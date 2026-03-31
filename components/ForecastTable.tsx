@@ -1,0 +1,1409 @@
+
+import React, { useMemo, useState, useEffect } from 'react';
+import { getForecastData } from '../services/mockData';
+import { Download, ListFilter, LayoutList, Settings2, ChevronUp, Activity, TrendingUp, Lock, LockOpen, CheckCircle2, X } from 'lucide-react';
+import { ExpenseDriver, ImportedRow, Account, CostPackage, Hotel, ForecastRow, ForecastConfig, ForecastOperator, ColumnVisibility } from '../types';
+
+interface ForecastTableProps {
+    selectedMonth?: number;
+    selectedYear?: number;
+    financialData?: ImportedRow[];
+    selectedHotel?: string;
+    // New props for dynamic structure
+    accounts: Account[];
+    packages: CostPackage[];
+    hotels: Hotel[];
+    
+    // Month Status Props
+    isMonthClosed?: boolean;
+    realOccupancyData?: Record<string, Record<string, number>>;
+    
+    // Budget Props
+    activeRealVersionId?: string;
+    activeBudgetVersionId?: string;
+}
+
+const ForecastTable: React.FC<ForecastTableProps> = ({ 
+    selectedMonth, 
+    selectedYear, 
+    financialData, 
+    selectedHotel,
+    accounts,
+    packages,
+    hotels,
+    isMonthClosed = false,
+    realOccupancyData = {},
+    activeRealVersionId,
+    activeBudgetVersionId
+}) => {
+  // Initialize state passing selectedHotel and dynamic structures
+  const [data, setData] = useState<ForecastRow[]>(() => {
+      const initialData = getForecastData(selectedMonth, selectedYear, financialData, selectedHotel, packages, accounts, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId);
+      // Initialize previaConfig if missing
+      const initializedData = initialData.map(row => ({
+          ...row,
+          previaConfig: row.previaConfig || { method: 'Fixed', manualValue: row.previa }
+      }));
+      return recalculateTotals(initializedData, packages, accounts);
+  });
+  const [showDetails, setShowDetails] = useState(true);
+  const [calculationBase, setCalculationBase] = useState<'forecast' | 'previa'>('forecast');
+  const [kpiBasis, setKpiBasis] = useState<'with_tax' | 'no_tax'>('with_tax');
+  
+  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>({
+      previa: true,
+      real: true,
+      budget: true,
+      deltaPreviaBudget: true,
+      deltaPreviaBudgetPct: true,
+      lastYear: true,
+      deltaLY: true,
+      deltaLYPct: true,
+  });
+  const [showColumnSettings, setShowColumnSettings] = useState(false);
+
+  // Column Resizing State
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
+      parameters: 280,
+      description: 350,
+      previa: 150,
+      real: 160,
+      budget: 150,
+      deltaPreviaBudget: 150,
+      deltaPreviaBudgetPct: 130,
+      lastYear: 150,
+      deltaLY: 150,
+      deltaLYPct: 130,
+  });
+
+  const [resizingColumn, setResizingColumn] = useState<string | null>(null);
+  const [startX, setStartX] = useState(0);
+  const [startWidth, setStartWidth] = useState(0);
+
+  const handleResizeStart = (e: React.MouseEvent, columnId: string) => {
+      e.preventDefault();
+      setResizingColumn(columnId);
+      setStartX(e.pageX);
+      setStartWidth(columnWidths[columnId]);
+      document.body.style.cursor = 'col-resize';
+  };
+
+  useEffect(() => {
+      const handleMouseMove = (e: MouseEvent) => {
+          if (!resizingColumn) return;
+          const diff = e.pageX - startX;
+          const newWidth = Math.max(80, startWidth + diff);
+          setColumnWidths(prev => ({ ...prev, [resizingColumn]: newWidth }));
+      };
+
+      const handleMouseUp = () => {
+          setResizingColumn(null);
+          document.body.style.cursor = 'default';
+      };
+
+      if (resizingColumn) {
+          window.addEventListener('mousemove', handleMouseMove);
+          window.addEventListener('mouseup', handleMouseUp);
+      }
+
+      return () => {
+          window.removeEventListener('mousemove', handleMouseMove);
+          window.removeEventListener('mouseup', handleMouseUp);
+      };
+  }, [resizingColumn, startX, startWidth]);
+
+  // State to track which parameter rows are expanded (showing full controls) vs minimized
+  const [expandedConfigRows, setExpandedConfigRows] = useState<Set<string>>(new Set());
+
+  // Validation Modal State
+  const [showValidationModal, setShowValidationModal] = useState(false);
+  const [justifications, setJustifications] = useState<Record<string, string>>({});
+
+  // Effect: When dependencies change, regenerate the Forecast rows using current state props
+  // We use useMemo to avoid the linter warning about setState in effect, 
+  // and we only update state when the derived data actually changes from props.
+  const derivedData = useMemo(() => {
+      const newData = getForecastData(selectedMonth, selectedYear, financialData, selectedHotel, packages, accounts, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId);
+      const initializedData = newData.map(row => ({
+          ...row,
+          previaConfig: row.previaConfig || { method: 'Fixed', manualValue: row.previa }
+      }));
+      return recalculateTotals(initializedData, packages, accounts);
+  }, [selectedMonth, selectedYear, financialData, selectedHotel, packages, accounts, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId]);
+
+  useEffect(() => {
+      setData(derivedData);
+  }, [derivedData]);
+
+
+
+
+  // --- STATE HANDLERS ---
+
+  const toggleConfigRow = (id: string) => {
+      setExpandedConfigRows(prev => {
+          const next = new Set(prev);
+          if (next.has(id)) next.delete(id);
+          else next.add(id);
+          return next;
+      });
+  };
+
+  const handleConfigChange = (rowId: string, updates: Partial<ForecastConfig>) => {
+      setData(prevData => {
+          const newData = prevData.map(row => {
+              if (row.id !== rowId) return row;
+              
+              const currentConfig = calculationBase === 'forecast' ? row.forecastConfig : (row.previaConfig || { method: 'Fixed' });
+              const newConfig = { ...currentConfig, ...updates };
+              
+              // Reset manual value if switching to Variable (optional, but keeps clean)
+              let newValue = calculationBase === 'forecast' ? row.real : row.previa;
+
+              if (updates.method === 'Fixed') {
+                  // Ensure manualValue is set to current value if not present
+                  newConfig.manualValue = updates.manualValue !== undefined ? updates.manualValue : newValue;
+                  newValue = newConfig.manualValue || 0;
+              }
+
+              // We update the config
+              const updatedRow = { 
+                  ...row, 
+                  [calculationBase === 'forecast' ? 'forecastConfig' : 'previaConfig']: newConfig 
+              };
+              
+              if (updates.method === 'Variable' || (currentConfig.method === 'Variable' && !updates.method)) {
+                 // We immediately calculate the new value based on this config
+                 const calculated = calculateRowValue(newConfig, prevData, calculationBase);
+                 if (calculationBase === 'forecast') updatedRow.real = calculated;
+                 else updatedRow.previa = calculated;
+              } else {
+                 if (calculationBase === 'forecast') updatedRow.real = newValue;
+                 else updatedRow.previa = newValue;
+              }
+              
+              return updatedRow;
+          });
+          
+          return recalculateTotals(newData, packages, accounts);
+      });
+  };
+
+  const handleManualValueChange = (rowId: string, field: 'real' | 'previa', value: number) => {
+      setData(prevData => {
+          const newData = prevData.map(row => {
+              if (row.id !== rowId) return row;
+              return { ...row, [field]: value };
+          });
+          return recalculateTotals(newData, packages, accounts);
+      });
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>, startRowId: string, field: 'real' | 'previa') => {
+      const pasteData = e.clipboardData.getData('text');
+      if (!pasteData) return;
+
+      const lines = pasteData.split(/\r?\n/).filter(line => line.trim() !== '');
+      if (lines.length <= 1) return; // Let default behavior handle single value paste
+
+      e.preventDefault();
+
+      setData(prevData => {
+          const newData = [...prevData];
+          const startIndex = newData.findIndex(r => r.id === startRowId);
+          if (startIndex === -1) return prevData;
+
+          let lineIndex = 0;
+
+          for (let i = startIndex; i < newData.length && lineIndex < lines.length; i++) {
+              const row = newData[i];
+              
+              if (row.isHeader || row.isTotal || row.category === 'Spacer') continue;
+
+              const isIndicator = row.id.startsWith('IND-');
+              const isManualRow = ['IND-MO-2', 'IND-MO-3'].includes(row.id);
+              const isInputIndicator = ['IND-1', 'IND-LZ-2', 'IND-LZ-4', 'IND-LZ-5', 'IND-EV-2', 'IND-EV-4', 'IND-EV-5'].includes(row.id);
+              
+              let canEdit = false;
+              if (!isIndicator) {
+                  const currentConfig = field === 'real' ? row.forecastConfig : (row.previaConfig || { method: 'Fixed' });
+                  if (currentConfig.method === 'Fixed') canEdit = true;
+              } else if (isInputIndicator || isManualRow) {
+                  canEdit = true;
+              }
+
+              if (canEdit) {
+                  const valStr = lines[lineIndex].replace(/\./g, '').replace(',', '.').replace(/[^0-9.-]/g, '');
+                  const val = parseFloat(valStr);
+                  
+                  if (!isNaN(val)) {
+                      if (!isIndicator) {
+                          if (field === 'real') {
+                              row.forecastConfig = { ...row.forecastConfig, method: 'Fixed', manualValue: val };
+                              row.real = val;
+                          } else {
+                              row.previaConfig = { ...(row.previaConfig || { method: 'Fixed' }), method: 'Fixed', manualValue: val };
+                              row.previa = val;
+                          }
+                      } else {
+                          if (isManualRow) {
+                              if (field === 'real') row.real = val;
+                              else row.previa = val;
+                          } else {
+                              if (field === 'real') {
+                                  row.forecastConfig = { ...row.forecastConfig, method: 'Fixed', manualValue: val };
+                                  row.real = val;
+                              } else {
+                                  row.previaConfig = { ...(row.previaConfig || { method: 'Fixed' }), method: 'Fixed', manualValue: val };
+                                  row.previa = val;
+                              }
+                          }
+                      }
+                  }
+                  lineIndex++;
+              }
+          }
+
+          return recalculateTotals(newData, packages, accounts);
+      });
+  };
+
+  // Function moved to end of file to avoid hoisting issues
+
+
+  // Filter data based on view mode
+  const visibleData = useMemo(() => {
+    return data.filter(row => {
+      // 1. Always keep Level 0 (Sections), Indicators and Spacers
+      if (row.category === 'Spacer') return true;
+      if ((row.indentLevel || 0) === 0) return true; 
+      if (row.category === 'Indicators') return true; 
+
+      // 2. Always show Level 1 (Packages/Groups)
+      if (row.indentLevel === 1) return true;
+
+      // 3. Toggle Level 2 (Accounts) based on showDetails
+      if (showDetails) return true;
+
+      return false;
+    });
+  }, [data, showDetails]);
+
+  const formatValue = (val: number | undefined, format: 'currency' | 'percent' | 'integer' | 'decimal' = 'currency') => {
+    if (val === undefined || val === null) return '-';
+    if (isNaN(val)) return '0';
+    
+    if (format === 'percent') {
+        return `${val.toFixed(2)}%`;
+    }
+    if (format === 'integer') {
+        return new Intl.NumberFormat('pt-BR', { style: 'decimal', maximumFractionDigits: 0 }).format(val);
+    }
+    if (format === 'decimal') {
+        return new Intl.NumberFormat('pt-BR', { style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val);
+    }
+    // Currency default: No decimals
+    return new Intl.NumberFormat('pt-BR', { style: 'decimal', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val);
+  };
+
+  const formatPercentDiff = (val: number | undefined) => {
+    if (val === undefined) return '-';
+    if (val > 999) return '>999%';
+    if (val < -999) return '<-999%';
+    if (isNaN(val)) return '-';
+    return `${val > 0 ? '+' : ''}${val.toFixed(1)}%`;
+  };
+
+  const blueRowIds = ['REV-TOTAL', 'REV-NET', 'CST-HEAD', 'RES-OP', 'RES-PCT'];
+  
+  const monthName = new Date(selectedYear || 2024, (selectedMonth || 1) - 1).toLocaleString('pt-BR', { month: 'long' });
+
+  // Custom Input Class to remove spinners and dashed lines
+  const inputClass = "w-full text-right bg-transparent border border-transparent hover:bg-gray-50 focus:bg-white focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 rounded px-1 text-indigo-900 font-semibold outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
+
+  return (
+    <div className="flex flex-col h-full w-full">
+        <div className="bg-white rounded-xl shadow-lg border border-gray-200 flex flex-col h-full overflow-hidden font-sans w-full">
+        <div className="px-5 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center shrink-0 gap-8">
+            <div>
+            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2 capitalize">
+                Demonstrativo de Resultados (DRE) - {monthName} {selectedYear}
+            </h2>
+            <p className="text-xs text-gray-500 mt-1">
+                Visão consolidada por plano de contas e gestão matricial ({selectedHotel}).
+            </p>
+            </div>
+            
+            {/* MONTH STATUS INDICATOR (Read Only) */}
+            <div className="flex items-center gap-4">
+                {/* CALCULATION BASE SELECTOR */}
+                <div className="flex items-center bg-gray-100 rounded-lg p-1 border border-gray-200">
+                    <button
+                        onClick={() => setCalculationBase('previa')}
+                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                            calculationBase === 'previa' 
+                            ? 'bg-white text-purple-700 shadow-sm' 
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                    >
+                        Prévia
+                    </button>
+                    <button
+                        onClick={() => setCalculationBase('forecast')}
+                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                            calculationBase === 'forecast' 
+                            ? 'bg-white text-blue-700 shadow-sm' 
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                    >
+                        Forecast
+                    </button>
+                </div>
+
+                {/* KPI BASIS SELECTOR */}
+                <div className="flex items-center bg-gray-100 rounded-lg p-1 border border-gray-200 ml-4">
+                    <button
+                        onClick={() => setKpiBasis('with_tax')}
+                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                            kpiBasis === 'with_tax' 
+                            ? 'bg-white text-indigo-700 shadow-sm' 
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                        title="Calcular Reatividade/Transformação com GOP Com Impostos"
+                    >
+                        GOP C/ Imp.
+                    </button>
+                    <button
+                        onClick={() => setKpiBasis('no_tax')}
+                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                            kpiBasis === 'no_tax' 
+                            ? 'bg-white text-indigo-700 shadow-sm' 
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                        title="Calcular Reatividade/Transformação com GOP Sem Impostos"
+                    >
+                        GOP S/ Imp.
+                    </button>
+                </div>
+
+                {isMonthClosed ? (
+                    <span className="flex items-center gap-1 px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold border border-red-200">
+                        <Lock size={12} /> Mês Fechado
+                    </span>
+                ) : (
+                    <span className="flex items-center gap-1 px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold border border-emerald-200">
+                        <LockOpen size={12} /> Mês Aberto
+                    </span>
+                )}
+            </div>
+
+            <div className="flex gap-3">
+            <button 
+                onClick={() => setShowColumnSettings(!showColumnSettings)}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-base font-bold transition-colors border ${
+                showColumnSettings 
+                    ? 'bg-orange-100 text-orange-700 border-orange-200' 
+                    : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 shadow-sm'
+                }`}
+                title="Configurar colunas visíveis"
+            >
+                <Settings2 size={20} />
+                Colunas
+            </button>
+            <button 
+                onClick={() => setShowDetails(!showDetails)}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-base font-bold transition-colors border ${
+                !showDetails 
+                    ? 'bg-indigo-100 text-indigo-700 border-indigo-200' 
+                    : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 shadow-sm'
+                }`}
+                title={showDetails ? "Ocultar contas contábeis" : "Mostrar contas contábeis"}
+            >
+                {showDetails ? <ListFilter size={20} /> : <LayoutList size={20} />}
+                {showDetails ? 'Ocultar Contas' : 'Mostrar Contas'}
+            </button>
+            <button 
+                onClick={() => setShowValidationModal(true)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-md text-base font-bold"
+            >
+                <CheckCircle2 size={20} />
+                Validar projeção
+            </button>
+            <button className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-md text-base font-bold">
+                <Download size={20} />
+                Exportar Excel
+            </button>
+            </div>
+        </div>
+
+        <div className="overflow-auto flex-1 bg-white relative">
+            {/* COLUMN SETTINGS PANEL */}
+            {showColumnSettings && (
+                <div className="absolute right-4 top-4 z-50 bg-white border border-gray-200 shadow-xl rounded-xl p-4 w-64 animate-in fade-in slide-in-from-top-2">
+                    <div className="flex justify-between items-center mb-3">
+                        <h4 className="font-bold text-gray-800 text-sm">Visibilidade das Colunas</h4>
+                        <button onClick={() => setShowColumnSettings(false)} className="text-gray-400 hover:text-gray-600">
+                            <ChevronUp size={16} />
+                        </button>
+                    </div>
+                    <div className="space-y-2">
+                        {[
+                            { key: 'previa', label: 'Prévia' },
+                            { key: 'real', label: 'Forecast (Real)' },
+                            { key: 'budget', label: 'Meta (Budget)' },
+                            { key: 'deltaPreviaBudget', label: 'Δ Prévia - Meta R$' },
+                            { key: 'deltaPreviaBudgetPct', label: 'Δ Prévia - Meta %' },
+                            { key: 'lastYear', label: 'Last Year' },
+                            { key: 'deltaLY', label: 'Δ 2026 x Last Year R$' },
+                            { key: 'deltaLYPct', label: 'Δ 2026 x Last Year %' },
+                        ].map(col => (
+                            <label key={col.key} className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-1.5 rounded transition-colors">
+                                <input 
+                                    type="checkbox" 
+                                    checked={columnVisibility[col.key as keyof ColumnVisibility]} 
+                                    onChange={() => setColumnVisibility(prev => ({ ...prev, [col.key]: !prev[col.key as keyof ColumnVisibility] }))}
+                                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                />
+                                <span className="text-xs font-medium text-gray-700">{col.label}</span>
+                            </label>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            <table className="text-base text-left border-collapse table-fixed w-max">
+            <thead className="bg-sky-100 sticky top-0 z-30 shadow-sm font-bold text-sky-900 uppercase tracking-tight text-sm">
+                <tr>
+                {/* Parameter Column - WIDENED */}
+                <th 
+                    style={{ width: columnWidths.parameters }}
+                    className="px-1 py-3 border-b border-sky-200 text-center bg-sky-100 text-sky-900 z-40 sticky left-0 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] group relative"
+                >
+                    Parâmetros ({calculationBase === 'previa' ? 'Prévia' : isMonthClosed ? 'Fechado' : 'Forecast'})
+                    <div 
+                        onMouseDown={(e) => handleResizeStart(e, 'parameters')}
+                        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
+                    />
+                </th>
+
+                {/* Description - Flexible Width */}
+                <th 
+                    style={{ width: columnWidths.description }}
+                    className="px-2 py-3 border-b border-sky-200 bg-sky-100 text-sky-900 truncate group relative"
+                >
+                    Descrição
+                    <div 
+                        onMouseDown={(e) => handleResizeStart(e, 'description')}
+                        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
+                    />
+                </th>
+                
+                {/* PRÉVIA */}
+                {columnVisibility.previa && (
+                    <th 
+                        style={{ width: columnWidths.previa }}
+                        className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 border-l border-sky-200 group relative"
+                    >
+                        PRÉVIA
+                        <div 
+                            onMouseDown={(e) => handleResizeStart(e, 'previa')}
+                            className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
+                        />
+                    </th>
+                )}
+
+                {/* FORECAST */}
+                {columnVisibility.real && (
+                    <th 
+                        style={{ width: columnWidths.real }}
+                        className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 border-l border-sky-200 group relative"
+                    >
+                        FORECAST
+                        <div 
+                            onMouseDown={(e) => handleResizeStart(e, 'real')}
+                            className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
+                        />
+                    </th>
+                )}
+
+                {/* META */}
+                {columnVisibility.budget && (
+                    <th 
+                        style={{ width: columnWidths.budget }}
+                        className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 group relative"
+                    >
+                        META
+                        <div 
+                            onMouseDown={(e) => handleResizeStart(e, 'budget')}
+                            className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
+                        />
+                    </th>
+                )}
+
+                {/* Δ Prévia - Meta R$ */}
+                {columnVisibility.deltaPreviaBudget && (
+                    <th 
+                        style={{ width: columnWidths.deltaPreviaBudget }}
+                        className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 whitespace-pre-line leading-tight group relative"
+                    >
+                        Δ R$<br/>PRÉVIA - META
+                        <div 
+                            onMouseDown={(e) => handleResizeStart(e, 'deltaPreviaBudget')}
+                            className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
+                        />
+                    </th>
+                )}
+
+                {/* Δ Prévia - Meta % */}
+                {columnVisibility.deltaPreviaBudgetPct && (
+                    <th 
+                        style={{ width: columnWidths.deltaPreviaBudgetPct }}
+                        className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 border-r border-sky-200 whitespace-pre-line leading-tight group relative"
+                    >
+                        Δ %<br/>PRÉVIA - META
+                        <div 
+                            onMouseDown={(e) => handleResizeStart(e, 'deltaPreviaBudgetPct')}
+                            className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
+                        />
+                    </th>
+                )}
+
+                {/* LAST YEAR */}
+                {columnVisibility.lastYear && (
+                    <th 
+                        style={{ width: columnWidths.lastYear }}
+                        className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 group relative"
+                    >
+                        LAST YEAR
+                        <div 
+                            onMouseDown={(e) => handleResizeStart(e, 'lastYear')}
+                            className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
+                        />
+                    </th>
+                )}
+
+                {/* Δ PRÉVIA X LY R$ */}
+                {columnVisibility.deltaLY && (
+                    <th 
+                        style={{ width: columnWidths.deltaLY }}
+                        className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 whitespace-pre-line leading-tight group relative"
+                    >
+                        PRÉVIA<br/>x<br/>LY R$
+                        <div 
+                            onMouseDown={(e) => handleResizeStart(e, 'deltaLY')}
+                            className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
+                        />
+                    </th>
+                )}
+
+                {/* Δ PRÉVIA X LY % */}
+                {columnVisibility.deltaLYPct && (
+                    <th 
+                        style={{ width: columnWidths.deltaLYPct }}
+                        className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 whitespace-pre-line leading-tight group relative"
+                    >
+                        PRÉVIA<br/>x<br/>LY %
+                        <div 
+                            onMouseDown={(e) => handleResizeStart(e, 'deltaLYPct')}
+                            className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
+                        />
+                    </th>
+                )}
+                </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+                {visibleData.map((row, idx) => {
+                // --- SPECIAL RENDER FOR TRANSFORMATION / REACTIVITY CARDS ---
+                if (row.id === 'KPI-TRANS-BUDGET' || row.id === 'KPI-TRANS-LY') {
+                    const isTransformation = row.label.includes('Transformação');
+                    return (
+                        <tr key={row.id}>
+                            <td colSpan={13} className="px-4 py-2 border-b border-gray-100 bg-white">
+                                <div className={`flex items-center gap-3 p-3 rounded-lg border shadow-sm max-w-lg mx-auto ${isTransformation ? 'bg-emerald-50 border-emerald-100' : 'bg-blue-50 border-blue-100'}`}>
+                                    <div className={`p-2 rounded-full ${isTransformation ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'}`}>
+                                        {isTransformation ? <TrendingUp size={20} /> : <Activity size={20} />}
+                                    </div>
+                                    <div className="flex-1">
+                                        <h4 className={`text-sm font-bold ${isTransformation ? 'text-emerald-800' : 'text-blue-800'}`}>
+                                            {row.label}
+                                        </h4>
+                                        <p className="text-xs text-gray-500">Indicador de eficiência operacional sobre variação de receita.</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <span className={`text-xl font-bold ${isTransformation ? 'text-emerald-700' : 'text-blue-700'}`}>
+                                            {formatValue(row.real, 'percent')}
+                                        </span>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    );
+                }
+
+                // --- SPACER LOGIC ---
+                if (row.category === 'Spacer') {
+                    return (
+                        <tr key={row.id}>
+                            <td colSpan={13} className="h-4 bg-white border-none"></td>
+                        </tr>
+                    );
+                }
+
+                const isIndicator = row.category === 'Indicators';
+                const isSectionHeader = row.isHeader && row.indentLevel === 0; // Level 0 (Receitas, Custos)
+                const isGroupHeader = row.isHeader && row.indentLevel === 1;   // Level 1 (Pacotes)
+                const isSubGroupHeader = row.isHeader && row.indentLevel === 2; // Level 2 (Sub-pacotes - Raro agora)
+                const isTotal = row.isTotal;
+                const isBlueHighlight = blueRowIds.includes(row.id);
+                
+                // Identify Special Revenue Rows for Styling
+                // REMOVED REV-TIME from this list to allow manual editing
+                const isSpecialRevenue = ['REV-HOSP', 'REV-EXTRA', 'REV-ISS'].includes(row.id);
+
+                const formatType = row.rowConfig?.format || 'currency';
+
+                // --- CONFIG CELL LOGIC ---
+                let configCell: React.ReactNode = <div className="h-6"></div>; // Placeholder
+                let cellStyle = `px-2 py-1 border-r border-gray-200 bg-white sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] align-middle ${isTotal ? 'bg-indigo-50' : ''}`;
+                let shouldRenderCell = true;
+                let rowSpan = 1;
+
+                if (isIndicator && row.indicatorSection) {
+                    const currentSection = row.indicatorSection;
+                    
+                    // Determine if this is the start of a new section in the visible list
+                    const prevRow = visibleData[idx - 1];
+                    const isFirstOfSection = !prevRow || prevRow.indicatorSection !== currentSection;
+                    
+                    if (isFirstOfSection) {
+                        // Calculate rowSpan
+                        let count = 0;
+                        for (let i = idx; i < visibleData.length; i++) {
+                            if (visibleData[i].indicatorSection === currentSection) count++;
+                            else break;
+                        }
+                        rowSpan = count;
+                        
+                        // Horizontal Title with Line Breaks
+                        configCell = (
+                            <div className="h-full w-full flex items-center justify-center bg-sky-50 p-1">
+                                <span className="text-sky-800 font-bold text-[10px] uppercase tracking-wider text-center leading-snug whitespace-normal break-words">
+                                    {currentSection}
+                                </span>
+                            </div>
+                        );
+                        cellStyle = `px-0 py-0 border-r border-gray-300 bg-sky-50 sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] align-middle border-b border-white`;
+                    } else {
+                        shouldRenderCell = false;
+                    }
+                } else if (!isIndicator && !row.isHeader && !row.isTotal) {
+                    // --- INTERACTIVE PARAMETER CELL FOR ACCOUNTS ---
+                    const config = row.forecastConfig;
+                    const isFixed = config.method === 'Fixed';
+                    const isExpanded = expandedConfigRows.has(row.id);
+                    
+                    // IF MONTH IS CLOSED, DISABLE EDITING
+                    if (isMonthClosed) {
+                         configCell = (
+                             <div className="flex items-center justify-center w-full h-full opacity-50 cursor-not-allowed">
+                                 <Lock size={12} className="text-gray-400" />
+                             </div>
+                         );
+                    } else {
+                        if (!isExpanded) {
+                            // --- MINIMIZED VIEW ---
+                            configCell = (
+                                <div 
+                                    className="flex items-center justify-between w-full cursor-pointer hover:bg-gray-50 p-1 rounded group"
+                                    onClick={() => toggleConfigRow(row.id)}
+                                    title="Clique para editar parâmetros"
+                                >
+                                    <div className="flex items-center gap-2 overflow-hidden">
+                                        <span className={`
+                                            w-5 h-5 flex items-center justify-center text-[10px] font-bold rounded shrink-0 shadow-sm
+                                            ${isFixed ? 'bg-indigo-100 text-indigo-700' : 'bg-orange-100 text-orange-700'}
+                                        `}>
+                                            {isFixed ? 'F' : 'V'}
+                                        </span>
+                                        
+                                        <div className="flex flex-col truncate">
+                                            {!isFixed ? (
+                                                <div className="flex items-center gap-1 text-[10px] text-gray-700 font-medium truncate">
+                                                    <span className="truncate">{config.driver || '?'}</span>
+                                                    <span className="text-gray-400 font-normal">
+                                                        {config.operator === 'divide' ? '/' : 'x'} {config.factor}
+                                                    </span>
+                                                </div>
+                                            ) : (
+                                                <span className="text-[10px] text-gray-400 italic">Manual</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <Settings2 size={12} className="text-gray-300 group-hover:text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </div>
+                            );
+                        } else {
+                            // --- EXPANDED VIEW (FULL EDIT MODE) ---
+                            configCell = (
+                                <div className="flex flex-col gap-1.5 w-full bg-white p-2 border border-indigo-100 rounded-md shadow-sm relative z-20">
+                                    <div className="flex justify-between items-center pb-1 border-b border-gray-100 mb-1">
+                                        <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider">Configuração</span>
+                                        <button onClick={(e) => { e.stopPropagation(); toggleConfigRow(row.id); }} className="text-gray-400 hover:text-gray-600">
+                                            <ChevronUp size={12} />
+                                        </button>
+                                    </div>
+
+                                    {/* Row 1: Method Toggle */}
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex bg-gray-100 p-0.5 rounded border border-gray-200 shrink-0">
+                                            <button 
+                                                onClick={() => handleConfigChange(row.id, { method: 'Fixed' })}
+                                                className={`px-2 py-0.5 text-[10px] font-bold rounded ${isFixed ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                                            >
+                                                F
+                                            </button>
+                                            <button 
+                                                onClick={() => handleConfigChange(row.id, { method: 'Variable' })}
+                                                className={`px-2 py-0.5 text-[10px] font-bold rounded ${!isFixed ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                                            >
+                                                V
+                                            </button>
+                                        </div>
+                                        {isFixed && <span className="text-[10px] text-gray-400 italic">Valor manual</span>}
+                                        {!isFixed && (
+                                            <select 
+                                                className="text-[10px] border border-gray-300 rounded px-1 py-0.5 bg-white flex-1 focus:ring-1 focus:ring-orange-500 outline-none"
+                                                value={config.driver || ''}
+                                                onChange={(e) => handleConfigChange(row.id, { driver: e.target.value as ExpenseDriver })}
+                                            >
+                                                <option value="">Selecione...</option>
+                                                <option value="UH Ocupada">UH Ocupada</option>
+                                                <option value="PAX">PAX</option>
+                                                <option value="Emocionadores">Emocionadores</option>
+                                                <option value="Extras">Extras</option>
+                                                <option value="Receita">Receita</option>
+                                            </select>
+                                        )}
+                                    </div>
+                                    
+                                    {/* Row 2: Variable Logic Inputs */}
+                                    {!isFixed && (
+                                        <div className="flex items-center gap-1 justify-end">
+                                            <select 
+                                                className="text-[10px] font-bold border border-gray-300 rounded px-1 py-0.5 bg-gray-50 w-10 text-center"
+                                                value={config.operator || 'multiply'}
+                                                onChange={(e) => handleConfigChange(row.id, { operator: e.target.value as ForecastOperator })}
+                                            >
+                                                <option value="multiply">x</option>
+                                                <option value="divide">/</option>
+                                            </select>
+                                            <input 
+                                                type="number"
+                                                step="0.01"
+                                                placeholder="0.00"
+                                                className="text-[10px] border border-gray-300 rounded px-2 py-0.5 w-16 text-right focus:ring-1 focus:ring-orange-500 outline-none"
+                                                value={config.factor || ''}
+                                                onChange={(e) => handleConfigChange(row.id, { factor: parseFloat(e.target.value) })}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        }
+                    }
+                }
+
+                // --- COMMON FINANCIAL CELLS RENDERER ---
+                const renderFinancialCells = (isHeaderOrTotal = false, customBg = "") => {
+                    const effectiveBg = isBlueHighlight ? 'bg-sky-100 border-sky-200' : (customBg || 'bg-blue-50/20 border-r border-blue-50');
+                    const effectiveText = isBlueHighlight ? 'text-sky-900' : (isHeaderOrTotal ? 'text-black' : 'text-slate-800');
+                    const previaBg = isBlueHighlight ? 'bg-sky-100 text-sky-800' : 'bg-purple-50/20 text-slate-500';
+                    
+                    // FORECAST (REAL) CELL LOGIC
+                    let realCellContent: React.ReactNode = formatValue(row.real, formatType);
+                    let previaCellContent: React.ReactNode = formatValue(row.previa, formatType);
+
+                    // Identify Manual Edit Rows (CLT / Extra Quantity)
+                    const isManualRow = ['IND-MO-2', 'IND-MO-3'].includes(row.id);
+                    
+                    if (!isIndicator && !isHeaderOrTotal) {
+                        const currentConfig = calculationBase === 'forecast' ? row.forecastConfig : (row.previaConfig || { method: 'Fixed' });
+                        const isFixed = currentConfig.method === 'Fixed';
+                        
+                        if (isMonthClosed) {
+                             // CLOSED MONTH: Read Only Standard
+                             realCellContent = <span className="text-gray-800 font-medium">{formatValue(row.real, formatType)}</span>;
+                             previaCellContent = <span className="text-gray-800 font-medium">{formatValue(row.previa, formatType)}</span>;
+                        } else {
+                            if (calculationBase === 'forecast') {
+                                if (isFixed) {
+                                    realCellContent = (
+                                        <input 
+                                            type="number" 
+                                            className={inputClass}
+                                            value={row.forecastConfig.manualValue === undefined ? '' : row.forecastConfig.manualValue}
+                                            onChange={(e) => handleConfigChange(row.id, { method: 'Fixed', manualValue: parseFloat(e.target.value) })}
+                                            onPaste={(e) => handlePaste(e, row.id, 'real')}
+                                            step="0.01"
+                                        />
+                                    );
+                                } else {
+                                    // Variable: Read Only calculated value
+                                    realCellContent = (
+                                        <div className="flex items-center justify-end gap-1 cursor-help" title={`Calculado: ${row.forecastConfig.driver} ${row.forecastConfig.operator === 'divide' ? '/' : 'x'} ${row.forecastConfig.factor}`}>
+                                            <span className="text-orange-800 font-medium">{formatValue(row.real, formatType)}</span>
+                                        </div>
+                                    );
+                                }
+                            } else {
+                                // Previa Editing
+                                if (isFixed) {
+                                    previaCellContent = (
+                                        <input 
+                                            type="number" 
+                                            className={inputClass}
+                                            value={row.previaConfig?.manualValue === undefined ? (row.previa || '') : row.previaConfig.manualValue}
+                                            onChange={(e) => handleConfigChange(row.id, { method: 'Fixed', manualValue: parseFloat(e.target.value) })}
+                                            onPaste={(e) => handlePaste(e, row.id, 'previa')}
+                                            step="0.01"
+                                        />
+                                    );
+                                } else {
+                                     previaCellContent = (
+                                        <div className="flex items-center justify-end gap-1 cursor-help" title={`Calculado: ${row.previaConfig?.driver} ${row.previaConfig?.operator === 'divide' ? '/' : 'x'} ${row.previaConfig?.factor}`}>
+                                            <span className="text-orange-800 font-medium">{formatValue(row.previa, formatType)}</span>
+                                        </div>
+                                    );
+                                }
+                            }
+                        }
+                    } else if (isIndicator) {
+                        // Special handling for Indicators that should be inputs (Fixed)
+                        const isInputIndicator = ['IND-1', 'IND-LZ-2', 'IND-LZ-4', 'IND-LZ-5', 'IND-EV-2', 'IND-EV-4', 'IND-EV-5'].includes(row.id);
+                        
+                        if ((isInputIndicator || isManualRow) && !isMonthClosed) {
+                             realCellContent = (
+                                <input 
+                                    type="number" 
+                                    className={inputClass}
+                                    value={row.real}
+                                    onChange={(e) => {
+                                        if (isManualRow) {
+                                            handleManualValueChange(row.id, 'real', parseFloat(e.target.value));
+                                        } else {
+                                            handleConfigChange(row.id, { method: 'Fixed', manualValue: parseFloat(e.target.value) });
+                                        }
+                                    }}
+                                    onPaste={(e) => handlePaste(e, row.id, 'real')}
+                                    step="0.01"
+                                />
+                             );
+                        } else if ((isInputIndicator || isManualRow) && isMonthClosed) {
+                             realCellContent = <span className="font-medium">{formatValue(row.real, formatType)}</span>;
+                        }
+
+                        // Handle Previa Editing for Manual Rows
+                        if (isManualRow && !isMonthClosed) {
+                            previaCellContent = (
+                                <input 
+                                    type="number" 
+                                    className={inputClass}
+                                    value={row.previa}
+                                    onChange={(e) => handleManualValueChange(row.id, 'previa', parseFloat(e.target.value))}
+                                    onPaste={(e) => handlePaste(e, row.id, 'previa')}
+                                    step="0.01"
+                                />
+                            );
+                        }
+                    }
+
+                    // Calculate Previa vs Last Year %
+                    const previaLYVal = (row.previa || 0) - (row.lastYear || 0);
+                    const previaLYPct = row.lastYear && row.lastYear !== 0 
+                        ? (previaLYVal / row.lastYear) * 100 
+                        : 0;
+                    
+                    const previaLYColor = previaLYPct < 0 ? 'text-rose-600' : 'text-emerald-600';
+                    const previaLYValColor = previaLYVal < 0 ? 'text-rose-600' : 'text-emerald-600';
+
+                    return (
+                        <>
+                {/* PRÉVIA */}
+                {columnVisibility.previa && (
+                    <td className={`px-2 py-1 text-right border-r border-gray-100 tabular-nums ${isHeaderOrTotal ? 'font-semibold' : ''} ${previaBg} truncate`}>
+                        {previaCellContent}
+                    </td>
+                )}
+
+                {/* FORECAST */}
+                {columnVisibility.real && (
+                    <td className={`px-2 py-1 text-right border-l border-gray-200 tabular-nums ${isHeaderOrTotal ? 'font-bold' : ''} ${effectiveText} ${effectiveBg} truncate`}>
+                        {realCellContent}
+                    </td>
+                )}
+                
+                {/* META */}
+                {columnVisibility.budget && (
+                    <td className={`px-2 py-1 text-right border-r border-gray-100 tabular-nums ${isHeaderOrTotal ? 'font-semibold' : ''} ${isBlueHighlight ? 'text-sky-900' : 'text-slate-500'} truncate`}>
+                    {formatValue(row.budget, formatType)}
+                    </td>
+                )}
+                
+                {/* Δ Prévia - Meta R$ */}
+                {columnVisibility.deltaPreviaBudget && (
+                    <td className={`px-2 py-1 text-right border-r border-gray-100 tabular-nums font-medium ${row.deltaPreviaBudgetVal && row.deltaPreviaBudgetVal < 0 ? 'text-rose-600' : 'text-emerald-600'} truncate`}>
+                    {formatValue(row.deltaPreviaBudgetVal || 0, isIndicator && formatType !== 'percent' ? formatType : 'currency')}
+                    </td>
+                )}
+
+                {/* Δ Prévia - Meta % */}
+                {columnVisibility.deltaPreviaBudgetPct && (
+                    <td className={`px-2 py-1 text-right border-r border-gray-200 tabular-nums ${row.deltaPreviaBudgetPct && row.deltaPreviaBudgetPct < 0 ? 'text-rose-600' : 'text-emerald-600'} truncate`}>
+                    {formatPercentDiff(row.deltaPreviaBudgetPct)}
+                    </td>
+                )}
+
+                {/* LAST YEAR */}
+                {columnVisibility.lastYear && (
+                    <td className={`px-2 py-1 text-right tabular-nums border-r border-gray-100 ${isHeaderOrTotal ? 'font-semibold' : ''} bg-orange-50/20 text-slate-500 truncate`}>
+                    {formatValue(row.lastYear, formatType)}
+                    </td>
+                )}
+
+                {/* PRÉVIA X LY R$ */}
+                {columnVisibility.deltaLY && (
+                    <td className={`px-2 py-1 text-right border-r border-gray-100 tabular-nums font-medium ${previaLYValColor} truncate`}>
+                    {formatValue(previaLYVal, isIndicator && formatType !== 'percent' ? formatType : 'currency')}
+                    </td>
+                )}
+
+                {/* PRÉVIA X LY % */}
+                {columnVisibility.deltaLYPct && (
+                    <td className={`px-2 py-1 text-right tabular-nums ${previaLYColor} ${isBlueHighlight ? 'bg-sky-100' : 'bg-orange-50/10'} truncate`}>
+                    {formatPercentDiff(previaLYPct)}
+                    </td>
+                )}
+                        </>
+                    );
+                };
+
+                // --- INDICATOR DATA ROWS (MODIFIED FOR GROUPING) ---
+                if (isIndicator) {
+                    return (
+                        <tr key={row.id} className="border-b border-gray-100 hover:bg-sky-50/30 transition-colors h-8">
+                            {shouldRenderCell && (
+                                <td rowSpan={rowSpan} className={cellStyle}>
+                                    {configCell}
+                                </td>
+                            )}
+                            <td className="px-2 py-1 border-r border-gray-100 align-middle">
+                                <div className="truncate text-xs font-bold text-slate-700 pl-2">
+                                {row.label}
+                                </div>
+                            </td>
+                            {renderFinancialCells(false, "bg-sky-50/30")}
+                        </tr>
+                    )
+                }
+
+                // --- STANDARD DRE HEADERS ---
+                if (isSectionHeader) {
+                    const rowClass = isBlueHighlight 
+                        ? "bg-sky-100 hover:bg-sky-200 transition-colors border-y border-sky-200" 
+                        : "bg-slate-100 hover:bg-slate-200 transition-colors border-y border-slate-200";
+                    
+                    const stickyClass = isBlueHighlight ? "bg-sky-100 border-r border-sky-300" : "bg-slate-100 border-r border-slate-300";
+                    const textClass = isBlueHighlight ? "text-sky-900" : "text-slate-800";
+
+                    return (
+                    <tr key={row.id} className={rowClass}>
+                        <td className={`${stickyClass} sticky left-0 z-20`}>
+                            {configCell}
+                        </td>
+                        <td className={`px-2 py-3 text-sm font-bold ${textClass} uppercase tracking-wide flex items-center truncate`}>
+                        {!isBlueHighlight && <div className="w-1 h-4 bg-indigo-500 mr-2 rounded-full"></div>}
+                        {row.label}
+                        </td>
+                        
+                        {renderFinancialCells(true)}
+                    </tr>
+                    );
+                }
+
+                // --- LEVEL 1: MASTER PACKAGES OR SPECIAL REVENUE ROWS ---
+                // Applying unified Gray Style to Group Headers AND Special Revenue Rows (REV-HOSP, REV-EXTRA, etc.)
+                if (isGroupHeader || isSpecialRevenue) {
+                    return (
+                    <tr key={row.id} className="bg-gray-50 text-gray-800 font-bold border-b border-gray-200 hover:bg-gray-100 transition-colors">
+                        <td className="bg-gray-50 border-r border-gray-200 sticky left-0 z-20 px-1 py-1">
+                            {!isTotal && configCell}
+                        </td>
+                        <td className="px-2 py-2 text-sm uppercase align-middle border-r border-gray-200">
+                             <div style={{ paddingLeft: `${(row.indentLevel || 0) * 16}px` }} className="truncate">
+                                {row.label}
+                            </div>
+                        </td>
+                        {renderFinancialCells(true, "bg-gray-50 border-r border-gray-200")}
+                    </tr>
+                    );
+                }
+
+                // --- LEVEL 2: PACKAGES ---
+                if (isSubGroupHeader || (!showDetails && (row.indentLevel === 2 || row.indentLevel === 1))) {
+                    return (
+                    <tr key={row.id} className="bg-gray-50 text-gray-600 font-semibold border-b border-gray-200 hover:bg-gray-100 transition-colors">
+                        <td className="bg-gray-50 border-r border-gray-200 sticky left-0 z-20"></td>
+                        <td className="px-2 py-2 text-sm uppercase pl-8 truncate">
+                            {row.label}
+                        </td>
+                        {renderFinancialCells(true, "bg-gray-50 border-r border-gray-200")}
+                    </tr>
+                    );
+                }
+
+                // --- STANDARD DATA ROW ---
+                // Format Label if it looks like an unformatted account code (e.g. 64104 -> 64.104)
+                let displayLabel = row.label;
+                if (displayLabel && /^\d{5}$/.test(displayLabel.trim())) {
+                    displayLabel = displayLabel.trim().replace(/^(\d{2})(\d{3})$/, '$1.$2');
+                }
+
+                return (
+                    <tr 
+                    key={row.id} 
+                    className={`
+                        transition-colors text-slate-700 hover:bg-indigo-50/30
+                        ${isTotal ? 'bg-indigo-50 font-bold border-y-2 border-gray-300 text-indigo-900' : 'border-b border-gray-50'}
+                    `}
+                    >
+                    <td className={`px-1 py-1 border-r border-gray-200 bg-white sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] align-middle ${isTotal ? 'bg-indigo-50' : ''}`}>
+                        {!isTotal && configCell}
+                    </td>
+
+                    <td className="px-2 py-1 border-r border-gray-100 align-middle">
+                        <div style={{ paddingLeft: `${(row.indentLevel || 0) * 16}px` }} className={`truncate text-xs ${isTotal ? 'uppercase tracking-wide' : ''}`}>
+                        {displayLabel}
+                        </div>
+                    </td>
+                    
+                    {renderFinancialCells(false)}
+                    </tr>
+                );
+                })}
+            </tbody>
+            </table>
+        </div>
+        </div>
+
+        {/* VALIDATION MODAL */}
+        {showValidationModal && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95">
+                    <div className="flex items-center justify-between p-5 border-b border-gray-100 bg-indigo-50">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
+                                <CheckCircle2 size={24} />
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-bold text-indigo-900">Validar Projeção</h2>
+                                <p className="text-sm text-indigo-700">Justifique os desvios significativos em relação à Meta.</p>
+                            </div>
+                        </div>
+                        <button 
+                            onClick={() => setShowValidationModal(false)}
+                            className="text-indigo-400 hover:text-indigo-600 transition-colors p-2 hover:bg-indigo-100 rounded-full"
+                        >
+                            <X size={24} />
+                        </button>
+                    </div>
+                    
+                    <div className="flex-1 overflow-y-auto p-6 bg-gray-50/50">
+                        <div className="space-y-4">
+                            {data.filter(row => Math.abs(row.deltaPreviaBudgetPct || 0) > 5 && !row.isHeader && !row.isTotal).map(row => (
+                                <div key={row.id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                                    <div className="flex items-start justify-between mb-3">
+                                        <div>
+                                            <h3 className="font-bold text-gray-800">{row.label}</h3>
+                                            <p className="text-xs text-gray-500 uppercase tracking-wider">{row.category}</p>
+                                        </div>
+                                        <div className="flex items-center gap-4 text-sm">
+                                            <div className="text-right">
+                                                <span className="block text-xs text-gray-500">Prévia</span>
+                                                <span className="font-medium text-gray-900">
+                                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(row.previa || 0)}
+                                                </span>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className="block text-xs text-gray-500">Meta</span>
+                                                <span className="font-medium text-gray-900">
+                                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(row.budget || 0)}
+                                                </span>
+                                            </div>
+                                            <div className="text-right bg-rose-50 px-3 py-1.5 rounded-md border border-rose-100">
+                                                <span className="block text-xs text-rose-600 font-bold">Desvio</span>
+                                                <span className="font-bold text-rose-700">
+                                                    {new Intl.NumberFormat('pt-BR', { style: 'percent', minimumFractionDigits: 1 }).format((row.deltaPreviaBudgetPct || 0) / 100)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="mt-2">
+                                        <label className="block text-xs font-bold text-gray-700 mb-1">Justificativa do Desvio</label>
+                                        <textarea 
+                                            className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none"
+                                            rows={2}
+                                            placeholder="Explique o motivo deste desvio em relação à meta..."
+                                            value={justifications[row.id] || ''}
+                                            onChange={(e) => setJustifications(prev => ({ ...prev, [row.id]: e.target.value }))}
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                            {data.filter(row => Math.abs(row.deltaPreviaBudgetPct || 0) > 5 && !row.isHeader && !row.isTotal).length === 0 && (
+                                <div className="text-center py-12">
+                                    <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <CheckCircle2 size={32} />
+                                    </div>
+                                    <h3 className="text-lg font-bold text-gray-800">Nenhum desvio significativo</h3>
+                                    <p className="text-gray-500">Todas as projeções estão dentro da margem aceitável (±5%).</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    
+                    <div className="p-5 border-t border-gray-100 bg-white flex justify-end gap-3">
+                        <button 
+                            onClick={() => setShowValidationModal(false)}
+                            className="px-5 py-2.5 text-gray-600 font-bold hover:bg-gray-100 rounded-lg transition-colors"
+                        >
+                            Cancelar
+                        </button>
+                        <button 
+                            onClick={() => {
+                                // In a real app, this would save the justifications to the backend
+                                setShowValidationModal(false);
+                                alert('Projeção validada e justificativas salvas com sucesso!');
+                            }}
+                            className="px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-lg shadow-md hover:bg-indigo-700 transition-colors flex items-center gap-2"
+                        >
+                            <CheckCircle2 size={18} />
+                            Confirmar Validação
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+    </div>
+  );
+};
+
+export default ForecastTable;
+
+function getDriverValue(driver: ExpenseDriver | undefined, allRows: ForecastRow[], base: 'forecast' | 'previa' = 'forecast'): number {
+    if (!driver) return 0;
+    
+    // Logic to find the driver value from the "Indicators" or "Revenue" rows
+    let targetRowId = '';
+    
+    switch (driver) {
+        case 'UH Ocupada': targetRowId = 'IND-2'; break; // UH Ocupada
+        case 'PAX': targetRowId = 'IND-5'; break; // PAX
+        case 'Emocionadores': targetRowId = 'IND-7'; break; // Emocionadores (Mocked)
+        case 'Extras': targetRowId = 'IND-8'; break; // Extras (Mocked)
+        case 'Receita': targetRowId = 'REV-TOTAL'; break; // Total Revenue (New ID)
+        default: return 0;
+    }
+
+    const row = allRows.find(r => r.id === targetRowId);
+    // Use the appropriate base value of the driver for calculation
+    return row ? (base === 'forecast' ? row.real : row.previa) : 0;
+}
+
+function calculateRowValue(config: ForecastConfig, allRows: ForecastRow[], base: 'forecast' | 'previa'): number {
+    if (!config) return 0;
+
+    if (config.method === 'Fixed') {
+        return config.manualValue || 0;
+    } else {
+        // Variable Calculation
+        const driverValue = getDriverValue(config.driver, allRows, base);
+        const factor = config.factor || 0;
+        
+        if (config.operator === 'divide' && factor !== 0) {
+            return driverValue / factor;
+        } else {
+            // Default multiply
+            return driverValue * factor;
+        }
+    }
+}
+
+function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], accounts: Account[]) {
+    const rowMap = new Map(rows.map(r => [r.id, r]));
+
+    const sumAndSet = (targetId: string, sources: {id: string}[], fieldToSet: 'real' | 'budget' | 'lastYear' | 'previa') => {
+        let total = 0;
+        sources.forEach(src => {
+            const row = rowMap.get(src.id);
+            if (row) total += row[fieldToSet] || 0;
+        });
+        const target = rowMap.get(targetId);
+        if (target) target[fieldToSet] = total;
+    };
+
+    // --- INDICATORS ---
+    ['real', 'budget', 'lastYear', 'previa'].forEach(f => {
+        const field = f as 'real' | 'budget' | 'lastYear' | 'previa';
+        
+        const avail = rowMap.get('IND-1')?.[field] || 0;
+        const occ = rowMap.get('IND-2')?.[field] || 0;
+        const revApt = rowMap.get('REV-APT')?.[field] || 0;
+
+        // % Ocupação
+        const occPct = rowMap.get('IND-3');
+        if (occPct) occPct[field] = avail > 0 ? (occ / avail) * 100 : 0;
+
+        // DM Bruta
+        const dm = rowMap.get('IND-4');
+        if (dm) dm[field] = occ > 0 ? revApt / occ : 0;
+
+        // RevPAR
+        const revpar = rowMap.get('IND-6');
+        if (revpar) revpar[field] = avail > 0 ? revApt / avail : 0;
+    });
+
+    // --- REVENUE CALCULATIONS ---
+    ['real', 'budget', 'lastYear', 'previa'].forEach(f => {
+        const field = f as 'real' | 'budget' | 'lastYear' | 'previa';
+        
+        // REV-APT = Lazer + Eventos
+        sumAndSet('REV-APT', [{id: 'REV-APT-LAZER'}, {id: 'REV-APT-EVENTOS'}], field);
+        
+        // REV-TOTAL = REV-APT + REV-EXTRA + REV-TIME
+        sumAndSet('REV-TOTAL', [{id: 'REV-APT'}, {id: 'REV-EXTRA'}, {id: 'REV-TIME'}], field);
+        
+        // REV-NET = REV-TOTAL - REV-ISS - REV-IMP
+        const total = rowMap.get('REV-TOTAL')?.[field] || 0;
+        const iss = rowMap.get('REV-ISS')?.[field] || 0;
+        const imp = rowMap.get('REV-IMP')?.[field] || 0;
+        const net = rowMap.get('REV-NET');
+        if(net) net[field] = total - iss - imp;
+    });
+
+    // --- COSTS CALCULATIONS ---
+    const updatedRows = Array.from(rowMap.values());
+    packages.forEach(pkg => {
+        const pkgRow = rowMap.get(pkg.id);
+        if (pkgRow) {
+            const pkgAccountIds = accounts.filter(a => a.packageId === pkg.id).map(a => a.id);
+            const children = updatedRows.filter(r => pkgAccountIds.includes(r.id));
+            
+            let sumReal = 0;
+            let sumBudget = 0;
+            let sumLY = 0;
+            let sumPrevia = 0;
+
+            children.forEach(child => {
+                // Forecast (Real)
+                if (child.forecastConfig.method === 'Variable') {
+                    const driverValue = getDriverValue(child.forecastConfig.driver, updatedRows, 'forecast');
+                    const factor = child.forecastConfig.factor || 0;
+                    const newVal = child.forecastConfig.operator === 'divide' && factor !== 0 ? driverValue / factor : driverValue * factor;
+                    child.real = newVal;
+                }
+
+                // Previa
+                if (child.previaConfig?.method === 'Variable') {
+                    const driverValue = getDriverValue(child.previaConfig.driver, updatedRows, 'previa');
+                    const factor = child.previaConfig.factor || 0;
+                    const newVal = child.previaConfig.operator === 'divide' && factor !== 0 ? driverValue / factor : driverValue * factor;
+                    child.previa = newVal;
+                }
+
+                sumReal += child.real;
+                sumBudget += child.budget;
+                sumLY += child.lastYear;
+                sumPrevia += child.previa || 0;
+            });
+
+            pkgRow.real = sumReal;
+            pkgRow.budget = sumBudget;
+            pkgRow.lastYear = sumLY;
+            pkgRow.previa = sumPrevia;
+        }
+    });
+
+    const pkgIds = packages.map(p => p.id);
+    ['real', 'budget', 'lastYear', 'previa'].forEach(f => {
+        const field = f as 'real' | 'budget' | 'lastYear' | 'previa';
+        sumAndSet('CST-HEAD', pkgIds.map(id => ({ id })), field);
+    });
+
+    // --- RESULTS CALCULATIONS ---
+    ['real', 'budget', 'lastYear', 'previa'].forEach(f => {
+        const field = f as 'real' | 'budget' | 'lastYear' | 'previa';
+        
+        const revTotal = rowMap.get('REV-TOTAL')?.[field] || 0;
+        const revIss = rowMap.get('REV-ISS')?.[field] || 0;
+        const revImp = rowMap.get('REV-IMP')?.[field] || 0;
+        const cstHead = rowMap.get('CST-HEAD')?.[field] || 0;
+
+        const resOpSemImp = rowMap.get('RES-OP-SEM-IMP');
+        if (resOpSemImp) resOpSemImp[field] = revTotal - revIss - cstHead;
+
+        const resOpComImp = rowMap.get('RES-OP-COM-IMP');
+        if (resOpComImp) resOpComImp[field] = revTotal - revIss - revImp - cstHead;
+    });
+
+    // --- DELTAS CALCULATIONS ---
+    Array.from(rowMap.values()).forEach(row => {
+        row.deltaBudgetVal = row.real - row.budget;
+        row.deltaBudgetPct = row.budget === 0 ? 0 : ((row.real - row.budget) / Math.abs(row.budget)) * 100;
+        
+        row.deltaLYVal = row.real - row.lastYear;
+        row.deltaLYPct = row.lastYear === 0 ? 0 : ((row.real - row.lastYear) / Math.abs(row.lastYear)) * 100;
+        
+        row.deltaPreviaVal = row.real - (row.previa || 0);
+        row.deltaPreviaPct = (row.previa || 0) === 0 ? 0 : ((row.real - (row.previa || 0)) / Math.abs(row.previa || 0)) * 100;
+
+        row.deltaPreviaBudgetVal = (row.previa || 0) - row.budget;
+        row.deltaPreviaBudgetPct = row.budget === 0 ? 0 : (((row.previa || 0) - row.budget) / Math.abs(row.budget)) * 100;
+    });
+
+    // --- TRANSFORMATION / REACTIVITY KPIs ---
+    const kpiBudget = rowMap.get('KPI-TRANS-BUDGET');
+    const kpiLY = rowMap.get('KPI-TRANS-LY');
+    const revTotal = rowMap.get('REV-TOTAL');
+    const gopRow = rowMap.get('RES-OP-COM-IMP');
+    const costHead = rowMap.get('CST-HEAD');
+
+    if (kpiBudget && revTotal && gopRow && costHead) {
+        const deltaRev = revTotal.real - revTotal.budget;
+        const deltaGop = gopRow.real - gopRow.budget;
+        const deltaCost = costHead.real - costHead.budget;
+
+        if (deltaRev > 0 && deltaGop > 0) {
+            kpiBudget.real = (deltaGop / deltaRev) * 100;
+        } else if (deltaRev < 0 && deltaCost < 0) {
+            kpiBudget.real = (deltaCost / deltaRev) * 100;
+        } else {
+            kpiBudget.real = 0;
+        }
+    }
+
+    if (kpiLY && revTotal && gopRow && costHead) {
+        const deltaRevLY = revTotal.real - revTotal.lastYear;
+        const deltaGopLY = gopRow.real - gopRow.lastYear;
+        const deltaCostLY = costHead.real - costHead.lastYear;
+
+        if (deltaRevLY > 0 && deltaGopLY > 0) {
+            kpiLY.real = (deltaGopLY / deltaRevLY) * 100;
+        } else if (deltaRevLY < 0 && deltaCostLY < 0) {
+            kpiLY.real = (deltaCostLY / deltaRevLY) * 100;
+        } else {
+            kpiLY.real = 0;
+        }
+    }
+
+    return Array.from(rowMap.values());
+}
