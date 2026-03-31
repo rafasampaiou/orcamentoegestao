@@ -15,6 +15,22 @@ export interface User {
   hotelId?: string; // Link user to a specific Hotel/Entity
 }
 
+// Profile represents a user account managed in the `profiles` table in Supabase.
+// It links to auth.users via the `id` field.
+export interface Profile {
+  id: string;           // UUID from auth.users
+  email: string;
+  full_name: string | null;
+  hotel_id: string | null;
+  role: string;         // e.g. 'admin', 'user'
+  can_access_admin: boolean;     // Administração
+  can_access_geral: boolean;     // Tauá Geral
+  can_access_cadastros: boolean; // Cadastros
+  avatar_url: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface Hotel {
   id: string;
   code: string;
