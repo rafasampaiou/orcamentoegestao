@@ -38,7 +38,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 }) => {
   // Initialize state passing selectedHotel and dynamic structures
   const [data, setData] = useState<ForecastRow[]>(() => {
-      const initialData = getForecastData(selectedMonth, selectedYear, financialData, selectedHotel, packages, accounts, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId);
+      const initialData = getForecastData(selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts);
       // Initialize previaConfig if missing
       const initializedData = initialData.map(row => ({
           ...row,
@@ -123,7 +123,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
   // We use useMemo to avoid the linter warning about setState in effect, 
   // and we only update state when the derived data actually changes from props.
   const derivedData = useMemo(() => {
-      const newData = getForecastData(selectedMonth, selectedYear, financialData, selectedHotel, packages, accounts, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId);
+      const newData = getForecastData(selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts);
       const initializedData = newData.map(row => ({
           ...row,
           previaConfig: row.previaConfig || { method: 'Fixed', manualValue: row.previa }
@@ -134,6 +134,10 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
   useEffect(() => {
       setData(derivedData);
   }, [derivedData]);
+
+  const isSpecialEditableRow = (id: string) => {
+      return ['REV-APT-LAZER', 'REV-APT-EVENTOS', 'REV-EXTRA-LAZER', 'REV-EXTRA-EVENTOS', 'REV-TIME', 'REV-ISS', 'REV-IMP'].includes(id);
+  };
 
 
 
@@ -223,11 +227,12 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
               const isIndicator = row.id.startsWith('IND-');
               const isManualRow = ['IND-MO-2', 'IND-MO-3'].includes(row.id);
               const isInputIndicator = ['IND-1', 'IND-LZ-2', 'IND-LZ-4', 'IND-LZ-5', 'IND-EV-2', 'IND-EV-4', 'IND-EV-5'].includes(row.id);
+              const canEditReal = !isMonthClosed && (!row.isHeader || isSpecialEditableRow(row.id)) && !row.isTotal && (row.forecastConfig.method === 'Fixed' || isSpecialEditableRow(row.id));
+              const canEditPrevia = !isMonthClosed && (!row.isHeader || isSpecialEditableRow(row.id)) && !row.isTotal && ((row.previaConfig?.method || 'Fixed') === 'Fixed' || isSpecialEditableRow(row.id));
               
               let canEdit = false;
               if (!isIndicator) {
-                  const currentConfig = field === 'real' ? row.forecastConfig : (row.previaConfig || { method: 'Fixed' });
-                  if (currentConfig.method === 'Fixed') canEdit = true;
+                  canEdit = field === 'real' ? canEditReal : canEditPrevia;
               } else if (isInputIndicator || isManualRow) {
                   canEdit = true;
               }
@@ -314,7 +319,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     return `${val > 0 ? '+' : ''}${val.toFixed(1)}%`;
   };
 
-  const blueRowIds = ['REV-TOTAL', 'REV-NET', 'CST-HEAD', 'RES-OP', 'RES-PCT'];
+  const blueRowIds = ['REV-TOTAL', 'REV-NET', 'CST-HEAD', 'RES-OP', 'RES-PCT', 'REV-IMP'];
   
   const monthName = new Date(selectedYear || 2024, (selectedMonth || 1) - 1).toLocaleString('pt-BR', { month: 'long' });
 
@@ -658,7 +663,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 
                 // Identify Special Revenue Rows for Styling
                 // REMOVED REV-TIME from this list to allow manual editing
-                const isSpecialRevenue = ['REV-HOSP', 'REV-EXTRA', 'REV-ISS'].includes(row.id);
+                const isSpecialRevenue = ['REV-HOSP', 'REV-EXTRA', 'REV-ISS', 'REV-APT'].includes(row.id);
 
                 const formatType = row.rowConfig?.format || 'currency';
 
@@ -719,13 +724,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     title="Clique para editar parâmetros"
                                 >
                                     <div className="flex items-center gap-2 overflow-hidden">
-                                        <span className={`
-                                            w-5 h-5 flex items-center justify-center text-[10px] font-bold rounded shrink-0 shadow-sm
-                                            ${isFixed ? 'bg-indigo-100 text-indigo-700' : 'bg-orange-100 text-orange-700'}
-                                        `}>
-                                            {isFixed ? 'F' : 'V'}
-                                        </span>
-                                        
+                                        {/* REMOVED MANUAL INDICATOR AS REQUESTED */}
                                         <div className="flex flex-col truncate">
                                             {!isFixed ? (
                                                 <div className="flex items-center gap-1 text-[10px] text-gray-700 font-medium truncate">
@@ -1279,6 +1278,9 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
         // REV-APT = Lazer + Eventos
         sumAndSet('REV-APT', [{id: 'REV-APT-LAZER'}, {id: 'REV-APT-EVENTOS'}], field);
         
+        // REV-EXTRA = Extra Lazer + Extra Eventos
+        sumAndSet('REV-EXTRA', [{id: 'REV-EXTRA-LAZER'}, {id: 'REV-EXTRA-EVENTOS'}], field);
+
         // REV-TOTAL = REV-APT + REV-EXTRA + REV-TIME
         sumAndSet('REV-TOTAL', [{id: 'REV-APT'}, {id: 'REV-EXTRA'}, {id: 'REV-TIME'}], field);
         

@@ -461,16 +461,18 @@ export const getForecastData = (
     selectedYear?: number, 
     importedData: ImportedRow[] = [],
     selectedHotelName?: string,
-    currentPackages: CostPackage[] = mockPackages,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _currentAccounts: Account[] = mockAccounts, // unused
     currentHotels: Hotel[] = mockHotels,
     realOccupancyData: Record<string, Record<string, number>> = {},
     activeRealVersionId?: string,
-    activeBudgetVersionId?: string
+    activeBudgetVersionId?: string,
+    currentAccounts: Account[] = mockAccounts
 ): ForecastRow[] => {
   
   const rows: ForecastRow[] = [];
+
+  // Filter out accounts that are marked as outOfScope
+  const activeAccounts = currentAccounts.filter(acc => !acc.outOfScope);
+  const activeAccountIds = activeAccounts.map(acc => acc.id);
 
   // Determine active hotel code for filtering logic
   const activeHotel = currentHotels.find(h => h.name === selectedHotelName);
@@ -596,11 +598,20 @@ export const getForecastData = (
   });
 
   // 1.02 Receitas Extras
-  const valBudgetExtra = getImportedValue('Receitas Extras', selectedYear, 'Budget');
-  const valRealExtra = getImportedValue('Receitas Extras', selectedYear, 'Real');
-  const valPreviaExtra = getImportedValue('Receitas Extras', selectedYear, 'Previa');
-  const valLYExtra = getImportedValue('Receitas Extras', (selectedYear || 0) - 1, 'Real');
-  rows.push(generateRow('REV-EXTRA', '1.02', 'Revenue', 'Receitas Extras', valBudgetExtra, valRealExtra, valLYExtra, valPreviaExtra, false, false, 1));
+  rows.push(generateRow('REV-EXTRA', '1.02', 'Revenue', 'Receitas Extras', 0, 0, 0, 0, true, false, 1));
+  
+  const revExtraItems = [
+      { id: 'REV-EXTRA-LAZER', code: '1.02.01', label: 'Extra Lazer' },
+      { id: 'REV-EXTRA-EVENTOS', code: '1.02.02', label: 'Extra Eventos' },
+  ];
+
+  revExtraItems.forEach(item => {
+      const valBudget = getImportedValue(item.label, selectedYear, 'Budget');
+      const valReal = getImportedValue(item.label, selectedYear, 'Real');
+      const valPrevia = getImportedValue(item.label, selectedYear, 'Previa');
+      const valLY = getImportedValue(item.label, (selectedYear || 0) - 1, 'Real');
+      rows.push(generateRow(item.id, item.code, 'Revenue', item.label, valBudget, valReal, valLY, valPrevia, false, false, 2));
+  });
   
   // 1.03 Cancelamento de Time Share
   const valBudgetTS = getImportedValue('Cancelamento de Time Share', selectedYear, 'Budget');
@@ -632,6 +643,9 @@ export const getForecastData = (
   rows.push(generateRow('CST-HEAD', '3.00', 'Costs', 'CUSTOS E DESPESAS OPERACIONAIS', 0, 0, 0, 0, true, true, 0));
 
   currentPackages.forEach(pkg => {
+    const pkgAccounts = activeAccounts.filter(a => a.packageId === pkg.id);
+    if (pkgAccounts.length === 0) return; // Hide packages with no active accounts
+
     const valBudget = getImportedValue(pkg.name, selectedYear, 'Budget');
     const valReal = getImportedValue(pkg.name, selectedYear, 'Real');
     const valPrevia = getImportedValue(pkg.name, selectedYear, 'Previa');
