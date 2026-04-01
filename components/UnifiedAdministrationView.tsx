@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useRef } from 'react';
 import { getForecastData } from '../services/mockData';
-import { Plus, Trash2, X, Save, Briefcase, Pencil, Calendar, PieChart, Lock, LockOpen, Settings as SettingsIcon, Users, Search, Upload, Settings, Eye, FileText, Layout, Info } from 'lucide-react';
+import { Plus, Trash2, X, Save, Briefcase, Pencil, Calendar, PieChart, Lock, LockOpen, Settings as SettingsIcon, Users, Search, Upload, Settings, Eye, FileText, Layout, Info, ChevronUp, GripVertical } from 'lucide-react';
 import { User, UserRole, CostCenter, ImportedRow, Hotel, Account, BudgetVersion, LaborParameters, ScheduleItem, ImportedCostCenter, CostPackage, GMDConfiguration } from '../types';
 import TimelineView from './TimelineView';
 
@@ -359,7 +359,102 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const [accImportMode, setAccImportMode] = useState<'append' | 'replace'>('append');
   const [accSearchTerm, setAccSearchTerm] = useState('');
 
+  // Account View Customization
+  const [collapsedMasterPackages, setCollapsedMasterPackages] = useState<Set<string>>(new Set());
+  const [collapsedPackages, setCollapsedPackages] = useState<Set<string>>(new Set());
+  const [accountViewLevel, setAccountViewLevel] = useState<'master' | 'package' | 'account'>('account');
+
+  const uniqueMasterPackages = useMemo(() => {
+    const map = new Map<string, {name: string, code: string}>();
+    accounts.forEach(a => {
+        if (a.masterPackage) map.set(a.masterPackage, { name: a.masterPackage, code: a.masterPackageCode || '' });
+    });
+    return Array.from(map.values()).sort((a,b) => a.name.localeCompare(b.name));
+  }, [accounts]);
+
+  const uniqueSubPackages = useMemo(() => {
+    const map = new Map<string, {name: string, code: string, masterName: string}>();
+    accounts.forEach(a => {
+        if (a.package) map.set(a.package, { name: a.package, code: a.packageCode || '', masterName: a.masterPackage || '' });
+    });
+    return Array.from(map.values()).sort((a,b) => a.name.localeCompare(b.name));
+  }, [accounts]);
+
+  const toggleMasterExpand = (name: string) => {
+    setCollapsedMasterPackages(prev => {
+        const next = new Set(prev);
+        if (next.has(name)) next.delete(name);
+        else next.add(name);
+        return next;
+    });
+  };
+
+  const togglePackageExpand = (name: string) => {
+    setCollapsedPackages(prev => {
+        const next = new Set(prev);
+        if (next.has(name)) next.delete(name);
+        else next.add(name);
+        return next;
+    });
+  };
+
+  const setAllLevel = (level: 'master' | 'package' | 'account') => {
+      setAccountViewLevel(level);
+      if (level === 'master') {
+          setCollapsedMasterPackages(new Set(uniqueMasterPackages.map(m => m.name)));
+          setCollapsedPackages(new Set(uniqueSubPackages.map(p => p.name)));
+      } else if (level === 'package') {
+          setCollapsedMasterPackages(new Set());
+          setCollapsedPackages(new Set(uniqueSubPackages.map(p => p.name)));
+      } else {
+          setCollapsedMasterPackages(new Set());
+          setCollapsedPackages(new Set());
+      }
+  };
+
   const [pickingFor, setPickingFor] = useState<{ sectionId: string, packageId: string } | null>(null);
+
+  const handleAccountDragStart = (e: React.DragEvent, id: string, type: 'account' | 'pkg' | 'master') => {
+    e.dataTransfer.setData('sourceId', id);
+    e.dataTransfer.setData('sourceType', type);
+    e.currentTarget.classList.add('opacity-40');
+  };
+
+  const handleAccountDragEnd = (e: React.DragEvent) => {
+    e.currentTarget.classList.remove('opacity-40');
+  };
+
+  const handleAccountDrop = (e: React.DragEvent, targetId: string, targetType: 'account' | 'pkg' | 'master') => {
+    e.preventDefault();
+    const sourceId = e.dataTransfer.getData('sourceId');
+    const sourceType = e.dataTransfer.getData('sourceType');
+    if (sourceId === targetId) return;
+
+    setAccounts(prev => {
+        const sorted = [...prev].sort((a,b) => (a.sortOrder || 0) - (b.sortOrder || 0) || a.id.localeCompare(b.id));
+        
+        if (sourceType === 'account' && targetType === 'account') {
+            const srcIdx = sorted.findIndex(a => a.id === sourceId);
+            const tgtIdx = sorted.findIndex(a => a.id === targetId);
+            const [moved] = sorted.splice(srcIdx, 1);
+            sorted.splice(tgtIdx, 0, moved);
+        } else if (sourceType === 'pkg' && targetType === 'pkg') {
+            const srcSet = sorted.filter(a => a.package === sourceId);
+            const rest = sorted.filter(a => a.package !== sourceId);
+            const tgtIdx = srcSet[0].masterPackage === sourceId ? -1 : rest.findIndex(a => a.package === targetId);
+            if (tgtIdx !== -1) rest.splice(tgtIdx, 0, ...srcSet);
+            return rest.map((a, i) => ({ ...a, sortOrder: i }));
+        } else if (sourceType === 'master' && targetType === 'master') {
+            const srcSet = sorted.filter(a => a.masterPackage === sourceId);
+            const rest = sorted.filter(a => a.masterPackage !== sourceId);
+            const tgtIdx = rest.findIndex(a => a.masterPackage === targetId);
+            if (tgtIdx !== -1) rest.splice(tgtIdx, 0, ...srcSet);
+            return rest.map((a, i) => ({ ...a, sortOrder: i }));
+        }
+        
+        return sorted.map((a, i) => ({ ...a, sortOrder: i }));
+    });
+  };
   const [newSectionName, setNewSectionName] = useState('');
   const [isAddingSection, setIsAddingSection] = useState(false);
   const [addingPackageTo, setAddingPackageTo] = useState<string | null>(null);
@@ -1050,14 +1145,14 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     const validData = accParsedData.filter(r => r.status === 'valid');
     if (validData.length === 0) return;
 
-    const newAccounts: Account[] = validData.map(a => ({ 
+    const newAccounts: Account[] = validData.map((a, i) => ({ 
         id: a.id, 
         code: a.id, 
         name: a.name, 
         package: a.package, 
         masterPackage: a.masterPackage,
         type: 'Fixed' as const,
-        sortOrder: accounts.length // Simple fallback for sort order
+        sortOrder: accounts.length + i // Ensure unique sequential order
     }));
 
     if (accImportMode === 'replace') {
@@ -1937,6 +2032,26 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                       </div>
                     </div>
                     <div className="flex gap-2">
+                      <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200">
+                        <button 
+                          onClick={() => setAllLevel('master')}
+                          className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${accountViewLevel === 'master' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                        >
+                          Masters
+                        </button>
+                        <button 
+                          onClick={() => setAllLevel('package')}
+                          className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${accountViewLevel === 'package' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                        >
+                          Pacotes
+                        </button>
+                        <button 
+                          onClick={() => setAllLevel('account')}
+                          className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${accountViewLevel === 'account' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                        >
+                          Contas
+                        </button>
+                      </div>
                       <button 
                         onClick={() => {
                           setActiveGeralTab('import');
@@ -1971,37 +2086,92 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                             (acc.masterPackage || '').toLowerCase().includes(accSearchTerm.toLowerCase())
                           ).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0) || a.id.localeCompare(b.id));
 
-                          return filteredAccounts.map((acc) => {
-                            const showMaster = acc.masterPackage !== lastMaster;
-                            const showPackage = (acc.package !== lastPackage || showMaster) && acc.package;
-                            
-                            lastMaster = acc.masterPackage || '';
-                            lastPackage = acc.package || '';
+                          const rows: React.ReactNode[] = [];
 
-                            return (
-                              <React.Fragment key={acc.id}>
-                                {showMaster && acc.masterPackage && (
-                                  <tr className="bg-indigo-50/50 border-y border-indigo-100">
-                                    <td className="px-4 py-2 text-[10px] font-black text-indigo-900 uppercase tracking-widest">{acc.masterPackageCode}</td>
-                                    <td colSpan={2} className="px-4 py-2 text-[10px] font-black text-indigo-900 uppercase tracking-widest">{acc.masterPackage}</td>
-                                  </tr>
-                                )}
-                                {showPackage && (
-                                  <tr className="bg-slate-50/50 border-b border-slate-100">
-                                    <td className="px-4 py-1.5 text-[10px] font-bold text-slate-600 uppercase tracking-wider pl-8">{acc.packageCode}</td>
-                                    <td colSpan={2} className="px-4 py-1.5 text-[10px] font-bold text-slate-600 uppercase tracking-wider pl-8">{acc.package}</td>
-                                  </tr>
-                                )}
-                                <tr className="hover:bg-gray-50 transition-colors group cursor-pointer" onClick={() => openEditAccount(acc.id)}>
-                                  <td className="px-4 py-3 whitespace-nowrap text-xs font-mono text-gray-500">{acc.code}</td>
-                                  <td className="px-4 py-3 whitespace-nowrap text-xs font-bold text-gray-900 pl-12">{acc.name}</td>
-                                  <td className="px-4 py-3 whitespace-nowrap text-xs font-bold text-gray-900">
+                          filteredAccounts.forEach((acc) => {
+                            const isNewMaster = acc.masterPackage !== lastMaster;
+                            const isNewPackage = (acc.package !== lastPackage || isNewMaster) && acc.package;
+                            
+                            if (isNewMaster && acc.masterPackage) {
+                              const isCollapsed = collapsedMasterPackages.has(acc.masterPackage);
+                              rows.push(
+                                <tr 
+                                  key={`master-${acc.masterPackage}`} 
+                                  draggable={true}
+                                  onDragStart={(e) => handleAccountDragStart(e, acc.masterPackage!, 'master')}
+                                  onDragEnd={handleAccountDragEnd}
+                                  onDragOver={(e) => e.preventDefault()}
+                                  onDrop={(e) => handleAccountDrop(e, acc.masterPackage!, 'master')}
+                                  className="bg-indigo-50 border-y border-indigo-100 group cursor-pointer hover:bg-indigo-100 transition-colors" 
+                                >
+                                  <td className="px-4 py-2 flex items-center gap-2" onClick={() => toggleMasterExpand(acc.masterPackage!)}>
+                                    <GripVertical size={14} className="text-indigo-300 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing" />
+                                    <ChevronUp size={14} className={`text-indigo-600 transition-transform ${isCollapsed ? 'rotate-180' : ''}`} />
+                                    <span className="text-[10px] font-black text-indigo-900 uppercase tracking-widest">{acc.masterPackageCode}</span>
+                                  </td>
+                                  <td colSpan={2} className="px-4 py-2 text-[10px] font-black text-indigo-900 uppercase tracking-widest" onClick={() => toggleMasterExpand(acc.masterPackage!)}>
+                                    {acc.masterPackage}
+                                  </td>
+                                </tr>
+                              );
+                            }
+
+                            const masterCollapsed = acc.masterPackage && collapsedMasterPackages.has(acc.masterPackage);
+
+                            if (isNewPackage && !masterCollapsed) {
+                              const isCollapsed = collapsedPackages.has(acc.package!);
+                              rows.push(
+                                <tr 
+                                  key={`pkg-${acc.package}`} 
+                                  draggable={true}
+                                  onDragStart={(e) => handleAccountDragStart(e, acc.package!, 'pkg')}
+                                  onDragEnd={handleAccountDragEnd}
+                                  onDragOver={(e) => e.preventDefault()}
+                                  onDrop={(e) => handleAccountDrop(e, acc.package!, 'pkg')}
+                                  className="bg-slate-50 border-b border-slate-100 group cursor-pointer hover:bg-slate-100 transition-colors" 
+                                >
+                                  <td className="px-4 py-1.5 flex items-center gap-2 pl-8" onClick={() => togglePackageExpand(acc.package!)}>
+                                    <GripVertical size={12} className="text-slate-300 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing" />
+                                    <ChevronUp size={12} className={`text-slate-500 transition-transform ${isCollapsed ? 'rotate-180' : ''}`} />
+                                    <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">{acc.packageCode}</span>
+                                  </td>
+                                  <td colSpan={2} className="px-4 py-1.5 text-[10px] font-bold text-slate-600 uppercase tracking-wider" onClick={() => togglePackageExpand(acc.package!)}>
+                                    {acc.package}
+                                  </td>
+                                </tr>
+                              );
+                            }
+
+                            const pkgCollapsed = acc.package && collapsedPackages.has(acc.package);
+
+                            if (!masterCollapsed && !pkgCollapsed) {
+                              rows.push(
+                                <tr 
+                                  key={acc.id} 
+                                  draggable={true}
+                                  onDragStart={(e) => handleAccountDragStart(e, acc.id, 'account')}
+                                  onDragEnd={handleAccountDragEnd}
+                                  onDragOver={(e) => e.preventDefault()}
+                                  onDrop={(e) => handleAccountDrop(e, acc.id, 'account')}
+                                  className="hover:bg-gray-50 transition-colors group cursor-pointer" 
+                                >
+                                  <td className="px-4 py-3 whitespace-nowrap text-xs font-mono text-gray-500 pl-14 flex items-center gap-2" onClick={() => openEditAccount(acc.id)}>
+                                    <GripVertical size={12} className="text-gray-300 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing" />
+                                    {acc.code}
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-xs font-bold text-gray-900" onClick={() => openEditAccount(acc.id)}>{acc.name}</td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-xs font-bold text-gray-900 text-center" onClick={() => openEditAccount(acc.id)}>
                                     {acc.outOfScope ? <span className="text-red-600">Sim</span> : <span className="text-emerald-600">Não</span>}
                                   </td>
                                 </tr>
-                              </React.Fragment>
-                            );
+                              );
+                            }
+                            
+                            lastMaster = acc.masterPackage || '';
+                            lastPackage = acc.package || '';
                           });
+
+                          return rows;
                         })()}
                       </tbody>
                     </table>
@@ -2630,22 +2800,80 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <div className="col-span-1">
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Cód. Pacote</label>
-                  <input type="text" value={accountForm.packageCode} onChange={e => setAccountForm({...accountForm, packageCode: e.target.value})} className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ex: 4.1.1" />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Pacote</label>
-                  <input type="text" value={accountForm.package} onChange={e => setAccountForm({...accountForm, package: e.target.value})} className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ex: Custo de Alimentos" />
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="col-span-1">
                   <label className="block text-sm font-bold text-gray-700 mb-1">Cód. Master</label>
-                  <input type="text" value={accountForm.masterPackageCode} onChange={e => setAccountForm({...accountForm, masterPackageCode: e.target.value})} className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ex: 4.1" />
+                  <input type="text" value={accountForm.masterPackageCode} onChange={e => setAccountForm({...accountForm, masterPackageCode: e.target.value})} className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none bg-gray-50" placeholder="Ex: 4.1" />
                 </div>
                 <div className="col-span-2">
                   <label className="block text-sm font-bold text-gray-700 mb-1">Pacote Master</label>
-                  <input type="text" value={accountForm.masterPackage} onChange={e => setAccountForm({...accountForm, masterPackage: e.target.value})} className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ex: CUSTOS DE ALIMENTOS E BEBIDAS" />
+                  <select 
+                    value={accountForm.masterPackage} 
+                    onChange={e => {
+                        const val = e.target.value;
+                        const match = uniqueMasterPackages.find(m => m.name === val);
+                        setAccountForm({
+                            ...accountForm, 
+                            masterPackage: val,
+                            masterPackageCode: match ? match.code : accountForm.masterPackageCode
+                        });
+                    }} 
+                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                  >
+                    <option value="">Selecione um Master...</option>
+                    {uniqueMasterPackages.map(m => <option key={m.name} value={m.name}>{m.name}</option>)}
+                    <option value="CUSTOM">+ Novo Pacote Master...</option>
+                  </select>
+                  {accountForm.masterPackage === 'CUSTOM' && (
+                      <input 
+                        type="text" 
+                        placeholder="Nome do Novo Master..."
+                        className="w-full mt-2 p-2 border border-gray-300 rounded-lg text-sm"
+                        onBlur={e => {
+                            if (e.target.value) setAccountForm({...accountForm, masterPackage: e.target.value});
+                            else setAccountForm({...accountForm, masterPackage: ''});
+                        }}
+                      />
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div className="col-span-1">
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Cód. Pacote</label>
+                  <input type="text" value={accountForm.packageCode} onChange={e => setAccountForm({...accountForm, packageCode: e.target.value})} className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none bg-gray-50" placeholder="Ex: 4.1.1" />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Pacote</label>
+                  <select 
+                    value={accountForm.package} 
+                    onChange={e => {
+                        const val = e.target.value;
+                        const match = uniqueSubPackages.find(p => p.name === val);
+                        setAccountForm({
+                            ...accountForm, 
+                            package: val,
+                            packageCode: match ? match.code : accountForm.packageCode
+                        });
+                    }} 
+                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                  >
+                    <option value="">Selecione um Pacote...</option>
+                    {uniqueSubPackages
+                        .filter(p => !accountForm.masterPackage || p.masterName === accountForm.masterPackage)
+                        .map(p => <option key={p.name} value={p.name}>{p.name}</option>)
+                    }
+                    <option value="CUSTOM">+ Novo Pacote...</option>
+                  </select>
+                  {accountForm.package === 'CUSTOM' && (
+                      <input 
+                        type="text" 
+                        placeholder="Nome do Novo Pacote..."
+                        className="w-full mt-2 p-2 border border-gray-300 rounded-lg text-sm"
+                        onBlur={e => {
+                            if (e.target.value) setAccountForm({...accountForm, package: e.target.value});
+                            else setAccountForm({...accountForm, package: ''});
+                        }}
+                      />
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-4">
