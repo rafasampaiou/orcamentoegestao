@@ -919,9 +919,10 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               setGmdConfigs(prev => [...prev, newGMD]);
           }
           setActiveModal(null);
-      } catch (err) {
+      } catch (err: any) {
           console.error("Erro ao salvar GMD:", err);
-          alert("Erro ao salvar no banco de dados.");
+          const msg = err?.message || err?.details || JSON.stringify(err);
+          alert(`Erro ao salvar GMD: ${msg}`);
       }
   };
 
@@ -942,9 +943,10 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               setUsers(prev => [...prev, newUser]);
           }
           setActiveModal(null);
-      } catch (err) {
+      } catch (err: any) {
           console.error("Erro ao salvar usuário:", err);
-          alert("Erro ao salvar no banco de dados.");
+          const msg = err?.message || err?.details || JSON.stringify(err);
+          alert(`Erro ao salvar usuário: ${msg}`);
       }
   };
 
@@ -963,9 +965,10 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               setCostCenters(prev => [...prev, newCC]);
           }
           setActiveModal(null);
-      } catch (err) {
+      } catch (err: any) {
           console.error("Erro ao salvar setor:", err);
-          alert("Erro ao salvar no banco de dados.");
+          const msg = err?.message || err?.details || JSON.stringify(err);
+          alert(`Erro ao salvar setor: ${msg}`);
       }
   };
 
@@ -992,7 +995,12 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       if (editingId) {
           const updated = accounts.map(acc => acc.id === editingId ? { ...acc, ...finalForm } : acc);
           setAccounts(updated);
-          try { await supabaseService.upsertAccounts(updated.filter(a => a.id === editingId)); } catch(e) { console.error(e); }
+          try { 
+              await supabaseService.upsertAccounts(updated.filter(a => a.id === editingId)); 
+          } catch(e: any) { 
+              console.error(e); 
+              alert(`Erro ao atualizar conta: ${e?.message || JSON.stringify(e)}`);
+          }
       } else {
           const newAcc: Account = { 
               ...finalForm, 
@@ -1002,7 +1010,12 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
           };
           const updated = [...accounts, newAcc];
           setAccounts(updated);
-          try { await supabaseService.upsertAccounts([newAcc]); } catch(e) { console.error(e); }
+          try { 
+              await supabaseService.upsertAccounts([newAcc]); 
+          } catch(e: any) { 
+              console.error(e);
+              alert(`Erro ao criar conta: ${e?.message || JSON.stringify(e)}`);
+          }
       }
       setActiveModal(null);
   };
