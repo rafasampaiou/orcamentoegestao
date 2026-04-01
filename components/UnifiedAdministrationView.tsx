@@ -381,6 +381,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     return Array.from(map.values());
   }, [accounts]);
 
+
   const toggleMasterExpand = (name: string) => {
     setCollapsedMasterPackages(prev => {
         const next = new Set(prev);
