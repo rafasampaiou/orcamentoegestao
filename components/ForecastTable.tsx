@@ -338,35 +338,10 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 Visão consolidada por plano de contas e gestão matricial ({selectedHotel}).
             </p>
             </div>
-            
-            {/* MONTH STATUS INDICATOR (Read Only) */}
-            <div className="flex items-center gap-4">
-                {/* CALCULATION BASE SELECTOR */}
-                <div className="flex items-center bg-gray-100 rounded-lg p-1 border border-gray-200">
-                    <button
-                        onClick={() => setCalculationBase('previa')}
-                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
-                            calculationBase === 'previa' 
-                            ? 'bg-white text-purple-700 shadow-sm' 
-                            : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                    >
-                        Prévia
-                    </button>
-                    <button
-                        onClick={() => setCalculationBase('forecast')}
-                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
-                            calculationBase === 'forecast' 
-                            ? 'bg-white text-blue-700 shadow-sm' 
-                            : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                    >
-                        Forecast
-                    </button>
-                </div>
 
+            <div className="flex items-center gap-4">
                 {/* KPI BASIS SELECTOR */}
-                <div className="flex items-center bg-gray-100 rounded-lg p-1 border border-gray-200 ml-4">
+                <div className="flex items-center bg-gray-100 rounded-lg p-1 border border-gray-200">
                     <button
                         onClick={() => setKpiBasis('with_tax')}
                         className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
@@ -702,114 +677,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                         shouldRenderCell = false;
                     }
                 } else if (!isIndicator && !row.isHeader && !row.isTotal) {
-                    // --- INTERACTIVE PARAMETER CELL FOR ACCOUNTS ---
-                    const config = row.forecastConfig;
-                    const isFixed = config.method === 'Fixed';
-                    const isExpanded = expandedConfigRows.has(row.id);
-                    
-                    // IF MONTH IS CLOSED, DISABLE EDITING
-                    if (isMonthClosed) {
-                         configCell = (
-                             <div className="flex items-center justify-center w-full h-full opacity-50 cursor-not-allowed">
-                                 <Lock size={12} className="text-gray-400" />
-                             </div>
-                         );
-                    } else {
-                        if (!isExpanded) {
-                            // --- MINIMIZED VIEW ---
-                            configCell = (
-                                <div 
-                                    className="flex items-center justify-between w-full cursor-pointer hover:bg-gray-50 p-1 rounded group"
-                                    onClick={() => toggleConfigRow(row.id)}
-                                    title="Clique para editar parâmetros"
-                                >
-                                    <div className="flex items-center gap-2 overflow-hidden">
-                                        {/* REMOVED MANUAL INDICATOR AS REQUESTED */}
-                                        <div className="flex flex-col truncate">
-                                            {!isFixed ? (
-                                                <div className="flex items-center gap-1 text-[10px] text-gray-700 font-medium truncate">
-                                                    <span className="truncate">{config.driver || '?'}</span>
-                                                    <span className="text-gray-400 font-normal">
-                                                        {config.operator === 'divide' ? '/' : 'x'} {config.factor}
-                                                    </span>
-                                                </div>
-                                            ) : (
-                                                <span className="text-[10px] text-gray-400 italic">Manual</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <Settings2 size={12} className="text-gray-300 group-hover:text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                </div>
-                            );
-                        } else {
-                            // --- EXPANDED VIEW (FULL EDIT MODE) ---
-                            configCell = (
-                                <div className="flex flex-col gap-1.5 w-full bg-white p-2 border border-indigo-100 rounded-md shadow-sm relative z-20">
-                                    <div className="flex justify-between items-center pb-1 border-b border-gray-100 mb-1">
-                                        <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider">Configuração</span>
-                                        <button onClick={(e) => { e.stopPropagation(); toggleConfigRow(row.id); }} className="text-gray-400 hover:text-gray-600">
-                                            <ChevronUp size={12} />
-                                        </button>
-                                    </div>
-
-                                    {/* Row 1: Method Toggle */}
-                                    <div className="flex items-center gap-2">
-                                        <div className="flex bg-gray-100 p-0.5 rounded border border-gray-200 shrink-0">
-                                            <button 
-                                                onClick={() => handleConfigChange(row.id, { method: 'Fixed' })}
-                                                className={`px-2 py-0.5 text-[10px] font-bold rounded ${isFixed ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                                            >
-                                                F
-                                            </button>
-                                            <button 
-                                                onClick={() => handleConfigChange(row.id, { method: 'Variable' })}
-                                                className={`px-2 py-0.5 text-[10px] font-bold rounded ${!isFixed ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                                            >
-                                                V
-                                            </button>
-                                        </div>
-                                        {isFixed && <span className="text-[10px] text-gray-400 italic">Valor manual</span>}
-                                        {!isFixed && (
-                                            <select 
-                                                className="text-[10px] border border-gray-300 rounded px-1 py-0.5 bg-white flex-1 focus:ring-1 focus:ring-orange-500 outline-none"
-                                                value={config.driver || ''}
-                                                onChange={(e) => handleConfigChange(row.id, { driver: e.target.value as ExpenseDriver })}
-                                            >
-                                                <option value="">Selecione...</option>
-                                                <option value="UH Ocupada">UH Ocupada</option>
-                                                <option value="PAX">PAX</option>
-                                                <option value="Emocionadores">Emocionadores</option>
-                                                <option value="Extras">Extras</option>
-                                                <option value="Receita">Receita</option>
-                                            </select>
-                                        )}
-                                    </div>
-                                    
-                                    {/* Row 2: Variable Logic Inputs */}
-                                    {!isFixed && (
-                                        <div className="flex items-center gap-1 justify-end">
-                                            <select 
-                                                className="text-[10px] font-bold border border-gray-300 rounded px-1 py-0.5 bg-gray-50 w-10 text-center"
-                                                value={config.operator || 'multiply'}
-                                                onChange={(e) => handleConfigChange(row.id, { operator: e.target.value as ForecastOperator })}
-                                            >
-                                                <option value="multiply">x</option>
-                                                <option value="divide">/</option>
-                                            </select>
-                                            <input 
-                                                type="number"
-                                                step="0.01"
-                                                placeholder="0.00"
-                                                className="text-[10px] border border-gray-300 rounded px-2 py-0.5 w-16 text-right focus:ring-1 focus:ring-orange-500 outline-none"
-                                                value={config.factor || ''}
-                                                onChange={(e) => handleConfigChange(row.id, { factor: parseFloat(e.target.value) })}
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        }
-                    }
+                    // Coluna Parâmetros vazia — edição é feita diretamente nas células
+                    configCell = <div className="h-6" />;
                 }
 
                 // --- COMMON FINANCIAL CELLS RENDERER ---

@@ -602,8 +602,8 @@ export const getForecastData = (
   rows.push(generateRow('REV-EXTRA', '1.02', 'Revenue', 'Receitas Extras', 0, 0, 0, 0, true, false, 1));
   
   const revExtraItems = [
-      { id: 'REV-EXTRA-LAZER', code: '1.02.01', label: 'Lazer' },
-      { id: 'REV-EXTRA-EVENTOS', code: '1.02.02', label: 'Eventos' },
+      { id: 'REV-EXTRA-LAZER', code: '1.02.01', label: 'Lazer', importName: 'Extra Lazer' },
+      { id: 'REV-EXTRA-EVENTOS', code: '1.02.02', label: 'Eventos', importName: 'Extra Eventos' },
   ];
 
   revExtraItems.forEach(item => {
