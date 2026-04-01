@@ -810,19 +810,29 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       }
   };
 
-  const handleSaveHotel = () => {
+  const handleSaveHotel = async () => {
       if (!hotelForm.name) return;
-      if (editingId) {
-          setHotels(prev => prev.map(h => h.id === editingId ? { ...h, name: hotelForm.name } : h));
-      } else {
-          const newHotel: Hotel = { 
-          id: hotelForm.id || `h-${hotels.length + 1}`, 
-          name: hotelForm.name,
-          code: hotelForm.id || `H${hotels.length + 1}` 
-        };
-          setHotels(prev => [...prev, newHotel]);
+      
+      const newHotel: Hotel = editingId 
+        ? { id: editingId, name: hotelForm.name, code: hotelForm.id || editingId }
+        : { 
+            id: hotelForm.id || `h-${Date.now()}`, 
+            name: hotelForm.name,
+            code: hotelForm.id || `H${hotels.length + 1}` 
+          };
+
+      try {
+          await supabaseService.upsertHotels([newHotel]);
+          if (editingId) {
+              setHotels(prev => prev.map(h => h.id === editingId ? newHotel : h));
+          } else {
+              setHotels(prev => [...prev, newHotel]);
+          }
+          setActiveModal(null);
+      } catch (err) {
+          console.error("Erro ao salvar hotel:", err);
+          alert("Erro ao salvar no banco de dados.");
       }
-      setActiveModal(null);
   };
 
   const openNewAccount = () => {
@@ -888,44 +898,73 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       }
   };
 
-  const handleSaveGMD = () => {
+  const handleSaveGMD = async () => {
       if (!gmdForm.hotelId || !gmdForm.packageId || !gmdForm.costCenterId) {
           alert("Por favor, preencha os campos obrigatórios (Hotel, Pacote e Setor).");
           return;
       }
 
-      if (editingId) {
-          setGmdConfigs(prev => prev.map(g => g.id === editingId ? { ...g, ...gmdForm } as GMDConfiguration : g));
-      } else {
-          const newGMD: GMDConfiguration = {
-              ...(gmdForm as GMDConfiguration),
-              id: `gmd-${Date.now()}`
-          };
-          setGmdConfigs(prev => [...prev, newGMD]);
+      const newGMD: GMDConfiguration = {
+          ...(gmdForm as GMDConfiguration),
+          id: editingId || `gmd-${Date.now()}`
+      };
+
+      try {
+          await supabaseService.upsertGmdConfig(newGMD);
+          if (editingId) {
+              setGmdConfigs(prev => prev.map(g => g.id === editingId ? newGMD : g));
+          } else {
+              setGmdConfigs(prev => [...prev, newGMD]);
+          }
+          setActiveModal(null);
+      } catch (err) {
+          console.error("Erro ao salvar GMD:", err);
+          alert("Erro ao salvar no banco de dados.");
       }
-      setActiveModal(null);
   };
 
   // --- HANDLERS: SAVE ---
 
-  const handleSaveUser = () => {
+  const handleSaveUser = async () => {
       if (!userForm.name) return;
-      if (editingId) {
-          setUsers(prev => prev.map(u => u.id === editingId ? { ...u, ...userForm } : u));
-      } else {
-          setUsers(prev => [...prev, { id: `u-${Date.now()}`, ...userForm }]);
+      const newUser: User = { 
+          id: editingId || `u-${Date.now()}`, 
+          ...userForm 
+      };
+
+      try {
+          await supabaseService.upsertProfile(newUser);
+          if (editingId) {
+              setUsers(prev => prev.map(u => u.id === editingId ? newUser : u));
+          } else {
+              setUsers(prev => [...prev, newUser]);
+          }
+          setActiveModal(null);
+      } catch (err) {
+          console.error("Erro ao salvar usuário:", err);
+          alert("Erro ao salvar no banco de dados.");
       }
-      setActiveModal(null);
   };
 
-  const handleSaveCostCenter = () => {
+  const handleSaveCostCenter = async () => {
       if (!costCenterForm.name || !costCenterForm.id) return;
-      if (editingId) {
-          setCostCenters(prev => prev.map(cc => cc.id === editingId ? { ...cc, ...costCenterForm } : cc));
-      } else {
-          setCostCenters(prev => [...prev, { ...costCenterForm }]);
+      const newCC: CostCenter = { 
+        ...costCenterForm,
+        code: costCenterForm.id // Ensure code matches ID
+      };
+
+      try {
+          await supabaseService.upsertCostCenters([newCC]);
+          if (editingId) {
+              setCostCenters(prev => prev.map(cc => cc.id === editingId ? newCC : cc));
+          } else {
+              setCostCenters(prev => [...prev, newCC]);
+          }
+          setActiveModal(null);
+      } catch (err) {
+          console.error("Erro ao salvar setor:", err);
+          alert("Erro ao salvar no banco de dados.");
       }
-      setActiveModal(null);
   };
 
   const handleSaveAccount = async () => {
@@ -1118,7 +1157,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     setCcImportStep('preview');
   };
 
-  const handleFinalCostCenterImport = () => {
+  const handleFinalCostCenterImport = async () => {
     const validData = ccParsedData.filter(r => r.status === 'valid');
     if (validData.length === 0) return;
 
@@ -1134,21 +1173,27 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         companyCode: r.companyCode
     }));
 
-    if (ccImportMode === 'replace') {
-        setCostCenters(newCostCenters);
-    } else {
-        // Merge logic: update existing or add new
-        setCostCenters(prev => {
-            const map = new Map(prev.map(cc => [cc.id, cc]));
-            newCostCenters.forEach(cc => map.set(cc.id, cc));
-            return Array.from(map.values());
-        });
-    }
+    try {
+        await supabaseService.upsertCostCenters(newCostCenters);
+        
+        if (ccImportMode === 'replace') {
+            setCostCenters(newCostCenters);
+        } else {
+            setCostCenters(prev => {
+                const map = new Map(prev.map(cc => [cc.id, cc]));
+                newCostCenters.forEach(cc => map.set(cc.id, cc));
+                return Array.from(map.values());
+            });
+        }
 
-    setCcImportStep('input');
-    setCcParsedData([]);
-    setImportText('');
-    alert(`${validData.length} setores importados com sucesso!`);
+        setCcImportStep('input');
+        setCcParsedData([]);
+        setImportText('');
+        alert(`${validData.length} setores importados e sincronizados com sucesso!`);
+    } catch (err) {
+        console.error("Erro ao importar setores no Supabase:", err);
+        alert("Erro ao sincronizar com banco de dados.");
+    }
   };
 
   const processAccountImport = () => {
@@ -1240,17 +1285,35 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
   // --- HANDLERS: DELETE ---
 
-  const handleDelete = (type: 'users' | 'gmd' | 'hotels' | 'costCenters' | 'accounts', id: string) => {
-      // For simplicity in this admin view, we'll use a standard confirm for now, 
-      // but in a real app we'd use a custom modal.
+  const handleDelete = async (type: 'users' | 'gmd' | 'hotels' | 'costCenters' | 'accounts', id: string) => {
       if (!confirm("Tem certeza que deseja excluir este item?")) return;
       
-      switch(type) {
-          case 'users': setUsers(prev => prev.filter(i => i.id !== id)); break;
-          case 'hotels': setHotels(prev => prev.filter(i => i.id !== id)); break;
-          case 'costCenters': setCostCenters(prev => prev.filter(i => i.id !== id)); break;
-          case 'accounts': setAccounts(prev => prev.filter(i => i.id !== id)); break;
-          case 'gmd': setGmdConfigs(prev => prev.filter(i => i.id !== id)); break;
+      try {
+          switch(type) {
+              case 'users': 
+                  await supabaseService.deleteProfile(id);
+                  setUsers(prev => prev.filter(i => i.id !== id)); 
+                  break;
+              case 'hotels': 
+                  await supabaseService.deleteHotel(id);
+                  setHotels(prev => prev.filter(i => i.id !== id)); 
+                  break;
+              case 'costCenters': 
+                  await supabaseService.deleteCostCenter(id);
+                  setCostCenters(prev => prev.filter(i => i.id !== id)); 
+                  break;
+              case 'accounts': 
+                  await supabaseService.deleteAccount(id);
+                  setAccounts(prev => prev.filter(i => i.id !== id)); 
+                  break;
+              case 'gmd': 
+                  await supabaseService.deleteGmdConfig(id);
+                  setGmdConfigs(prev => prev.filter(i => i.id !== id)); 
+                  break;
+          }
+      } catch (err) {
+          console.error(`Erro ao excluir ${type}:`, err);
+          alert("Erro ao excluir no banco de dados.");
       }
   };
 

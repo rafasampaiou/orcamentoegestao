@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { Account, CostCenter, Hotel, BudgetVersion, Profile } from '../types';
+import { Account, CostCenter, Hotel, BudgetVersion, User, GMDConfiguration } from '../types';
 
 export const supabaseService = {
   // ─── ACCOUNTS ────────────────────────────────────────────────────────────────
@@ -9,13 +9,35 @@ export const supabaseService = {
       .select('*')
       .order('sortOrder', { ascending: true });
     if (error) throw error;
-    return data || [];
+    
+    return (data || []).map(a => ({
+      ...a,
+      packageCode: a.package_code,
+      masterPackage: a.master_package,
+      masterPackageCode: a.master_package_code,
+      outOfScope: a.out_of_scope
+    })) as Account[];
   },
 
   async upsertAccounts(accounts: Account[]): Promise<void> {
+    const records = accounts.map(a => ({
+      id: a.id,
+      code: a.code || a.id,
+      name: a.name,
+      level: a.level || 'account',
+      package: a.package,
+      package_code: a.packageCode,
+      master_package: a.masterPackage,
+      master_package_code: a.masterPackageCode,
+      type: a.type || 'Fixed',
+      sortOrder: a.sortOrder || 0,
+      out_of_scope: a.outOfScope || false,
+      updated_at: new Date().toISOString()
+    }));
+
     const { error } = await supabase
       .from('accounts')
-      .upsert(accounts, { onConflict: 'id' });
+      .upsert(records, { onConflict: 'id' });
     if (error) throw error;
   },
 
@@ -34,7 +56,45 @@ export const supabaseService = {
       .select('*')
       .order('name', { ascending: true });
     if (error) throw error;
-    return data || [];
+    
+    return (data || []).map(cc => ({
+      id: cc.id,
+      code: cc.code || cc.id,
+      name: cc.name,
+      type: cc.type,
+      directorate: cc.directorate,
+      department: cc.department,
+      hotelName: cc.hotel_name,
+      hierarchicalCode: cc.hierarchical_code,
+      companyCode: cc.company_code
+    })) as CostCenter[];
+  },
+
+  async upsertCostCenters(costCenters: CostCenter[]): Promise<void> {
+    const records = costCenters.map(cc => ({
+      id: cc.id,
+      name: cc.name,
+      type: cc.type,
+      directorate: cc.directorate,
+      department: cc.department,
+      hotel_name: cc.hotelName,
+      hierarchical_code: cc.hierarchicalCode,
+      company_code: cc.companyCode,
+      updated_at: new Date().toISOString()
+    }));
+
+    const { error } = await supabase
+      .from('cost_centers')
+      .upsert(records, { onConflict: 'id' });
+    if (error) throw error;
+  },
+
+  async deleteCostCenter(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('cost_centers')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
   },
 
   // ─── HOTELS ───────────────────────────────────────────────────────────────
@@ -45,6 +105,28 @@ export const supabaseService = {
       .order('name', { ascending: true });
     if (error) throw error;
     return data || [];
+  },
+
+  async upsertHotels(hotels: Hotel[]): Promise<void> {
+    const records = hotels.map(h => ({
+      id: h.id,
+      name: h.name,
+      code: h.code,
+      updated_at: new Date().toISOString()
+    }));
+
+    const { error } = await supabase
+      .from('hotels')
+      .upsert(records, { onConflict: 'id' });
+    if (error) throw error;
+  },
+
+  async deleteHotel(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('hotels')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
   },
 
   // ─── BUDGET DATA ──────────────────────────────────────────────────────────
@@ -93,29 +175,38 @@ export const supabaseService = {
   },
 
   // ─── PROFILES (USER MANAGEMENT) ────────────────────────────────────────────
-
-  /** Fetch all user profiles */
-  async getProfiles(): Promise<Profile[]> {
+  async getProfiles(): Promise<User[]> {
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .order('full_name', { ascending: true });
     if (error) throw error;
-    return (data || []) as Profile[];
+    
+    return (data || []).map(p => ({
+      id: p.id,
+      name: p.full_name,
+      email: p.email,
+      role: p.role,
+      hotelId: p.hotel_id
+    })) as User[];
   },
 
-  /** Create or update a profile (upsert by id) */
-  async upsertProfile(profile: Partial<Profile> & { id: string }): Promise<Profile> {
-    const { data, error } = await supabase
+  async upsertProfile(user: User): Promise<void> {
+    const record = {
+      id: user.id,
+      full_name: user.name,
+      email: user.email,
+      role: user.role,
+      hotel_id: user.hotelId,
+      updated_at: new Date().toISOString()
+    };
+
+    const { error } = await supabase
       .from('profiles')
-      .upsert({ ...profile, updated_at: new Date().toISOString() }, { onConflict: 'id' })
-      .select()
-      .single();
+      .upsert(record, { onConflict: 'id' });
     if (error) throw error;
-    return data as Profile;
   },
 
-  /** Delete a profile by id */
   async deleteProfile(id: string): Promise<void> {
     const { error } = await supabase
       .from('profiles')
@@ -124,17 +215,51 @@ export const supabaseService = {
     if (error) throw error;
   },
 
-  /** Get the profile for the currently authenticated user */
-  async getCurrentProfile(): Promise<Profile | null> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
-
+  // ─── GMD CONFIGURATIONS ────────────────────────────────────────────────────
+  async getGmdConfigs(): Promise<GMDConfiguration[]> {
     const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
-    if (error) return null;
-    return data as Profile;
+      .from('gmd_configurations')
+      .select('*');
+    if (error) throw error;
+    
+    return (data || []).map(g => ({
+      id: g.id,
+      hotelId: g.hotel_id,
+      packageId: g.package_id,
+      packageManagerId: g.package_manager_id,
+      costCenterId: g.cost_center_id,
+      accountManagerId: g.account_manager_id,
+      entityManagerIds: g.entity_manager_ids || [],
+      supportUserIds: g.support_user_ids || [],
+      linkedAccountIds: g.linked_account_ids || []
+    })) as GMDConfiguration[];
+  },
+
+  async upsertGmdConfig(gmd: GMDConfiguration): Promise<void> {
+    const record = {
+      id: gmd.id,
+      hotel_id: gmd.hotelId,
+      package_id: gmd.packageId,
+      package_manager_id: gmd.packageManagerId,
+      cost_center_id: gmd.costCenterId,
+      account_manager_id: gmd.accountManagerId,
+      entity_manager_ids: gmd.entityManagerIds,
+      support_user_ids: gmd.supportUserIds,
+      linked_account_ids: gmd.linkedAccountIds,
+      updated_at: new Date().toISOString()
+    };
+
+    const { error } = await supabase
+      .from('gmd_configurations')
+      .upsert(record, { onConflict: 'id' });
+    if (error) throw error;
+  },
+
+  async deleteGmdConfig(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('gmd_configurations')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
   },
 };

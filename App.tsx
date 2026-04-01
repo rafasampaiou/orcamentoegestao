@@ -158,6 +158,16 @@ const App: React.FC = () => {
           setAccounts(remoteAccounts);
         }
 
+        const remoteProfiles = await supabaseService.getProfiles();
+        if (remoteProfiles && remoteProfiles.length > 0 && isMounted) {
+          setUsers(remoteProfiles);
+        }
+
+        const remoteGmd = await supabaseService.getGmdConfigs();
+        if (remoteGmd && remoteGmd.length > 0 && isMounted) {
+          setGmdConfigs(remoteGmd);
+        }
+
         const remoteVersions = await supabaseService.getBudgetVersions();
         if (remoteVersions && remoteVersions.length > 0 && isMounted) {
           setBudgetVersions(remoteVersions);
