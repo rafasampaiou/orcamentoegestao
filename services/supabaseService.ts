@@ -7,7 +7,7 @@ export const supabaseService = {
     const { data, error } = await supabase
       .from('accounts')
       .select('*')
-      .order('sortOrder', { ascending: true });
+      .order('code', { ascending: true });
     if (error) throw error;
     return data || [];
   },

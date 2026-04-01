@@ -38,7 +38,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 }) => {
   // Initialize state passing selectedHotel and dynamic structures
   const [data, setData] = useState<ForecastRow[]>(() => {
-      const initialData = getForecastData(selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts);
+      const initialData = getForecastData(selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages);
       // Initialize previaConfig if missing
       const initializedData = initialData.map(row => ({
           ...row,
@@ -123,7 +123,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
   // We use useMemo to avoid the linter warning about setState in effect, 
   // and we only update state when the derived data actually changes from props.
   const derivedData = useMemo(() => {
-      const newData = getForecastData(selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts);
+      const newData = getForecastData(selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages);
       const initializedData = newData.map(row => ({
           ...row,
           previaConfig: row.previaConfig || { method: 'Fixed', manualValue: row.previa }

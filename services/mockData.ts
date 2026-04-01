@@ -465,7 +465,8 @@ export const getForecastData = (
     realOccupancyData: Record<string, Record<string, number>> = {},
     activeRealVersionId?: string,
     activeBudgetVersionId?: string,
-    currentAccounts: Account[] = mockAccounts
+    currentAccounts: Account[] = mockAccounts,
+    currentPackages: CostPackage[] = mockPackages
 ): ForecastRow[] => {
   
   const rows: ForecastRow[] = [];
