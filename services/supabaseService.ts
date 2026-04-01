@@ -7,9 +7,24 @@ export const supabaseService = {
     const { data, error } = await supabase
       .from('accounts')
       .select('*')
-      .order('code', { ascending: true });
+      .order('sortOrder', { ascending: true });
     if (error) throw error;
     return data || [];
+  },
+
+  async upsertAccounts(accounts: Account[]): Promise<void> {
+    const { error } = await supabase
+      .from('accounts')
+      .upsert(accounts, { onConflict: 'id' });
+    if (error) throw error;
+  },
+
+  async deleteAccount(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('accounts')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
   },
 
   // ─── COST CENTERS ─────────────────────────────────────────────────────────

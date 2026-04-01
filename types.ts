@@ -69,6 +69,7 @@ export interface Account {
   type: 'Fixed' | 'Variable_PAX' | 'Variable_UH' | 'Variable_Revenue' | 'Variable_Staff';
   sortOrder?: number;
   outOfScope?: boolean;
+  level?: 'master' | 'pkg' | 'account';
 }
 
 export interface GMDConfiguration {
