@@ -319,7 +319,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     return `${val > 0 ? '+' : ''}${val.toFixed(1)}%`;
   };
 
-  const blueRowIds = ['REV-TOTAL', 'REV-NET', 'CST-HEAD', 'RES-OP', 'RES-PCT', 'REV-IMP'];
+  const blueRowIds = ['REV-TOTAL', 'REV-NET', 'CST-HEAD', 'RES-OP', 'RES-PCT', 'REV-IMP', 'RES-OP-SEM-IMP', 'RES-OP-COM-IMP'];
   
   const monthName = new Date(selectedYear || 2024, (selectedMonth || 1) - 1).toLocaleString('pt-BR', { month: 'long' });
 
@@ -826,54 +826,49 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                     const isManualRow = ['IND-MO-2', 'IND-MO-3'].includes(row.id);
                     
                     if (!isIndicator && !isHeaderOrTotal) {
-                        const currentConfig = calculationBase === 'forecast' ? row.forecastConfig : (row.previaConfig || { method: 'Fixed' });
-                        const isFixed = currentConfig.method === 'Fixed';
-                        
                         if (isMonthClosed) {
                              // CLOSED MONTH: Read Only Standard
                              realCellContent = <span className="text-gray-800 font-medium">{formatValue(row.real, formatType)}</span>;
                              previaCellContent = <span className="text-gray-800 font-medium">{formatValue(row.previa, formatType)}</span>;
                         } else {
-                            if (calculationBase === 'forecast') {
-                                if (isFixed) {
-                                    realCellContent = (
-                                        <input 
-                                            type="number" 
-                                            className={inputClass}
-                                            value={row.forecastConfig.manualValue === undefined ? '' : row.forecastConfig.manualValue}
-                                            onChange={(e) => handleConfigChange(row.id, { method: 'Fixed', manualValue: parseFloat(e.target.value) })}
-                                            onPaste={(e) => handlePaste(e, row.id, 'real')}
-                                            step="0.01"
-                                        />
-                                    );
-                                } else {
-                                    // Variable: Read Only calculated value
-                                    realCellContent = (
-                                        <div className="flex items-center justify-end gap-1 cursor-help" title={`Calculado: ${row.forecastConfig.driver} ${row.forecastConfig.operator === 'divide' ? '/' : 'x'} ${row.forecastConfig.factor}`}>
-                                            <span className="text-orange-800 font-medium">{formatValue(row.real, formatType)}</span>
-                                        </div>
-                                    );
-                                }
+                            // FORECAST (REAL) EDITING
+                            if (row.forecastConfig.method === 'Fixed') {
+                                realCellContent = (
+                                    <input 
+                                        type="number" 
+                                        className={inputClass}
+                                        value={row.real === 0 ? '' : row.real}
+                                        onChange={(e) => handleManualValueChange(row.id, 'real', parseFloat(e.target.value))}
+                                        onPaste={(e) => handlePaste(e, row.id, 'real')}
+                                        step="0.01"
+                                    />
+                                );
                             } else {
-                                // Previa Editing
-                                if (isFixed) {
-                                    previaCellContent = (
-                                        <input 
-                                            type="number" 
-                                            className={inputClass}
-                                            value={row.previaConfig?.manualValue === undefined ? (row.previa || '') : row.previaConfig.manualValue}
-                                            onChange={(e) => handleConfigChange(row.id, { method: 'Fixed', manualValue: parseFloat(e.target.value) })}
-                                            onPaste={(e) => handlePaste(e, row.id, 'previa')}
-                                            step="0.01"
-                                        />
-                                    );
-                                } else {
-                                     previaCellContent = (
-                                        <div className="flex items-center justify-end gap-1 cursor-help" title={`Calculado: ${row.previaConfig?.driver} ${row.previaConfig?.operator === 'divide' ? '/' : 'x'} ${row.previaConfig?.factor}`}>
-                                            <span className="text-orange-800 font-medium">{formatValue(row.previa, formatType)}</span>
-                                        </div>
-                                    );
-                                }
+                                realCellContent = (
+                                    <div className="flex items-center justify-end gap-1 cursor-help" title={`Calculado: ${row.forecastConfig.driver} ${row.forecastConfig.operator === 'divide' ? '/' : 'x'} ${row.forecastConfig.factor}`}>
+                                        <span className="text-orange-800 font-medium">{formatValue(row.real, formatType)}</span>
+                                    </div>
+                                );
+                            }
+
+                            // PREVIA EDITING
+                            if ((row.previaConfig?.method || 'Fixed') === 'Fixed') {
+                                previaCellContent = (
+                                    <input 
+                                        type="number" 
+                                        className={inputClass}
+                                        value={row.previa === 0 ? '' : row.previa}
+                                        onChange={(e) => handleManualValueChange(row.id, 'previa', parseFloat(e.target.value))}
+                                        onPaste={(e) => handlePaste(e, row.id, 'previa')}
+                                        step="0.01"
+                                    />
+                                );
+                            } else {
+                                previaCellContent = (
+                                    <div className="flex items-center justify-end gap-1 cursor-help" title={`Calculado: ${row.previaConfig?.driver} ${row.previaConfig?.operator === 'divide' ? '/' : 'x'} ${row.previaConfig?.factor}`}>
+                                        <span className="text-orange-800 font-medium">{formatValue(row.previa, formatType)}</span>
+                                    </div>
+                                );
                             }
                         }
                     } else if (isIndicator) {
@@ -1179,9 +1174,12 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                         </button>
                         <button 
                             onClick={() => {
-                                // In a real app, this would save the justifications to the backend
+                                // Simulate sending notification to Admin
+                                const notificationMsg = `A unidade ${selectedHotel} atualizou uma projeção para ${monthName}/${selectedYear}.`;
+                                console.log('Notification sent to Admin:', notificationMsg);
+                                
+                                alert(`Projeção validada com sucesso!\n\nNotificação enviada aos administradores: "${notificationMsg}"`);
                                 setShowValidationModal(false);
-                                alert('Projeção validada e justificativas salvas com sucesso!');
                             }}
                             className="px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-lg shadow-md hover:bg-indigo-700 transition-colors flex items-center gap-2"
                         >

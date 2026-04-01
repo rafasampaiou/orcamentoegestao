@@ -602,8 +602,8 @@ export const getForecastData = (
   rows.push(generateRow('REV-EXTRA', '1.02', 'Revenue', 'Receitas Extras', 0, 0, 0, 0, true, false, 1));
   
   const revExtraItems = [
-      { id: 'REV-EXTRA-LAZER', code: '1.02.01', label: 'Extra Lazer' },
-      { id: 'REV-EXTRA-EVENTOS', code: '1.02.02', label: 'Extra Eventos' },
+      { id: 'REV-EXTRA-LAZER', code: '1.02.01', label: 'Lazer' },
+      { id: 'REV-EXTRA-EVENTOS', code: '1.02.02', label: 'Eventos' },
   ];
 
   revExtraItems.forEach(item => {
@@ -628,7 +628,7 @@ export const getForecastData = (
   const valLYISS = getImportedValue('Receita de ISS', (selectedYear || 0) - 1, 'Real');
   rows.push(generateRow('REV-ISS', '1.04', 'Revenue', 'Receita de ISS', valBudgetISS, valRealISS, valLYISS, valPreviaISS, false, false, 1));
 
-  // 1.05 Impostos
+  // 1.05 Impostos (Moved here per user request)
   const valBudgetImp = getImportedValue('Impostos', selectedYear, 'Budget');
   const valRealImp = getImportedValue('Impostos', selectedYear, 'Real');
   const valPreviaImp = getImportedValue('Impostos', selectedYear, 'Previa');
@@ -652,7 +652,17 @@ export const getForecastData = (
     const valPrevia = getImportedValue(pkg.name, selectedYear, 'Previa');
     const valLY = getImportedValue(pkg.name, (selectedYear || 0) - 1, 'Real');
     
-    rows.push(generateRow(pkg.id, pkg.code, 'Costs', pkg.name, valBudget, valReal, valLY, valPrevia, false, false, 1));
+    rows.push(generateRow(pkg.id, pkg.code, 'Costs', pkg.name, valBudget, valReal, valLY, valPrevia, true, false, 1));
+
+    // List individual accounts within this package
+    pkgAccounts.forEach(acc => {
+      const accBudget = getImportedValue(acc.name, selectedYear, 'Budget');
+      const accReal = getImportedValue(acc.name, selectedYear, 'Real');
+      const accPrevia = getImportedValue(acc.name, selectedYear, 'Previa');
+      const accLY = getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
+
+      rows.push(generateRow(acc.id, acc.code, 'Costs', acc.name, accBudget, accReal, accLY, accPrevia, false, false, 2));
+    });
   });
 
   // 4. RESULTS
