@@ -630,7 +630,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     masterPackage: '', 
     masterPackageCode: '', 
     type: 'Fixed' as Account['type'],
-    sortOrder: 0
+    sortOrder: 0,
+    outOfScope: false
   });
   
   const [gmdForm, setGmdForm] = useState<Partial<GMDConfiguration>>({
@@ -737,7 +738,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         masterPackage: '', 
         masterPackageCode: '',
         type: 'Fixed',
-        sortOrder: accounts.length
+        sortOrder: accounts.length,
+        outOfScope: false
       });
       setActiveModal('account');
   };
@@ -755,7 +757,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
             masterPackage: acc.masterPackage || '', 
             masterPackageCode: acc.masterPackageCode || '',
             type: acc.type || 'Fixed',
-            sortOrder: acc.sortOrder || 0
+            sortOrder: acc.sortOrder || 0,
+            outOfScope: acc.outOfScope || false
           });
           setActiveModal('account');
       }
@@ -1946,6 +1949,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                         <tr>
                           <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider w-32">Código</th>
                           <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Conta Contábil</th>
+                          <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider w-32">Fora do Escopo</th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
@@ -1972,18 +1976,21 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                 {showMaster && acc.masterPackage && (
                                   <tr className="bg-indigo-50/50 border-y border-indigo-100">
                                     <td className="px-4 py-2 text-[10px] font-black text-indigo-900 uppercase tracking-widest">{acc.masterPackageCode}</td>
-                                    <td className="px-4 py-2 text-[10px] font-black text-indigo-900 uppercase tracking-widest">{acc.masterPackage}</td>
+                                    <td colSpan={2} className="px-4 py-2 text-[10px] font-black text-indigo-900 uppercase tracking-widest">{acc.masterPackage}</td>
                                   </tr>
                                 )}
                                 {showPackage && (
                                   <tr className="bg-slate-50/50 border-b border-slate-100">
                                     <td className="px-4 py-1.5 text-[10px] font-bold text-slate-600 uppercase tracking-wider pl-8">{acc.packageCode}</td>
-                                    <td className="px-4 py-1.5 text-[10px] font-bold text-slate-600 uppercase tracking-wider pl-8">{acc.package}</td>
+                                    <td colSpan={2} className="px-4 py-1.5 text-[10px] font-bold text-slate-600 uppercase tracking-wider pl-8">{acc.package}</td>
                                   </tr>
                                 )}
                                 <tr className="hover:bg-gray-50 transition-colors group cursor-pointer" onClick={() => openEditAccount(acc.id)}>
                                   <td className="px-4 py-3 whitespace-nowrap text-xs font-mono text-gray-500">{acc.code}</td>
                                   <td className="px-4 py-3 whitespace-nowrap text-xs font-bold text-gray-900 pl-12">{acc.name}</td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-xs font-bold text-gray-900">
+                                    {acc.outOfScope ? <span className="text-red-600">Sim</span> : <span className="text-emerald-600">Não</span>}
+                                  </td>
                                 </tr>
                               </React.Fragment>
                             );
@@ -2630,7 +2637,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                   <input type="text" value={accountForm.masterPackage} onChange={e => setAccountForm({...accountForm, masterPackage: e.target.value})} className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ex: CUSTOS DE ALIMENTOS E BEBIDAS" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Comportamento (Budget)</label>
                   <select value={accountForm.type} onChange={e => setAccountForm({...accountForm, type: e.target.value as Account['type']})} className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none">
@@ -2644,6 +2651,17 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Ordem</label>
                   <input type="number" value={accountForm.sortOrder} onChange={e => setAccountForm({...accountForm, sortOrder: parseInt(e.target.value) || 0})} className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="0" />
+                </div>
+                <div className="flex items-end pb-3">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      className="w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500"
+                      checked={accountForm.outOfScope}
+                      onChange={e => setAccountForm({...accountForm, outOfScope: e.target.checked})}
+                    />
+                    <span className="text-sm font-bold text-gray-700">Fora do Escopo</span>
+                  </label>
                 </div>
               </div>
             </div>
