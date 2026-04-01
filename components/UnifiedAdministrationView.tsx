@@ -813,13 +813,14 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const handleSaveHotel = async () => {
       if (!hotelForm.name) return;
       
-      const newHotel: Hotel = editingId 
-        ? { id: editingId, name: hotelForm.name, code: hotelForm.id || editingId }
-        : { 
-            id: hotelForm.id || `h-${Date.now()}`, 
-            name: hotelForm.name,
-            code: hotelForm.id || `H${hotels.length + 1}` 
-          };
+      const hotelId = editingId || hotelForm.id || hotelForm.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      const hotelCode = hotelForm.id || hotelForm.name.substring(0, 3).toUpperCase();
+      
+      const newHotel: Hotel = { 
+          id: hotelId, 
+          name: hotelForm.name, 
+          code: hotelCode 
+      };
 
       try {
           await supabaseService.upsertHotels([newHotel]);
@@ -829,9 +830,10 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               setHotels(prev => [...prev, newHotel]);
           }
           setActiveModal(null);
-      } catch (err) {
+      } catch (err: any) {
           console.error("Erro ao salvar hotel:", err);
-          alert("Erro ao salvar no banco de dados.");
+          const msg = err?.message || err?.details || JSON.stringify(err);
+          alert(`Erro ao salvar hotel: ${msg}`);
       }
   };
 
