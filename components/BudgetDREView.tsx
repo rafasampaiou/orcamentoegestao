@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { PieChart, Settings, Columns, Rows, Check, X, Eye, Table as TableIcon, Layers, BarChart, Hash, ChevronRight, ChevronDown, Copy, Plus, Minus } from 'lucide-react';
 import { Account, CostCenter } from '../types';
-import { USALI_STRUCTURE } from '../services/mockData';
 import { supabaseService } from '../services/supabaseService';
 import { toast } from 'react-hot-toast'; // Assuming toast is available for feedback
 
@@ -298,18 +297,15 @@ const BudgetDREView: React.FC<BudgetDREViewProps> = ({ accounts, costCenters, si
         }));
     };
 
-    // Map accounts to their packages and masters based on USALI_STRUCTURE
+    // Map accounts to their packages and masters using account fields from Supabase
     const accountPackageMap = useMemo(() => {
         const map: Record<string, { package: string, master: string }> = {};
         
         accounts.forEach(acc => {
-            const structureInfo = USALI_STRUCTURE.find(s => s.code === acc.code || s.name === acc.name);
-            if (structureInfo) {
-                map[acc.id] = { package: structureInfo.package, master: structureInfo.master };
-            } else {
-                // Fallback for accounts not in structure
-                map[acc.id] = { package: 'Outros', master: 'OUTROS' };
-            }
+            map[acc.id] = { 
+                package: acc.package || 'Outros', 
+                master: acc.masterPackage || 'OUTROS' 
+            };
         });
         return map;
     }, [accounts]);

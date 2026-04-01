@@ -1,22 +1,17 @@
 import { supabase } from './supabaseClient';
-import { Account, CostCenter, Hotel, BudgetVersion, User, GMDConfiguration } from '../types';
+import { Account, CostCenter, Hotel, BudgetVersion, User, GMDConfiguration, UserRole } from '../types';
 
 export const supabaseService = {
-  // ─── ACCOUNTS ────────────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ACCOUNTS (Contas Contábeis)
+  // ═══════════════════════════════════════════════════════════════════════════
   async getAccounts(): Promise<Account[]> {
     const { data, error } = await supabase
       .from('accounts')
       .select('*')
       .order('sortOrder', { ascending: true });
     if (error) throw error;
-    
-    return (data || []).map(a => ({
-      ...a,
-      packageCode: a.package_code,
-      masterPackage: a.master_package,
-      masterPackageCode: a.master_package_code,
-      outOfScope: a.out_of_scope
-    })) as Account[];
+    return (data || []) as Account[];
   },
 
   async upsertAccounts(accounts: Account[]): Promise<void> {
@@ -26,12 +21,13 @@ export const supabaseService = {
       name: a.name,
       level: a.level || 'account',
       package: a.package,
-      package_code: a.packageCode,
-      master_package: a.masterPackage,
-      master_package_code: a.masterPackageCode,
+      packageCode: a.packageCode,
+      masterPackage: a.masterPackage,
+      masterPackageCode: a.masterPackageCode,
+      packageId: a.packageId,
       type: a.type || 'Fixed',
       sortOrder: a.sortOrder || 0,
-      out_of_scope: a.outOfScope || false,
+      outOfScope: a.outOfScope || false,
       updated_at: new Date().toISOString()
     }));
 
@@ -49,14 +45,16 @@ export const supabaseService = {
     if (error) throw error;
   },
 
-  // ─── COST CENTERS ─────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════════
+  // COST CENTERS (Setores / CR / PDV)
+  // ═══════════════════════════════════════════════════════════════════════════
   async getCostCenters(): Promise<CostCenter[]> {
     const { data, error } = await supabase
       .from('cost_centers')
       .select('*')
       .order('name', { ascending: true });
     if (error) throw error;
-    
+
     return (data || []).map(cc => ({
       id: cc.id,
       code: cc.code || cc.id,
@@ -73,6 +71,7 @@ export const supabaseService = {
   async upsertCostCenters(costCenters: CostCenter[]): Promise<void> {
     const records = costCenters.map(cc => ({
       id: cc.id,
+      code: cc.code || cc.id,
       name: cc.name,
       type: cc.type,
       directorate: cc.directorate,
@@ -97,14 +96,16 @@ export const supabaseService = {
     if (error) throw error;
   },
 
-  // ─── HOTELS ───────────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HOTELS (Unidades)
+  // ═══════════════════════════════════════════════════════════════════════════
   async getHotels(): Promise<Hotel[]> {
     const { data, error } = await supabase
       .from('hotels')
       .select('*')
       .order('name', { ascending: true });
     if (error) throw error;
-    return data || [];
+    return (data || []) as Hotel[];
   },
 
   async upsertHotels(hotels: Hotel[]): Promise<void> {
@@ -129,7 +130,9 @@ export const supabaseService = {
     if (error) throw error;
   },
 
-  // ─── BUDGET DATA ──────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════════
+  // BUDGET DATA (Valores do Orçamento)
+  // ═══════════════════════════════════════════════════════════════════════════
   async getBudgetData(accountId: string, costCenterId: string, year: number): Promise<number[]> {
     const { data, error } = await supabase
       .from('budget_data')
@@ -164,30 +167,46 @@ export const supabaseService = {
     if (error) throw error;
   },
 
-  // ─── BUDGET VERSIONS ───────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════════
+  // BUDGET VERSIONS (Versões de Orçamento)
+  // ═══════════════════════════════════════════════════════════════════════════
   async getBudgetVersions(): Promise<BudgetVersion[]> {
     const { data, error } = await supabase
       .from('budget_versions')
       .select('*')
       .order('year', { ascending: false });
     if (error) throw error;
-    return data || [];
+
+    return (data || []).map(v => ({
+      id: v.id,
+      name: v.name,
+      year: v.year,
+      month: v.month,
+      isLocked: v.is_locked,
+      isMain: v.is_main,
+      createdAt: v.created_at,
+      updatedAt: v.updated_at
+    })) as BudgetVersion[];
   },
 
-  // ─── PROFILES (USER MANAGEMENT) ────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PROFILES (Usuários do sistema)
+  // Mapeamento: profiles.full_name → User.name
+  //             profiles.hotel_id  → User.hotelId
+  // ═══════════════════════════════════════════════════════════════════════════
   async getProfiles(): Promise<User[]> {
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .order('full_name', { ascending: true });
     if (error) throw error;
-    
+
     return (data || []).map(p => ({
       id: p.id,
-      name: p.full_name,
-      email: p.email,
-      role: p.role,
-      hotelId: p.hotel_id
+      name: p.full_name || '',
+      email: p.email || '',
+      role: (p.role || 'Gestor de Pacote') as UserRole,
+      hotelId: p.hotel_id || undefined
     })) as User[];
   },
 
@@ -197,7 +216,7 @@ export const supabaseService = {
       full_name: user.name,
       email: user.email,
       role: user.role,
-      hotel_id: user.hotelId,
+      hotel_id: user.hotelId || null,
       updated_at: new Date().toISOString()
     };
 
@@ -215,20 +234,23 @@ export const supabaseService = {
     if (error) throw error;
   },
 
-  // ─── GMD CONFIGURATIONS ────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GMD CONFIGURATIONS (Matriz de Gestão por conta)
+  // Mapeamento: snake_case (DB) → camelCase (Frontend)
+  // ═══════════════════════════════════════════════════════════════════════════
   async getGmdConfigs(): Promise<GMDConfiguration[]> {
     const { data, error } = await supabase
       .from('gmd_configurations')
       .select('*');
     if (error) throw error;
-    
+
     return (data || []).map(g => ({
       id: g.id,
-      hotelId: g.hotel_id,
-      packageId: g.package_id,
-      packageManagerId: g.package_manager_id,
-      costCenterId: g.cost_center_id,
-      accountManagerId: g.account_manager_id,
+      hotelId: g.hotel_id || '',
+      packageId: g.package_id || '',
+      packageManagerId: g.package_manager_id || '',
+      costCenterId: g.cost_center_id || '',
+      accountManagerId: g.account_manager_id || '',
       entityManagerIds: g.entity_manager_ids || [],
       supportUserIds: g.support_user_ids || [],
       linkedAccountIds: g.linked_account_ids || []
