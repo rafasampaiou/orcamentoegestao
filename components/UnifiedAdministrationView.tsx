@@ -1047,27 +1047,34 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   };
 
   const handleFinalAccountImport = () => {
-      // Logic to merge/replace accounts
-      const validAccounts = accParsedData
-          .filter(a => a.status === 'valid')
-          .map(a => ({ 
-            id: a.id, 
-            code: a.id, 
-            name: a.name, 
-            package: a.package, 
-            masterPackage: a.masterPackage,
-            type: 'Fixed' as const 
-          }));
+    const validData = accParsedData.filter(r => r.status === 'valid');
+    if (validData.length === 0) return;
 
-      if (accImportMode === 'replace') {
-          setAccounts(validAccounts);
-      } else {
-          setAccounts(prev => [...prev, ...validAccounts]);
-      }
-      setAccParsedData([]);
-      setAccImportStep('input');
-      setImportText('');
-      alert(`${validAccounts.length} contas importadas com sucesso!`);
+    const newAccounts: Account[] = validData.map(a => ({ 
+        id: a.id, 
+        code: a.id, 
+        name: a.name, 
+        package: a.package, 
+        masterPackage: a.masterPackage,
+        type: 'Fixed' as const,
+        sortOrder: accounts.length // Simple fallback for sort order
+    }));
+
+    if (accImportMode === 'replace') {
+        setAccounts(newAccounts);
+    } else {
+        // Merge logic: update existing or add new
+        setAccounts(prev => {
+            const map = new Map(prev.map(acc => [acc.id, acc]));
+            newAccounts.forEach(acc => map.set(acc.id, acc));
+            return Array.from(map.values());
+        });
+    }
+
+    setAccImportStep('input');
+    setAccParsedData([]);
+    setImportText('');
+    alert(`${validData.length} contas importadas com sucesso!`);
   };
 
   // --- HANDLERS: DELETE ---
@@ -2245,7 +2252,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                         <p className="font-bold mb-1">Instruções para Importação de Contas:</p>
                         <p>Cole os dados do Excel com as seguintes colunas (separadas por TAB ou Ponto e Vírgula):</p>
                         <code className="block mt-2 bg-white/50 p-2 rounded border border-amber-100">
-                          Nome | Código
+                          Código | Conta Contábil | Pacote | Pacote Master
                         </code>
                       </div>
                       <textarea 
@@ -2282,8 +2289,10 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                           <thead className="bg-gray-50">
                             <tr>
                               <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Status</th>
-                              <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Nome</th>
                               <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Código</th>
+                              <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Conta Contábil</th>
+                              <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Pacote</th>
+                              <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Pacote Master</th>
                               <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Mensagem</th>
                             </tr>
                           </thead>
@@ -2293,8 +2302,10 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                 <td className="px-4 py-3 whitespace-nowrap">
                                   {row.status === 'valid' ? <div className="w-2 h-2 rounded-full bg-emerald-500" /> : <div className="w-2 h-2 rounded-full bg-red-500" />}
                                 </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-xs font-bold">{row.name}</td>
                                 <td className="px-4 py-3 whitespace-nowrap text-xs font-mono">{row.id}</td>
+                                <td className="px-4 py-3 whitespace-nowrap text-xs font-bold">{row.name}</td>
+                                <td className="px-4 py-3 whitespace-nowrap text-xs">{row.package || '-'}</td>
+                                <td className="px-4 py-3 whitespace-nowrap text-xs">{row.masterPackage || '-'}</td>
                                 <td className="px-4 py-3 whitespace-nowrap text-[10px] text-red-600 italic">{row.msg}</td>
                               </tr>
                             ))}
