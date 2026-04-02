@@ -228,6 +228,23 @@ export const supabaseService = {
     if (error) throw error;
   },
 
+  async adminSaveProfile(user: User): Promise<string> {
+      const { data, error } = await supabase.rpc('admin_save_user', {
+          p_id: user.id,
+          p_email: user.email,
+          p_password: user.tempPassword || '',
+          p_name: user.name,
+          p_role: user.role,
+          p_hotel_id: user.hotelId || null,
+          p_can_admin: true,
+          p_can_geral: true,
+          p_can_cadastros: true
+      });
+      
+      if (error) throw error;
+      return data as string; // UUID of the user
+  },
+
   async deleteProfile(id: string): Promise<void> {
     const { error } = await supabase
       .from('profiles')

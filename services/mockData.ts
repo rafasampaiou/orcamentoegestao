@@ -628,12 +628,16 @@ export const getForecastData = (
   const valLYISS = getImportedValue('Receita de ISS', (selectedYear || 0) - 1, 'Real');
   rows.push(generateRow('REV-ISS', '1.04', 'Revenue', 'Receita de ISS', valBudgetISS, valRealISS, valLYISS, valPreviaISS, false, false, 1));
 
-  // 1.05 Impostos (Moved here per user request)
+  rows.push(generateRow('SPACER-BEFORE-IMP', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
+
+  // 1.05 Impostos (Azul conforme Receita Líquida, recuo zero)
   const valBudgetImp = getImportedValue('Impostos', selectedYear, 'Budget');
   const valRealImp = getImportedValue('Impostos', selectedYear, 'Real');
   const valPreviaImp = getImportedValue('Impostos', selectedYear, 'Previa');
   const valLYImp = getImportedValue('Impostos', (selectedYear || 0) - 1, 'Real');
-  rows.push(generateRow('REV-IMP', '1.05', 'Revenue', 'Impostos', valBudgetImp, valRealImp, valLYImp, valPreviaImp, false, false, 1));
+  rows.push(generateRow('REV-IMP', '1.05', 'Revenue', 'Impostos', valBudgetImp, valRealImp, valLYImp, valPreviaImp, false, false, 0));
+
+  rows.push(generateRow('SPACER-AFTER-IMP', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
 
   // 3.00 Receita Líquida
   rows.push(generateRow('REV-NET', '3.00', 'Revenue', 'RECEITA LÍQUIDA', 0, 0, 0, 0, true, true, 0)); 

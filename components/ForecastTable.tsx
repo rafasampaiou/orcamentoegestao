@@ -319,7 +319,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     return `${val > 0 ? '+' : ''}${val.toFixed(1)}%`;
   };
 
-  const blueRowIds = ['REV-TOTAL', 'REV-NET', 'CST-HEAD', 'RES-OP', 'RES-PCT', 'RES-OP-SEM-IMP', 'RES-OP-COM-IMP'];
+  const blueRowIds = ['REV-TOTAL', 'REV-NET', 'CST-HEAD', 'RES-OP', 'RES-PCT', 'REV-IMP', 'RES-OP-SEM-IMP', 'RES-OP-COM-IMP'];
   
   const monthName = new Date(selectedYear || 2024, (selectedMonth || 1) - 1).toLocaleString('pt-BR', { month: 'long' });
 

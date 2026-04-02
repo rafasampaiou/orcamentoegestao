@@ -935,29 +935,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       let finalId = editingId || `u-${Date.now()}`;
       
       try {
-          if (!editingId && userForm.password && userForm.email) {
-              const { data, error } = await supabaseTemp.auth.signUp({
-                  email: userForm.email,
-                  password: userForm.password,
-                  options: {
-                      data: {
-                          full_name: userForm.name
-                      }
-                  }
-              });
-              if (error) {
-                  if (error.status === 422 || error.message.toLowerCase().includes('already')) {
-                     alert(`Atenção: O e-mail ${userForm.email} já está registrado no Auth. O perfil será criado/vinculado, mas a senha precisará ser redefinida pelo próprio usuário se ele tiver esquecido.`);
-                  } else {
-                     throw error;
-                  }
-              }
-              if (data?.user?.id) {
-                  finalId = data.user.id;
-              }
-          }
-          
-          const newUser: User = { 
+          const newUserReq: User = { 
               id: finalId, 
               name: userForm.name,
               email: userForm.email,
@@ -966,11 +944,13 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               tempPassword: userForm.password || undefined
           };
 
-          await supabaseService.upsertProfile(newUser);
+          const returnedUuid = await supabaseService.adminSaveProfile(newUserReq);
+          newUserReq.id = returnedUuid;
+          
           if (editingId) {
-              setUsers(prev => prev.map(u => u.id === editingId ? newUser : u));
+              setUsers(prev => prev.map(u => u.id === editingId ? newUserReq : u));
           } else {
-              setUsers(prev => [...prev, newUser]);
+              setUsers(prev => [...prev, newUserReq]);
           }
           setActiveModal(null);
       } catch (err: any) {
@@ -1368,7 +1348,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
       const rows = importText.split('\n');
       const firstRowCols = rows[0].split('\t');
-      const hasHeader = isNaN(Number(firstRowCols[9])); // Mês is at index 9
+      const hasHeader = isNaN(Number(firstRowCols[2])); // Mês is now at index 2
       const startIdx = hasHeader ? 1 : 0;
       
       const parsed: ImportedRow[] = [];
@@ -1386,13 +1366,18 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
           let status: 'valid' | 'error' = 'valid';
           const msgParts: string[] = [];
           
-          if (cols.length < 12) {
+          if (cols.length < 11) {
               status = 'error';
-              msgParts.push(`Colunas insuficientes (${cols.length}/12). Verifique tabulação.`);
-              while(cols.length < 12) cols.push('');
+              msgParts.push(`Colunas insuficientes (${cols.length}/11). Verifique tabulação.`);
+              while(cols.length < 11) cols.push('');
           }
 
-          const [tipo, cenario, escopo, hotel, crName, departamento, contaName, pacote, pacoteMaster, mes, valor, diretoria] = cols;
+          const [ano_col, escopo, mes, contaName, crName, valor, hotel, departamento, pacote, pacoteMaster, diretoria] = cols;
+          
+          // Se o cenário não vier na coluna, assumimos REAL por padrão para a aba de Real
+          // Mas para manter compatibilidade com a lógica de handleFinalImport:
+          const cenario = 'REAL'; 
+          const tipo = 'Revenue'; // Valor padrão para tipo/natureza se omitido
 
           let finalVal = '';
           if (valor) {
@@ -1444,9 +1429,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
           }
 
           parsed.push({
-              ano: importYear.toString(), 
-              cenario: cenario || '', 
-              tipo: tipo || '', 
+              ano: ano_col || importYear.toString(), 
+              cenario: cenario, 
+              tipo: tipo, 
               hotel: hotel || '', 
               conta: matchedAccountName || contaName || '', 
               cr: crName || '', 
@@ -1843,9 +1828,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                   <>
                     <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl text-sm text-amber-800 mb-4">
                       <p className="font-bold mb-1">Instruções para Importação Financeira:</p>
-                      <p>Cole os dados do Excel com as seguintes colunas (separadas por TAB ou Ponto e Vírgula):</p>
+                      <p>Cole os dados do Excel com as seguintes colunas (separadas por TAB):</p>
                       <code className="block mt-2 bg-white/50 p-2 rounded border border-amber-100 font-mono text-[10px]">
-                        Natureza | Cenário | Escopo | Hotel | Setor (CR/PDV) | Departamento | Conta Contábil | Pacote | Pacote Master | Mês | Valor | Diretoria
+                        Ano | Escopo ou Fora | Mês | Classe Gerencial Nome | Centro de Resultado Nome | Valor Ajustado | Filial | Departamento | Pacote | Pacote Master | Diretoria
                       </code>
                     </div>
                     <div className="flex items-center gap-4 mb-4">
@@ -2018,9 +2003,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                   <>
                     <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl text-sm text-amber-800 mb-4">
                       <p className="font-bold mb-1">Instruções para Importação Financeira:</p>
-                      <p>Cole os dados do Excel com as seguintes colunas (separadas por TAB ou Ponto e Vírgula):</p>
+                      <p>Cole os dados do Excel com as seguintes colunas (separadas por TAB):</p>
                       <code className="block mt-2 bg-white/50 p-2 rounded border border-amber-100 font-mono text-[10px]">
-                        Natureza | Cenário | Escopo | Hotel | Setor (CR/PDV) | Departamento | Conta Contábil | Pacote | Pacote Master | Mês | Valor | Diretoria
+                        Ano | Escopo ou Fora | Mês | Classe Gerencial Nome | Centro de Resultado Nome | Valor Ajustado | Filial | Departamento | Pacote | Pacote Master | Diretoria
                       </code>
                     </div>
                     <div className="flex items-center gap-4 mb-4">
