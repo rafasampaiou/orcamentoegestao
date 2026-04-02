@@ -5,6 +5,7 @@ import { Plus, Trash2, X, Save, Briefcase, Pencil, Calendar, PieChart, Lock, Loc
 import { User, UserRole, CostCenter, ImportedRow, Hotel, Account, BudgetVersion, LaborParameters, ScheduleItem, ImportedCostCenter, CostPackage, GMDConfiguration } from '../types';
 import TimelineView from './TimelineView';
 import { supabaseService } from '../services/supabaseService';
+import { supabaseTemp } from '../services/supabaseClient';
 
 // Types for DRE Configuration state
 interface DreAccount {
@@ -715,7 +716,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const [editingId, setEditingId] = useState<string | null>(null);
 
   // Form States
-  const [userForm, setUserForm] = useState({ name: '', email: '', role: UserRole.PACKAGE_MANAGER, hotelId: '' });
+  const [userForm, setUserForm] = useState({ name: '', email: '', role: UserRole.PACKAGE_MANAGER, hotelId: '', password: '' });
   const [costCenterForm, setCostCenterForm] = useState({ id: '', code: '', name: '', directorate: '', department: '', type: 'CR' as 'CR' | 'PDV', hotelName: '', hierarchicalCode: '', companyCode: '' });
   const [hotelForm, setHotelForm] = useState({ id: '', name: '' });
   const [accountForm, setAccountForm] = useState<Account>({ 
@@ -756,7 +757,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   
   const openNewUser = () => {
       setEditingId(null);
-      setUserForm({ name: '', email: '', role: UserRole.PACKAGE_MANAGER, hotelId: '' });
+      setUserForm({ name: '', email: '', role: UserRole.PACKAGE_MANAGER, hotelId: '', password: '' });
       setActiveModal('user');
   };
 
@@ -764,7 +765,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       const u = users.find(i => i.id === id);
       if (u) {
           setEditingId(id);
-          setUserForm({ name: u.name, email: u.email, role: u.role, hotelId: u.hotelId || '' });
+          setUserForm({ name: u.name, email: u.email, role: u.role, hotelId: u.hotelId || '', password: '' });
           setActiveModal('user');
       }
   };
@@ -930,12 +931,40 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
   const handleSaveUser = async () => {
       if (!userForm.name) return;
-      const newUser: User = { 
-          id: editingId || `u-${Date.now()}`, 
-          ...userForm 
-      };
-
+      
+      let finalId = editingId || `u-${Date.now()}`;
+      
       try {
+          if (!editingId && userForm.password && userForm.email) {
+              const { data, error } = await supabaseTemp.auth.signUp({
+                  email: userForm.email,
+                  password: userForm.password,
+                  options: {
+                      data: {
+                          full_name: userForm.name
+                      }
+                  }
+              });
+              if (error) {
+                  if (error.status === 422 || error.message.toLowerCase().includes('already')) {
+                     alert(`Atenção: O e-mail ${userForm.email} já está registrado no Auth. O perfil será criado/vinculado, mas a senha precisará ser redefinida pelo próprio usuário se ele tiver esquecido.`);
+                  } else {
+                     throw error;
+                  }
+              }
+              if (data?.user?.id) {
+                  finalId = data.user.id;
+              }
+          }
+          
+          const newUser: User = { 
+              id: finalId, 
+              name: userForm.name,
+              email: userForm.email,
+              role: userForm.role,
+              hotelId: userForm.hotelId
+          };
+
           await supabaseService.upsertProfile(newUser);
           if (editingId) {
               setUsers(prev => prev.map(u => u.id === editingId ? newUser : u));
@@ -2828,6 +2857,13 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 <label className="block text-sm font-bold text-gray-700 mb-1">Email</label>
                 <input type="email" value={userForm.email} onChange={e => setUserForm({...userForm, email: e.target.value})} className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="joao@taua.com.br" />
               </div>
+              {!editingId && (
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Senha Provisória</label>
+                  <input type="password" value={userForm.password} onChange={e => setUserForm({...userForm, password: e.target.value})} className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Definir senha de acesso" />
+                  <p className="text-[10px] text-gray-500 mt-1 italic">Defina uma senha para que o usuário possa acessar o sistema. Opcional caso o usuário já possua cadastro no sistema corporativo.</p>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1">Perfil de Acesso</label>
                 <select value={userForm.role} onChange={e => setUserForm({...userForm, role: e.target.value as UserRole})} className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none">

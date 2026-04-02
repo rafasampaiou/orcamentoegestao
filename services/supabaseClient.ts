@@ -8,3 +8,6 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabaseTemp = createClient(supabaseUrl, supabaseAnonKey, { 
+    auth: { persistSession: false, autoRefreshToken: false, storageKey: 'temp_user_reg' } 
+});
