@@ -206,7 +206,8 @@ export const supabaseService = {
       name: p.full_name || '',
       email: p.email || '',
       role: (p.role || 'Gestor de Pacote') as UserRole,
-      hotelId: p.hotel_id || undefined
+      hotelId: p.hotel_id || undefined,
+      tempPassword: p.temp_password || undefined
     })) as User[];
   },
 
@@ -217,6 +218,7 @@ export const supabaseService = {
       email: user.email,
       role: user.role,
       hotel_id: user.hotelId || null,
+      temp_password: user.tempPassword || null,
       updated_at: new Date().toISOString()
     };
 

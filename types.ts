@@ -13,6 +13,7 @@ export interface User {
   role: UserRole;
   avatarUrl?: string;
   hotelId?: string; // Link user to a specific Hotel/Entity
+  tempPassword?: string; // Storing temporary password for admin viewing
 }
 
 // Profile represents a user account managed in the `profiles` table in Supabase.
@@ -27,6 +28,7 @@ export interface Profile {
   can_access_geral: boolean;     // Tauá Geral
   can_access_cadastros: boolean; // Cadastros
   avatar_url: string | null;
+  temp_password?: string | null;
   created_at?: string;
   updated_at?: string;
 }

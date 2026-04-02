@@ -319,7 +319,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     return `${val > 0 ? '+' : ''}${val.toFixed(1)}%`;
   };
 
-  const blueRowIds = ['REV-TOTAL', 'REV-NET', 'CST-HEAD', 'RES-OP', 'RES-PCT', 'REV-IMP', 'RES-OP-SEM-IMP', 'RES-OP-COM-IMP'];
+  const blueRowIds = ['REV-TOTAL', 'REV-NET', 'CST-HEAD', 'RES-OP', 'RES-PCT', 'RES-OP-SEM-IMP', 'RES-OP-COM-IMP'];
   
   const monthName = new Date(selectedYear || 2024, (selectedMonth || 1) - 1).toLocaleString('pt-BR', { month: 'long' });
 
@@ -1148,15 +1148,16 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
         // REV-EXTRA = Extra Lazer + Extra Eventos
         sumAndSet('REV-EXTRA', [{id: 'REV-EXTRA-LAZER'}, {id: 'REV-EXTRA-EVENTOS'}], field);
 
-        // REV-TOTAL = REV-APT + REV-EXTRA + REV-TIME
-        sumAndSet('REV-TOTAL', [{id: 'REV-APT'}, {id: 'REV-EXTRA'}, {id: 'REV-TIME'}], field);
+        // REV-TOTAL = REV-APT + REV-EXTRA
+        sumAndSet('REV-TOTAL', [{id: 'REV-APT'}, {id: 'REV-EXTRA'}], field);
         
-        // REV-NET = REV-TOTAL - REV-ISS - REV-IMP
+        // REV-NET = REV-TOTAL - REV-TIME - REV-ISS - REV-IMP
         const total = rowMap.get('REV-TOTAL')?.[field] || 0;
+        const ts = rowMap.get('REV-TIME')?.[field] || 0;
         const iss = rowMap.get('REV-ISS')?.[field] || 0;
         const imp = rowMap.get('REV-IMP')?.[field] || 0;
         const net = rowMap.get('REV-NET');
-        if(net) net[field] = total - iss - imp;
+        if(net) net[field] = total - ts - iss - imp;
     });
 
     // --- COSTS CALCULATIONS ---

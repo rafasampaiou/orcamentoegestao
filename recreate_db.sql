@@ -68,6 +68,7 @@ CREATE TABLE public.profiles (
     can_access_geral BOOLEAN DEFAULT FALSE,
     can_access_cadastros BOOLEAN DEFAULT FALSE,
     avatar_url TEXT,
+    temp_password TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );

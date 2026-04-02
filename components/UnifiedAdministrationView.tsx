@@ -962,7 +962,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               name: userForm.name,
               email: userForm.email,
               role: userForm.role,
-              hotelId: userForm.hotelId
+              hotelId: userForm.hotelId,
+              tempPassword: userForm.password || undefined
           };
 
           await supabaseService.upsertProfile(newUser);
@@ -1840,6 +1841,13 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               <div className="space-y-4">
                 {importStep === 'input' ? (
                   <>
+                    <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl text-sm text-amber-800 mb-4">
+                      <p className="font-bold mb-1">Instruções para Importação Financeira:</p>
+                      <p>Cole os dados do Excel com as seguintes colunas (separadas por TAB ou Ponto e Vírgula):</p>
+                      <code className="block mt-2 bg-white/50 p-2 rounded border border-amber-100 font-mono text-[10px]">
+                        Natureza | Cenário | Escopo | Hotel | Setor (CR/PDV) | Departamento | Conta Contábil | Pacote | Pacote Master | Mês | Valor | Diretoria
+                      </code>
+                    </div>
                     <div className="flex items-center gap-4 mb-4">
                       <label className="text-sm font-bold text-gray-700">Ano da Importação:</label>
                       <select 
@@ -2008,6 +2016,13 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               <div className="space-y-4">
                 {importStep === 'input' ? (
                   <>
+                    <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl text-sm text-amber-800 mb-4">
+                      <p className="font-bold mb-1">Instruções para Importação Financeira:</p>
+                      <p>Cole os dados do Excel com as seguintes colunas (separadas por TAB ou Ponto e Vírgula):</p>
+                      <code className="block mt-2 bg-white/50 p-2 rounded border border-amber-100 font-mono text-[10px]">
+                        Natureza | Cenário | Escopo | Hotel | Setor (CR/PDV) | Departamento | Conta Contábil | Pacote | Pacote Master | Mês | Valor | Diretoria
+                      </code>
+                    </div>
                     <div className="flex items-center gap-4 mb-4">
                       <label className="text-sm font-bold text-gray-700">Ano da Importação:</label>
                       <select 
@@ -2046,7 +2061,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
           <button onClick={() => setActiveGeralTab('registries')} className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeGeralTab === 'registries' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Cadastros</button>
           <button onClick={() => setActiveGeralTab('gmd')} className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeGeralTab === 'gmd' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>GMD</button>
           <button onClick={() => setActiveGeralTab('import')} className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeGeralTab === 'import' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Importação</button>
-          <button onClick={() => setActiveGeralTab('dre_view')} className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeGeralTab === 'dre_view' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Visualização DRE</button>
         </div>
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm min-h-[400px]">
           {activeGeralTab === 'registries' && (
@@ -2070,6 +2084,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                         <tr>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Senha (Temporária)</th>
                           <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
                         </tr>
                       </thead>
@@ -2078,6 +2093,15 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                           <tr key={u.id}>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{u.name}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{u.email}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-mono text-gray-500">
+                              {u.tempPassword ? (
+                                <div className="flex items-center justify-center gap-2 group cursor-pointer" title="Clique para copiar" onClick={() => {navigator.clipboard.writeText(u.tempPassword!); alert('Criado copiado!');}}>
+                                  <span className="blur-sm group-hover:blur-none transition-all select-all">{u.tempPassword}</span>
+                                </div>
+                              ) : (
+                                <span className="text-gray-300 italic text-xs">Oculta / Não Definida</span>
+                              )}
+                            </td>
                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                               <button onClick={() => openEditUser(u.id)} className="text-indigo-600 hover:text-indigo-900 mr-3"><Pencil size={16}/></button>
                               <button onClick={() => handleDelete('users', u.id)} className="text-red-600 hover:text-red-900"><Trash2 size={16}/></button>
@@ -2696,96 +2720,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                   )}
                 </div>
               )}
-            </div>
-          )}
-          {activeGeralTab === 'dre_view' && (
-            <div className="max-w-2xl space-y-6">
-              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-6">
-                <h4 className="font-bold text-gray-800 flex items-center gap-2 border-b border-gray-50 pb-4">
-                  <Settings size={20} className="text-indigo-600"/>
-                  Parâmetros de Visualização da DRE
-                </h4>
-                
-                <div className="grid grid-cols-1 gap-4">
-                  <label className="flex items-center justify-between p-4 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-white rounded-lg shadow-sm text-indigo-600"><Eye size={18}/></div>
-                      <div>
-                        <p className="font-bold text-gray-700 text-sm">Exibir Linhas Vazias</p>
-                        <p className="text-[10px] text-gray-500">Mostra contas mesmo sem movimentação no período</p>
-                      </div>
-                    </div>
-                    <input 
-                      type="checkbox" 
-                      className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                      checked={dreParams.showEmptyRows}
-                      onChange={e => setDreParams({...dreParams, showEmptyRows: e.target.checked})}
-                    />
-                  </label>
-
-                  <label className="flex items-center justify-between p-4 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-white rounded-lg shadow-sm text-indigo-600"><FileText size={18}/></div>
-                      <div>
-                        <p className="font-bold text-gray-700 text-sm">Exibir Códigos das Contas</p>
-                        <p className="text-[10px] text-gray-500">Mostra o código contábil ao lado do nome da conta</p>
-                      </div>
-                    </div>
-                    <input 
-                      type="checkbox" 
-                      className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                      checked={dreParams.showAccountCodes}
-                      onChange={e => setDreParams({...dreParams, showAccountCodes: e.target.checked})}
-                    />
-                  </label>
-
-                  <label className="flex items-center justify-between p-4 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-white rounded-lg shadow-sm text-indigo-600"><Layout size={18}/></div>
-                      <div>
-                        <p className="font-bold text-gray-700 text-sm">Agrupar por Master Packages</p>
-                        <p className="text-[10px] text-gray-500">Exibe a hierarquia completa de pacotes master</p>
-                      </div>
-                    </div>
-                    <input 
-                      type="checkbox" 
-                      className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                      checked={dreParams.showMasterPackages}
-                      onChange={e => setDreParams({...dreParams, showMasterPackages: e.target.checked})}
-                    />
-                  </label>
-
-                  <div className="pt-4 border-t border-gray-100">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">Comparações Padrão</p>
-                    <div className="grid grid-cols-2 gap-4">
-                      <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-xl cursor-pointer hover:border-indigo-300 transition-all">
-                        <input 
-                          type="checkbox" 
-                          checked={dreParams.compareWithLastYear}
-                          onChange={e => setDreParams({...dreParams, compareWithLastYear: e.target.checked})}
-                        />
-                        <span className="text-xs font-medium text-gray-600">vs. Ano Anterior (LY)</span>
-                      </label>
-                      <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-xl cursor-pointer hover:border-indigo-300 transition-all">
-                        <input 
-                          type="checkbox" 
-                          checked={dreParams.compareWithBudget}
-                          onChange={e => setDreParams({...dreParams, compareWithBudget: e.target.checked})}
-                        />
-                        <span className="text-xs font-medium text-gray-600">vs. Orçamento (BGT)</span>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 flex gap-3 items-start">
-                <div className="p-2 bg-white rounded-lg text-indigo-600 shadow-sm"><Info size={18}/></div>
-                <div>
-                  <p className="text-xs font-bold text-indigo-900">Configurações de Visualização</p>
-                  <p className="text-[10px] text-indigo-700 leading-relaxed">Estas configurações afetam como os dados são apresentados nos relatórios de DRE em todos os módulos. Elas não alteram os dados originais, apenas a forma como são exibidos.</p>
-                </div>
-              </div>
             </div>
           )}
         </div>

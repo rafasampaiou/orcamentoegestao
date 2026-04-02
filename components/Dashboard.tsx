@@ -63,21 +63,23 @@ const calculateDreSummary = (rows: ForecastRow[], packages: CostPackage[], accou
       });
 
       // 2. Revenue Totals
-      // Sum Revenue Groups
-      const revApt = rowMap.get('REV-APT')?.real || 0;
-      const revAlim = rowMap.get('REV-ALIM')?.real || 0;
-      if(rowMap.get('REV-HOSP')) rowMap.get('REV-HOSP')!.real = revApt + revAlim;
-
-      const revLazer = rowMap.get('REV-LAZER')?.real || 0;
-      const revEvent = rowMap.get('REV-EVENT')?.real || 0;
-      if(rowMap.get('REV-EXTRA')) rowMap.get('REV-EXTRA')!.real = revLazer + revEvent;
-
-      const revTime = rowMap.get('REV-TIME')?.real || 0;
-      if(rowMap.get('REV-TOTAL')) rowMap.get('REV-TOTAL')!.real = (revApt + revAlim) + (revLazer + revEvent) + revTime;
+      const sumRev = (field: 'real'|'budget'|'lastYear') => {
+          const revApt = rowMap.get('REV-APT')?.[field] || 0;
+          const revExtra = rowMap.get('REV-EXTRA')?.[field] || 0;
+          const revTotal = rowMap.get('REV-TOTAL');
+          if (revTotal) revTotal[field] = revApt + revExtra;
+          
+          const totalVal = revTotal?.[field] || 0;
+          const revTime = rowMap.get('REV-TIME')?.[field] || 0;
+          const revIss = rowMap.get('REV-ISS')?.[field] || 0;
+          const revImp = rowMap.get('REV-IMP')?.[field] || 0;
+          
+          if(rowMap.get('REV-NET')) rowMap.get('REV-NET')![field] = totalVal - revTime - revIss - revImp;
+      };
       
-      const revIss = rowMap.get('REV-ISS')?.real || 0;
-      const revTotal = rowMap.get('REV-TOTAL')?.real || 0;
-      if(rowMap.get('REV-NET')) rowMap.get('REV-NET')!.real = revTotal - revIss;
+      sumRev('real');
+      sumRev('budget');
+      sumRev('lastYear');
 
 
       // 3. Update Costs Head
@@ -108,16 +110,20 @@ const calculateDreSummary = (rows: ForecastRow[], packages: CostPackage[], accou
 
       return {
           revenue: rowMap.get('REV-TOTAL'),
-          tax: rowMap.get('REV-ISS'),
+          tax: {
+              real: (rowMap.get('REV-ISS')?.real || 0) + (rowMap.get('REV-IMP')?.real || 0) + (rowMap.get('REV-TIME')?.real || 0),
+              budget: (rowMap.get('REV-ISS')?.budget || 0) + (rowMap.get('REV-IMP')?.budget || 0) + (rowMap.get('REV-TIME')?.budget || 0),
+              lastYear: (rowMap.get('REV-ISS')?.lastYear || 0) + (rowMap.get('REV-IMP')?.lastYear || 0) + (rowMap.get('REV-TIME')?.lastYear || 0),
+          },
           expenses: rowMap.get('CST-HEAD'),
           gop: rowMap.get('RES-OP'),
           gopPct: rowMap.get('RES-PCT'),
           revpar: rowMap.get('IND-6'),
-          // Calculated: GOP without Tax (GOP + Imposto)
+          // Calculated: GOP without Tax (GOP + Deduções)
           gopNoTax: {
-              real: (rowMap.get('RES-OP')?.real || 0) + (rowMap.get('REV-ISS')?.real || 0),
-              budget: (rowMap.get('RES-OP')?.budget || 0) + (rowMap.get('REV-ISS')?.budget || 0),
-              lastYear: (rowMap.get('RES-OP')?.lastYear || 0) + (rowMap.get('REV-ISS')?.lastYear || 0),
+              real: (rowMap.get('RES-OP')?.real || 0) + ((rowMap.get('REV-ISS')?.real || 0) + (rowMap.get('REV-IMP')?.real || 0) + (rowMap.get('REV-TIME')?.real || 0)),
+              budget: (rowMap.get('RES-OP')?.budget || 0) + ((rowMap.get('REV-ISS')?.budget || 0) + (rowMap.get('REV-IMP')?.budget || 0) + (rowMap.get('REV-TIME')?.budget || 0)),
+              lastYear: (rowMap.get('RES-OP')?.lastYear || 0) + ((rowMap.get('REV-ISS')?.lastYear || 0) + (rowMap.get('REV-IMP')?.lastYear || 0) + (rowMap.get('REV-TIME')?.lastYear || 0)),
           }
       };
 };
