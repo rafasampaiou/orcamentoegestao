@@ -624,7 +624,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 if (row.category === 'Spacer') {
                     return (
                         <tr key={row.id}>
-                            <td colSpan={13} className="h-4 bg-white border-none"></td>
+                            <td colSpan={13} className="h-6 bg-gray-50/30 border-y border-gray-200"></td>
                         </tr>
                     );
                 }
@@ -937,6 +937,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                     className={`
                         transition-colors text-slate-700 hover:bg-indigo-50/30
                         ${isTotal ? 'bg-indigo-50 font-bold border-y-2 border-gray-300 text-indigo-900' : 'border-b border-gray-50'}
+                        ${row.id === 'REV-IMP' ? 'bg-sky-50 border-y-2 border-sky-300 font-bold text-sky-950' : ''}
                     `}
                     >
                     <td className={`px-1 py-1 border-r border-gray-200 bg-white sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] align-middle ${isTotal ? 'bg-indigo-50' : ''}`}>
