@@ -170,11 +170,38 @@ const App: React.FC = () => {
 
         const remoteVersions = await supabaseService.getBudgetVersions();
         if (remoteVersions && remoteVersions.length > 0 && isMounted) {
-          setBudgetVersions(remoteVersions);
-          const activeVersion = remoteVersions.find(v => v.isMain);
-          if (activeVersion) {
-            setActiveBudgetVersionId(activeVersion.id);
-          }
+          setBudgetVersions(remoteVersions.filter(v => v.id.startsWith('v')));
+          setRealVersions(remoteVersions.filter(v => v.id.startsWith('r')));
+          const activeBudget = remoteVersions.find(v => v.isMain && v.id.startsWith('v'));
+          const activeReal = remoteVersions.find(v => v.isMain && v.id.startsWith('r'));
+          if (activeBudget) setActiveBudgetVersionId(activeBudget.id);
+          if (activeReal) setActiveRealVersionId(activeReal.id);
+        }
+
+        // --- FETCH FINANCIAL DATA ---
+        const { data: remoteFinancial, error: finError } = await (supabase as any)
+          .from('financial_data')
+          .select('*');
+        
+        if (remoteFinancial && !finError && isMounted) {
+          const mapped = remoteFinancial.map((r: any) => ({
+            ano:          String(r.year),
+            cenario:      r.scenario,
+            tipo:         r.type || '',
+            hotel:        r.hotel,
+            conta:        r.account_name,
+            cr:           r.cost_center || '',
+            mes:          String(r.month),
+            valor:        String(r.value || '0'),
+            escopo:       r.scope || '',
+            departamento: r.department || '',
+            pacote:       r.package || '',
+            pacoteMaster: r.master_package || '',
+            diretoria:    r.directorate || '',
+            versionId:    r.version_id || '',
+            status:       'valid' as const,
+          }));
+          setImportedFinancialData(mapped);
         }
       } catch (error) {
         console.warn('Could not fetch real data from Supabase, falling back to mockData.', error);

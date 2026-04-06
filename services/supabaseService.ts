@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { Account, CostCenter, Hotel, BudgetVersion, User, GMDConfiguration, UserRole } from '../types';
+import { Account, CostCenter, Hotel, BudgetVersion, User, GMDConfiguration, UserRole, ImportedRow } from '../types';
 
 export const supabaseService = {
   // ═══════════════════════════════════════════════════════════════════════════
@@ -189,10 +189,33 @@ export const supabaseService = {
     })) as BudgetVersion[];
   },
 
+  async upsertBudgetVersion(version: BudgetVersion): Promise<void> {
+    const record = {
+      id: version.id,
+      name: version.name,
+      year: version.year,
+      month: version.month || 1,
+      is_locked: version.isLocked,
+      is_main: version.isMain,
+      updated_at: new Date().toISOString()
+    };
+
+    const { error } = await supabase
+      .from('budget_versions')
+      .upsert(record, { onConflict: 'id' });
+    if (error) throw error;
+  },
+
+  async deleteBudgetVersion(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('budget_versions')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+  },
+
   // ═══════════════════════════════════════════════════════════════════════════
   // PROFILES (Usuários do sistema)
-  // Mapeamento: profiles.full_name → User.name
-  //             profiles.hotel_id  → User.hotelId
   // ═══════════════════════════════════════════════════════════════════════════
   async getProfiles(): Promise<User[]> {
     const { data, error } = await supabase
@@ -255,7 +278,6 @@ export const supabaseService = {
 
   // ═══════════════════════════════════════════════════════════════════════════
   // GMD CONFIGURATIONS (Matriz de Gestão por conta)
-  // Mapeamento: snake_case (DB) → camelCase (Frontend)
   // ═══════════════════════════════════════════════════════════════════════════
   async getGmdConfigs(): Promise<GMDConfiguration[]> {
     const { data, error } = await supabase
@@ -302,5 +324,73 @@ export const supabaseService = {
       .delete()
       .eq('id', id);
     if (error) throw error;
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FINANCIAL DATA (Dados Financeiros Reais e de Orçamento)
+  // ═══════════════════════════════════════════════════════════════════════════
+  async saveFinancialData(rows: ImportedRow[]): Promise<void> {
+    if (rows.length === 0) return;
+    const records = rows.map(r => ({
+      version_id:    r.versionId || null,
+      year:          parseInt(r.ano) || new Date().getFullYear(),
+      month:         parseInt(r.mes) || 1,
+      scenario:      r.cenario,
+      real_meta:     r.cenario,           // 'Real' or 'Meta'
+      hotel:         r.hotel,
+      account_name:  r.conta,
+      cost_center:   r.cr,
+      value:         parseFloat(r.valor) || 0,
+      type:          r.tipo || '',
+      scope:         r.escopo || null,
+      department:    r.departamento || null,
+      package:       r.pacote || null,
+      master_package: r.pacoteMaster || null,
+      cr:            r.cr || null,
+      conta_contabil: (r as any).contaContabil || null,
+    }));
+
+    // Save in batches of 500 to avoid payload limits
+    const batchSize = 500;
+    for (let i = 0; i < records.length; i += batchSize) {
+      const batch = records.slice(i, i + batchSize);
+      const { error } = await supabase
+        .from('financial_data')
+        .insert(batch);
+      if (error) throw error;
+    }
+  },
+
+  async deleteFinancialDataByVersion(versionId: string): Promise<void> {
+    const { error } = await supabase
+      .from('financial_data')
+      .delete()
+      .eq('version_id', versionId);
+    if (error) throw error;
+  },
+
+  async getFinancialDataByVersion(versionId: string): Promise<ImportedRow[]> {
+    const { data, error } = await supabase
+      .from('financial_data')
+      .select('*')
+      .eq('version_id', versionId);
+    if (error) throw error;
+    return (data || []).map(r => ({
+      ano:          String(r.year),
+      cenario:      r.scenario,
+      tipo:         r.type || '',
+      hotel:        r.hotel,
+      conta:        r.account_name,
+      cr:           r.cost_center || '',
+      mes:          String(r.month),
+      valor:        String(r.value || '0'),
+      escopo:       r.scope || '',
+      departamento: r.department || '',
+      pacote:       r.package || '',
+      pacoteMaster: r.master_package || '',
+      diretoria:    r.directorate || '',
+      versionId:    r.version_id || '',
+      status:       'valid' as const,
+    }));
   },
 };

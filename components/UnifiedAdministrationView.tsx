@@ -342,12 +342,19 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   // Import Sub-tabs
   const [activeImportTab, setActiveImportTab] = useState<'financial' | 'revenue' | 'occupancy' | 'costCenters' | 'accounts'>('financial');
   
-  // Financial Import State
+  // Financial Import State (shared for Real tab)
   const [importText, setImportText] = useState('');
   const [parsedData, setParsedData] = useState<ImportedRow[]>([]);
   const [importStep, setImportStep] = useState<'input' | 'preview'>('input');
   const [importMode, setImportMode] = useState<'append' | 'replace'>('append');
   const [importYear, setImportYear] = useState<number>(new Date().getFullYear());
+
+  // Budget 2026 Import State (separate from Real import)
+  const [budgetImportText, setBudgetImportText] = useState('');
+  const [budgetParsedData, setBudgetParsedData] = useState<ImportedRow[]>([]);
+  const [budgetImportStep, setBudgetImportStep] = useState<'input' | 'preview' | 'done'>('input');
+  const [budgetImportSaving, setBudgetImportSaving] = useState(false);
+  const [budgetImportSavedCount, setBudgetImportSavedCount] = useState<number | null>(null);
 
   // Cost Center Import State
   const [ccImportStep, setCcImportStep] = useState<'input' | 'preview'>('input');
@@ -1477,6 +1484,166 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       setImportMode('append');
   };
 
+  // ─── Budget 2026 Import (13-column format) ─────────────────────────────────
+  const processBudget2026Import = () => {
+    if (!budgetImportText.trim()) return;
+    setBudgetImportSavedCount(null);
+
+    const rows = budgetImportText.split('\n');
+    const firstRow = rows[0];
+    const sep = firstRow.includes('\t') ? '\t' : ';';
+
+    // Detect header: first cell should be text like 'Receita/ despesa'
+    const firstCols = firstRow.split(sep);
+    const hasHeader = isNaN(Number(firstCols[9])); // col 9 = Mês
+    const startIdx = hasHeader ? 1 : 0;
+
+    const parsed: ImportedRow[] = [];
+    const accountSet = new Set(accounts.map(a => a.name.trim().toLowerCase()));
+    const accountCodeSet = new Set(accounts.map(a => (a.code || '').trim().toLowerCase()).filter(Boolean));
+    const crSet = new Set(costCenters.map(c => c.id.trim().toLowerCase()));
+    const crNameSet = new Set(costCenters.map(c => c.name.trim().toLowerCase()));
+
+    for (let i = startIdx; i < rows.length; i++) {
+      const rowContent = rows[i].trim();
+      if (!rowContent) continue;
+
+      const cols = rows[i].split(sep).map(c => c?.trim() || '');
+
+      let status: 'valid' | 'error' = 'valid';
+      const msgParts: string[] = [];
+
+      if (cols.length < 11) {
+        status = 'error';
+        msgParts.push(`Colunas insuficientes (${cols.length}/13). Verifique a tabulação.`);
+        while (cols.length < 13) cols.push('');
+      }
+
+      // Column mapping:
+      // 0: Receita/Despesa  1: Real/Meta  2: Escopo ou Fora  3: Filial
+      // 4: CR Certo         5: Departamento  6: Descrição da Conta
+      // 7: Pacote           8: Pacote Master  9: Mês  10: Valor
+      // 11: CR              12: Conta Contábil
+      const [
+        tipoConta,   // Receita/Despesa
+        realMeta,    // Real/Meta
+        escopo,      // Escopo ou Fora
+        filial,      // Filial
+        crCerto,     // CR Certo
+        departamento,// Departamento
+        descConta,   // Descrição da Conta
+        pacote,      // Pacote
+        pacoteMaster,// Pacote Master
+        mesRaw,      // Mês
+        valorRaw,    // Valor
+        crRaw,       // CR (ex: 1.1.1.004)
+        contaContabil// Conta Contábil (ex: 4.01.01.01.006)
+      ] = cols;
+
+      // Validate month
+      const mes = mesRaw?.trim();
+      if (!mes || isNaN(Number(mes)) || Number(mes) < 1 || Number(mes) > 12) {
+        status = 'error';
+        msgParts.push(`Mês inválido: '${mes}'`);
+      }
+
+      // Validate & clean value
+      const cleanVal = (valorRaw || '').replace(/\./g, '').replace(',', '.').trim();
+      const valNum = parseFloat(cleanVal);
+      let finalValor = '';
+      if (isNaN(valNum)) {
+        status = 'error';
+        msgParts.push(`Valor inválido: '${valorRaw}'`);
+      } else {
+        finalValor = Math.round(valNum).toString();
+      }
+
+      // Match account by name or code (flexible)
+      const descLower = (descConta || '').trim().toLowerCase();
+      const ccLower   = (contaContabil || '').trim().toLowerCase();
+      let matchedAccount = descConta || '';
+      if (!accountSet.has(descLower) && !accountCodeSet.has(ccLower)) {
+        // Non-blocking: we keep it valid but flag as warning
+        // The account may not exist yet — allow import
+      }
+
+      // Only mark as error if BOTH cost center AND account are completely empty
+      if (!descConta && !contaContabil) {
+        status = 'error';
+        msgParts.push('Descrição da Conta e Conta Contábil ausentes');
+      }
+
+      parsed.push({
+        ano:          '2026',
+        cenario:      'Meta',            // Budget 2026 is always 'Meta'
+        tipo:         tipoConta || '',
+        hotel:        filial || '',
+        conta:        matchedAccount,
+        cr:           crCerto || crRaw || '',
+        mes:          mes || '',
+        valor:        finalValor || '0',
+        escopo:       escopo || '',
+        departamento: departamento || '',
+        pacote:       pacote || '',
+        pacoteMaster: pacoteMaster || '',
+        diretoria:    '',
+        status,
+        msg:          msgParts.join(' | '),
+        originalLine: i + 1,
+        // Extra fields stored on the row for Supabase
+        ...({
+          contaContabil: contaContabil || '',
+          crCodigo:      crRaw || '',
+          realMeta:      realMeta || 'Meta',
+        } as any),
+      });
+    }
+
+    setBudgetParsedData(parsed);
+    setBudgetImportStep('preview');
+  };
+
+  const handleFinalBudget2026Import = async (targetBudgetVersionId: string) => {
+    if (!targetBudgetVersionId) {
+      alert('Selecione a versão de Budget de destino.');
+      return;
+    }
+
+    const validRows = budgetParsedData.filter(r => r.status === 'valid');
+    if (validRows.length === 0) {
+      alert('Nenhum registro válido para importar.');
+      return;
+    }
+
+    const rowsWithVersion = validRows.map(r => ({
+      ...r,
+      versionId: targetBudgetVersionId,
+      cenario:   'Meta',
+    }));
+
+    // 1) Atualiza estado local (Tauá Real vai usar cenario=Meta como budget)
+    if (onImportData) {
+      onImportData(rowsWithVersion, 'append');
+    }
+
+    // 2) Persiste no Supabase
+    setBudgetImportSaving(true);
+    try {
+      // Remove registros anteriores desta versão para evitar duplicados
+      await supabaseService.deleteFinancialDataByVersion(targetBudgetVersionId);
+      await supabaseService.saveFinancialData(rowsWithVersion);
+      setBudgetImportSavedCount(rowsWithVersion.length);
+      setBudgetImportStep('done');
+    } catch (err: any) {
+      console.error('Erro ao salvar orçamento no Supabase:', err);
+      alert(`Dados importados localmente, mas erro ao salvar no banco:\n${err?.message || JSON.stringify(err)}`);
+      setBudgetImportStep('done');
+      setBudgetImportSavedCount(rowsWithVersion.length);
+    } finally {
+      setBudgetImportSaving(false);
+    }
+  };
+
   /*
   const processRevenueImport = () => {
     if (!revImportText.trim()) return;
@@ -1576,53 +1743,89 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   };
   */
 
-  const handleCreateBudgetVersion = (year?: number, month?: number) => {
+  const handleCreateBudgetVersion = async (year?: number, month?: number) => {
     const name = prompt('Nome da nova versão (ex: 2026 Oficial):');
     if (name) {
-      const yearStr = prompt('Ano da versão (ex: 2026):', (year || budgetFilterYear).toString());
-      const finalYear = parseInt(yearStr || '');
+      const newVersion: BudgetVersion = {
+        id: `v-${Date.now()}`,
+        name,
+        year: year || new Date().getFullYear(),
+        month: month || 1,
+        createdAt: new Date().toISOString(),
+        isLocked: false,
+        isMain: budgetVersions.length === 0
+      };
       
-      if (!isNaN(finalYear)) {
-        const newVersion: BudgetVersion = {
-          id: `v-${Date.now()}`,
-          name,
-          year: finalYear,
-          month: month || 1,
-          createdAt: new Date().toISOString(),
-          isLocked: false,
-          isMain: budgetVersions.length === 0
-        };
+      try {
+        await supabaseService.upsertBudgetVersion(newVersion);
         setBudgetVersions(prev => [...prev, newVersion]);
         setActiveBudgetVersionId(newVersion.id);
-        setBudgetFilterYear(finalYear);
-      } else {
-        alert('Ano inválido.');
+      } catch (err) {
+        console.error('Failed to save version:', err);
+        alert('Erro ao salvar versão no banco.');
       }
     }
   };
 
-  const handleCreateRealVersion = (year?: number, month?: number) => {
-    const name = prompt('Nome da nova versão (ex: 2026 Oficial):');
+  const handleCreateRealVersion = async (year?: number, month?: number) => {
+    const name = prompt('Nome da nova versão de Realizado (ex: 2026 Real):');
     if (name) {
-      const yearStr = prompt('Ano da versão (ex: 2026):', (year || realFilterYear).toString());
-      const finalYear = parseInt(yearStr || '');
+      const newVersion: BudgetVersion = {
+        id: `r-${Date.now()}`,
+        name,
+        year: year || new Date().getFullYear(),
+        month: month || 1,
+        createdAt: new Date().toISOString(),
+        isLocked: false,
+        isMain: realVersions.length === 0
+      };
       
-      if (!isNaN(finalYear)) {
-        const newVersion: BudgetVersion = {
-          id: `r-${Date.now()}`,
-          name,
-          year: finalYear,
-          month: month || 1,
-          createdAt: new Date().toISOString(),
-          isLocked: false,
-          isMain: realVersions.length === 0
-        };
+      try {
+        await supabaseService.upsertBudgetVersion(newVersion);
         setRealVersions(prev => [...prev, newVersion]);
         setActiveRealVersionId(newVersion.id);
-        setRealFilterYear(finalYear);
-      } else {
-        alert('Ano inválido.');
+      } catch (err) {
+        console.error('Failed to save version:', err);
+        alert('Erro ao salvar versão no banco.');
       }
+    }
+  };
+
+  const handleToggleVersionLock = async (id: string, isBudget: boolean) => {
+    const list = isBudget ? budgetVersions : realVersions;
+    const version = list.find(v => v.id === id);
+    if (!version) return;
+
+    const updated = { ...version, isLocked: !version.isLocked };
+    try {
+      await supabaseService.upsertBudgetVersion(updated);
+      if (isBudget) {
+        setBudgetVersions(prev => prev.map(bv => bv.id === id ? updated : bv));
+      } else {
+        setRealVersions(prev => prev.map(rv => rv.id === id ? updated : rv));
+      }
+    } catch (err) {
+      console.error('Failed to update version lock:', err);
+    }
+  };
+
+  const handleDeleteVersion = async (id: string, isBudget: boolean) => {
+    if (!confirm('Tem certeza que deseja excluir esta versão? Todos os dados vinculados serão perdidos.')) return;
+    
+    try {
+      await supabaseService.deleteFinancialDataByVersion(id);
+      await supabaseService.deleteBudgetVersion(id);
+      
+      if (isBudget) {
+        setBudgetVersions(prev => prev.filter(v => v.id !== id));
+        if (activeBudgetVersionId === id) setActiveBudgetVersionId('');
+      } else {
+        setRealVersions(prev => prev.filter(v => v.id !== id));
+        if (activeRealVersionId === id) setActiveRealVersionId('');
+      }
+    } catch (err) {
+      console.error('Failed to delete version:', err);
+      alert('Erro ao excluir versão.');
     }
   };
 
@@ -1795,7 +1998,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               versions={realVersions}
               activeVersionId={activeRealVersionId}
               onSelectVersion={setActiveRealVersionId}
-              onToggleLock={(id) => setRealVersions(prev => prev.map(bv => bv.id === id ? {...bv, isLocked: !bv.isLocked} : bv))}
+              onToggleLock={(id) => handleToggleVersionLock(id, false)}
+              onDelete={(id) => handleDeleteVersion(id, false)}
               onCreateVersion={handleCreateRealVersion}
             />
           )}
@@ -1947,7 +2151,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               versions={budgetVersions}
               activeVersionId={activeBudgetVersionId}
               onSelectVersion={setActiveBudgetVersionId}
-              onToggleLock={(id) => setBudgetVersions(prev => prev.map(bv => bv.id === id ? {...bv, isLocked: !bv.isLocked} : bv))}
+              onToggleLock={(id) => handleToggleVersionLock(id, true)}
+              onDelete={(id) => handleDeleteVersion(id, true)}
               onCreateVersion={handleCreateBudgetVersion}
             />
           )}
@@ -1998,35 +2203,201 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
           )}
           {activeBudgetTab === 'import' && (
             <div className="space-y-6">
-              <div className="space-y-4">
-                {importStep === 'input' ? (
-                  <>
-                    <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl text-sm text-amber-800 mb-4">
-                      <p className="font-bold mb-1">Instruções para Importação Financeira:</p>
-                      <p>Cole os dados do Excel com as seguintes colunas (separadas por TAB):</p>
-                      <code className="block mt-2 bg-white/50 p-2 rounded border border-amber-100 font-mono text-[10px]">
-                        Ano | Escopo ou Fora | Mês | Classe Gerencial Nome | Centro de Resultado Nome | Valor Ajustado | Filial | Departamento | Pacote | Pacote Master | Diretoria
-                      </code>
+              {budgetImportStep === 'input' && (
+                <>
+                  <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 p-5 rounded-xl text-sm text-amber-900">
+                    <p className="font-bold text-base mb-2 flex items-center gap-2">
+                      <Upload size={18} className="text-amber-600" />
+                      Importação do Orçamento 2026
+                    </p>
+                    <p className="mb-3">Cole os dados do Excel com as <strong>13 colunas</strong> abaixo (separadas por TAB):</p>
+                    <div className="bg-white/70 p-3 rounded-lg border border-amber-100 font-mono text-[10px] leading-relaxed grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
+                      <div><span className="text-amber-600 font-bold">1.</span> Receita / Despesa <span className="text-gray-400">(Texto)</span></div>
+                      <div><span className="text-amber-600 font-bold">2.</span> Real / Meta <span className="text-gray-400">(Número)</span></div>
+                      <div><span className="text-amber-600 font-bold">3.</span> Escopo ou Fora <span className="text-gray-400">(Texto)</span></div>
+                      <div><span className="text-amber-600 font-bold">4.</span> Filial <span className="text-gray-400">(Texto)</span></div>
+                      <div><span className="text-amber-600 font-bold">5.</span> CR Certo <span className="text-gray-400">(Texto)</span></div>
+                      <div><span className="text-amber-600 font-bold">6.</span> Departamento <span className="text-gray-400">(Texto)</span></div>
+                      <div><span className="text-amber-600 font-bold">7.</span> Descrição da Conta <span className="text-gray-400">(Texto)</span></div>
+                      <div><span className="text-amber-600 font-bold">8.</span> Pacote <span className="text-gray-400">(Texto)</span></div>
+                      <div><span className="text-amber-600 font-bold">9.</span> Pacote Master <span className="text-gray-400">(Texto)</span></div>
+                      <div><span className="text-amber-600 font-bold">10.</span> Mês <span className="text-gray-400">(Número 1-12)</span></div>
+                      <div><span className="text-amber-600 font-bold">11.</span> Valor <span className="text-gray-400">(Número)</span></div>
+                      <div><span className="text-amber-600 font-bold">12.</span> CR <span className="text-gray-400">(ex: 1.1.1.004)</span></div>
+                      <div><span className="text-amber-600 font-bold">13.</span> Conta Contábil <span className="text-gray-400">(ex: 4.01.01.01.006)</span></div>
                     </div>
-                    <div className="flex items-center gap-4 mb-4">
-                      <label className="text-sm font-bold text-gray-700">Ano da Importação:</label>
+                    <p className="mt-3 text-xs text-amber-700 italic">
+                      💡 Os dados importados serão salvos como <strong>Meta</strong> e ficarão disponíveis automaticamente no Tauá Real ao criar uma versão de 2026.
+                    </p>
+                  </div>
+                  <textarea 
+                    className="w-full h-64 p-4 border border-gray-300 rounded-lg font-mono text-xs focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" 
+                    placeholder="Cole os dados do Excel aqui (13 colunas separadas por TAB)..." 
+                    value={budgetImportText} 
+                    onChange={(e) => setBudgetImportText(e.target.value)} 
+                  />
+                  <button 
+                    onClick={processBudget2026Import} 
+                    disabled={!budgetImportText.trim()}
+                    className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+                  >
+                    <FileText size={16} /> Processar Dados
+                  </button>
+                </>
+              )}
+
+              {budgetImportStep === 'preview' && (() => {
+                const budgetErrors = budgetParsedData.filter(r => r.status === 'error');
+                const budgetValid = budgetParsedData.filter(r => r.status === 'valid');
+
+                // Summary by filial + mes
+                const summaryMap = new Map<string, { hotel: string; mes: string; tipo: string; total: number; count: number }>();
+                budgetValid.forEach(r => {
+                  const key = `${r.hotel}|${r.mes}|${r.tipo}`;
+                  if (!summaryMap.has(key)) summaryMap.set(key, { hotel: r.hotel, mes: r.mes, tipo: r.tipo, total: 0, count: 0 });
+                  const e = summaryMap.get(key)!;
+                  e.total += parseFloat(r.valor) || 0;
+                  e.count++;
+                });
+                const summaryArr = Array.from(summaryMap.values()).sort((a, b) => Number(a.mes) - Number(b.mes));
+
+                return (
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-lg font-bold text-slate-800">Resumo — Orçamento 2026</h4>
+                      <div className="flex gap-2">
+                        <button onClick={() => { setBudgetImportStep('input'); setBudgetParsedData([]); }} className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-bold text-gray-600 hover:bg-gray-50">Cancelar</button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+                        <div className="text-emerald-600 text-xs font-bold uppercase mb-1">Registros Válidos</div>
+                        <div className="text-2xl font-bold text-emerald-700">{budgetValid.length}</div>
+                      </div>
+                      <div className="bg-red-50 p-4 rounded-xl border border-red-100">
+                        <div className="text-red-600 text-xs font-bold uppercase mb-1">Erros</div>
+                        <div className="text-2xl font-bold text-red-700">{budgetErrors.length}</div>
+                      </div>
+                      <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                        <div className="text-indigo-600 text-xs font-bold uppercase mb-1">Total Geral</div>
+                        <div className="text-2xl font-bold text-indigo-700">
+                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(budgetValid.reduce((s, r) => s + (parseFloat(r.valor) || 0), 0))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Target version picker */}
+                    <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
+                      <label className="block text-sm font-bold text-orange-800 mb-2">Versão Budget de Destino</label>
                       <select 
-                        value={importYear}
-                        onChange={(e) => setImportYear(parseInt(e.target.value))}
-                        className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                        id="budget2026-version-select"
+                        defaultValue={activeBudgetVersionId}
+                        className="w-full border border-orange-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none"
                       >
-                        {[2023, 2024, 2025, 2026, 2027].map(y => (
-                          <option key={y} value={y}>{y}</option>
-                        ))}
+                        <option value="">Selecione uma versão...</option>
+                        {budgetVersions.map(v => <option key={v.id} value={v.id}>{v.name} ({v.year})</option>)}
                       </select>
                     </div>
-                    <textarea className="w-full h-64 p-4 border border-gray-300 rounded-lg font-mono text-xs" placeholder="Cole os dados do Excel aqui..." value={importText} onChange={(e) => setImportText(e.target.value)} />
-                    <button onClick={processFinancialImport} className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold">Processar Dados</button>
-                  </>
-                ) : (
-                  <ImportPreview summaryRows={summaryRows} errorRows={errorRows} onCancel={() => setImportStep('input')} onConfirm={handleFinalImport} importMode={importMode} setImportMode={setImportMode} realVersions={realVersions} budgetVersions={budgetVersions} />
-                )}
-              </div>
+
+                    {budgetErrors.length > 0 && (
+                      <div className="bg-white border border-red-200 rounded-xl overflow-hidden">
+                        <div className="bg-red-50 px-4 py-2 border-b border-red-200">
+                          <h5 className="text-xs font-bold text-red-700 uppercase">Erros de Validação (primeiros 50)</h5>
+                        </div>
+                        <div className="max-h-48 overflow-y-auto">
+                          <table className="min-w-full divide-y divide-gray-200 text-[10px]">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th className="px-4 py-2 text-left font-medium text-gray-500">Linha</th>
+                                <th className="px-4 py-2 text-left font-medium text-gray-500">Erro</th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {budgetErrors.slice(0, 50).map((err, idx) => (
+                                <tr key={idx}>
+                                  <td className="px-4 py-2 font-mono text-gray-400">{err.originalLine}</td>
+                                  <td className="px-4 py-2 text-red-600">{err.msg}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Summary table */}
+                    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                      <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
+                        <h5 className="text-xs font-bold text-gray-700 uppercase">Resumo por Filial / Mês</h5>
+                      </div>
+                      <div className="max-h-64 overflow-y-auto">
+                        <table className="min-w-full divide-y divide-gray-200 text-xs">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-4 py-2 text-left font-medium text-gray-500">Filial</th>
+                              <th className="px-4 py-2 text-left font-medium text-gray-500">Mês</th>
+                              <th className="px-4 py-2 text-left font-medium text-gray-500">Tipo</th>
+                              <th className="px-4 py-2 text-right font-medium text-gray-500">Registros</th>
+                              <th className="px-4 py-2 text-right font-medium text-gray-500">Total</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {summaryArr.map((row, idx) => (
+                              <tr key={idx}>
+                                <td className="px-4 py-2 font-medium text-gray-900">{row.hotel}</td>
+                                <td className="px-4 py-2 text-gray-500">{row.mes}</td>
+                                <td className="px-4 py-2 text-gray-500">{row.tipo}</td>
+                                <td className="px-4 py-2 text-right text-gray-500">{row.count}</td>
+                                <td className="px-4 py-2 text-right font-bold text-indigo-600">
+                                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(row.total)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        const sel = (document.getElementById('budget2026-version-select') as HTMLSelectElement)?.value || activeBudgetVersionId;
+                        handleFinalBudget2026Import(sel);
+                      }}
+                      disabled={budgetImportSaving || budgetValid.length === 0}
+                      className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      {budgetImportSaving ? (
+                        <><span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> Salvando...</>
+                      ) : (
+                        <><Save size={16} /> Confirmar e Salvar no Supabase</>
+                      )}
+                    </button>
+                  </div>
+                );
+              })()}
+
+              {budgetImportStep === 'done' && (
+                <div className="text-center py-16 space-y-6">
+                  <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto">
+                    <svg className="w-10 h-10 text-emerald-600" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900">Orçamento 2026 Importado!</h3>
+                  <p className="text-gray-500 max-w-md mx-auto">
+                    {budgetImportSavedCount !== null
+                      ? <><strong>{budgetImportSavedCount}</strong> registros foram salvos com sucesso no Supabase e estão disponíveis como <strong>Meta</strong> no Tauá Real.</>
+                      : 'Dados importados com sucesso.'}
+                  </p>
+                  <div className="flex gap-3 justify-center">
+                    <button
+                      onClick={() => { setBudgetImportStep('input'); setBudgetImportText(''); setBudgetParsedData([]); setBudgetImportSavedCount(null); }}
+                      className="px-6 py-2.5 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700"
+                    >
+                      Nova Importação
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
           {activeBudgetTab === 'labor' && (
