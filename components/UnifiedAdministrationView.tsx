@@ -1243,6 +1243,11 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         const rowContent = rows[i].trim();
         if (!rowContent) continue;
 
+        // SKIP HEADER ROW: if the first column is 'Código', skip it
+        if (i === 0 && (rowContent.toLowerCase().includes('código') || rowContent.toLowerCase().includes('codigo'))) {
+            continue;
+        }
+
         const cols = rows[i].split(separator);
         
         // Expected: Código | Conta Contábil | Pacote | Pacote Master
@@ -2642,7 +2647,20 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                             acc.id.toLowerCase().includes(accSearchTerm.toLowerCase()) ||
                             (acc.package || '').toLowerCase().includes(accSearchTerm.toLowerCase()) ||
                             (acc.masterPackage || '').toLowerCase().includes(accSearchTerm.toLowerCase())
-                          ).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0) || a.id.localeCompare(b.id));
+                          ).sort((a, b) => {
+                            // 1. Sort by Master
+                            const masterA = (a.masterPackage || '').toLowerCase();
+                            const masterB = (b.masterPackage || '').toLowerCase();
+                            if (masterA !== masterB) return masterA.localeCompare(masterB);
+
+                            // 2. Sort by Package
+                            const pkgA = (a.package || '').toLowerCase();
+                            const pkgB = (b.package || '').toLowerCase();
+                            if (pkgA !== pkgB) return pkgA.localeCompare(pkgB);
+
+                            // 3. Fallback to Name
+                            return a.name.localeCompare(b.name);
+                          });
 
                           const rows: React.ReactNode[] = [];
 
