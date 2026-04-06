@@ -9,9 +9,23 @@ export const supabaseService = {
     const { data, error } = await supabase
       .from('accounts')
       .select('*')
-      .order('sortOrder', { ascending: true });
+      .order('sort_order', { ascending: true });
     if (error) throw error;
-    return (data || []) as Account[];
+
+    return (data || []).map(a => ({
+      id: a.id,
+      code: a.code || a.id,
+      name: a.name,
+      level: a.level || 'account',
+      package: a.package,
+      packageCode: a.package_code,
+      masterPackage: a.master_package,
+      masterPackageCode: a.master_package_code,
+      packageId: a.package_id,
+      type: a.type || 'Fixed',
+      sortOrder: a.sort_order || 0,
+      outOfScope: a.out_of_scope || false
+    })) as Account[];
   },
 
   async upsertAccounts(accounts: Account[]): Promise<void> {
@@ -21,13 +35,13 @@ export const supabaseService = {
       name: a.name,
       level: a.level || 'account',
       package: a.package,
-      packageCode: a.packageCode,
-      masterPackage: a.masterPackage,
-      masterPackageCode: a.masterPackageCode,
-      packageId: a.packageId,
+      package_code: a.packageCode,
+      master_package: a.masterPackage,
+      master_package_code: a.masterPackageCode,
+      package_id: a.packageId,
       type: a.type || 'Fixed',
-      sortOrder: a.sortOrder || 0,
-      outOfScope: a.outOfScope || false,
+      sort_order: a.sortOrder || 0,
+      out_of_scope: a.outOfScope || false,
       updated_at: new Date().toISOString()
     }));
 
