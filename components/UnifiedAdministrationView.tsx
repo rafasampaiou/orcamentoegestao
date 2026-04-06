@@ -1293,9 +1293,14 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         sortOrder: accounts.length + i // Ensure unique sequential order
     }));
 
-    const updated = accImportMode === 'replace' ? newAccounts : (() => {
+    // DEDUPLICATE: Postgres throws error if same ID appears twice in one upsert batch
+    const deduplicatedRecordMap = new Map<string, Account>();
+    newAccounts.forEach(acc => deduplicatedRecordMap.set(acc.id, acc));
+    const uniqueAccountsToSave = Array.from(deduplicatedRecordMap.values());
+
+    const updated = accImportMode === 'replace' ? uniqueAccountsToSave : (() => {
         const map = new Map(accounts.map(acc => [acc.id, acc]));
-        newAccounts.forEach(acc => map.set(acc.id, acc));
+        uniqueAccountsToSave.forEach(acc => map.set(acc.id, acc));
         return Array.from(map.values());
     })();
 
@@ -1303,8 +1308,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     
     // PERSIST TO SUPABASE
     try {
-        await supabaseService.upsertAccounts(newAccounts);
-        alert(`${validData.length} contas importadas e sincronizadas com sucesso!`);
+        await supabaseService.upsertAccounts(uniqueAccountsToSave);
+        alert(`${uniqueAccountsToSave.length} contas importadas e sincronizadas com sucesso!`);
     } catch (err: any) {
         console.error("Erro ao salvar no Supabase:", err);
         alert(`Erro ao sincronizar com banco de dados: ${err.message || JSON.stringify(err)}`);
