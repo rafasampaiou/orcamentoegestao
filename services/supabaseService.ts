@@ -7,7 +7,7 @@ export const supabaseService = {
   // ═══════════════════════════════════════════════════════════════════════════
   async getAccounts(): Promise<Account[]> {
     const { data, error } = await supabase
-      .from('accounts')
+      .from('Accounts')
       .select('*')
       .order('sort_order', { ascending: true });
     if (error) throw error;
@@ -46,14 +46,14 @@ export const supabaseService = {
     }));
 
     const { error } = await supabase
-      .from('accounts')
+      .from('Accounts')
       .upsert(records, { onConflict: 'id' });
     if (error) throw error;
   },
 
   async deleteAccount(id: string): Promise<void> {
     const { error } = await supabase
-      .from('accounts')
+      .from('Accounts')
       .delete()
       .eq('id', id);
     if (error) throw error;

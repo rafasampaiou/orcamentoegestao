@@ -1305,9 +1305,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     try {
         await supabaseService.upsertAccounts(newAccounts);
         alert(`${validData.length} contas importadas e sincronizadas com sucesso!`);
-    } catch (err) {
+    } catch (err: any) {
         console.error("Erro ao salvar no Supabase:", err);
-        alert("Contas importadas localmente, mas erro ao sincronizar com banco de dados.");
+        alert(`Erro ao sincronizar com banco de dados: ${err.message || JSON.stringify(err)}`);
     }
 
     setAccImportStep('input');
