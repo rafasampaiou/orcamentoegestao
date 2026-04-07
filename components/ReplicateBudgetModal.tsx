@@ -158,42 +158,44 @@ const ReplicateBudgetModal: React.FC<ReplicateBudgetModalProps> = ({
              </div>
           )}
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              {mode === 'REAL' ? 'Outras Opções (Cópia)' : 'Como deseja criar a nova versão?'}
-            </label>
-            <div className="space-y-3">
-              <label className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
-                <input
-                  type="radio"
-                  name="replicationType"
-                  value="exact"
-                  checked={replicationType === 'exact'}
-                  onChange={() => setReplicationType('exact')}
-                  className="mt-1 text-[#38b2ac] focus:ring-[#38b2ac]"
-                />
-                <div>
-                  <div className="font-medium text-gray-900">Fazer exatamente uma cópia de alguma versão</div>
-                  <div className="text-sm text-gray-500">Criar uma cópia idêntica da versão selecionada.</div>
-                </div>
+          {mode !== 'REAL' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Como deseja criar a nova versão?
               </label>
-              
-              <label className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
-                <input
-                  type="radio"
-                  name="replicationType"
-                  value="new_projected"
-                  checked={replicationType === 'new_projected'}
-                  onChange={() => setReplicationType('new_projected')}
-                  className="mt-1 text-[#38b2ac] focus:ring-[#38b2ac]"
-                />
-                <div>
-                  <div className="font-medium text-gray-900">Iniciar uma nova versão</div>
-                  <div className="text-sm text-gray-500">Criar uma nova versão com projeções e novos dados.</div>
-                </div>
-              </label>
+              <div className="space-y-3">
+                <label className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                  <input
+                    type="radio"
+                    name="replicationType"
+                    value="exact"
+                    checked={replicationType === 'exact'}
+                    onChange={() => setReplicationType('exact')}
+                    className="mt-1 text-[#38b2ac] focus:ring-[#38b2ac]"
+                  />
+                  <div>
+                    <div className="font-medium text-gray-900">Fazer exatamente uma cópia de alguma versão</div>
+                    <div className="text-sm text-gray-500">Criar uma cópia idêntica da versão selecionada.</div>
+                  </div>
+                </label>
+                
+                <label className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                  <input
+                    type="radio"
+                    name="replicationType"
+                    value="new_projected"
+                    checked={replicationType === 'new_projected'}
+                    onChange={() => setReplicationType('new_projected')}
+                    className="mt-1 text-[#38b2ac] focus:ring-[#38b2ac]"
+                  />
+                  <div>
+                    <div className="font-medium text-gray-900">Iniciar uma nova versão</div>
+                    <div className="text-sm text-gray-500">Criar uma nova versão com projeções e novos dados.</div>
+                  </div>
+                </label>
+              </div>
             </div>
-          </div>
+          )}
 
           {replicationType === 'new_projected' && (
             <div className="space-y-4 p-4 bg-gray-50 rounded-lg border border-gray-200">

@@ -400,25 +400,13 @@ const App: React.FC = () => {
               setCurrentView('dashboard');
             }}
             onToggleLock={(id) => setRealVersions(prev => prev.map(bv => bv.id === id ? {...bv, isLocked: !bv.isLocked} : bv))}
-            onCreateVersion={(year, month, name) => {
-              const newVersion: BudgetVersion = {
-                id: `r-${Date.now()}`,
-                name,
-                year: year,
-                month: month || 1,
-                createdAt: new Date().toISOString(),
-                isLocked: false,
-                isMain: realVersions.length === 0
-              };
-              setRealVersions(prev => [...prev, newVersion]);
-              setActiveRealVersionId(newVersion.id);
-              setCurrentView('dashboard');
-            }}
+            onCreateVersion={() => {}} // Disabled as we use replication only
             onReplicateVersion={(year, month) => {
               setReplicateTarget({ year, month });
               setReplicateMode('REAL');
               setReplicateModalOpen(true);
             }}
+            showCreateOption={false}
             onSetMain={(id) => setRealVersions(prev => prev.map(v => ({ ...v, isMain: v.id === id })))}
             onDelete={(id) => {
               setRealVersions(prev => prev.filter(v => v.id !== id));

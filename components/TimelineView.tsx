@@ -12,6 +12,7 @@ interface TimelineViewProps {
   onReplicateVersion?: (year: number, month: number) => void;
   onSetMain?: (id: string) => void;
   onDelete?: (id: string) => void;
+  showCreateOption?: boolean;
 }
 
 const TimelineView: React.FC<TimelineViewProps> = ({
@@ -23,7 +24,8 @@ const TimelineView: React.FC<TimelineViewProps> = ({
   onCreateVersion,
   onReplicateVersion,
   onSetMain,
-  onDelete
+  onDelete,
+  showCreateOption = true
 }) => {
   const [modalOpen, setModalOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -34,6 +36,11 @@ const TimelineView: React.FC<TimelineViewProps> = ({
 
   const handleMonthClick = (year: number, month: number) => {
     setSelectedDate({ year, month });
+    if (!showCreateOption && onReplicateVersion) {
+      onReplicateVersion(year, month);
+      return;
+    }
+    
     if (onReplicateVersion) {
       setModalOpen(true);
     } else {
@@ -46,6 +53,11 @@ const TimelineView: React.FC<TimelineViewProps> = ({
   const handleNewPlanClick = () => {
     const currentYear = new Date().getFullYear();
     setSelectedDate({ year: currentYear, month: 1 });
+    if (!showCreateOption && onReplicateVersion) {
+      onReplicateVersion(currentYear, 1);
+      return;
+    }
+
     if (onReplicateVersion) {
       setModalOpen(true);
     } else {
