@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-import { Settings2, ChevronUp } from 'lucide-react';
+import { Settings2, ChevronUp, Save, Trash2, CheckCircle } from 'lucide-react';
 import { ColumnVisibility, ImportedRow } from '../types';
 
 // --- Types ---
@@ -8,6 +8,8 @@ interface OccupancyViewProps {
     isBudget: boolean;
     budgetData?: Record<string, number[]>;
     setBudgetData?: React.Dispatch<React.SetStateAction<Record<string, number[]>>>;
+    onSaveOccupancy?: () => void;
+    onClearOccupancy?: () => void;
     
     // Real Mode Props
     selectedMonth?: number;
@@ -220,6 +222,8 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
     isBudget, 
     budgetData: propBudgetData, 
     setBudgetData: propSetBudgetData,
+    onSaveOccupancy,
+    onClearOccupancy,
     selectedMonth,
     selectedYear,
     selectedHotel,
@@ -792,13 +796,92 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
       );
   }
 
+  // State for confirmation modal and save feedback
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [savedIndicator, setSavedIndicator] = useState(false);
+
+  const handleManualSave = () => {
+      if (onSaveOccupancy) {
+          onSaveOccupancy();
+      }
+      setSavedIndicator(true);
+      setTimeout(() => setSavedIndicator(false), 2500);
+  };
+
+  const handleConfirmClear = () => {
+      if (setBudgetData) {
+          setBudgetData({});
+      }
+      if (onClearOccupancy) {
+          onClearOccupancy();
+      }
+      setShowClearConfirm(false);
+  };
+
   // --- Budget View ---
   return (
     <div className="p-8 max-w-[1600px] mx-auto">
-        <div className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Orçamento de Ocupação</h2>
-            <p className="text-gray-500 mt-1">Projeção mensal de ocupação e receitas (Lazer e Eventos).</p>
+        {/* Header */}
+        <div className="mb-6 flex items-start justify-between">
+            <div>
+                <h2 className="text-2xl font-bold text-gray-900">Or&ccedil;amento de Ocupa&ccedil;&atilde;o</h2>
+                <p className="text-gray-500 mt-1">Proje&ccedil;&atilde;o mensal de ocupa&ccedil;&atilde;o e receitas (Lazer e Eventos).</p>
+            </div>
+            <div className="flex items-center gap-3">
+                {/* Save Button */}
+                <button
+                    onClick={handleManualSave}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-all shadow-sm border ${
+                        savedIndicator
+                            ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
+                            : 'bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700'
+                    }`}
+                >
+                    {savedIndicator ? <CheckCircle size={16} /> : <Save size={16} />}
+                    {savedIndicator ? 'Salvo!' : 'Salvar Ocupação'}
+                </button>
+
+                {/* Clear Button */}
+                <button
+                    onClick={() => setShowClearConfirm(true)}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold border border-red-200 bg-white text-red-600 hover:bg-red-50 transition-all shadow-sm"
+                >
+                    <Trash2 size={16} />
+                    Limpar Dados de Ocupação
+                </button>
+            </div>
         </div>
+
+        {/* Confirm Clear Modal */}
+        {showClearConfirm && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+                <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 border border-red-100">
+                    <div className="flex items-center gap-4 mb-6">
+                        <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                            <Trash2 size={24} className="text-red-600" />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-bold text-gray-900">Limpar dados de ocupa&ccedil;&atilde;o?</h3>
+                            <p className="text-sm text-gray-500 mt-1">Esta a&ccedil;&atilde;o ir&aacute; apagar todos os valores inseridos neste or&ccedil;amento de ocupa&ccedil;&atilde;o. N&atilde;o &eacute; poss&iacute;vel desfazer.</p>
+                        </div>
+                    </div>
+                    <div className="flex justify-end gap-3">
+                        <button
+                            onClick={() => setShowClearConfirm(false)}
+                            className="px-5 py-2.5 rounded-lg border border-gray-200 text-gray-600 font-semibold hover:bg-gray-50 transition-colors"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            onClick={handleConfirmClear}
+                            className="px-5 py-2.5 rounded-lg bg-red-600 text-white font-bold hover:bg-red-700 transition-colors shadow-sm"
+                        >
+                            Sim, limpar tudo
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
 
         <BudgetOccupancyTable title="Geral" rows={geralRows} data={budgetData} onUpdate={handleUpdate} decimalOverrides={decimalOverrides} onToggleDecimals={toggleDecimals} />
         <BudgetOccupancyTable title="Lazer" rows={lazerRows} data={budgetData} onUpdate={handleUpdate} decimalOverrides={decimalOverrides} onToggleDecimals={toggleDecimals} />

@@ -630,6 +630,38 @@ const App: React.FC = () => {
                     [activeBudgetVersionId]: typeof newData === 'function' ? newData(prev[activeBudgetVersionId] || {}) : newData
                 }));
             }}
+            onSaveOccupancy={async () => {
+                const version = budgetVersions.find(v => v.id === activeBudgetVersionId);
+                if (version) {
+                    const versionToSave = {
+                        ...version,
+                        occupancyData: budgetOccupancyDataMap[activeBudgetVersionId] || {},
+                        laborData: globalLaborDataMap[activeBudgetVersionId] || {},
+                        extraRevenueData: extraRevenueDataMap[activeBudgetVersionId] || []
+                    };
+                    try {
+                        await supabaseService.upsertBudgetVersion(versionToSave);
+                        toast.success('Ocupação salva com sucesso!');
+                    } catch (e) {
+                        toast.error('Erro ao salvar ocupação.');
+                        console.error(e);
+                    }
+                }
+            }}
+            onClearOccupancy={async () => {
+                setBudgetOccupancyDataMap(prev => ({ ...prev, [activeBudgetVersionId]: {} }));
+                const version = budgetVersions.find(v => v.id === activeBudgetVersionId);
+                if (version) {
+                    const versionToSave = { ...version, occupancyData: {} };
+                    try {
+                        await supabaseService.upsertBudgetVersion(versionToSave);
+                        toast.success('Dados de ocupação apagados.');
+                    } catch (e) {
+                        toast.error('Erro ao limpar ocupação.');
+                        console.error(e);
+                    }
+                }
+            }}
         />
       );
       case 'labor_budget': return (
