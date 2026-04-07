@@ -323,10 +323,12 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
           const lzChd = get('lazer_chd', i);
           const lzRateAd = get('lazer_rate_ad', i);
           const lzRateChd = get('lazer_rate_chd', i);
-          const lzRevHosp = get('lazer_rev_hosp', i); // Input
 
           const lzPax = lzAd + lzChd;
-          const lzRevFap = (lzAd * lzRateAd) + (lzChd * lzRateChd);
+          const lzRevFap = get('lazer_rev_fap', i); // Manual Input
+          
+          // Formula: Receita SEM rateios = Receita COM rateios - (ADULTOS * FAP ADULTOS) - (CHD * FAP CHD)
+          const lzRevHosp = lzRevFap - (lzAd * lzRateAd) - (lzChd * lzRateChd);
 
           set('lazer_occ_pct', i, lzAvail > 0 ? (lzSold / lzAvail) * 100 : 0);
           set('lazer_pax', i, lzPax);
@@ -334,6 +336,7 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
           set('lazer_coef_ad', i, lzSold > 0 ? lzAd / lzSold : 0);
           set('lazer_coef_chd', i, lzSold > 0 ? lzChd / lzSold : 0);
           set('lazer_rev_fap', i, lzRevFap);
+          set('lazer_rev_hosp', i, lzRevHosp);
           set('lazer_dm_fap', i, lzSold > 0 ? lzRevFap / lzSold : 0);
           set('lazer_dm_hosp', i, lzSold > 0 ? lzRevHosp / lzSold : 0);
           set('lazer_revpar', i, lzAvail > 0 ? lzRevFap / lzAvail : 0);
@@ -348,17 +351,21 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
           const evChd = get('event_chd', i);
           const evRateAd = get('event_rate_ad', i);
           const evRateChd = get('event_rate_chd', i);
-          const evRevHosp = get('event_rev_hosp', i); // Input
 
           const evPax = evAd + evChd;
-          const evRevFap = (evAd * evRateAd) + (evChd * evRateChd);
+          const evRevFap = get('event_rev_fap', i); // Manual Input
+          
+          // Formula: Receita SEM rateios = Receita COM rateios - (ADULTOS * FAP ADULTOS) - (CHD * FAP CHD)
+          const evRevHosp = evRevFap - (evAd * evRateAd) - (evChd * evRateChd);
 
           set('event_occ_pct', i, evAvail > 0 ? (evSold / evAvail) * 100 : 0);
           set('event_pax', i, evPax);
           set('event_coef_total', i, evSold > 0 ? evPax / evSold : 0);
+          set('event_pax', i, evPax); 
           set('event_coef_ad', i, evSold > 0 ? evAd / evSold : 0);
           set('event_coef_chd', i, evSold > 0 ? evChd / evSold : 0);
           set('event_rev_fap', i, evRevFap);
+          set('event_rev_hosp', i, evRevHosp);
           set('event_dm_fap', i, evSold > 0 ? evRevFap / evSold : 0);
           set('event_dm_hosp', i, evSold > 0 ? evRevHosp / evSold : 0);
           set('event_revpar', i, evAvail > 0 ? evRevFap / evAvail : 0);
@@ -425,8 +432,8 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
       { id: 'geral_revpar', label: 'REVPAR', isCalculated: true, format: 'currency' },
       { id: 'geral_trevpor', label: 'TREVPOR', isCalculated: true, format: 'currency' },
       { id: 'geral_trevpar', label: 'TREVPAR', isCalculated: true, format: 'currency' },
-      { id: 'geral_rev_fap', label: 'RECEITA DE LÍQ COM FAP', isCalculated: true, forceWhite: true, format: 'currency' },
-      { id: 'geral_rev_hosp', label: 'RECEITA LÍQ HOSPEDAGEM', isCalculated: true, format: 'currency' },
+      { id: 'geral_rev_fap', label: 'Receita COM rateios', isCalculated: true, format: 'currency' },
+      { id: 'geral_rev_hosp', label: 'Receita SEM rateios', isCalculated: true, format: 'currency' },
   ];
 
   const lazerRows: BudgetRow[] = [
@@ -445,8 +452,8 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
       { id: 'lazer_dm_fap', label: 'DM LÍQ COM FAP', isCalculated: true, isManualReal: true, format: 'currency' },
       { id: 'lazer_dm_hosp', label: 'DM LÍQ HOSPEDAGEM', isCalculated: true, format: 'currency' },
       { id: 'lazer_revpar', label: 'REVPAR', isCalculated: true, format: 'currency' },
-      { id: 'lazer_rev_fap', label: 'RECEITA DE LÍQ COM FAP', isCalculated: true, format: 'currency' },
-      { id: 'lazer_rev_hosp', label: 'RECEITA LÍQ HOSPEDAGEM', isInput: true, format: 'currency' },
+      { id: 'lazer_rev_fap', label: 'Receita COM rateios', isInput: true, format: 'currency' },
+      { id: 'lazer_rev_hosp', label: 'Receita SEM rateios', isCalculated: true, format: 'currency' },
   ];
 
   const eventRows: BudgetRow[] = [
@@ -465,8 +472,8 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
       { id: 'event_dm_fap', label: 'DM LÍQ COM FAP', isCalculated: true, isManualReal: true, format: 'currency' },
       { id: 'event_dm_hosp', label: 'DM LÍQ HOSPEDAGEM', isCalculated: true, format: 'currency' },
       { id: 'event_revpar', label: 'REVPAR', isCalculated: true, format: 'currency' },
-      { id: 'event_rev_fap', label: 'RECEITA DE LÍQ COM FAP', isCalculated: true, format: 'currency' },
-      { id: 'event_rev_hosp', label: 'RECEITA LÍQ HOSPEDAGEM', isInput: true, format: 'currency' },
+      { id: 'event_rev_fap', label: 'Receita COM rateios', isInput: true, format: 'currency' },
+      { id: 'event_rev_hosp', label: 'Receita SEM rateios', isCalculated: true, format: 'currency' },
   ];
 
   // --- Real View ---
