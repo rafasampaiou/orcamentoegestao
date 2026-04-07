@@ -171,6 +171,8 @@ export interface ColumnVisibility {
   previa: boolean;
   real: boolean;
   budget: boolean;
+  deltaBudget: boolean;
+  deltaBudgetPct: boolean;
   deltaPreviaBudget: boolean;
   deltaPreviaBudgetPct: boolean;
   lastYear: boolean;

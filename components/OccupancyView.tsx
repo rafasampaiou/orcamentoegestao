@@ -48,8 +48,8 @@ const formatValue = (val: number | undefined, format: 'currency' | 'percent' | '
   if (format === 'decimal') {
       return new Intl.NumberFormat('pt-BR', { style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val);
   }
-  // Currency default: No decimals
-  return new Intl.NumberFormat('pt-BR', { style: 'decimal', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val);
+  // Currency default: 2 decimals as requested
+  return new Intl.NumberFormat('pt-BR', { style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val);
 };
 
 // --- Budget Table Component ---
@@ -63,15 +63,13 @@ const BudgetOccupancyTable: React.FC<{
     const handlePaste = (e: React.ClipboardEvent, startRowId: string, startMonthIndex: number) => {
         e.preventDefault();
         const clipboardData = e.clipboardData.getData('text');
-        const pastedRows = clipboardData.split(/\r?\n/).filter(row => row.trim() !== '');
+        const pastedLines = clipboardData.split(/\r?\n/).filter(row => row.trim() !== '');
 
-        // Find the index of the starting row in the visible rows list
         const startRowIndex = rows.findIndex(r => r.id === startRowId);
         if (startRowIndex === -1) return;
 
-        pastedRows.forEach((rowStr, rIdx) => {
+        pastedLines.forEach((rowStr, rIdx) => {
             const currentRow = rows[startRowIndex + rIdx];
-            // Skip if row doesn't exist or isn't an input row
             if (!currentRow || !currentRow.isInput) return;
 
             const cells = rowStr.split('\t');
@@ -79,12 +77,27 @@ const BudgetOccupancyTable: React.FC<{
                 const targetMonthIndex = startMonthIndex + cIdx;
                 if (targetMonthIndex < 12) {
                     let cleanStr = cellStr.trim();
-                    if (cleanStr.includes(',') && cleanStr.includes('.')) {
-                         cleanStr = cleanStr.replace(/\./g, '').replace(',', '.');
-                    } else if (cleanStr.includes(',')) {
+                    
+                    // Robust Brazilian Number Parsing
+                    // 1. If has both dot and comma (e.g. 1.203,50), remove dot and change comma to dot
+                    if (cleanStr.includes('.') && cleanStr.includes(',')) {
+                        cleanStr = cleanStr.replace(/\./g, '').replace(',', '.');
+                    } 
+                    // 2. If has ONLY comma (e.g. 203,50), change to dot
+                    else if (cleanStr.includes(',')) {
                         cleanStr = cleanStr.replace(',', '.');
                     }
-                    const val = parseFloat(cleanStr.replace(/[^0-9.-]/g, ''));
+                    // 3. If has ONLY dot AND looks like thousands (e.g. 203.500), remove dot
+                    // We assume it's a thousands separator if there are 3 digits after the dot at the end 
+                    // or if the number is large.
+                    else if (cleanStr.includes('.')) {
+                        const parts = cleanStr.split('.');
+                        if (parts[parts.length - 1].length === 3 || parseFloat(cleanStr.replace(/\./g, '')) > 999) {
+                            cleanStr = cleanStr.replace(/\./g, '');
+                        }
+                    }
+
+                    const val = parseFloat(cleanStr);
                     if (!isNaN(val)) {
                         onUpdate(currentRow.id, targetMonthIndex, val);
                     }
@@ -92,6 +105,8 @@ const BudgetOccupancyTable: React.FC<{
             });
         });
     };
+
+    const [focusedCell, setFocusedCell] = useState<{rowId: string, colIdx: number} | null>(null);
 
     return (
         <div className="mb-8 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -141,10 +156,28 @@ const BudgetOccupancyTable: React.FC<{
                                             {row.isInput ? (
                                                 <input
                                                     type="text"
-                                                    className="w-full text-center bg-transparent focus:bg-indigo-50 focus:outline-none focus:ring-1 focus:ring-indigo-300 rounded px-1 text-xs"
-                                                    value={rowValues[idx] || ''}
+                                                    className={`w-full text-center bg-transparent focus:bg-indigo-50 focus:outline-none focus:ring-1 focus:ring-indigo-300 rounded px-1 text-xs ${
+                                                        focusedCell?.rowId === row.id && focusedCell?.colIdx === idx ? 'text-black' : 'text-gray-700 font-medium'
+                                                    }`}
+                                                    value={
+                                                        focusedCell?.rowId === row.id && focusedCell?.colIdx === idx 
+                                                        ? (rowValues[idx] || '') 
+                                                        : formatValue(rowValues[idx], row.format)
+                                                    }
+                                                    onFocus={() => setFocusedCell({ rowId: row.id, colIdx: idx })}
+                                                    onBlur={() => setFocusedCell(null)}
                                                     onChange={(e) => {
-                                                        const val = parseFloat(e.target.value.replace(',', '.'));
+                                                        let cleanVal = e.target.value;
+                                                        // If it contains both dot and comma, it's definitely Brazilian formatted
+                                                        if (cleanVal.includes('.') && cleanVal.includes(',')) {
+                                                            cleanVal = cleanVal.replace(/\./g, '').replace(',', '.');
+                                                        } 
+                                                        // If it ONLY contains comma, change to dot
+                                                        else if (cleanVal.includes(',')) {
+                                                            cleanVal = cleanVal.replace(',', '.');
+                                                        }
+                                                        
+                                                        const val = parseFloat(cleanVal);
                                                         if (!isNaN(val)) onUpdate(row.id, idx, val);
                                                         else if (e.target.value === '') onUpdate(row.id, idx, 0);
                                                     }}
@@ -190,6 +223,8 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
       budget: true,
       deltaBudget: true,
       deltaBudgetPct: true,
+      deltaPreviaBudget: true,
+      deltaPreviaBudgetPct: true,
       lastYear: true,
       deltaLY: true,
       deltaLYPct: true,
