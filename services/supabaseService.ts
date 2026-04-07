@@ -198,6 +198,8 @@ export const supabaseService = {
       month: v.month,
       isLocked: v.is_locked,
       isMain: v.is_main,
+      hotelId: v.hotel_id,
+      occupancyData: v.occupancy_data,
       createdAt: v.created_at,
       updatedAt: v.updated_at
     })) as BudgetVersion[];
@@ -211,6 +213,8 @@ export const supabaseService = {
       month: version.month || 1,
       is_locked: version.isLocked,
       is_main: version.isMain,
+      hotel_id: version.hotelId,
+      occupancy_data: version.occupancyData || {},
       updated_at: new Date().toISOString()
     };
 

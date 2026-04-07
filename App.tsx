@@ -173,6 +173,15 @@ const App: React.FC = () => {
         if (remoteVersions && remoteVersions.length > 0 && isMounted) {
           setBudgetVersions(remoteVersions.filter(v => v.id.startsWith('v')));
           setRealVersions(remoteVersions.filter(v => v.id.startsWith('r')));
+          
+          const newOccMap: Record<string, Record<string, number[]>> = {};
+          remoteVersions.forEach(v => {
+              if (v.id.startsWith('v') && v.occupancyData) {
+                  newOccMap[v.id] = v.occupancyData;
+              }
+          });
+          setBudgetOccupancyDataMap(newOccMap);
+
           const activeBudget = remoteVersions.find(v => v.isMain && v.id.startsWith('v'));
           const activeReal = remoteVersions.find(v => v.isMain && v.id.startsWith('r'));
           if (activeBudget) setActiveBudgetVersionId(activeBudget.id);
@@ -510,14 +519,18 @@ const App: React.FC = () => {
           </div>
           <TimelineView
             title="Planejamentos (Orçamento)"
-            versions={budgetVersions}
+            versions={budgetVersions.filter(v => !v.hotelId || v.hotelId === (hotels.find(h => h.name === selectedHotel)?.code || selectedHotel))}
             activeVersionId={activeBudgetVersionId}
             onSelectVersion={(id) => {
               setActiveBudgetVersionId(id);
-              setCurrentView('occupancy_budget');
+              const isAdm = selectedHotel === 'Administradora' || hotels.find(h => h.name === selectedHotel)?.code === 'ADM';
+              setCurrentView(isAdm ? 'dre_budget' : 'occupancy_budget');
             }}
             onToggleLock={(id) => setBudgetVersions(prev => prev.map(bv => bv.id === id ? {...bv, isLocked: !bv.isLocked} : bv))}
-            onCreateVersion={(year, month, name) => {
+            onCreateVersion={async (year, month, name) => {
+              const selectedHotelObj = hotels.find(h => h.name === selectedHotel || h.code === selectedHotel);
+              const hotelId = selectedHotelObj?.code || selectedHotelObj?.id || selectedHotel;
+
               const newVersion: BudgetVersion = {
                 id: `v-${Date.now()}`,
                 name,
@@ -525,11 +538,24 @@ const App: React.FC = () => {
                 month: month || 1,
                 createdAt: new Date().toISOString(),
                 isLocked: false,
-                isMain: budgetVersions.length === 0
+                isMain: budgetVersions.length === 0,
+                hotelId: hotelId,
+                occupancyData: {}
               };
+              
+              // Save to Supabase right away
+              try {
+                  await supabaseService.upsertBudgetVersion(newVersion);
+              } catch (e) {
+                  console.error('Failed to create version in Supabase', e);
+              }
+
               setBudgetVersions(prev => [...prev, newVersion]);
               setActiveBudgetVersionId(newVersion.id);
-              setCurrentView('occupancy_budget');
+              setBudgetOccupancyDataMap(prev => ({ ...prev, [newVersion.id]: {} }));
+              
+              const isAdm = selectedHotelObj?.code === 'ADM' || selectedHotel === 'Administradora';
+              setCurrentView(isAdm ? 'dre_budget' : 'occupancy_budget');
             }}
             onReplicateVersion={(year, month) => {
               setReplicateTarget({ year, month });
@@ -565,10 +591,23 @@ const App: React.FC = () => {
         <OccupancyView 
             isBudget={true} 
             budgetData={budgetOccupancyDataMap[activeBudgetVersionId] || {}}
-            setBudgetData={(newData) => setBudgetOccupancyDataMap(prev => ({
-              ...prev,
-              [activeBudgetVersionId]: typeof newData === 'function' ? newData(prev[activeBudgetVersionId] || {}) : newData
-            }))}
+            setBudgetData={(newData) => {
+                setBudgetOccupancyDataMap(prev => {
+                    const updatedData = typeof newData === 'function' ? newData(prev[activeBudgetVersionId] || {}) : newData;
+                    
+                    const activeVersion = budgetVersions.find(v => v.id === activeBudgetVersionId);
+                    if (activeVersion) {
+                        const versionToSave = { ...activeVersion, occupancyData: updatedData };
+                        supabaseService.upsertBudgetVersion(versionToSave).catch(e => console.error('Erro ao salvar ocupação', e));
+                        setBudgetVersions(bvPrev => bvPrev.map(v => v.id === activeVersion.id ? versionToSave : v));
+                    }
+                    
+                    return {
+                        ...prev,
+                        [activeBudgetVersionId]: updatedData
+                    };
+                });
+            }}
         />
       );
       case 'labor_budget': return (

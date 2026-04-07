@@ -247,6 +247,8 @@ export interface BudgetVersion {
     createdAt: string;
     updatedAt?: string;
     isMain?: boolean;
+    hotelId?: string;
+    occupancyData?: Record<string, number[]>;
 }
 
 export interface LaborParameters {
