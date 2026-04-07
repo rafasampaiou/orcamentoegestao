@@ -36,20 +36,20 @@ interface BudgetRow {
 const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
 // --- Helper Functions ---
-const formatValue = (val: number | undefined, format: 'currency' | 'percent' | 'integer' | 'decimal' = 'currency') => {
+const formatValue = (val: number | undefined, format: 'currency' | 'percent' | 'integer' | 'decimal' = 'currency', decimals?: number) => {
   if (val === undefined || val === null || isNaN(val)) return '-';
   
   if (format === 'percent') {
-      return `${val.toFixed(2)}%`;
+      return `${val.toFixed(decimals ?? 2)}%`;
   }
-  if (format === 'integer') {
-      return new Intl.NumberFormat('pt-BR', { style: 'decimal', maximumFractionDigits: 0 }).format(val);
-  }
-  if (format === 'decimal') {
-      return new Intl.NumberFormat('pt-BR', { style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val);
-  }
-  // Currency default: 2 decimals as requested
-  return new Intl.NumberFormat('pt-BR', { style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val);
+  
+  const d = decimals ?? (format === 'integer' ? 0 : 2);
+  
+  return new Intl.NumberFormat('pt-BR', { 
+    style: 'decimal', 
+    minimumFractionDigits: d, 
+    maximumFractionDigits: d 
+  }).format(val);
 };
 
 // --- Budget Table Component ---
@@ -57,8 +57,10 @@ const BudgetOccupancyTable: React.FC<{
     title: string, 
     rows: BudgetRow[], 
     data: Record<string, number[]>, 
-    onUpdate: (rowId: string, monthIndex: number, value: number) => void 
-}> = ({ title, rows, data, onUpdate }) => {
+    onUpdate: (rowId: string, monthIndex: number, value: number) => void,
+    decimalOverrides: Record<string, number>,
+    onToggleDecimals: (rowId: string) => void
+}> = ({ title, rows, data, onUpdate, decimalOverrides, onToggleDecimals }) => {
 
     const handlePaste = (e: React.ClipboardEvent, startRowId: string, startMonthIndex: number) => {
         e.preventDefault();
@@ -148,8 +150,17 @@ const BudgetOccupancyTable: React.FC<{
 
                             return (
                                 <tr key={row.id} className={`hover:bg-gray-50 transition-colors group ${rowBgClass}`}>
-                                    <td className={`px-4 py-2 sticky left-0 z-10 border-r border-gray-200 ${stickyBgClass} ${row.indent ? 'pl-8 text-gray-500' : 'text-gray-700 font-medium'}`}>
-                                        {row.label}
+                                    <td className={`px-4 py-2 sticky left-0 z-10 border-r border-gray-200 ${stickyBgClass} flex items-center justify-between gap-2 overflow-hidden`}>
+                                        <span className={`${row.indent ? 'pl-4 text-gray-500' : 'text-gray-700 font-medium'} truncate`}>
+                                            {row.label}
+                                        </span>
+                                        <button 
+                                            onClick={() => onToggleDecimals(row.id)}
+                                            className="opacity-0 group-hover:opacity-100 flex items-center justify-center w-6 h-6 rounded bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-all text-[10px] font-bold shrink-0 shadow-sm border border-indigo-200"
+                                            title="Mudar casas decimais"
+                                        >
+                                            .{decimalOverrides[row.id] ?? (row.format === 'integer' ? 0 : 2)}
+                                        </button>
                                     </td>
                                     {MONTHS.map((_, idx) => (
                                         <td key={idx} className="px-1 py-1 border-r border-gray-100 text-center">
@@ -162,7 +173,7 @@ const BudgetOccupancyTable: React.FC<{
                                                     value={
                                                         focusedCell?.rowId === row.id && focusedCell?.colIdx === idx 
                                                         ? (rowValues[idx] || '') 
-                                                        : formatValue(rowValues[idx], row.format)
+                                                        : formatValue(rowValues[idx], row.format, decimalOverrides[row.id])
                                                     }
                                                     onFocus={() => setFocusedCell({ rowId: row.id, colIdx: idx })}
                                                     onBlur={() => setFocusedCell(null)}
@@ -185,13 +196,13 @@ const BudgetOccupancyTable: React.FC<{
                                                 />
                                             ) : (
                                                 <span className="text-xs text-gray-600 font-medium">
-                                                    {formatValue(rowValues[idx], row.format)}
+                                                    {formatValue(rowValues[idx], row.format, decimalOverrides[row.id])}
                                                 </span>
                                             )}
                                         </td>
                                     ))}
                                     <td className="px-2 py-2 text-center bg-gray-50 font-bold text-gray-800 text-xs border-l border-gray-200">
-                                        {formatValue(total, row.format)}
+                                        {formatValue(total, row.format, decimalOverrides[row.id])}
                                     </td>
                                 </tr>
                             );
@@ -230,6 +241,24 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
       deltaLYPct: true,
   });
   const [showColumnSettings, setShowColumnSettings] = useState(false);
+  const [decimalOverrides, setDecimalOverrides] = useState<Record<string, number>>({});
+
+  const toggleDecimals = (rowId: string) => {
+      setDecimalOverrides(prev => {
+          const current = prev[rowId] ?? -1;
+          const allRows = [...geralRows, ...lazerRows, ...eventRows];
+          const found = allRows.find(r => r.id === rowId);
+          const standard = found?.format === 'integer' ? 0 : 2;
+          
+          let next;
+          if (current === -1) {
+              next = (standard + 1) % 5;
+          } else {
+              next = (current + 1) % 5;
+          }
+          return { ...prev, [rowId]: next };
+      });
+  };
 
   const recalculateReal = (currentData: Record<string, number>) => {
       const newData = { ...currentData };
@@ -629,6 +658,12 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
                                   <tr key={row.id} className="hover:bg-gray-50 transition-colors">
                                       <td className={`px-4 py-2 sticky left-0 bg-white z-10 border-r border-gray-200 ${row.indent ? 'pl-8 text-gray-500' : 'text-gray-700 font-medium'}`}>
                                           {row.label}
+                                          <button 
+                                              onClick={() => toggleDecimals(row.id)}
+                                              className="ml-2 text-[10px] text-gray-400 hover:text-indigo-600 font-bold"
+                                          >
+                                              .{decimalOverrides[row.id] ?? 0}
+                                          </button>
                                       </td>
                                       {columnVisibility.previa && (
                                           <td className="px-2 py-2 text-right bg-purple-50/20 text-purple-800 font-medium border-r border-gray-100">
@@ -640,7 +675,7 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
                                                       onChange={(e) => handleRealUpdate(row.id, 'previa', parseFloat(e.target.value) || 0)}
                                                   />
                                               ) : (
-                                                  <span className="font-bold text-purple-900">{formatValue(previa, row.format)}</span>
+                                                  <span className="font-bold text-purple-900">{formatValue(previa, row.format, decimalOverrides[row.id])}</span>
                                               )}
                                           </td>
                                       )}
@@ -654,18 +689,18 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
                                                       onChange={(e) => handleRealUpdate(row.id, 'forecast', parseFloat(e.target.value) || 0)}
                                                   />
                                               ) : (
-                                                  <span className="font-bold text-sky-900">{formatValue(forecast, row.format)}</span>
+                                                  <span className="font-bold text-sky-900">{formatValue(forecast, row.format, decimalOverrides[row.id])}</span>
                                               )}
                                           </td>
                                       )}
                                       {columnVisibility.budget && (
                                           <td className="px-2 py-2 text-right text-gray-500 border-r border-gray-100">
-                                              {formatValue(meta, row.format)}
+                                              {formatValue(meta, row.format, decimalOverrides[row.id])}
                                           </td>
                                       )}
                                       {columnVisibility.deltaBudget && (
                                           <td className={`px-2 py-2 text-right font-medium border-r border-gray-100 ${deltaColor}`}>
-                                              {formatValue(deltaBudgetVal, row.format)}
+                                              {formatValue(deltaBudgetVal, row.format, decimalOverrides[row.id])}
                                           </td>
                                       )}
                                       {columnVisibility.deltaBudgetPct && (
@@ -675,12 +710,12 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
                                       )}
                                       {columnVisibility.lastYear && (
                                           <td className="px-2 py-2 text-right bg-orange-50/20 text-orange-800 border-r border-gray-100">
-                                              {formatValue(ly, row.format)}
+                                              {formatValue(ly, row.format, decimalOverrides[row.id])}
                                           </td>
                                       )}
                                       {columnVisibility.deltaLY && (
                                           <td className={`px-2 py-2 text-right font-medium border-r border-gray-100 ${lyColor}`}>
-                                              {formatValue(deltaLYVal, row.format)}
+                                              {formatValue(deltaLYVal, row.format, decimalOverrides[row.id])}
                                           </td>
                                       )}
                                       {columnVisibility.deltaLYPct && (
@@ -765,9 +800,9 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             <p className="text-gray-500 mt-1">Projeção mensal de ocupação e receitas (Lazer e Eventos).</p>
         </div>
 
-        <BudgetOccupancyTable title="Geral" rows={geralRows} data={budgetData} onUpdate={handleUpdate} />
-        <BudgetOccupancyTable title="Lazer" rows={lazerRows} data={budgetData} onUpdate={handleUpdate} />
-        <BudgetOccupancyTable title="Eventos" rows={eventRows} data={budgetData} onUpdate={handleUpdate} />
+        <BudgetOccupancyTable title="Geral" rows={geralRows} data={budgetData} onUpdate={handleUpdate} decimalOverrides={decimalOverrides} onToggleDecimals={toggleDecimals} />
+        <BudgetOccupancyTable title="Lazer" rows={lazerRows} data={budgetData} onUpdate={handleUpdate} decimalOverrides={decimalOverrides} onToggleDecimals={toggleDecimals} />
+        <BudgetOccupancyTable title="Eventos" rows={eventRows} data={budgetData} onUpdate={handleUpdate} decimalOverrides={decimalOverrides} onToggleDecimals={toggleDecimals} />
     </div>
   );
 };
