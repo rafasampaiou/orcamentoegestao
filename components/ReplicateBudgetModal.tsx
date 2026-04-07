@@ -7,13 +7,16 @@ interface ReplicateBudgetModalProps {
   targetYear: number;
   targetMonth: number;
   availableVersions: BudgetVersion[];
+  budgetVersions?: BudgetVersion[];
+  mode?: 'BUDGET' | 'REAL';
   onReplicate: (sourceVersionId: string, options: ReplicationOptions) => void;
 }
 
 export interface ReplicationOptions {
-  type: 'exact' | 'new_projected';
+  type: 'exact' | 'new_projected' | 'pull_budget_meta';
   name: string;
   sourceVersionId: string;
+  budgetYear?: number;
   insertNewOccupancy: boolean;
   projectFixedWithInflation: boolean;
   inflationRate?: number;
@@ -26,11 +29,14 @@ const ReplicateBudgetModal: React.FC<ReplicateBudgetModalProps> = ({
   targetYear,
   targetMonth,
   availableVersions,
+  budgetVersions = [],
+  mode = 'BUDGET',
   onReplicate
 }) => {
   const [sourceVersionId, setSourceVersionId] = useState<string>('');
-  const [replicationType, setReplicationType] = useState<'exact' | 'new_projected'>('exact');
-  const [versionName, setVersionName] = useState<string>(`Orçamento ${targetYear}`);
+  const [replicationType, setReplicationType] = useState<'exact' | 'new_projected' | 'pull_budget_meta'>(mode === 'REAL' ? 'pull_budget_meta' : 'exact');
+  const [versionName, setVersionName] = useState<string>(`${mode === 'REAL' ? 'Planejamento' : 'Orçamento'} ${targetYear}`);
+  const [selectedBudgetYear, setSelectedBudgetYear] = useState<number>(targetYear);
   
   // New options state
   const [insertNewOccupancy, setInsertNewOccupancy] = useState(true);
@@ -42,7 +48,7 @@ const ReplicateBudgetModal: React.FC<ReplicateBudgetModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!sourceVersionId) {
+    if (replicationType !== 'pull_budget_meta' && !sourceVersionId) {
       alert('Selecione uma versão de origem para servir de base.');
       return;
     }
@@ -55,6 +61,7 @@ const ReplicateBudgetModal: React.FC<ReplicateBudgetModalProps> = ({
       type: replicationType,
       name: versionName,
       sourceVersionId,
+      budgetYear: replicationType === 'pull_budget_meta' ? selectedBudgetYear : undefined,
       insertNewOccupancy: replicationType === 'new_projected' ? insertNewOccupancy : false,
       projectFixedWithInflation: replicationType === 'new_projected' ? projectFixedWithInflation : false,
       inflationRate: (replicationType === 'new_projected' && projectFixedWithInflation) ? inflationRate : undefined,
@@ -69,7 +76,7 @@ const ReplicateBudgetModal: React.FC<ReplicateBudgetModalProps> = ({
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
           <h3 className="text-lg font-medium text-gray-900">
-            Replicar Orçamento - {months[targetMonth - 1]} {targetYear}
+            {mode === 'REAL' ? 'Novo Planejamento' : 'Replicar Orçamento'} - {months[targetMonth - 1]} {targetYear}
           </h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-500">
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -111,9 +118,49 @@ const ReplicateBudgetModal: React.FC<ReplicateBudgetModalProps> = ({
             </select>
           </div>
 
+          {mode === 'REAL' && (
+             <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  Opções de Meta (Realizado)
+                </label>
+                <div className="space-y-3">
+                  <label className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 border-teal-500 bg-teal-50">
+                    <input
+                      type="radio"
+                      name="replicationType"
+                      value="pull_budget_meta"
+                      checked={replicationType === 'pull_budget_meta'}
+                      onChange={() => setReplicationType('pull_budget_meta')}
+                      className="mt-1 text-[#38b2ac] focus:ring-[#38b2ac]"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium text-teal-900">Puxar Meta do Tauá Budget</div>
+                      <div className="text-sm text-teal-700 mb-2">Importar os valores orçados no módulo Budget para esta versão de Realizado.</div>
+                      
+                      {replicationType === 'pull_budget_meta' && (
+                        <div className="mt-2 bg-white/50 p-2 rounded">
+                          <label className="text-xs font-bold text-teal-800 uppercase block mb-1">Ano do Orçamento Origem</label>
+                          <select 
+                            value={selectedBudgetYear}
+                            onChange={(e) => setSelectedBudgetYear(parseInt(e.target.value))}
+                            className="w-full text-sm border-teal-200 rounded focus:ring-teal-500 focus:border-teal-500"
+                          >
+                            {Array.from(new Set(budgetVersions.map(v => v.year))).sort((a,b) => b-a).map(year => (
+                              <option key={year} value={year}>{year}</option>
+                            ))}
+                            <option value={targetYear}>{targetYear} (Atual)</option>
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  </label>
+                </div>
+             </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">
-              Como deseja criar a nova versão?
+              {mode === 'REAL' ? 'Outras Opções (Cópia)' : 'Como deseja criar a nova versão?'}
             </label>
             <div className="space-y-3">
               <label className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">

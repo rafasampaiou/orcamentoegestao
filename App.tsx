@@ -21,7 +21,7 @@ import { Session } from '@supabase/supabase-js';
 import { ViewState, ImportedRow, User, Hotel, CostCenter, CostPackage, Account, GMDConfiguration, ModuleType, UserRole, BudgetVersion, LaborParameters, ScheduleItem } from './types';
 import { Calendar, ArrowLeft, ArrowRight, Building2 as Building2Icon, Layers } from 'lucide-react';
 import { mockUsers, mockHotels, mockCostCenters, mockPackages, mockAccounts, mockGMDConfigs } from './services/mockData';
-import { Toaster } from 'react-hot-toast';
+import { Toaster, toast } from 'react-hot-toast';
 
 const App: React.FC = () => {
   const [currentModule, setCurrentModule] = useState<ModuleType>('REAL');
@@ -58,6 +58,7 @@ const App: React.FC = () => {
   const [activeBudgetVersionId, setActiveBudgetVersionId] = useState<string>('v2');
   const [replicateModalOpen, setReplicateModalOpen] = useState(false);
   const [replicateTarget, setReplicateTarget] = useState<{year: number, month: number} | null>(null);
+  const [replicateMode, setReplicateMode] = useState<'BUDGET' | 'REAL'>('BUDGET');
   const [projectedBudgetVersionId] = useState<string>('v2');
 
   // --- REAL VERSIONING STATE ---
@@ -277,11 +278,10 @@ const App: React.FC = () => {
 
   const handleReplicateBudget = (sourceVersionId: string, options: ReplicationOptions) => {
     if (!replicateTarget) return;
-    
-    const sourceVersion = budgetVersions.find(v => v.id === sourceVersionId);
-    if (!sourceVersion) return;
 
-    const newVersionId = `b${Date.now()}`;
+    const sourceVersion = budgetVersions.find(v => v.id === sourceVersionId) || realVersions.find(v => v.id === sourceVersionId);
+    
+    const newVersionId = `${replicateMode === 'REAL' ? 'r' : 'b'}${Date.now()}`;
     const newVersion: BudgetVersion = {
       id: newVersionId,
       name: options.name,
@@ -293,55 +293,64 @@ const App: React.FC = () => {
       updatedAt: new Date().toISOString()
     };
 
-    setBudgetVersions(prev => [...prev, newVersion]);
-    setActiveBudgetVersionId(newVersionId);
-
-    // --- DATA REPLICATION LOGIC ---
-    
-    // 1. Replicate Financial Data (ImportedRows)
-    const sourceData = importedFinancialData.filter(row => row.versionId === sourceVersionId);
-    const newData: ImportedRow[] = sourceData.map(row => {
-      let newValue = parseFloat(row.valor) || 0;
-      
-      if (options.type === 'new_projected') {
-        // Find account to check if it's fixed or variable
-        // We check by name or code
-        const account = accounts.find(a => a.name === row.conta || a.code === row.conta);
-        
-        if (account) {
-          // Fixed Expenses Projection based on inflation
-          if (account.type === 'Fixed' && options.projectFixedWithInflation && options.inflationRate !== undefined) {
-            newValue = newValue * (1 + options.inflationRate / 100);
-          }
-          
-          // Variable Expenses Projection
-          // If projectVariableWithOCC is true, we keep the values for now.
-          // In a more advanced version, we would wait for the new OCC and then re-calculate.
-          // For this implementation, we copy the base values which will be adjusted later in the DRE/Occupancy views.
-          if (account.type !== 'Fixed' && !options.projectVariableWithOCC) {
-            // If they DON'T want to project variables, maybe we zero them out? 
-            // Usually "start new" implies starting fresh or projecting.
-            // If they don't project, they might want to enter manually.
-            // But let's stick to copying as a base unless specified.
-          }
-        }
-      }
-      
-      return {
-        ...row,
-        valor: newValue.toFixed(2),
-        versionId: newVersionId,
-        ano: replicateTarget.year.toString(),
-        mes: replicateTarget.month?.toString() || row.mes
-      };
-    });
-
-    if (newData.length > 0) {
-      setImportedFinancialData(prev => [...prev, ...newData]);
+    if (replicateMode === 'REAL') {
+      setRealVersions(prev => [...prev, newVersion]);
+      setActiveRealVersionId(newVersionId);
+    } else {
+      setBudgetVersions(prev => [...prev, newVersion]);
+      setActiveBudgetVersionId(newVersionId);
     }
 
+    // --- DATA REPLICATION LOGIC ---
+    const runReplication = async () => {
+      try {
+        if (options.type === 'pull_budget_meta' && options.budgetYear) {
+            // PULL FROM BUDGET DATABASE TO FINANCIAL_DATA
+            await supabaseService.pullBudgetMetaToReal(options.budgetYear, newVersionId);
+            
+            // Refresh local state by fetching this version's data
+            const newData = await supabaseService.getFinancialDataByVersion(newVersionId);
+            setImportedFinancialData(prev => [...prev, ...newData]);
+            
+            toast.success(`Meta de ${options.budgetYear} importada com sucesso!`);
+        } else if (sourceVersionId) {
+            // Replicate Financial Data (ImportedRows)
+            const sourceData = importedFinancialData.filter(row => row.versionId === sourceVersionId);
+            const newData: ImportedRow[] = sourceData.map(row => {
+              let newValue = parseFloat(row.valor) || 0;
+              
+              if (options.type === 'new_projected') {
+                const account = accounts.find(a => a.name === row.conta || a.code === row.conta);
+                if (account) {
+                  if (account.type === 'Fixed' && options.projectFixedWithInflation && options.inflationRate !== undefined) {
+                    newValue = newValue * (1 + options.inflationRate / 100);
+                  }
+                }
+              }
+              
+              return {
+                ...row,
+                valor: newValue.toFixed(2),
+                versionId: newVersionId,
+                ano: replicateTarget.year.toString(),
+                mes: replicateTarget.month?.toString() || row.mes
+              };
+            });
+
+            if (newData.length > 0) {
+              setImportedFinancialData(prev => [...prev, ...newData]);
+            }
+        }
+      } catch (err) {
+        console.error('Replication Error:', err);
+        toast.error('Erro ao replicar dados. Verifique a conexão.');
+      }
+    };
+    
+    runReplication();
+
     // 2. Replicate Occupancy Data
-    if (budgetOccupancyDataMap[sourceVersionId]) {
+    if (sourceVersionId && budgetOccupancyDataMap[sourceVersionId]) {
       setBudgetOccupancyDataMap(prev => ({
         ...prev,
         [newVersionId]: JSON.parse(JSON.stringify(prev[sourceVersionId]))
@@ -349,7 +358,7 @@ const App: React.FC = () => {
     }
 
     // 3. Replicate Labor Parameters
-    if (laborParametersMap[sourceVersionId]) {
+    if (sourceVersionId && laborParametersMap[sourceVersionId]) {
       setLaborParametersMap(prev => ({
         ...prev,
         [newVersionId]: { ...prev[sourceVersionId] }
@@ -360,13 +369,15 @@ const App: React.FC = () => {
     setReplicateTarget(null);
     
     // Navigation logic based on user choice
-    if (options.type === 'new_projected' && options.insertNewOccupancy) {
-      setCurrentView('occupancy_budget');
+    if (replicateMode === 'BUDGET') {
+      if (options.type === 'new_projected' && options.insertNewOccupancy) {
+        setCurrentView('occupancy_budget');
+      } else {
+        setCurrentView('dre_budget');
+      }
     } else {
-      setCurrentView('dre_budget');
+      setCurrentView('dashboard');
     }
-    
-    alert(`Versão "${options.name}" criada com sucesso! ${options.type === 'new_projected' ? 'Projeções aplicadas.' : 'Cópia exata realizada.'}`);
   };
 
   const renderContent = () => {
@@ -391,7 +402,7 @@ const App: React.FC = () => {
             onToggleLock={(id) => setRealVersions(prev => prev.map(bv => bv.id === id ? {...bv, isLocked: !bv.isLocked} : bv))}
             onCreateVersion={(year, month, name) => {
               const newVersion: BudgetVersion = {
-                id: `v-${Date.now()}`,
+                id: `r-${Date.now()}`,
                 name,
                 year: year,
                 month: month || 1,
@@ -403,6 +414,11 @@ const App: React.FC = () => {
               setActiveRealVersionId(newVersion.id);
               setCurrentView('dashboard');
             }}
+            onReplicateVersion={(year, month) => {
+              setReplicateTarget({ year, month });
+              setReplicateMode('REAL');
+              setReplicateModalOpen(true);
+            }}
             onSetMain={(id) => setRealVersions(prev => prev.map(v => ({ ...v, isMain: v.id === id })))}
             onDelete={(id) => {
               setRealVersions(prev => prev.filter(v => v.id !== id));
@@ -411,6 +427,21 @@ const App: React.FC = () => {
               }
             }}
           />
+          {replicateTarget && replicateMode === 'REAL' && (
+            <ReplicateBudgetModal
+              isOpen={replicateModalOpen}
+              onClose={() => {
+                setReplicateModalOpen(false);
+                setReplicateTarget(null);
+              }}
+              targetYear={replicateTarget.year}
+              targetMonth={replicateTarget.month}
+              availableVersions={realVersions}
+              budgetVersions={budgetVersions}
+              mode="REAL"
+              onReplicate={handleReplicateBudget}
+            />
+          )}
         </div>
       );
       case 'dashboard': return (
@@ -514,6 +545,7 @@ const App: React.FC = () => {
             }}
             onReplicateVersion={(year, month) => {
               setReplicateTarget({ year, month });
+              setReplicateMode('BUDGET');
               setReplicateModalOpen(true);
             }}
             onSetMain={(id) => setBudgetVersions(prev => prev.map(v => ({ ...v, isMain: v.id === id })))}
@@ -524,7 +556,7 @@ const App: React.FC = () => {
               }
             }}
           />
-          {replicateTarget && (
+          {replicateTarget && replicateMode === 'BUDGET' && (
             <ReplicateBudgetModal
               isOpen={replicateModalOpen}
               onClose={() => {
@@ -534,6 +566,8 @@ const App: React.FC = () => {
               targetYear={replicateTarget.year}
               targetMonth={replicateTarget.month}
               availableVersions={budgetVersions}
+              budgetVersions={budgetVersions}
+              mode="BUDGET"
               onReplicate={handleReplicateBudget}
             />
           )}

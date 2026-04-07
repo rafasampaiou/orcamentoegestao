@@ -506,7 +506,11 @@ export const getForecastData = (
           
           // Filter by versionId if applicable
           if (normScenario === 'REAL' && activeRealVersionId && row.versionId && row.versionId !== activeRealVersionId) return;
-          if (normScenario === 'BUDGET' && activeBudgetVersionId && row.versionId && row.versionId !== activeBudgetVersionId) return;
+          if (normScenario === 'BUDGET' && row.versionId) {
+              const matchesBudget = activeBudgetVersionId && row.versionId === activeBudgetVersionId;
+              const matchesReal = activeRealVersionId && row.versionId === activeRealVersionId;
+              if (!matchesBudget && !matchesReal) return;
+          }
 
           // 4. Normalize Hotel
           const normHotel = row.hotel.trim().toUpperCase();
