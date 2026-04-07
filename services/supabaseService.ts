@@ -409,31 +409,62 @@ export const supabaseService = {
   },
 
   async pullBudgetMetaToReal(budgetYear: number, targetRealVersionId: string): Promise<void> {
-    // 1. Get all budget data for the year
-    const { data: budgetData, error: budgetError } = await supabase
+    // 1. Try to get data from budget_data (Direct module entries)
+    const { data: budgetTableData, error: budgetError } = await supabase
       .from('budget_data')
       .select('*, accounts(name, package, master_package), cost_centers(name, department, directorate, hotel_name)')
       .eq('year', budgetYear);
     
     if (budgetError) throw budgetError;
-    if (!budgetData || budgetData.length === 0) return;
 
-    // 2. Map to financial_data format
-    const financialRecords = budgetData.map(r => ({
-      version_id: targetRealVersionId,
-      year: r.year,
-      month: r.month,
-      scenario: 'Meta',
-      real_meta: 'Meta',
-      hotel: (r as any).cost_centers?.hotel_name || 'Desconhecido',
-      account_name: (r as any).accounts?.name || 'Desconhecido',
-      cost_center: (r as any).cost_centers?.name || '',
-      value: r.value,
-      department: (r as any).cost_centers?.department || '',
-      package: (r as any).accounts?.package || '',
-      master_package: (r as any).accounts?.master_package || '',
-      directorate: (r as any).cost_centers?.directorate || '',
-    }));
+    let financialRecords: any[] = [];
+
+    if (budgetTableData && budgetTableData.length > 0) {
+      financialRecords = budgetTableData.map(r => ({
+        version_id: targetRealVersionId,
+        year: r.year,
+        month: r.month,
+        scenario: 'Meta',
+        real_meta: 'Meta',
+        hotel: (r as any).cost_centers?.hotel_name || 'Desconhecido',
+        account_name: (r as any).accounts?.name || 'Desconhecido',
+        cost_center: (r as any).cost_centers?.name || '',
+        value: r.value,
+        department: (r as any).cost_centers?.department || '',
+        package: (r as any).accounts?.package || '',
+        master_package: (r as any).accounts?.master_package || '',
+        directorate: (r as any).cost_centers?.directorate || '',
+      }));
+    } else {
+      // 2. FALLBACK: Look into financial_data for manual imports
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('financial_data')
+        .select('*')
+        .eq('year', budgetYear)
+        .in('scenario', ['Meta', 'BUDGET', 'Budget', 'ORÇAMENTO', 'Orçamento', 'Orcamento']);
+      
+      if (fallbackError) throw fallbackError;
+      
+      if (fallbackData && fallbackData.length > 0) {
+        financialRecords = fallbackData.map(r => ({
+          version_id: targetRealVersionId,
+          year: r.year,
+          month: r.month,
+          scenario: 'Meta',
+          real_meta: 'Meta',
+          hotel: r.hotel,
+          account_name: r.account_name,
+          cost_center: r.cost_center,
+          value: r.value || 0,
+          department: r.department,
+          package: r.package,
+          master_package: r.master_package,
+          directorate: r.directorate,
+        }));
+      }
+    }
+
+    if (financialRecords.length === 0) return;
 
     // 3. Save to financial_data
     const batchSize = 500;
