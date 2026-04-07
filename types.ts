@@ -249,6 +249,8 @@ export interface BudgetVersion {
     isMain?: boolean;
     hotelId?: string;
     occupancyData?: Record<string, number[]>;
+    laborData?: Record<string, any>;
+    extraRevenueData?: any[];
 }
 
 export interface LaborParameters {

@@ -4,6 +4,8 @@ const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', '
 
 interface BudgetExtraRevViewProps {
     budgetOccupancyData: Record<string, number[]>;
+    extraRevenueData?: any[];
+    setExtraRevenueData?: (data: any[]) => void;
 }
 
 interface PDVRow {
@@ -12,13 +14,19 @@ interface PDVRow {
     values: number[]; // 12 months (Indicator per PAX)
 }
 
-const BudgetExtraRevView: React.FC<BudgetExtraRevViewProps> = ({ budgetOccupancyData }) => {
-    const [pdvs, setPdvs] = useState<PDVRow[]>([
+const BudgetExtraRevView: React.FC<BudgetExtraRevViewProps> = ({ budgetOccupancyData, extraRevenueData, setExtraRevenueData }) => {
+    const [pdvs, setPdvs] = useState<PDVRow[]>(extraRevenueData && extraRevenueData.length > 0 ? extraRevenueData : [
         { id: '1', name: 'A&B (Alimentos e Bebidas)', values: Array(12).fill(0) },
         { id: '2', name: 'Spa', values: Array(12).fill(0) },
         { id: '3', name: 'Lojinha', values: Array(12).fill(0) },
         { id: '4', name: 'Estacionamento', values: Array(12).fill(0) },
     ]);
+
+    React.useEffect(() => {
+        if (setExtraRevenueData) {
+            setExtraRevenueData(pdvs);
+        }
+    }, [pdvs]);
 
     const paxData = budgetOccupancyData['geral_pax'] || Array(12).fill(0);
 

@@ -94,6 +94,10 @@ CREATE TABLE public.budget_versions (
     month INTEGER,
     is_locked BOOLEAN DEFAULT FALSE,
     is_main BOOLEAN DEFAULT FALSE,
+    hotel_id TEXT,
+    occupancy_data JSONB DEFAULT '{}'::jsonb,
+    labor_data JSONB DEFAULT '{}'::jsonb,
+    extra_revenue_data JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );

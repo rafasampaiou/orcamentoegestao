@@ -200,6 +200,8 @@ export const supabaseService = {
       isMain: v.is_main,
       hotelId: v.hotel_id,
       occupancyData: v.occupancy_data,
+      laborData: v.labor_data,
+      extraRevenueData: v.extra_revenue_data,
       createdAt: v.created_at,
       updatedAt: v.updated_at
     })) as BudgetVersion[];
@@ -215,6 +217,8 @@ export const supabaseService = {
       is_main: version.isMain,
       hotel_id: version.hotelId,
       occupancy_data: version.occupancyData || {},
+      labor_data: version.laborData || {},
+      extra_revenue_data: version.extraRevenueData || [],
       updated_at: new Date().toISOString()
     };
 

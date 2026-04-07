@@ -90,6 +90,9 @@ const App: React.FC = () => {
     'r1': { ...defaultLaborParams },
     'r2': { ...defaultLaborParams }
   });
+  
+  const [globalLaborDataMap, setGlobalLaborDataMap] = useState<Record<string, Record<string, any>>>({});
+  const [extraRevenueDataMap, setExtraRevenueDataMap] = useState<Record<string, any[]>>({});
 
   // --- BUDGET SCHEDULE STATE ---
   const [budgetSchedule, setBudgetSchedule] = useState<ScheduleItem[]>([
@@ -125,6 +128,30 @@ const App: React.FC = () => {
 
   // --- BUDGET OCCUPANCY STATE (LIFTED) ---
   const [budgetOccupancyDataMap, setBudgetOccupancyDataMap] = useState<Record<string, Record<string, number[]>>>({});
+
+  // Central Auto-Save Effect (Debounces and sends everything to Supabase)
+  React.useEffect(() => {
+     if (!activeBudgetVersionId) return;
+     const timeout = setTimeout(() => {
+         const version = budgetVersions.find(v => v.id === activeBudgetVersionId);
+         if (version && version.id.startsWith('v')) {
+             const versionToSave = { 
+                 ...version, 
+                 occupancyData: budgetOccupancyDataMap[activeBudgetVersionId] || {},
+                 laborData: globalLaborDataMap[activeBudgetVersionId] || {},
+                 extraRevenueData: extraRevenueDataMap[activeBudgetVersionId] || []
+             };
+             supabaseService.upsertBudgetVersion(versionToSave).catch(e => console.error('Erro ao salvar planejamento auto-save', e));
+         }
+     }, 1500); // 1.5 seconds debounce
+     return () => clearTimeout(timeout);
+  }, [
+      activeBudgetVersionId,
+      budgetVersions,
+      budgetOccupancyDataMap, 
+      globalLaborDataMap, 
+      extraRevenueDataMap
+  ]);
   const [realOccupancyData, setRealOccupancyData] = useState<Record<string, Record<string, number>>>({});
 
   // --- REGISTRY STATE (LIFTED FROM SETTINGS) ---
@@ -175,12 +202,18 @@ const App: React.FC = () => {
           setRealVersions(remoteVersions.filter(v => v.id.startsWith('r')));
           
           const newOccMap: Record<string, Record<string, number[]>> = {};
+          const newLaborMap: Record<string, Record<string, any>> = {};
+          const newExtraMap: Record<string, any[]> = {};
           remoteVersions.forEach(v => {
-              if (v.id.startsWith('v') && v.occupancyData) {
-                  newOccMap[v.id] = v.occupancyData;
+              if (v.id.startsWith('v')) {
+                  if (v.occupancyData) newOccMap[v.id] = v.occupancyData;
+                  if (v.laborData) newLaborMap[v.id] = v.laborData;
+                  if (v.extraRevenueData) newExtraMap[v.id] = v.extraRevenueData;
               }
           });
           setBudgetOccupancyDataMap(newOccMap);
+          setGlobalLaborDataMap(newLaborMap);
+          setExtraRevenueDataMap(newExtraMap);
 
           const activeBudget = remoteVersions.find(v => v.isMain && v.id.startsWith('v'));
           const activeReal = remoteVersions.find(v => v.isMain && v.id.startsWith('r'));
@@ -592,38 +625,35 @@ const App: React.FC = () => {
             isBudget={true} 
             budgetData={budgetOccupancyDataMap[activeBudgetVersionId] || {}}
             setBudgetData={(newData) => {
-                setBudgetOccupancyDataMap(prev => {
-                    const updatedData = typeof newData === 'function' ? newData(prev[activeBudgetVersionId] || {}) : newData;
-                    
-                    const activeVersion = budgetVersions.find(v => v.id === activeBudgetVersionId);
-                    if (activeVersion) {
-                        const versionToSave = { ...activeVersion, occupancyData: updatedData };
-                        supabaseService.upsertBudgetVersion(versionToSave).catch(e => console.error('Erro ao salvar ocupação', e));
-                        setBudgetVersions(bvPrev => bvPrev.map(v => v.id === activeVersion.id ? versionToSave : v));
-                    }
-                    
-                    return {
-                        ...prev,
-                        [activeBudgetVersionId]: updatedData
-                    };
-                });
+                setBudgetOccupancyDataMap(prev => ({
+                    ...prev,
+                    [activeBudgetVersionId]: typeof newData === 'function' ? newData(prev[activeBudgetVersionId] || {}) : newData
+                }));
             }}
         />
       );
       case 'labor_budget': return (
         <ErrorBoundary>
           <BudgetLaborView 
+            key={activeBudgetVersionId}
             costCenters={costCenters} 
             laborParameters={laborParametersMap[activeBudgetVersionId] || defaultLaborParams} 
             accounts={accounts}
             packages={packages}
             budgetOccupancyData={budgetOccupancyDataMap[activeBudgetVersionId] || {}}
+            laborData={globalLaborDataMap[activeBudgetVersionId]}
+            setLaborData={(data) => setGlobalLaborDataMap(prev => ({ ...prev, [activeBudgetVersionId]: data }))}
           />
         </ErrorBoundary>
       );
       case 'extra_revenue_budget': return (
         <ErrorBoundary>
-          <BudgetExtraRevView budgetOccupancyData={budgetOccupancyDataMap[activeBudgetVersionId] || {}} />
+          <BudgetExtraRevView 
+            key={activeBudgetVersionId}
+            budgetOccupancyData={budgetOccupancyDataMap[activeBudgetVersionId] || {}} 
+            extraRevenueData={extraRevenueDataMap[activeBudgetVersionId]}
+            setExtraRevenueData={(data) => setExtraRevenueDataMap(prev => ({ ...prev, [activeBudgetVersionId]: data }))}
+          />
         </ErrorBoundary>
       );
       case 'dre_budget': return (

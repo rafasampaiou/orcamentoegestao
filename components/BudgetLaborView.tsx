@@ -13,9 +13,11 @@ interface BudgetLaborViewProps {
     accounts: Account[];
     packages: CostPackage[];
     budgetOccupancyData?: Record<string, number[]>;
+    laborData?: Record<string, any>;
+    setLaborData?: (data: any) => void;
 }
 
-const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborParameters, accounts, packages, budgetOccupancyData = {} }) => {
+const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborParameters, accounts, packages, budgetOccupancyData = {}, laborData = {}, setLaborData }) => {
     const [activeTab, setActiveTab] = useState<LaborTab>('positions');
 
     // Derive Benefit and Charge accounts from provided accounts and packages
@@ -69,20 +71,20 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
     }, [accounts, packages]);
     
     // Dissídio State
-    const [dissidio, setDissidio] = useState<LaborDissidio>({ 
+    const [dissidio, setDissidio] = useState<LaborDissidio>(laborData?.dissidio || { 
         percentage: laborParameters.dissidioPct, 
         startMonth: laborParameters.dissidioMonth 
     });
 
     // Job Templates State (Master List)
-    const [jobTemplates, setJobTemplates] = useState<JobTemplate[]>([
+    const [jobTemplates, setJobTemplates] = useState<JobTemplate[]>(laborData?.jobTemplates || [
         { id: 't1', name: 'Gerente Geral', type: 'PJ', salaries: Array(12).fill(15000) },
         { id: 't2', name: 'Recepcionista', type: 'CLT', salaries: Array(12).fill(2500) },
         { id: 't3', name: 'Jovem Aprendiz', type: 'CLT', salaries: Array(12).fill(800) },
     ]);
 
     // Positions State (Assignments to Sectors)
-    const [positions, setPositions] = useState<LaborPosition[]>([
+    const [positions, setPositions] = useState<LaborPosition[]>(laborData?.positions || [
         { id: '1', templateId: 't1', sectorId: costCenters[0]?.id || '1', isExcludedFromTotal: false, headcount: Array(12).fill(1) },
         { id: '2', templateId: 't2', sectorId: costCenters[1]?.id || '2', isExcludedFromTotal: false, headcount: Array(12).fill(4) },
         { id: '3', templateId: 't3', sectorId: costCenters[0]?.id || '1', isExcludedFromTotal: true, headcount: Array(12).fill(2) },
@@ -97,14 +99,14 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
         values: number[],
         lastYearValues: number[],
         increaseValue: number
-    }>>({});
+    }>>(laborData?.benefitConfigs || {});
 
     const [personnelExpensesConfigs, setPersonnelExpensesConfigs] = useState<Record<string, { 
         method: 'driver' | 'absolute' | 'percent_increase' | 'absolute_increase', 
         values: number[],
         lastYearValues: number[],
         increaseValue: number
-    }>>({});
+    }>>(laborData?.personnelExpensesConfigs || {});
 
     const [thirdPartyConfigs, setThirdPartyConfigs] = useState<Record<string, { 
         method: 'driver' | 'absolute' | 'percent_increase' | 'absolute_increase', 
@@ -112,7 +114,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
         lastYearValues: number[],
         increaseValue: number,
         providerName?: string
-    }>>({});
+    }>>(laborData?.thirdPartyConfigs || {});
     
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [importText, setImportText] = useState('');
@@ -125,21 +127,37 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
     const [expandedDetailPositions, setExpandedDetailPositions] = useState<Record<string, boolean>>({});
 
     // Track which sectors are active for each third-party account
-    const [activeThirdPartySectors, setActiveThirdPartySectors] = useState<Record<string, string[]>>({});
+    const [activeThirdPartySectors, setActiveThirdPartySectors] = useState<Record<string, string[]>>(laborData?.activeThirdPartySectors || {});
 
     // Specific state for Third Party Temporaries (per sector)
     const [thirdPartyTemporariesSectors, setThirdPartyTemporariesSectors] = useState<Record<string, {
         kpi: number[],
         hoursPerDay: number[],
         hourlyRate: number[]
-    }>>({});
+    }>>(laborData?.thirdPartyTemporariesSectors || {});
 
     // Specific state for Third Party Recurrent (PJ Managers)
     const [thirdPartyRecurrentData, setThirdPartyRecurrentData] = useState<Record<string, {
         salary: number[],
         thirteenth: number[],
         vacation: number[]
-    }>>({});
+    }>>(laborData?.thirdPartyRecurrentData || {});
+
+    React.useEffect(() => {
+        if (setLaborData) {
+            setLaborData({
+                jobTemplates,
+                positions,
+                benefitConfigs,
+                personnelExpensesConfigs,
+                thirdPartyConfigs,
+                activeThirdPartySectors,
+                thirdPartyTemporariesSectors,
+                thirdPartyRecurrentData,
+                dissidio
+            });
+        }
+    }, [jobTemplates, positions, benefitConfigs, personnelExpensesConfigs, thirdPartyConfigs, activeThirdPartySectors, thirdPartyTemporariesSectors, thirdPartyRecurrentData, dissidio]);
 
     const toggleSectorExpand = (sectorId: string) => {
         setExpandedSectors(prev => ({ ...prev, [sectorId]: !prev[sectorId] }));
@@ -1083,10 +1101,10 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                 {activeSectors.map(sectorId => {
                                                     const sector = costCenters.find(s => s.id === sectorId);
                                                     if (!sector) return null;
-                                                    const config = thirdPartyConfigs[`${acc.code}-${sector.id}`] || { 
+                                                    const config = (thirdPartyConfigs[`${acc.code}-${sector.id}`] || { 
                                                         method: 'absolute', 
                                                         values: Array(12).fill(0)
-                                                    };
+                                                    }) as any;
                                                     const rowTotal = config.values.reduce((a, b) => a + b, 0);
 
                                                     return (
