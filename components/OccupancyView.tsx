@@ -342,13 +342,24 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
       return newData;
   };
 
-  // --- Internal State Fallback (for Real mode or if props missing) ---
+  // --- State resolution: prefer controlled props; local state only for Real mode ---
+  // SAFE GUARD: never fall back to an empty local state when the parent just hasn't
+  // finished loading yet — that would make the table blink out all data.
   const [localBudgetData, setLocalBudgetData] = useState<Record<string, number[]>>({});
-  
-  const budgetData = propBudgetData || localBudgetData;
+
+  // If the component is controlled (isBudget=true), wait for the prop to be defined.
+  // propBudgetData starts as {} (not undefined) in App.tsx, so this is safe.
+  const budgetData: Record<string, number[]> = isBudget
+      ? (propBudgetData ?? localBudgetData)
+      : (propBudgetData ?? localBudgetData);
+
   const setBudgetData = propSetBudgetData || setLocalBudgetData;
 
+  // Show a loading guard when in Budget mode and the parent has not yet provided data
+  const isDataReady = !isBudget || propBudgetData !== undefined;
+
   useEffect(() => {
+      if (!isDataReady) return;
       const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
       if (!budgetData['days_month']) {
           setBudgetData(prev => ({
@@ -356,7 +367,7 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
               'days_month': daysInMonth
           }));
       }
-  }, [budgetData, setBudgetData]);
+  }, [isDataReady, budgetData, setBudgetData]);
 
   const handleUpdate = (rowId: string, monthIndex: number, value: number) => {
       setBudgetData(prev => {
@@ -374,7 +385,14 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
       // Helper to safe get
       const get = (key: string, idx: number) => newData[key]?.[idx] || 0;
       const set = (key: string, idx: number, val: number) => {
-          if (!newData[key]) newData[key] = Array(12).fill(0);
+          if (!newData[key]) {
+              // Array doesn't exist yet — create a fresh one
+              newData[key] = Array(12).fill(0);
+          } else if (newData[key] === data[key]) {
+              // Still pointing to the original array from state — clone it first
+              // to avoid mutating React state directly (breaks change detection)
+              newData[key] = [...newData[key]];
+          }
           newData[key][idx] = val;
       };
 
@@ -817,6 +835,15 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
       }
       setShowClearConfirm(false);
   };
+
+  // --- Budget View Loading Guard ---
+  if (isBudget && !isDataReady) {
+      return (
+          <div className="flex items-center justify-center h-96">
+              <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-500" />
+          </div>
+      );
+  }
 
   // --- Budget View ---
   return (
