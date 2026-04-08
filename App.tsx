@@ -492,10 +492,15 @@ const App: React.FC = () => {
             }}
             showCreateOption={false}
             onSetMain={(id) => setRealVersions(prev => prev.map(v => ({ ...v, isMain: v.id === id })))}
-            onDelete={(id) => {
-              setRealVersions(prev => prev.filter(v => v.id !== id));
-              if (activeRealVersionId === id) {
-                setActiveRealVersionId(realVersions.find(v => v.id !== id)?.id || '');
+            onDelete={async (id) => {
+              try {
+                await supabaseService.deleteBudgetVersion(id);
+                setRealVersions(prev => prev.filter(v => v.id !== id));
+                if (activeRealVersionId === id) {
+                  setActiveRealVersionId(realVersions.find(v => v.id !== id)?.id || '');
+                }
+              } catch (e) {
+                console.error('Failed to delete version from Supabase', e);
               }
             }}
           />
@@ -638,10 +643,15 @@ const App: React.FC = () => {
               setReplicateModalOpen(true);
             }}
             onSetMain={(id) => setBudgetVersions(prev => prev.map(v => ({ ...v, isMain: v.id === id })))}
-            onDelete={(id) => {
-              setBudgetVersions(prev => prev.filter(v => v.id !== id));
-              if (activeBudgetVersionId === id) {
-                setActiveBudgetVersionId(budgetVersions.find(v => v.id !== id)?.id || '');
+            onDelete={async (id) => {
+              try {
+                await supabaseService.deleteBudgetVersion(id);
+                setBudgetVersions(prev => prev.filter(v => v.id !== id));
+                if (activeBudgetVersionId === id) {
+                  setActiveBudgetVersionId(budgetVersions.find(v => v.id !== id)?.id || '');
+                }
+              } catch (e) {
+                console.error('Failed to delete version from Supabase', e);
               }
             }}
           />
