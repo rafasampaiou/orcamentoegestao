@@ -150,11 +150,12 @@ const App: React.FC = () => {
      const timeout = setTimeout(() => {
          const version = budgetVersions.find(v => v.id === activeBudgetVersionId);
          if (version && version.id.startsWith('v')) {
+             // Use REFS to guarantee we save the latest data, never stale closure values
              const versionToSave = { 
                  ...version, 
-                 occupancyData: budgetOccupancyDataMap[activeBudgetVersionId] || {},
-                 laborData: globalLaborDataMap[activeBudgetVersionId] || {},
-                 extraRevenueData: extraRevenueDataMap[activeBudgetVersionId] || []
+                 occupancyData: budgetOccupancyDataMapRef.current[activeBudgetVersionId] || {},
+                 laborData: globalLaborDataMapRef.current[activeBudgetVersionId] || {},
+                 extraRevenueData: extraRevenueDataMapRef.current[activeBudgetVersionId] || []
              };
              supabaseService.upsertBudgetVersion(versionToSave).catch(e => console.error('Erro ao salvar planejamento auto-save', e));
          }
@@ -167,6 +168,8 @@ const App: React.FC = () => {
       globalLaborDataMap, 
       extraRevenueDataMap
   ]);
+
+
   const [realOccupancyData, setRealOccupancyData] = useState<Record<string, Record<string, number>>>({});
 
   // --- REGISTRY STATE (LIFTED FROM SETTINGS) ---
@@ -178,6 +181,25 @@ const App: React.FC = () => {
   const [accounts, setAccounts] = useState<Account[]>(mockAccounts);
   const [gmdConfigs, setGmdConfigs] = useState<GMDConfiguration[]>(mockGMDConfigs);
 
+  // --- AUTO-SWITCH ACTIVE BUDGET VERSION WHEN HOTEL FILTER CHANGES ---
+  // When the user changes the hotel in the header while in Budget mode,
+  // automatically switch to the main (or first) budget version for that hotel.
+  React.useEffect(() => {
+      if (currentModule !== 'BUDGET') return;
+      if (budgetVersions.length === 0 || hotels.length === 0) return;
+
+      const selectedHotelObj = hotels.find(h => h.name === selectedHotel);
+      const hotelCode = selectedHotelObj?.code || selectedHotel;
+
+      // Prefer the main version; fall back to the first matching version
+      const matchingVersion =
+          budgetVersions.find(v => (v.hotelId === hotelCode || v.hotelId === selectedHotel) && v.isMain) ||
+          budgetVersions.find(v => v.hotelId === hotelCode || v.hotelId === selectedHotel);
+
+      if (matchingVersion && matchingVersion.id !== activeBudgetVersionId) {
+          setActiveBudgetVersionId(matchingVersion.id);
+      }
+  }, [selectedHotel, currentModule, budgetVersions, hotels]);
   // -- SUPABASE INTEGRATION: Fetch Real Data on Auth --
   React.useEffect(() => {
     if (!session) return;
