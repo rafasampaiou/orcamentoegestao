@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import TimelineView from './components/TimelineView';
 
@@ -128,9 +128,24 @@ const App: React.FC = () => {
 
   // --- BUDGET OCCUPANCY STATE (LIFTED) ---
   const [budgetOccupancyDataMap, setBudgetOccupancyDataMap] = useState<Record<string, Record<string, number[]>>>({});
+  // Ref always holds the latest value to avoid stale closure in save callbacks
+  const budgetOccupancyDataMapRef = useRef(budgetOccupancyDataMap);
+  React.useEffect(() => { budgetOccupancyDataMapRef.current = budgetOccupancyDataMap; }, [budgetOccupancyDataMap]);
+
+  const globalLaborDataMapRef = useRef(globalLaborDataMap);
+  React.useEffect(() => { globalLaborDataMapRef.current = globalLaborDataMap; }, [globalLaborDataMap]);
+
+  const extraRevenueDataMapRef = useRef(extraRevenueDataMap);
+  React.useEffect(() => { extraRevenueDataMapRef.current = extraRevenueDataMap; }, [extraRevenueDataMap]);
+
+  const isInitialMount = useRef(true);
 
   // Central Auto-Save Effect (Debounces and sends everything to Supabase)
   React.useEffect(() => {
+     if (isInitialMount.current) {
+         isInitialMount.current = false;
+         return;
+     }
      if (!activeBudgetVersionId) return;
      const timeout = setTimeout(() => {
          const version = budgetVersions.find(v => v.id === activeBudgetVersionId);
@@ -633,11 +648,15 @@ const App: React.FC = () => {
             onSaveOccupancy={async () => {
                 const version = budgetVersions.find(v => v.id === activeBudgetVersionId);
                 if (version) {
+                    // Use refs to always read the LATEST state, avoiding stale closure bug
+                    const latestOccupancy = budgetOccupancyDataMapRef.current[activeBudgetVersionId] || {};
+                    const latestLabor = globalLaborDataMapRef.current[activeBudgetVersionId] || {};
+                    const latestExtra = extraRevenueDataMapRef.current[activeBudgetVersionId] || [];
                     const versionToSave = {
                         ...version,
-                        occupancyData: budgetOccupancyDataMap[activeBudgetVersionId] || {},
-                        laborData: globalLaborDataMap[activeBudgetVersionId] || {},
-                        extraRevenueData: extraRevenueDataMap[activeBudgetVersionId] || []
+                        occupancyData: latestOccupancy,
+                        laborData: latestLabor,
+                        extraRevenueData: latestExtra
                     };
                     try {
                         await supabaseService.upsertBudgetVersion(versionToSave);
@@ -652,7 +671,12 @@ const App: React.FC = () => {
                 setBudgetOccupancyDataMap(prev => ({ ...prev, [activeBudgetVersionId]: {} }));
                 const version = budgetVersions.find(v => v.id === activeBudgetVersionId);
                 if (version) {
-                    const versionToSave = { ...version, occupancyData: {} };
+                    const versionToSave = {
+                        ...version,
+                        occupancyData: {},
+                        laborData: globalLaborDataMapRef.current[activeBudgetVersionId] || {},
+                        extraRevenueData: extraRevenueDataMapRef.current[activeBudgetVersionId] || []
+                    };
                     try {
                         await supabaseService.upsertBudgetVersion(versionToSave);
                         toast.success('Dados de ocupação apagados.');
