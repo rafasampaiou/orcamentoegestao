@@ -196,10 +196,15 @@ const App: React.FC = () => {
           budgetVersions.find(v => (v.hotelId === hotelCode || v.hotelId === selectedHotel) && v.isMain) ||
           budgetVersions.find(v => v.hotelId === hotelCode || v.hotelId === selectedHotel);
 
-      if (matchingVersion && matchingVersion.id !== activeBudgetVersionId) {
-          setActiveBudgetVersionId(matchingVersion.id);
+      if (matchingVersion) {
+          if (matchingVersion.id !== activeBudgetVersionId) {
+              setActiveBudgetVersionId(matchingVersion.id);
+          }
+      } else if (activeBudgetVersionId) {
+          // Se não houver nenhum orçamento para esse hotel ainda, garante que não mostramos do hotel antigo
+          setActiveBudgetVersionId('');
       }
-  }, [selectedHotel, currentModule, budgetVersions, hotels]);
+  }, [selectedHotel, currentModule, budgetVersions, hotels, activeBudgetVersionId]);
   // -- SUPABASE INTEGRATION: Fetch Real Data on Auth --
   React.useEffect(() => {
     if (!session) return;
