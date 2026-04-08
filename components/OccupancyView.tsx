@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 
 import { Settings2, ChevronUp, Save, Trash2, CheckCircle } from 'lucide-react';
 import { ColumnVisibility, ImportedRow } from '../types';
@@ -217,6 +217,70 @@ const BudgetOccupancyTable: React.FC<{
 };
 
 
+// --- Row Definitions (Moved outside for performance) ---
+const geralRows: BudgetRow[] = [
+    { id: 'days_month', label: 'Dias do mês', isInput: true, format: 'integer' },
+    { id: 'geral_capacity', label: 'Aptos Hotel', isInput: true, format: 'integer' },
+    { id: 'geral_avail', label: 'APTOS DISPONIVEIS', isCalculated: true, format: 'integer' },
+    { id: 'geral_sold', label: 'APTO VENDIDOS', isCalculated: true, forceWhite: true, format: 'integer' },
+    { id: 'geral_occ_pct', label: '% DE OCUPAÇÃO', isCalculated: true, format: 'percent' },
+    { id: 'geral_pax', label: 'N° DE HOSPEDES', isCalculated: true, forceWhite: true, format: 'integer' },
+    { id: 'geral_coef_total', label: 'Coef. Occ Geral', isCalculated: true, format: 'decimal' },
+    { id: 'geral_adults', label: 'ADULTOS', isCalculated: true, forceWhite: true, format: 'integer' },
+    { id: 'geral_coef_ad', label: 'Coef. Occ Adultos', isCalculated: true, format: 'decimal' },
+    { id: 'geral_chd', label: 'CHD', isCalculated: true, forceWhite: true, format: 'integer' },
+    { id: 'geral_coef_chd', label: 'Coef. Occ CHD', isCalculated: true, format: 'decimal' },
+    { id: 'geral_rate_ad', label: 'Valor FAP Adulto', isCalculated: true, forceWhite: true, format: 'currency' },
+    { id: 'geral_rate_chd', label: 'Valor FAP Criança', isCalculated: true, forceWhite: true, format: 'currency' },
+    { id: 'geral_dm_fap', label: 'DM LÍQ COM FAP', isCalculated: true, format: 'currency' },
+    { id: 'geral_dm_hosp', label: 'DM LÍQ HOSPEDAGEM', isCalculated: true, format: 'currency' },
+    { id: 'geral_revpar', label: 'REVPAR', isCalculated: true, format: 'currency' },
+    { id: 'geral_trevpor', label: 'TREVPOR', isCalculated: true, format: 'currency' },
+    { id: 'geral_trevpar', label: 'TREVPAR', isCalculated: true, format: 'currency' },
+    { id: 'geral_rev_fap', label: 'Receita COM rateios', isCalculated: true, format: 'currency' },
+    { id: 'geral_rev_hosp', label: 'Receita SEM rateios', isCalculated: true, format: 'currency' },
+];
+
+const lazerRows: BudgetRow[] = [
+    { id: 'lazer_capacity', label: 'Aptos Hotel', isInput: true, format: 'integer' },
+    { id: 'lazer_avail', label: 'APTOS DISPONIVEIS', isCalculated: true, format: 'integer' },
+    { id: 'lazer_sold', label: 'APTO VENDIDOS', isInput: true, isManualReal: true, format: 'integer' },
+    { id: 'lazer_occ_pct', label: '% DE OCUPAÇÃO', isCalculated: true, format: 'percent' },
+    { id: 'lazer_pax', label: 'N° DE HOSPEDES', isCalculated: true, format: 'integer' },
+    { id: 'lazer_coef_total', label: 'Coef. Occ Geral', isCalculated: true, format: 'decimal' },
+    { id: 'lazer_adults', label: 'ADULTOS', isInput: true, isManualReal: true, format: 'integer' },
+    { id: 'lazer_coef_ad', label: 'Coef. Occ Adultos', isCalculated: true, format: 'decimal' },
+    { id: 'lazer_chd', label: 'CHD', isInput: true, isManualReal: true, format: 'integer' },
+    { id: 'lazer_coef_chd', label: 'Coef. Occ CHD', isCalculated: true, format: 'decimal' },
+    { id: 'lazer_rate_ad', label: 'Valor FAP Adulto', isInput: true, format: 'currency' },
+    { id: 'lazer_rate_chd', label: 'Valor FAP Criança', isInput: true, format: 'currency' },
+    { id: 'lazer_dm_fap', label: 'DM LÍQ COM FAP', isCalculated: true, isManualReal: true, format: 'currency' },
+    { id: 'lazer_dm_hosp', label: 'DM LÍQ HOSPEDAGEM', isCalculated: true, format: 'currency' },
+    { id: 'lazer_revpar', label: 'REVPAR', isCalculated: true, format: 'currency' },
+    { id: 'lazer_rev_fap', label: 'Receita COM rateios', isInput: true, format: 'currency' },
+    { id: 'lazer_rev_hosp', label: 'Receita SEM rateios', isCalculated: true, format: 'currency' },
+];
+
+const eventRows: BudgetRow[] = [
+    { id: 'event_capacity', label: 'Aptos Hotel', isInput: true, format: 'integer' },
+    { id: 'event_avail', label: 'APTOS DISPONIVEIS', isCalculated: true, format: 'integer' },
+    { id: 'event_sold', label: 'APTO VENDIDOS', isInput: true, isManualReal: true, format: 'integer' },
+    { id: 'event_occ_pct', label: '% DE OCUPAÇÃO', isCalculated: true, format: 'percent' },
+    { id: 'event_pax', label: 'N° DE HOSPEDES', isCalculated: true, format: 'integer' },
+    { id: 'event_coef_total', label: 'Coef. Occ Geral', isCalculated: true, format: 'decimal' },
+    { id: 'event_adults', label: 'ADULTOS', isInput: true, isManualReal: true, format: 'integer' },
+    { id: 'event_coef_ad', label: 'Coef. Occ Adultos', isCalculated: true, format: 'decimal' },
+    { id: 'event_chd', label: 'CHD', isInput: true, isManualReal: true, format: 'integer' },
+    { id: 'event_coef_chd', label: 'Coef. Occ CHD', isCalculated: true, format: 'decimal' },
+    { id: 'event_rate_ad', label: 'Valor FAP Adulto', isInput: true, format: 'currency' },
+    { id: 'event_rate_chd', label: 'Valor FAP Criança', isInput: true, format: 'currency' },
+    { id: 'event_dm_fap', label: 'DM LÍQ COM FAP', isCalculated: true, isManualReal: true, format: 'currency' },
+    { id: 'event_dm_hosp', label: 'DM LÍQ HOSPEDAGEM', isCalculated: true, format: 'currency' },
+    { id: 'event_revpar', label: 'REVPAR', isCalculated: true, format: 'currency' },
+    { id: 'event_rev_fap', label: 'Receita COM rateios', isInput: true, format: 'currency' },
+    { id: 'event_rev_hosp', label: 'Receita SEM rateios', isCalculated: true, format: 'currency' },
+];
+
 // --- Main Component ---
 const OccupancyView: React.FC<OccupancyViewProps> = ({ 
     isBudget, 
@@ -348,8 +412,10 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
   // In Real mode: the prop isn't used for budget data, so localBudgetData is fine.
   const [localBudgetData, setLocalBudgetData] = useState<Record<string, number[]>>({});
 
+  const defaultBudgetData = useMemo(() => ({}), []);
+
   const budgetData: Record<string, number[]> = isBudget
-      ? (propBudgetData || {})
+      ? (propBudgetData || defaultBudgetData)
       : (propBudgetData || localBudgetData);
 
   const setBudgetData = propSetBudgetData || setLocalBudgetData;
@@ -497,69 +563,7 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
       return newData;
   };
 
-  // --- Row Definitions ---
-  const geralRows: BudgetRow[] = [
-      { id: 'days_month', label: 'Dias do mês', isInput: true, format: 'integer' },
-      { id: 'geral_capacity', label: 'Aptos Hotel', isInput: true, format: 'integer' },
-      { id: 'geral_avail', label: 'APTOS DISPONIVEIS', isCalculated: true, format: 'integer' },
-      { id: 'geral_sold', label: 'APTO VENDIDOS', isCalculated: true, forceWhite: true, format: 'integer' },
-      { id: 'geral_occ_pct', label: '% DE OCUPAÇÃO', isCalculated: true, format: 'percent' },
-      { id: 'geral_pax', label: 'N° DE HOSPEDES', isCalculated: true, forceWhite: true, format: 'integer' },
-      { id: 'geral_coef_total', label: 'Coef. Occ Geral', isCalculated: true, format: 'decimal' },
-      { id: 'geral_adults', label: 'ADULTOS', isCalculated: true, forceWhite: true, format: 'integer' },
-      { id: 'geral_coef_ad', label: 'Coef. Occ Adultos', isCalculated: true, format: 'decimal' },
-      { id: 'geral_chd', label: 'CHD', isCalculated: true, forceWhite: true, format: 'integer' },
-      { id: 'geral_coef_chd', label: 'Coef. Occ CHD', isCalculated: true, format: 'decimal' },
-      { id: 'geral_rate_ad', label: 'Valor FAP Adulto', isCalculated: true, forceWhite: true, format: 'currency' },
-      { id: 'geral_rate_chd', label: 'Valor FAP Criança', isCalculated: true, forceWhite: true, format: 'currency' },
-      { id: 'geral_dm_fap', label: 'DM LÍQ COM FAP', isCalculated: true, format: 'currency' },
-      { id: 'geral_dm_hosp', label: 'DM LÍQ HOSPEDAGEM', isCalculated: true, format: 'currency' },
-      { id: 'geral_revpar', label: 'REVPAR', isCalculated: true, format: 'currency' },
-      { id: 'geral_trevpor', label: 'TREVPOR', isCalculated: true, format: 'currency' },
-      { id: 'geral_trevpar', label: 'TREVPAR', isCalculated: true, format: 'currency' },
-      { id: 'geral_rev_fap', label: 'Receita COM rateios', isCalculated: true, format: 'currency' },
-      { id: 'geral_rev_hosp', label: 'Receita SEM rateios', isCalculated: true, format: 'currency' },
-  ];
 
-  const lazerRows: BudgetRow[] = [
-      { id: 'lazer_capacity', label: 'Aptos Hotel', isInput: true, format: 'integer' },
-      { id: 'lazer_avail', label: 'APTOS DISPONIVEIS', isCalculated: true, format: 'integer' },
-      { id: 'lazer_sold', label: 'APTO VENDIDOS', isInput: true, isManualReal: true, format: 'integer' },
-      { id: 'lazer_occ_pct', label: '% DE OCUPAÇÃO', isCalculated: true, format: 'percent' },
-      { id: 'lazer_pax', label: 'N° DE HOSPEDES', isCalculated: true, format: 'integer' },
-      { id: 'lazer_coef_total', label: 'Coef. Occ Geral', isCalculated: true, format: 'decimal' },
-      { id: 'lazer_adults', label: 'ADULTOS', isInput: true, isManualReal: true, format: 'integer' },
-      { id: 'lazer_coef_ad', label: 'Coef. Occ Adultos', isCalculated: true, format: 'decimal' },
-      { id: 'lazer_chd', label: 'CHD', isInput: true, isManualReal: true, format: 'integer' },
-      { id: 'lazer_coef_chd', label: 'Coef. Occ CHD', isCalculated: true, format: 'decimal' },
-      { id: 'lazer_rate_ad', label: 'Valor FAP Adulto', isInput: true, format: 'currency' },
-      { id: 'lazer_rate_chd', label: 'Valor FAP Criança', isInput: true, format: 'currency' },
-      { id: 'lazer_dm_fap', label: 'DM LÍQ COM FAP', isCalculated: true, isManualReal: true, format: 'currency' },
-      { id: 'lazer_dm_hosp', label: 'DM LÍQ HOSPEDAGEM', isCalculated: true, format: 'currency' },
-      { id: 'lazer_revpar', label: 'REVPAR', isCalculated: true, format: 'currency' },
-      { id: 'lazer_rev_fap', label: 'Receita COM rateios', isInput: true, format: 'currency' },
-      { id: 'lazer_rev_hosp', label: 'Receita SEM rateios', isCalculated: true, format: 'currency' },
-  ];
-
-  const eventRows: BudgetRow[] = [
-      { id: 'event_capacity', label: 'Aptos Hotel', isInput: true, format: 'integer' },
-      { id: 'event_avail', label: 'APTOS DISPONIVEIS', isCalculated: true, format: 'integer' },
-      { id: 'event_sold', label: 'APTO VENDIDOS', isInput: true, isManualReal: true, format: 'integer' },
-      { id: 'event_occ_pct', label: '% DE OCUPAÇÃO', isCalculated: true, format: 'percent' },
-      { id: 'event_pax', label: 'N° DE HOSPEDES', isCalculated: true, format: 'integer' },
-      { id: 'event_coef_total', label: 'Coef. Occ Geral', isCalculated: true, format: 'decimal' },
-      { id: 'event_adults', label: 'ADULTOS', isInput: true, isManualReal: true, format: 'integer' },
-      { id: 'event_coef_ad', label: 'Coef. Occ Adultos', isCalculated: true, format: 'decimal' },
-      { id: 'event_chd', label: 'CHD', isInput: true, isManualReal: true, format: 'integer' },
-      { id: 'event_coef_chd', label: 'Coef. Occ CHD', isCalculated: true, format: 'decimal' },
-      { id: 'event_rate_ad', label: 'Valor FAP Adulto', isInput: true, format: 'currency' },
-      { id: 'event_rate_chd', label: 'Valor FAP Criança', isInput: true, format: 'currency' },
-      { id: 'event_dm_fap', label: 'DM LÍQ COM FAP', isCalculated: true, isManualReal: true, format: 'currency' },
-      { id: 'event_dm_hosp', label: 'DM LÍQ HOSPEDAGEM', isCalculated: true, format: 'currency' },
-      { id: 'event_revpar', label: 'REVPAR', isCalculated: true, format: 'currency' },
-      { id: 'event_rev_fap', label: 'Receita COM rateios', isInput: true, format: 'currency' },
-      { id: 'event_rev_hosp', label: 'Receita SEM rateios', isCalculated: true, format: 'currency' },
-  ];
 
   // --- Real View ---
   if (!isBudget) {
@@ -835,16 +839,7 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
       setShowClearConfirm(false);
   };
 
-  // --- Budget View Loading Guard ---
-  if (isBudget && !isDataReady) {
-      return (
-          <div className="flex items-center justify-center h-96">
-              <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-500" />
-          </div>
-      );
-  }
 
-  // --- Budget View ---
   return (
     <div className="p-8 max-w-[1600px] mx-auto">
         {/* Header */}
