@@ -342,20 +342,19 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
       return newData;
   };
 
-  // --- State resolution: prefer controlled props; local state only for Real mode ---
-  // SAFE GUARD: never fall back to an empty local state when the parent just hasn't
-  // finished loading yet — that would make the table blink out all data.
+  // --- State resolution ---
+  // In Budget mode: ALWAYS use the parent's prop. Never fall back to localBudgetData,
+  // because that would make the table ignore hotel-filter changes from the parent.
+  // In Real mode: the prop isn't used for budget data, so localBudgetData is fine.
   const [localBudgetData, setLocalBudgetData] = useState<Record<string, number[]>>({});
 
-  // If the component is controlled (isBudget=true), wait for the prop to be defined.
-  // propBudgetData starts as {} (not undefined) in App.tsx, so this is safe.
   const budgetData: Record<string, number[]> = isBudget
-      ? (propBudgetData ?? localBudgetData)
-      : (propBudgetData ?? localBudgetData);
+      ? (propBudgetData || {})
+      : (propBudgetData || localBudgetData);
 
   const setBudgetData = propSetBudgetData || setLocalBudgetData;
 
-  // Show a loading guard when in Budget mode and the parent has not yet provided data
+  // Show a spinner only when the parent explicitly hasn't provided data yet (undefined)
   const isDataReady = !isBudget || propBudgetData !== undefined;
 
   useEffect(() => {
