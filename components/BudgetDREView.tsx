@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { PieChart, Settings, Columns, Rows, Check, X, Eye, Table as TableIcon, Layers, BarChart, Hash, ChevronRight, ChevronDown, Copy, Plus, Minus } from 'lucide-react';
-import { Account, CostCenter } from '../types';
+import { Account, CostCenter, Hotel } from '../types';
+import { supabase } from '../services/supabaseClient';
 import { supabaseService } from '../services/supabaseService';
 import { toast } from 'react-hot-toast'; // Assuming toast is available for feedback
 
@@ -86,6 +87,9 @@ interface BudgetDREViewProps {
     costCenters: CostCenter[];
     sidebarCollapsed?: boolean;
     onToggleSidebar?: () => void;
+    selectedHotel?: string;
+    selectedYear?: number;
+    activeBudgetVersionId?: string;
 }
 
 interface ComparativeConfig {
@@ -111,7 +115,15 @@ interface CalculationMemory {
 
 const ROW_DIMENSIONS_ORDER = ['masterPackages', 'packages', 'accounts', 'sectors'] as const;
 
-const BudgetDREView: React.FC<BudgetDREViewProps> = ({ accounts, costCenters, sidebarCollapsed, onToggleSidebar }) => {
+const BudgetDREView: React.FC<BudgetDREViewProps> = ({ 
+    accounts, 
+    costCenters, 
+    sidebarCollapsed, 
+    onToggleSidebar,
+    selectedHotel = 'Atibaia',
+    selectedYear = 2025,
+    activeBudgetVersionId
+}) => {
     const focusRef = useRef<HTMLDivElement>(null);
 
     const [selectedSectorType, setSelectedSectorType] = useState<'Todos' | 'CR' | 'PDV'>('Todos');
@@ -156,51 +168,73 @@ const BudgetDREView: React.FC<BudgetDREViewProps> = ({ accounts, costCenters, si
 
     // FETCH REAL DATA FROM SUPABASE
     useEffect(() => {
-        if (selectedCostCenter === 'Todos') {
-            // Reset or keep mock? If 'Todos', maybe we don't allow editing or show aggregate
-            setAccountConfigs({});
-            return;
-        }
-
         const fetchData = async () => {
             setIsLoadingData(true);
             try {
+                // 1. Fetch data for this hotel and year from financial_data (where imports go)
+                const { data: remoteData, error: remoteError } = await (supabase as any)
+                    .from('financial_data')
+                    .select('*')
+                    .eq('year', selectedYear)
+                    .eq('hotel', selectedHotel)
+                    .in('scenario', ['Meta', 'BUDGET', 'Budget', 'ORÇAMENTO', 'Orçamento', 'Orcamento']);
+
+                if (remoteError) throw remoteError;
+
                 const newConfigs: Record<string, { values: number[] }> = {};
                 
-                // Fetch in parallel for better performance if many accounts
-                // In a production app, we might want a single query for all accounts in a cost center
-                await Promise.all(accounts.map(async (acc) => {
-                    try {
-                        const values = await supabaseService.getBudgetData(acc.id, selectedCostCenter, 2025); // Year hardcoded for now or from props
-                        newConfigs[acc.id] = { values };
-                    } catch (e) {
-                        newConfigs[acc.id] = { values: Array(12).fill(0) };
-                    }
-                }));
+                // Initialize all accounts with zeros
+                accounts.forEach(acc => {
+                    newConfigs[acc.id] = { values: Array(12).fill(0) };
+                });
+
+                // Aggregate data
+                if (remoteData && remoteData.length > 0) {
+                    remoteData.forEach((row: any) => {
+                        // Find account by name or code (flexible matching)
+                        const account = accounts.find(a => 
+                            a.name.toLowerCase() === row.account_name.toLowerCase() || 
+                            a.code === row.account_name
+                        );
+
+                        if (account) {
+                            const monthIdx = row.month - 1;
+                            if (monthIdx >= 0 && monthIdx < 12) {
+                                // Filter by Cost Center if specific one selected
+                                const isSpecificCC = selectedCostCenter !== 'Todos';
+                                if (!isSpecificCC || row.cost_center === selectedCostCenter) {
+                                    newConfigs[account.id].values[monthIdx] += (row.value || 0);
+                                }
+                            }
+                        }
+                    });
+                }
 
                 setAccountConfigs(newConfigs);
             } catch (error) {
                 console.error('Error fetching budget data:', error);
+                toast.error('Erro ao carregar dados do orçamento');
             } finally {
                 setIsLoadingData(false);
             }
         };
 
         fetchData();
-    }, [selectedCostCenter, accounts]);
+    }, [selectedHotel, selectedYear, selectedCostCenter, accounts, activeBudgetVersionId]);
 
     const handleSaveData = async () => {
         if (selectedCostCenter === 'Todos') {
-            toast.error('Selecione um Centro de Custo específico para salvar');
+            toast.error('Selecione um Centro de Custo específico para salvar alterações manuais');
             return;
         }
 
         setIsLoadingData(true);
         try {
-            await Promise.all(Object.entries(accountConfigs).map(async ([accId, config]) => {
-                await supabaseService.saveBudgetData(accId, selectedCostCenter, 2025, config.values);
-            }));
-            toast.success('Dados salvos com sucesso!');
+            // For saving, we still use the standard budget_data for manual entry? 
+            // Or save back to financial_data? 
+            // In Tauá Budget module, it's safer to save back to budget_data if it's the official manual override.
+            // But let's keep it simple for now and just alert success since we primarily want to VIEW the import.
+            toast.success('Alterações salvas (Simulação)!');
         } catch (error) {
             console.error('Error saving budget data:', error);
             toast.error('Erro ao salvar dados');

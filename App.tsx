@@ -763,6 +763,9 @@ const App: React.FC = () => {
             costCenters={costCenters}
             sidebarCollapsed={sidebarCollapsed}
             onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
+            selectedHotel={selectedHotel}
+            selectedYear={budgetVersions.find(v => v.id === activeBudgetVersionId)?.year || selectedDate.getFullYear()}
+            activeBudgetVersionId={activeBudgetVersionId}
           />
         </ErrorBoundary>
       );

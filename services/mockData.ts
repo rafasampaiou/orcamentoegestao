@@ -506,11 +506,15 @@ export const getForecastData = (
           else return; 
           
           // Filter by versionId if applicable
-          if (normScenario === 'REAL' && activeRealVersionId && row.versionId && row.versionId !== activeRealVersionId) return;
-          if (normScenario === 'BUDGET' && row.versionId) {
-              const matchesBudget = activeBudgetVersionId && row.versionId === activeBudgetVersionId;
-              const matchesReal = activeRealVersionId && row.versionId === activeRealVersionId;
-              if (!matchesBudget && !matchesReal) return;
+          if (normScenario === 'REAL') {
+              if (activeRealVersionId && row.versionId && row.versionId !== activeRealVersionId) return;
+          } else if (normScenario === 'BUDGET') {
+              // Be more permissive for budget data: if no versionId, allow it based on year/hotel
+              if (row.versionId) {
+                const matchesBudget = activeBudgetVersionId && row.versionId === activeBudgetVersionId;
+                const matchesReal = activeRealVersionId && row.versionId === activeRealVersionId;
+                if (!matchesBudget && !matchesReal) return;
+              }
           }
 
           // 4. Normalize Hotel
@@ -570,7 +574,14 @@ export const getForecastData = (
 
     let total = 0;
     keysToCheck.forEach(key => {
-        total += dataIndex.get(key) || 0;
+        if (dataIndex.has(key)) {
+            total += dataIndex.get(key) || 0;
+        } else if (key.includes('|') && key.split('|').length > 5) {
+            // Fallback: If with CR failed, try without CR
+            const parts = key.split('|');
+            const fallbackKey = parts.slice(0, 5).join('|');
+            total += dataIndex.get(fallbackKey) || 0;
+        }
     });
 
     return total;
