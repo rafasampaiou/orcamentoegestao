@@ -69,11 +69,11 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
             pis: findAccount('ENCARGOS SOCIAIS', 'PIS s/ folha')
         };
     }, [accounts, packages]);
-    
+
     // Dissídio State
-    const [dissidio, setDissidio] = useState<LaborDissidio>(laborData?.dissidio || { 
-        percentage: laborParameters.dissidioPct, 
-        startMonth: laborParameters.dissidioMonth 
+    const [dissidio, setDissidio] = useState<LaborDissidio>(laborData?.dissidio || {
+        percentage: laborParameters.dissidioPct,
+        startMonth: laborParameters.dissidioMonth
     });
 
     // Job Templates State (Master List)
@@ -94,28 +94,28 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
     const [copiedHeadcount, setCopiedHeadcount] = useState<number | null>(null);
 
     // Benefits State
-    const [benefitConfigs, setBenefitConfigs] = useState<Record<string, { 
-        method: 'driver' | 'absolute' | 'percent_increase' | 'absolute_increase', 
+    const [benefitConfigs, setBenefitConfigs] = useState<Record<string, {
+        method: 'driver' | 'absolute' | 'percent_increase' | 'absolute_increase',
         values: number[],
         lastYearValues: number[],
         increaseValue: number
     }>>(laborData?.benefitConfigs || {});
 
-    const [personnelExpensesConfigs, setPersonnelExpensesConfigs] = useState<Record<string, { 
-        method: 'driver' | 'absolute' | 'percent_increase' | 'absolute_increase', 
+    const [personnelExpensesConfigs, setPersonnelExpensesConfigs] = useState<Record<string, {
+        method: 'driver' | 'absolute' | 'percent_increase' | 'absolute_increase',
         values: number[],
         lastYearValues: number[],
         increaseValue: number
     }>>(laborData?.personnelExpensesConfigs || {});
 
-    const [thirdPartyConfigs, setThirdPartyConfigs] = useState<Record<string, { 
-        method: 'driver' | 'absolute' | 'percent_increase' | 'absolute_increase', 
+    const [thirdPartyConfigs, setThirdPartyConfigs] = useState<Record<string, {
+        method: 'driver' | 'absolute' | 'percent_increase' | 'absolute_increase',
         values: number[],
         lastYearValues: number[],
         increaseValue: number,
         providerName?: string
     }>>(laborData?.thirdPartyConfigs || {});
-    
+
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [importText, setImportText] = useState('');
     const [expandedSectors, setExpandedSectors] = useState<Record<string, boolean>>({});
@@ -213,7 +213,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
 
     const handleImportExcel = () => {
         const rows = importText.split('\n').filter(r => r.trim());
-        
+
         // Filter out header row if present
         const dataRows = rows.filter(row => {
             const firstCol = row.split('\t')[0].toLowerCase();
@@ -223,7 +223,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
         const newTemplates: JobTemplate[] = dataRows.map(row => {
             const cols = row.split('\t');
             const name = cols[0]?.trim() || 'Novo Cargo';
-            
+
             const monthlySalaries = Array(12).fill(0).map((_, i) => {
                 const valStr = cols[i + 1] || '0';
                 // Remove R$, spaces, and thousands separator (dot)
@@ -233,10 +233,10 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                     .replace(/\s/g, '')
                     .replace(/\./g, '')
                     .replace(',', '.');
-                
+
                 return parseFloat(cleanVal) || 0;
             });
-            
+
             return {
                 id: Math.random().toString(36).substr(2, 9),
                 name,
@@ -255,8 +255,8 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
     const handleBenefitChange = (accCode: string, sectorId: string, monthIdx: number, value: number) => {
         const key = `${accCode}-${sectorId}`;
         setBenefitConfigs(prev => {
-            const current = prev[key] || { 
-                method: 'driver', 
+            const current = prev[key] || {
+                method: 'driver',
                 values: Array(12).fill(0),
                 lastYearValues: Array(12).fill(0),
                 increaseValue: 0
@@ -270,12 +270,12 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
     const handleBenefitMethodChange = (accCode: string, sectorId: string, method: 'driver' | 'absolute') => {
         const key = `${accCode}-${sectorId}`;
         setBenefitConfigs(prev => {
-            const current = prev[key] || { 
+            const current = prev[key] || {
                 values: Array(12).fill(0),
                 lastYearValues: Array(12).fill(0),
                 increaseValue: 0
             };
-            
+
             return {
                 ...prev,
                 [key]: { ...current, method, values: current.values }
@@ -286,8 +286,8 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
     const handlePersonnelExpenseChange = (accCode: string, sectorId: string, monthIdx: number, value: number) => {
         const key = `${accCode}-${sectorId}`;
         setPersonnelExpensesConfigs(prev => {
-            const current = prev[key] || { 
-                method: 'driver', 
+            const current = prev[key] || {
+                method: 'driver',
                 values: Array(12).fill(0),
                 lastYearValues: Array(12).fill(0),
                 increaseValue: 0
@@ -309,8 +309,8 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
     const handleThirdPartyChange = (accCode: string, sectorId: string, monthIdx: number, value: number) => {
         const key = `${accCode}-${sectorId}`;
         setThirdPartyConfigs(prev => {
-            const current = prev[key] || { 
-                method: 'driver', 
+            const current = prev[key] || {
+                method: 'driver',
                 values: Array(12).fill(0),
                 lastYearValues: Array(12).fill(0),
                 increaseValue: 0
@@ -324,8 +324,8 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
     const handleThirdPartyProviderNameChange = (accCode: string, sectorId: string, name: string) => {
         const key = `${accCode}-${sectorId}`;
         setThirdPartyConfigs(prev => {
-            const current = prev[key] || { 
-                method: 'absolute', 
+            const current = prev[key] || {
+                method: 'absolute',
                 values: Array(12).fill(0),
                 lastYearValues: Array(12).fill(0),
                 increaseValue: 0
@@ -414,11 +414,11 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
     const getAdjustedSalary = (templateId: string, monthIdx: number) => {
         const template = jobTemplates.find(t => t.id === templateId);
         if (!template) return 0;
-        
+
         const baseSalary = template.salaries[monthIdx];
         // Dissídio applies from startMonth onwards
         if (monthIdx + 1 < dissidio.startMonth) return baseSalary;
-        
+
         return baseSalary * (1 + dissidio.percentage / 100);
     };
 
@@ -441,10 +441,10 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
     };
 
     const formatCurrency = (val: number, decimals: number = 2) => {
-        return new Intl.NumberFormat('pt-BR', { 
-            style: 'decimal', 
-            minimumFractionDigits: decimals, 
-            maximumFractionDigits: decimals 
+        return new Intl.NumberFormat('pt-BR', {
+            style: 'decimal',
+            minimumFractionDigits: decimals,
+            maximumFractionDigits: decimals
         }).format(val);
     };
 
@@ -461,8 +461,8 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                     <div className="flex items-center gap-4">
                         <div className="flex flex-col">
                             <label className="text-[10px] font-bold text-gray-500 uppercase">Percentual (%)</label>
-                            <input 
-                                type="number" 
+                            <input
+                                type="number"
                                 value={dissidio.percentage}
                                 onChange={(e) => setDissidio({ ...dissidio, percentage: parseFloat(e.target.value) || 0 })}
                                 className="border-b border-gray-300 focus:border-indigo-500 outline-none py-1 w-24 font-bold text-indigo-700"
@@ -470,7 +470,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                         </div>
                         <div className="flex flex-col">
                             <label className="text-[10px] font-bold text-gray-500 uppercase">Mês de Início</label>
-                            <select 
+                            <select
                                 value={dissidio.startMonth}
                                 onChange={(e) => setDissidio({ ...dissidio, startMonth: parseInt(e.target.value) })}
                                 className="border-b border-gray-300 focus:border-indigo-500 outline-none py-1 w-32 font-bold text-indigo-700 bg-transparent"
@@ -482,7 +482,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                         </div>
                     </div>
                 </div>
-                <button 
+                <button
                     onClick={() => setIsImportModalOpen(true)}
                     className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-bold shadow-sm"
                 >
@@ -503,20 +503,20 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                             </button>
                         </div>
                         <div className="p-6">
-                            <textarea 
+                            <textarea
                                 value={importText}
                                 onChange={(e) => setImportText(e.target.value)}
                                 placeholder="Cole aqui..."
                                 className="w-full h-64 p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-mono text-xs"
                             />
                             <div className="mt-6 flex justify-end gap-3">
-                                <button 
+                                <button
                                     onClick={() => setIsImportModalOpen(false)}
                                     className="px-6 py-2 rounded-lg text-gray-600 font-bold hover:bg-gray-100 transition-colors"
                                 >
                                     Cancelar
                                 </button>
-                                <button 
+                                <button
                                     onClick={handleImportExcel}
                                     className="px-6 py-2 rounded-lg bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition-colors shadow-md"
                                 >
@@ -531,7 +531,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
                     <h3 className="font-bold text-gray-700">Cargos e Salários por Mês</h3>
-                    <button 
+                    <button
                         onClick={handleAddJobTemplate}
                         className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 transition-colors text-xs font-bold"
                     >
@@ -552,15 +552,15 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                             {jobTemplates.filter(t => t.type === 'CLT').map((template) => (
                                 <tr key={template.id} className="hover:bg-gray-50 transition-colors">
                                     <td className="px-4 py-2 sticky left-0 bg-white z-10 border-r border-gray-100">
-                                        <input 
-                                            type="text" 
+                                        <input
+                                            type="text"
                                             value={template.name}
                                             onChange={(e) => updateJobTemplate(template.id, { name: e.target.value })}
                                             className="w-full bg-transparent focus:outline-none font-medium text-gray-700 text-sm"
                                         />
                                     </td>
                                     <td className="px-4 py-2 text-center">
-                                        <select 
+                                        <select
                                             value={template.type}
                                             onChange={(e) => updateJobTemplate(template.id, { type: e.target.value as 'CLT' | 'PJ' })}
                                             className="bg-transparent focus:outline-none text-[10px] font-bold uppercase text-indigo-600"
@@ -571,8 +571,8 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                     </td>
                                     {MONTHS.map((_, idx) => (
                                         <td key={idx} className="px-2 py-2 text-right font-mono text-sm">
-                                            <input 
-                                                type="text" 
+                                            <input
+                                                type="text"
                                                 value={formatCurrency(template.salaries[idx], 0)}
                                                 onChange={(e) => {
                                                     const val = parseFloat(e.target.value.replace(/\./g, '').replace(',', '.')) || 0;
@@ -639,7 +639,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                     <div className="flex items-center gap-4 flex-1">
                         <div className="flex flex-col flex-1">
                             <label className="text-[10px] font-bold text-gray-500 uppercase">Cargo</label>
-                            <select 
+                            <select
                                 value={newAssignment.templateId}
                                 onChange={(e) => setNewAssignment({ ...newAssignment, templateId: e.target.value })}
                                 className="border-b border-gray-300 focus:border-indigo-500 outline-none py-1 font-bold text-indigo-700 bg-transparent"
@@ -652,7 +652,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                         </div>
                         <div className="flex flex-col flex-1">
                             <label className="text-[10px] font-bold text-gray-500 uppercase">Setor</label>
-                            <select 
+                            <select
                                 value={newAssignment.sectorId}
                                 onChange={(e) => setNewAssignment({ ...newAssignment, sectorId: e.target.value })}
                                 className="border-b border-gray-300 focus:border-indigo-500 outline-none py-1 font-bold text-indigo-700 bg-transparent"
@@ -663,7 +663,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                 ))}
                             </select>
                         </div>
-                        <button 
+                        <button
                             onClick={handleAddAssignment}
                             disabled={!newAssignment.templateId || !newAssignment.sectorId}
                             className="mt-4 px-6 py-2 rounded-lg bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition-colors shadow-md disabled:bg-gray-300 disabled:shadow-none"
@@ -695,11 +695,11 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                     const sectorPositions = cltPositions.filter(p => p.sectorId === sector.id);
                                     const isExpanded = expandedSectors[sector.id];
                                     const isSectorExcluded = sectorPositions.length > 0 && sectorPositions.every(p => p.isExcludedFromTotal);
-                                    
+
                                     const toggleSector = (excluded: boolean) => {
-                                        setPositions(prev => prev.map(p => 
+                                        setPositions(prev => prev.map(p =>
                                             p.sectorId === sector.id && jobTemplates.find(t => t.id === p.templateId)?.type === 'CLT'
-                                                ? { ...p, isExcludedFromTotal: excluded } 
+                                                ? { ...p, isExcludedFromTotal: excluded }
                                                 : p
                                         ));
                                     };
@@ -708,14 +708,14 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                         <React.Fragment key={sector.id}>
                                             <tr className="bg-gray-50/50 font-bold text-gray-800">
                                                 <td className="px-4 py-2 sticky left-0 bg-gray-50/50 z-10 flex items-center gap-2 min-w-[200px]">
-                                                    <button 
+                                                    <button
                                                         onClick={() => toggleSectorExpand(sector.id)}
                                                         className="p-1 hover:bg-gray-200 rounded transition-colors"
                                                     >
                                                         {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                                                     </button>
-                                                    <input 
-                                                        type="checkbox" 
+                                                    <input
+                                                        type="checkbox"
                                                         checked={!isSectorExcluded}
                                                         onChange={(e) => toggleSector(!e.target.checked)}
                                                         className="rounded border-gray-300 text-indigo-600"
@@ -741,8 +741,8 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                 return (
                                                     <tr key={p.id} className={`hover:bg-gray-50 ${p.isExcludedFromTotal ? 'opacity-60 italic' : ''}`}>
                                                         <td className="px-8 py-2 sticky left-0 bg-white z-10 text-gray-600 flex items-center gap-2 min-w-[200px]">
-                                                            <input 
-                                                                type="checkbox" 
+                                                            <input
+                                                                type="checkbox"
                                                                 checked={!p.isExcludedFromTotal}
                                                                 onChange={(e) => updateAssignment(p.id, { isExcludedFromTotal: !e.target.checked })}
                                                                 className="rounded border-gray-300 text-indigo-600"
@@ -751,7 +751,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                         </td>
                                                         {MONTHS.map((_, idx) => (
                                                             <td key={idx} className="px-2 py-2 text-right">
-                                                                <input 
+                                                                <input
                                                                     type="text"
                                                                     value={p.headcount[idx]}
                                                                     onChange={(e) => {
@@ -852,7 +852,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                     <React.Fragment key={acc.code}>
                                         <tr className="bg-gray-100 font-bold text-gray-700">
                                             <td className="px-4 py-2 sticky left-0 bg-gray-100 z-10 flex items-center gap-2">
-                                                <button 
+                                                <button
                                                     onClick={() => toggleBenefitAccountExpand(acc.code)}
                                                     className="p-1 hover:bg-gray-200 rounded transition-colors"
                                                 >
@@ -868,8 +868,8 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                             ))}
                                         </tr>
                                         {expandedBenefitAccounts[acc.code] && costCenters.map(sector => {
-                                            const config = benefitConfigs[`${acc.code}-${sector.id}`] || { 
-                                                method: 'driver', 
+                                            const config = benefitConfigs[`${acc.code}-${sector.id}`] || {
+                                                method: 'driver',
                                                 values: Array(12).fill(0),
                                                 lastYearValues: Array(12).fill(0),
                                                 increaseValue: 0
@@ -878,7 +878,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                 <tr key={`${acc.code}-${sector.id}`} className="hover:bg-gray-50 border-b border-gray-50">
                                                     <td className="px-8 py-2 sticky left-0 bg-white z-10 font-medium text-gray-700 text-sm">{sector.name}</td>
                                                     <td className="px-4 py-2 flex items-center gap-2">
-                                                        <select 
+                                                        <select
                                                             value={config.method}
                                                             onChange={(e) => handleBenefitMethodChange(acc.code, sector.id, e.target.value as 'driver' | 'absolute')}
                                                             className="flex-1 bg-transparent text-[10px] font-bold uppercase text-indigo-600 outline-none"
@@ -889,7 +889,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                     </td>
                                                     {MONTHS.map((_, idx) => (
                                                         <td key={idx} className="px-2 py-2 text-right">
-                                                            <input 
+                                                            <input
                                                                 type="text"
                                                                 value={config.values[idx] === 0 ? '' : formatCurrency(config.values[idx], 0)}
                                                                 onChange={(e) => {
@@ -945,7 +945,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                     <React.Fragment key={acc.code}>
                                         <tr className="bg-gray-100 font-bold text-gray-700">
                                             <td className="px-4 py-2 sticky left-0 bg-gray-100 z-10 flex items-center gap-2">
-                                                <button 
+                                                <button
                                                     onClick={() => togglePersonnelAccountExpand(acc.code)}
                                                     className="p-1 hover:bg-gray-200 rounded transition-colors"
                                                 >
@@ -961,8 +961,8 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                             ))}
                                         </tr>
                                         {expandedPersonnelAccounts[acc.code] && costCenters.map(sector => {
-                                            const config = personnelExpensesConfigs[`${acc.code}-${sector.id}`] || { 
-                                                method: 'absolute', 
+                                            const config = personnelExpensesConfigs[`${acc.code}-${sector.id}`] || {
+                                                method: 'absolute',
                                                 values: Array(12).fill(0),
                                                 lastYearValues: Array(12).fill(0),
                                                 increaseValue: 0
@@ -971,7 +971,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                 <tr key={`${acc.code}-${sector.id}`} className="hover:bg-gray-50 border-b border-gray-50">
                                                     <td className="px-8 py-2 sticky left-0 bg-white z-10 font-medium text-gray-700 text-sm">{sector.name}</td>
                                                     <td className="px-4 py-2 flex items-center gap-2">
-                                                        <select 
+                                                        <select
                                                             value={config.method}
                                                             onChange={(e) => handlePersonnelExpenseMethodChange(acc.code, sector.id, e.target.value as 'driver' | 'absolute')}
                                                             className="flex-1 bg-transparent text-[10px] font-bold uppercase text-indigo-600 outline-none"
@@ -982,7 +982,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                     </td>
                                                     {MONTHS.map((_, idx) => (
                                                         <td key={idx} className="px-2 py-2 text-right">
-                                                            <input 
+                                                            <input
                                                                 type="text"
                                                                 value={config.values[idx] === 0 ? '' : formatCurrency(config.values[idx], 0)}
                                                                 onChange={(e) => {
@@ -1016,10 +1016,10 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                 {THIRD_PARTY_ACCOUNTS.map(acc => {
                     const isExpanded = expandedThirdPartyAccounts[acc.code] !== false;
                     const activeSectors = activeThirdPartySectors[acc.code] || [];
-                    
+
                     // Calculate Account Totals for Header
                     const accountMonthlyTotals = Array(12).fill(0);
-                    
+
                     // 1. Serviços prestados por terceiros
                     if (acc.name.toLowerCase().includes('servicos prestados por terceiros')) {
                         activeSectors.forEach(sectorId => {
@@ -1055,7 +1055,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                 {formatCurrency(accountMonthlyTotals.reduce((a, b) => a + b, 0), 0)}
                                             </span>
                                         </div>
-                                        <button 
+                                        <button
                                             onClick={() => toggleThirdPartyAccountExpand(acc.code)}
                                             className="p-1 hover:bg-gray-200 rounded transition-colors"
                                         >
@@ -1065,16 +1065,16 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                 </div>
                                 {isExpanded && (
                                     <div className="no-scrollbar overflow-x-auto">
-                                    <table className="w-full text-sm text-left border-collapse">
-                                        <thead className="bg-gray-50 text-gray-600 font-bold border-b border-gray-200 uppercase text-sm">
-                                            <tr>
-                                                <th className="px-4 py-3 min-w-[200px] sticky left-0 bg-gray-50 z-10">
-                                                    <div className="flex items-center justify-start gap-2">
-                                                        <div className="relative group">
-                                                            <button className="w-6 h-6 flex items-center justify-center rounded-full bg-amber-100 text-amber-600 hover:bg-amber-200 transition-colors">
-                                                                <span className="text-lg font-bold leading-none">+</span>
-                                                            </button>
-                                                                <select 
+                                        <table className="w-full text-sm text-left border-collapse">
+                                            <thead className="bg-gray-50 text-gray-600 font-bold border-b border-gray-200 uppercase text-sm">
+                                                <tr>
+                                                    <th className="px-4 py-3 min-w-[200px] sticky left-0 bg-gray-50 z-10">
+                                                        <div className="flex items-center justify-start gap-2">
+                                                            <div className="relative group">
+                                                                <button className="w-6 h-6 flex items-center justify-center rounded-full bg-amber-100 text-amber-600 hover:bg-amber-200 transition-colors">
+                                                                    <span className="text-lg font-bold leading-none">+</span>
+                                                                </button>
+                                                                <select
                                                                     className="absolute inset-0 opacity-0 cursor-pointer"
                                                                     onChange={(e) => {
                                                                         if (e.target.value) {
@@ -1101,8 +1101,8 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                 {activeSectors.map(sectorId => {
                                                     const sector = costCenters.find(s => s.id === sectorId);
                                                     if (!sector) return null;
-                                                    const config = (thirdPartyConfigs[`${acc.code}-${sector.id}`] || { 
-                                                        method: 'absolute', 
+                                                    const config = (thirdPartyConfigs[`${acc.code}-${sector.id}`] || {
+                                                        method: 'absolute',
                                                         values: Array(12).fill(0)
                                                     }) as any;
                                                     const rowTotal = config.values.reduce((a, b) => a + b, 0);
@@ -1113,7 +1113,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                                 <div className="flex flex-col gap-1">
                                                                     <span>{sector.name}</span>
                                                                     {acc.name.includes('Servicos prestados por terceiros') && (
-                                                                        <input 
+                                                                        <input
                                                                             type="text"
                                                                             placeholder="Nome do prestador..."
                                                                             value={config.providerName || ''}
@@ -1125,7 +1125,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                             </td>
                                                             {MONTHS.map((_, idx) => (
                                                                 <td key={idx} className="px-2 py-2 text-right">
-                                                                    <input 
+                                                                    <input
                                                                         type="text"
                                                                         value={config.values[idx] === 0 ? '' : formatCurrency(config.values[idx], 0)}
                                                                         onChange={(e) => {
@@ -1145,7 +1145,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                                 {formatCurrency(rowTotal, 0)}
                                                             </td>
                                                             <td className="px-2 py-2 text-center">
-                                                                <button 
+                                                                <button
                                                                     onClick={() => handleRemoveThirdPartySector(acc.code, sector.id)}
                                                                     className="text-red-400 hover:text-red-600 p-1"
                                                                 >
@@ -1231,7 +1231,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                 {formatCurrency(accountMonthlyTotals.reduce((a, b) => a + b, 0), 0)}
                                             </span>
                                         </div>
-                                        <button 
+                                        <button
                                             onClick={() => toggleThirdPartyAccountExpand(acc.code)}
                                             className="p-1 hover:bg-gray-200 rounded transition-colors"
                                         >
@@ -1250,7 +1250,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                                 <button className="w-6 h-6 flex items-center justify-center rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors">
                                                                     <span className="text-lg font-bold leading-none">+</span>
                                                                 </button>
-                                                                <select 
+                                                                <select
                                                                     className="absolute inset-0 opacity-0 cursor-pointer"
                                                                     onChange={(e) => {
                                                                         if (e.target.value) {
@@ -1312,7 +1312,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                             <tr className="hover:bg-gray-50 font-bold">
                                                                 <td className="px-4 py-2 sticky left-0 bg-white z-10 flex items-center justify-between gap-2">
                                                                     <div className="flex items-center gap-2">
-                                                                        <button 
+                                                                        <button
                                                                             onClick={() => setExpandedSectors(prev => ({ ...prev, [`${acc.code}-${sector.id}`]: !prev[`${acc.code}-${sector.id}`] }))}
                                                                             className="p-1 hover:bg-gray-200 rounded transition-colors"
                                                                         >
@@ -1320,7 +1320,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                                         </button>
                                                                         <span className="text-xs">{sector.name}</span>
                                                                     </div>
-                                                                    <button 
+                                                                    <button
                                                                         onClick={() => handleRemoveThirdPartySector(acc.code, sector.id)}
                                                                         className="text-red-400 hover:text-red-600 p-1"
                                                                     >
@@ -1343,7 +1343,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                                         <td className="px-12 py-1 sticky left-0 bg-gray-50/30 z-10">KPI</td>
                                                                         {MONTHS.map((_, idx) => (
                                                                             <td key={idx} className="px-2 py-1 text-right">
-                                                                                <input 
+                                                                                <input
                                                                                     type="text"
                                                                                     value={editingKpi?.key === `${sector.id}-${idx}` ? editingKpi.value : (config.kpi[idx] === 0 ? '' : config.kpi[idx].toString().replace('.', ','))}
                                                                                     onChange={(e) => {
@@ -1365,7 +1365,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                                         <td className="px-12 py-1 sticky left-0 bg-gray-50/30 z-10">Hora trabalhada por dia</td>
                                                                         {MONTHS.map((_, idx) => (
                                                                             <td key={idx} className="px-2 py-1 text-right">
-                                                                                <input 
+                                                                                <input
                                                                                     type="number"
                                                                                     value={config.hoursPerDay[idx] || ''}
                                                                                     onChange={(e) => handleThirdPartyTemporariesSectorChange(sector.id, 'hoursPerDay', idx, parseFloat(e.target.value) || 0)}
@@ -1381,7 +1381,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                                         <td className="px-12 py-1 sticky left-0 bg-gray-50/30 z-10">Valor da Hora</td>
                                                                         {MONTHS.map((_, idx) => (
                                                                             <td key={idx} className="px-2 py-1 text-right">
-                                                                                <input 
+                                                                                <input
                                                                                     type="number"
                                                                                     value={config.hourlyRate[idx] || ''}
                                                                                     onChange={(e) => handleThirdPartyTemporariesSectorChange(sector.id, 'hourlyRate', idx, parseFloat(e.target.value) || 0)}
@@ -1456,7 +1456,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                 {formatCurrency(accountMonthlyTotals.reduce((a, b) => a + b, 0), 0)}
                                             </span>
                                         </div>
-                                        <button 
+                                        <button
                                             onClick={() => toggleThirdPartyAccountExpand(acc.code)}
                                             className="p-1 hover:bg-gray-200 rounded transition-colors"
                                         >
@@ -1475,7 +1475,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                                 <button className="w-6 h-6 flex items-center justify-center rounded-full bg-purple-100 text-purple-600 hover:bg-purple-200 transition-colors">
                                                                     <span className="text-lg font-bold leading-none">+</span>
                                                                 </button>
-                                                                <select 
+                                                                <select
                                                                     className="absolute inset-0 opacity-0 cursor-pointer"
                                                                     onChange={(e) => {
                                                                         if (e.target.value) {
@@ -1512,7 +1512,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                             <tr className="bg-gray-50/50 font-bold text-gray-800">
                                                                 <td className="px-4 py-2 sticky left-0 bg-gray-50/50 z-10 flex items-center justify-between gap-2">
                                                                     <span className="text-xs">{sector.name}</span>
-                                                                    <button 
+                                                                    <button
                                                                         onClick={() => handleRemoveThirdPartySector(acc.code, sector.id)}
                                                                         className="text-red-400 hover:text-red-600 p-1"
                                                                     >
@@ -1543,7 +1543,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                             {sectorPJPositions.map(p => {
                                                                 const template = jobTemplates.find(t => t.id === p.templateId);
                                                                 const data = thirdPartyRecurrentData[`${p.id}`] || { salary: Array(12).fill(0), thirteenth: Array(12).fill(0), vacation: Array(12).fill(0) };
-                                                                
+
                                                                 return (
                                                                     <React.Fragment key={p.id}>
                                                                         <tr className="hover:bg-gray-50">
@@ -1562,7 +1562,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                                             <td className="px-12 py-1 sticky left-0 bg-white z-10 text-gray-500 text-[10px]">Salário</td>
                                                                             {MONTHS.map((_, idx) => (
                                                                                 <td key={idx} className="px-2 py-1 text-right">
-                                                                                    <input 
+                                                                                    <input
                                                                                         type="text"
                                                                                         value={data.salary[idx] === 0 ? '' : formatCurrency(data.salary[idx], 0)}
                                                                                         onChange={(e) => {
@@ -1581,7 +1581,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                                             <td className="px-12 py-1 sticky left-0 bg-white z-10 text-gray-500 text-[10px]">13º Salário</td>
                                                                             {MONTHS.map((_, idx) => (
                                                                                 <td key={idx} className="px-2 py-1 text-right">
-                                                                                    <input 
+                                                                                    <input
                                                                                         type="text"
                                                                                         value={data.thirteenth[idx] === 0 ? '' : formatCurrency(data.thirteenth[idx], 0)}
                                                                                         onChange={(e) => {
@@ -1600,7 +1600,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                                             <td className="px-12 py-1 sticky left-0 bg-white z-10 text-gray-500 text-[10px]">Férias</td>
                                                                             {MONTHS.map((_, idx) => (
                                                                                 <td key={idx} className="px-2 py-1 text-right">
-                                                                                    <input 
+                                                                                    <input
                                                                                         type="text"
                                                                                         value={data.vacation[idx] === 0 ? '' : formatCurrency(data.vacation[idx], 0)}
                                                                                         onChange={(e) => {
@@ -1671,7 +1671,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                 {formatCurrency(accountMonthlyTotals.reduce((a, b) => a + b, 0), 0)}
                                             </span>
                                         </div>
-                                        <button 
+                                        <button
                                             onClick={() => toggleThirdPartyAccountExpand(acc.code)}
                                             className="p-1 hover:bg-gray-200 rounded transition-colors"
                                         >
@@ -1690,7 +1690,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                                 <button className="w-6 h-6 flex items-center justify-center rounded-full bg-emerald-100 text-emerald-600 hover:bg-emerald-200 transition-colors">
                                                                     <span className="text-lg font-bold leading-none">+</span>
                                                                 </button>
-                                                                <select 
+                                                                <select
                                                                     className="absolute inset-0 opacity-0 cursor-pointer"
                                                                     onChange={(e) => {
                                                                         if (e.target.value) {
@@ -1717,8 +1717,8 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                 {activeSectors.map(sectorId => {
                                                     const sector = costCenters.find(s => s.id === sectorId);
                                                     if (!sector) return null;
-                                                    const config = thirdPartyConfigs[`${acc.code}-${sector.id}`] || { 
-                                                        method: 'absolute', 
+                                                    const config = thirdPartyConfigs[`${acc.code}-${sector.id}`] || {
+                                                        method: 'absolute',
                                                         values: Array(12).fill(0)
                                                     };
                                                     const rowTotal = config.values.reduce((a, b) => a + b, 0);
@@ -1728,7 +1728,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                             <td className="px-4 py-2 sticky left-0 bg-white z-10 font-medium text-gray-700 text-sm min-w-[200px]">{sector.name}</td>
                                                             {MONTHS.map((_, idx) => (
                                                                 <td key={idx} className="px-2 py-2 text-right">
-                                                                    <input 
+                                                                    <input
                                                                         type="text"
                                                                         value={config.values[idx] === 0 ? '' : formatCurrency(config.values[idx], 0)}
                                                                         onChange={(e) => {
@@ -1744,7 +1744,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                                 {formatCurrency(rowTotal, 0)}
                                                             </td>
                                                             <td className="px-2 py-2 text-center">
-                                                                <button 
+                                                                <button
                                                                     onClick={() => handleRemoveThirdPartySector(acc.code, sector.id)}
                                                                     className="text-red-400 hover:text-red-600 p-1"
                                                                 >
@@ -1769,12 +1769,12 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                         );
                     }
 
-                // Default fallback (should not happen with current names)
-                return null;
-            })}
-        </div>
-    );
-};
+                    // Default fallback (should not happen with current names)
+                    return null;
+                })}
+            </div>
+        );
+    };
 
     const renderChargesTab = () => (
         <div className="space-y-6">
@@ -1814,7 +1814,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                     <React.Fragment key={acc.code}>
                                         <tr className="bg-gray-100 font-bold text-gray-700">
                                             <td className="px-4 py-2 sticky left-0 bg-gray-100 z-10 flex items-center gap-2">
-                                                <button 
+                                                <button
                                                     onClick={() => toggleChargeAccountExpand(acc.code)}
                                                     className="p-1 hover:bg-gray-200 rounded transition-colors"
                                                 >
@@ -1885,39 +1885,39 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {costCenters.map(sector => {
-                                                const sectorPositions = positions.filter(p => p.sectorId === sector.id);
-                                                const sectorPJManagers = sectorPositions
-                                                    .filter(p => {
-                                                        const template = jobTemplates.find(t => t.id === p.templateId);
-                                                        return template?.type === 'PJ';
-                                                    })
-                                                    .map(p => {
-                                                        const template = jobTemplates.find(t => t.id === p.templateId);
-                                                        const data = thirdPartyRecurrentData[p.id] || { salary: Array(12).fill(0), thirteenth: Array(12).fill(0), vacation: Array(12).fill(0) };
-                                                        return {
-                                                            role: template?.name || 'Gestor PJ',
-                                                            data: {
-                                                                salary: data.salary,
-                                                                decimo: data.thirteenth,
-                                                                vacation: data.vacation
-                                                            }
-                                                        };
-                                                    });
-                                                const isSectorExpanded = expandedSectors[sector.id];
+                                    const sectorPositions = positions.filter(p => p.sectorId === sector.id);
+                                    const sectorPJManagers = sectorPositions
+                                        .filter(p => {
+                                            const template = jobTemplates.find(t => t.id === p.templateId);
+                                            return template?.type === 'PJ';
+                                        })
+                                        .map(p => {
+                                            const template = jobTemplates.find(t => t.id === p.templateId);
+                                            const data = thirdPartyRecurrentData[p.id] || { salary: Array(12).fill(0), thirteenth: Array(12).fill(0), vacation: Array(12).fill(0) };
+                                            return {
+                                                role: template?.name || 'Gestor PJ',
+                                                data: {
+                                                    salary: data.salary,
+                                                    decimo: data.thirteenth,
+                                                    vacation: data.vacation
+                                                }
+                                            };
+                                        });
+                                    const isSectorExpanded = expandedSectors[sector.id];
 
-                                                // PJ Managers for this sector
-                                                const sectorPJPositions = positions.filter(p => {
-                                                    const template = jobTemplates.find(t => t.id === p.templateId);
-                                                    return p.sectorId === sector.id && template?.type === 'PJ';
-                                                });
+                                    // PJ Managers for this sector
+                                    const sectorPJPositions = positions.filter(p => {
+                                        const template = jobTemplates.find(t => t.id === p.templateId);
+                                        return p.sectorId === sector.id && template?.type === 'PJ';
+                                    });
 
-                                                // Other Third Party for this sector
-                                                const meiAcc = THIRD_PARTY_ACCOUNTS.find(a => a.name.toLowerCase().includes('mei'));
-                                                const servicesAcc = THIRD_PARTY_ACCOUNTS.find(a => a.name.toLowerCase().includes('prestados por terceiros'));
+                                    // Other Third Party for this sector
+                                    const meiAcc = THIRD_PARTY_ACCOUNTS.find(a => a.name.toLowerCase().includes('mei'));
+                                    const servicesAcc = THIRD_PARTY_ACCOUNTS.find(a => a.name.toLowerCase().includes('prestados por terceiros'));
 
-                                                const sectorMEI = thirdPartyConfigs[`${meiAcc?.code}-${sector.id}`]?.values || Array(12).fill(0);
-                                                const sectorServices = thirdPartyConfigs[`${servicesAcc?.code}-${sector.id}`]?.values || Array(12).fill(0);
-                                    
+                                    const sectorMEI = thirdPartyConfigs[`${meiAcc?.code}-${sector.id}`]?.values || Array(12).fill(0);
+                                    const sectorServices = thirdPartyConfigs[`${servicesAcc?.code}-${sector.id}`]?.values || Array(12).fill(0);
+
                                     const tempConfig = thirdPartyTemporariesSectors[sector.id] || {
                                         kpi: Array(12).fill(0),
                                         hoursPerDay: Array(12).fill(0),
@@ -1963,7 +1963,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                         <React.Fragment key={sector.id}>
                                             <tr className="bg-gray-100 font-bold text-gray-800">
                                                 <td className="px-4 py-2 sticky left-0 bg-gray-100 z-10 flex items-center gap-2">
-                                                    <button 
+                                                    <button
                                                         onClick={() => toggleSectorExpand(sector.id)}
                                                         className="p-1 hover:bg-gray-200 rounded transition-colors"
                                                     >
@@ -2020,7 +2020,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                             <React.Fragment key={p.id}>
                                                                 <tr className="bg-white font-semibold text-gray-700 border-b border-gray-100">
                                                                     <td className="px-8 py-2 sticky left-0 bg-white z-10 flex items-center gap-2">
-                                                                        <button 
+                                                                        <button
                                                                             onClick={() => toggleDetailPositionExpand(p.id)}
                                                                             className="p-1 hover:bg-gray-100 rounded transition-colors"
                                                                         >
@@ -2058,7 +2058,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                     {sectorPJManagers.map(pj => {
                                                         const pjTotalPerMonth = MONTHS.map((_, idx) => (pj.data.salary[idx] || 0) + (pj.data.decimo[idx] || 0) + (pj.data.vacation[idx] || 0));
                                                         const isPJExpanded = expandedDetailPositions[`pj-${sector.id}-${pj.role}`];
-                                                        
+
                                                         const rows = [
                                                             { name: 'Pro-labore / Salário', values: pj.data.salary },
                                                             { name: '13º Salário', values: pj.data.decimo },
@@ -2069,7 +2069,7 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
                                                             <React.Fragment key={pj.role}>
                                                                 <tr className="bg-white font-semibold text-gray-700 border-b border-gray-100">
                                                                     <td className="px-8 py-2 sticky left-0 bg-white z-10 flex items-center gap-2">
-                                                                        <button 
+                                                                        <button
                                                                             onClick={() => toggleDetailPositionExpand(`pj-${sector.id}-${pj.role}`)}
                                                                             className="p-1 hover:bg-gray-100 rounded transition-colors"
                                                                         >
@@ -2147,43 +2147,43 @@ const BudgetLaborView: React.FC<BudgetLaborViewProps> = ({ costCenters, laborPar
 
             {/* TAB NAVIGATION */}
             <div className="flex gap-1 bg-gray-200 p-1 rounded-xl mb-8 w-fit">
-                <button 
+                <button
                     onClick={() => setActiveTab('positions')}
                     className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'positions' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}
                 >
                     <DollarSign size={18} /> Cargos e Salários
                 </button>
-                <button 
+                <button
                     onClick={() => setActiveTab('headcount')}
                     className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'headcount' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}
                 >
                     <Users size={18} /> Headcount
                 </button>
-                <button 
+                <button
                     onClick={() => setActiveTab('benefits')}
                     className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'benefits' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}
                 >
                     <Gift size={18} /> Benefícios
                 </button>
-                <button 
+                <button
                     onClick={() => setActiveTab('personnel_expenses')}
                     className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'personnel_expenses' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}
                 >
                     <UserPlus size={18} /> Despesas com Pessoal
                 </button>
-                <button 
+                <button
                     onClick={() => setActiveTab('third_party')}
                     className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'third_party' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}
                 >
                     <Truck size={18} /> Terceiros
                 </button>
-                <button 
+                <button
                     onClick={() => setActiveTab('charges')}
                     className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'charges' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}
                 >
                     <ShieldCheck size={18} /> Encargos Sociais
                 </button>
-                <button 
+                <button
                     onClick={() => setActiveTab('details')}
                     className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'details' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}
                 >

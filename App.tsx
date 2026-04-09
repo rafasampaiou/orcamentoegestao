@@ -532,6 +532,7 @@ const App: React.FC = () => {
           hotels={hotels}
           isMonthClosed={isClosed}
           realOccupancyData={realOccupancyData}
+          budgetOccupancyData={budgetOccupancyDataMap[activeBudgetVersionId] || {}}
           activeRealVersionId={activeRealVersionId}
           activeBudgetVersionId={activeBudgetVersionId}
         />

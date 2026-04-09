@@ -466,7 +466,8 @@ export const getForecastData = (
     activeRealVersionId?: string,
     activeBudgetVersionId?: string,
     currentAccounts: Account[] = mockAccounts,
-    currentPackages: CostPackage[] = mockPackages
+    currentPackages: CostPackage[] = mockPackages,
+    budgetOccupancyData: Record<string, number[]> = {}
 ): ForecastRow[] => {
   
   const rows: ForecastRow[] = [];
@@ -572,12 +573,28 @@ export const getForecastData = (
   const gOccReal = getRealOccValue('geral_sold') ?? 75;
   const gPaxReal = getRealOccValue('geral_pax') ?? 210;
 
-  rows.push(generateRow('IND-1', '', 'Indicators', 'UH Disponível', 0, gAvailReal, 100, 0, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
-  rows.push(generateRow('IND-2', '', 'Indicators', 'UH Ocupada', 0, gOccReal, 70, 0, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
-  rows.push(generateRow('IND-3', '', 'Indicators', '% Ocupação', 0, gAvailReal > 0 ? (gOccReal / gAvailReal) * 100 : 0, 70, 0, false, false, 0, undefined, { format: 'percent' }, 'INDICADORES GERAIS'));
-  rows.push(generateRow('IND-4', '', 'Indicators', 'DM Bruta', 0, 850, 800, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
-  rows.push(generateRow('IND-5', '', 'Indicators', 'PAX', 0, gPaxReal, 190, 0, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
-  rows.push(generateRow('IND-6', '', 'Indicators', 'REVPAR', 0, 637.5, 560, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
+  // Retrieve budget values from budgetOccupancyData based on the selectedMonth (0-indexed)
+  const monthIdx = selectedMonth ? selectedMonth - 1 : 0;
+  const gAvailBudget = budgetOccupancyData['geral_avail'] ? budgetOccupancyData['geral_avail'][monthIdx] : 0;
+  const gOccBudget = budgetOccupancyData['geral_sold'] ? budgetOccupancyData['geral_sold'][monthIdx] : 0;
+  const gOccPctBudget = gAvailBudget > 0 ? (gOccBudget / gAvailBudget) * 100 : 0;
+  // Get Budget Revenue values to compute Budget DM & RevPAR (Approximation or zeros if missing)
+  const gPaxBudget = budgetOccupancyData['geral_pax'] ? budgetOccupancyData['geral_pax'][monthIdx] : 0;
+  
+  // DM and Revpar Budget calculation based on imported budget vs occupancy, or from budgetOccupancyData if there were a field.
+  // We'll calculate it from imported if possible, otherwise 0 or basic calc.
+  const revLazerBudget = getImportedValue('Lazer', selectedYear, 'Budget'); 
+  const revEventosBudget = getImportedValue('Eventos', selectedYear, 'Budget');
+  const revOcupacaoBudget = revLazerBudget + revEventosBudget; 
+  const dmBudget = gOccBudget > 0 ? revOcupacaoBudget / gOccBudget : 0;
+  const revparBudget = gAvailBudget > 0 ? revOcupacaoBudget / gAvailBudget : 0;
+
+  rows.push(generateRow('IND-1', '', 'Indicators', 'UH Disponível', gAvailBudget, gAvailReal, 100, 0, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
+  rows.push(generateRow('IND-2', '', 'Indicators', 'UH Ocupada', gOccBudget, gOccReal, 70, 0, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
+  rows.push(generateRow('IND-3', '', 'Indicators', '% Ocupação', gOccPctBudget, gAvailReal > 0 ? (gOccReal / gAvailReal) * 100 : 0, 70, 0, false, false, 0, undefined, { format: 'percent' }, 'INDICADORES GERAIS'));
+  rows.push(generateRow('IND-4', '', 'Indicators', 'DM Bruta', dmBudget, 850, 800, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
+  rows.push(generateRow('IND-5', '', 'Indicators', 'PAX', gPaxBudget, gPaxReal, 190, 0, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
+  rows.push(generateRow('IND-6', '', 'Indicators', 'REVPAR', revparBudget, 637.5, 560, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
 
   rows.push(generateRow('SPACER-IND-REV', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
 
@@ -592,6 +609,7 @@ export const getForecastData = (
   const revAptItems = [
       { id: 'REV-APT-LAZER', code: '1.01.01', label: 'Lazer' },
       { id: 'REV-APT-EVENTOS', code: '1.01.02', label: 'Eventos' },
+      { id: 'REV-APT-INCLUSAS', code: '1.01.03', label: 'Receitas Inclusas na diária' },
   ];
 
   revAptItems.forEach(item => {
@@ -601,6 +619,8 @@ export const getForecastData = (
       const valLY = getImportedValue(item.label, (selectedYear || 0) - 1, 'Real');
       rows.push(generateRow(item.id, item.code, 'Revenue', item.label, valBudget, valReal, valLY, valPrevia, false, false, 2));
   });
+
+  rows.push(generateRow('SPACER-APT-EXTRA', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
 
   // 1.02 Receitas Extras
   rows.push(generateRow('REV-EXTRA', '1.02', 'Revenue', 'Receitas Extras', 0, 0, 0, 0, true, false, 1));

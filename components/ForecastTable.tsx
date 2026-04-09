@@ -21,6 +21,7 @@ interface ForecastTableProps {
     // Budget Props
     activeRealVersionId?: string;
     activeBudgetVersionId?: string;
+    budgetOccupancyData?: Record<string, number[]>;
 }
 
 const ForecastTable: React.FC<ForecastTableProps> = ({ 
@@ -33,12 +34,13 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     hotels,
     isMonthClosed = false,
     realOccupancyData = {},
+    budgetOccupancyData = {},
     activeRealVersionId,
     activeBudgetVersionId
 }) => {
   // Initialize state passing selectedHotel and dynamic structures
   const [data, setData] = useState<ForecastRow[]>(() => {
-      const initialData = getForecastData(selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages);
+      const initialData = getForecastData(selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData);
       // Initialize previaConfig if missing
       const initializedData = initialData.map(row => ({
           ...row,
@@ -56,6 +58,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
       budget: true,
       deltaPreviaBudget: true,
       deltaPreviaBudgetPct: true,
+      deltaBudget: true,
+      deltaBudgetPct: true,
       lastYear: true,
       deltaLY: true,
       deltaLYPct: true,
@@ -123,13 +127,13 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
   // We use useMemo to avoid the linter warning about setState in effect, 
   // and we only update state when the derived data actually changes from props.
   const derivedData = useMemo(() => {
-      const newData = getForecastData(selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages);
+      const newData = getForecastData(selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData);
       const initializedData = newData.map(row => ({
           ...row,
           previaConfig: row.previaConfig || { method: 'Fixed', manualValue: row.previa }
       }));
       return recalculateTotals(initializedData, packages, accounts);
-  }, [selectedMonth, selectedYear, financialData, selectedHotel, packages, accounts, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId]);
+  }, [selectedMonth, selectedYear, financialData, selectedHotel, packages, accounts, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, budgetOccupancyData]);
 
   useEffect(() => {
       setData(derivedData);
