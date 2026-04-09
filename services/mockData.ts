@@ -522,11 +522,19 @@ export const getForecastData = (
 
           // 6. Indexing
           const normConta = row.conta.trim().toLowerCase();
-          const keyConta = `${rYear}|${rMonth}|${normHotel}|${normScenario}|${normConta}`;
+          const normCR = (row.cr || '').trim().toLowerCase();
           
+          // Index by Account only
+          const keyConta = `${rYear}|${rMonth}|${normHotel}|${normScenario}|${normConta}`;
           dataIndex.set(keyConta, (dataIndex.get(keyConta) || 0) + val);
 
-          // Index by 'classificacao' if it exists and is different from conta
+          // Index by Account + CR for more specific lookups
+          if (normCR) {
+              const keyContaCR = `${rYear}|${rMonth}|${normHotel}|${normScenario}|${normConta}|${normCR}`;
+              dataIndex.set(keyContaCR, (dataIndex.get(keyContaCR) || 0) + val);
+          }
+
+          // 7. Index by 'classificacao' if it exists
           if (row.classificacao) {
               const normClass = row.classificacao.trim().toLowerCase();
               if (normClass && normClass !== normConta) {
@@ -538,19 +546,27 @@ export const getForecastData = (
   }
 
   // Optimized Helper using Index
-  const getImportedValue = (accountName: string, targetYear: number | undefined, valueCategory: 'Real' | 'Budget' | 'Previa') => {
+  const getImportedValue = (accountName: string, targetYear: number | undefined, valueCategory: 'Real' | 'Budget' | 'Previa', crFilter?: string) => {
     if (!selectedMonth || !targetYear) return 0;
     
     const targetName = accountName.trim().toLowerCase();
+    const targetCR = crFilter?.trim().toLowerCase();
     let targetScenario = '';
     if (valueCategory === 'Real') targetScenario = 'REAL';
     else if (valueCategory === 'Budget') targetScenario = 'BUDGET';
     else targetScenario = 'PREVIA';
 
-    // Check both Code and Name keys to ensure coverage
     const keysToCheck = new Set<string>();
-    if (activeHotelCode) keysToCheck.add(`${targetYear}|${selectedMonth}|${activeHotelCode.toUpperCase()}|${targetScenario}|${targetName}`);
-    if (selectedHotelName) keysToCheck.add(`${targetYear}|${selectedMonth}|${selectedHotelName.trim().toUpperCase()}|${targetScenario}|${targetName}`);
+    const hotelsToTry = [selectedHotelName, activeHotelCode].filter(Boolean) as string[];
+
+    hotelsToTry.forEach(h => {
+        const baseKey = `${targetYear}|${selectedMonth}|${h.trim().toUpperCase()}|${targetScenario}|${targetName}`;
+        if (targetCR) {
+            keysToCheck.add(`${baseKey}|${targetCR}`);
+        } else {
+            keysToCheck.add(baseKey);
+        }
+    });
 
     let total = 0;
     keysToCheck.forEach(key => {
@@ -607,16 +623,28 @@ export const getForecastData = (
   rows.push(generateRow('REV-APT', '1.01', 'Revenue', 'Receita de Apartamentos', 0, 0, 0, 0, true, false, 1));
   
   const revAptItems = [
-      { id: 'REV-APT-LAZER', code: '1.01.01', label: 'Lazer' },
-      { id: 'REV-APT-EVENTOS', code: '1.01.02', label: 'Eventos' },
-      { id: 'REV-APT-INCLUSAS', code: '1.01.03', label: 'Receitas Inclusas na diária' },
+      { id: 'REV-APT-LAZER', code: '1.01.01', label: 'Lazer', importNames: ['Lazer', 'Receita de Apartamentos'] },
+      { id: 'REV-APT-EVENTOS', code: '1.01.02', label: 'Eventos', importNames: ['Eventos', 'Receita de Apartamentos'] },
+      { id: 'REV-APT-INCLUSAS', code: '1.01.03', label: 'Receitas Inclusas na diária', importNames: ['Receitas Inclusas na diária', 'Receita de Alimentos - Incluso na diária'] },
   ];
 
   revAptItems.forEach(item => {
-      const valBudget = getImportedValue(item.label, selectedYear, 'Budget');
-      const valReal = getImportedValue(item.label, selectedYear, 'Real');
-      const valPrevia = getImportedValue(item.label, selectedYear, 'Previa');
-      const valLY = getImportedValue(item.label, (selectedYear || 0) - 1, 'Real');
+      let valBudget = 0;
+      let valReal = 0;
+      let valPrevia = 0;
+      let valLY = 0;
+
+      // Special logic for Lazer/Eventos: if label matches 'Receita de Apartamentos', we MUST filter by CR
+      const crFilter = (item.label === 'Lazer' || item.label === 'Eventos') ? item.label : undefined;
+      
+      const namesToTry = item.importNames || [item.label];
+      namesToTry.forEach(name => {
+          valBudget += getImportedValue(name, selectedYear, 'Budget', crFilter);
+          valReal += getImportedValue(name, selectedYear, 'Real', crFilter);
+          valPrevia += getImportedValue(name, selectedYear, 'Previa', crFilter);
+          valLY += getImportedValue(name, (selectedYear || 0) - 1, 'Real', crFilter);
+      });
+      
       rows.push(generateRow(item.id, item.code, 'Revenue', item.label, valBudget, valReal, valLY, valPrevia, false, false, 2));
   });
 

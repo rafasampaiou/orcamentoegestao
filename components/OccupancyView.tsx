@@ -469,12 +469,15 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
         if (!isDataReady) return;
         const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
         if (!budgetData['days_month']) {
-            setBudgetData(prev => ({
-                ...prev,
-                'days_month': daysInMonth
-            }));
+            setBudgetData(prev => {
+                const newData = {
+                    ...prev,
+                    'days_month': daysInMonth
+                };
+                return recalculateBudget(newData);
+            });
         }
-    }, [isDataReady, budgetData, setBudgetData]);
+    }, [isDataReady, budgetData, setBudgetData]); // Note: recalculateBudget is stable as it's a regular function in the component body
 
     const handleUpdate = (rowId: string, monthIndex: number, value: number) => {
         setBudgetData(prev => {

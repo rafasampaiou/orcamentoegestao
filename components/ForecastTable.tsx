@@ -627,8 +627,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 // --- SPACER LOGIC ---
                 if (row.category === 'Spacer') {
                     return (
-                        <tr key={row.id}>
-                            <td colSpan={13} className="h-6 bg-gray-50/30 border-y border-gray-200"></td>
+                        <tr key={row.id} className="bg-gray-100/50">
+                            <td colSpan={13} className="h-6 border-y border-gray-200"></td>
                         </tr>
                     );
                 }

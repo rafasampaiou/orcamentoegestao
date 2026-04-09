@@ -181,30 +181,34 @@ const App: React.FC = () => {
   const [accounts, setAccounts] = useState<Account[]>(mockAccounts);
   const [gmdConfigs, setGmdConfigs] = useState<GMDConfiguration[]>(mockGMDConfigs);
 
-  // --- AUTO-SWITCH ACTIVE BUDGET VERSION WHEN HOTEL FILTER CHANGES ---
-  // When the user changes the hotel in the header while in Budget mode,
-  // automatically switch to the main (or first) budget version for that hotel.
   React.useEffect(() => {
-    if (currentModule !== 'BUDGET') return;
+    // We want to update the active budget version whenever the hotel changes,
+    // even in REAL mode, so that indicators (Meta) can be retrieved correctly.
     if (budgetVersions.length === 0 || hotels.length === 0) return;
 
     const selectedHotelObj = hotels.find(h => h.name === selectedHotel);
     const hotelCode = selectedHotelObj?.code || selectedHotel;
 
-    // Prefer the main version; fall back to the first matching version
+    // Matching logic:
+    // 1. Version matches hotel and is main
+    // 2. Version matches hotel
+    // 3. Main version with null hotelId (Global main)
+    // 4. Any version with null hotelId
     const matchingVersion =
       budgetVersions.find(v => (v.hotelId === hotelCode || v.hotelId === selectedHotel) && v.isMain) ||
-      budgetVersions.find(v => v.hotelId === hotelCode || v.hotelId === selectedHotel);
+      budgetVersions.find(v => v.hotelId === hotelCode || v.hotelId === selectedHotel) ||
+      budgetVersions.find(v => !v.hotelId && v.isMain) ||
+      budgetVersions.find(v => !v.hotelId);
 
     if (matchingVersion) {
       if (matchingVersion.id !== activeBudgetVersionId) {
         setActiveBudgetVersionId(matchingVersion.id);
       }
-    } else if (activeBudgetVersionId) {
-      // Se não houver nenhum orçamento para esse hotel ainda, garante que não mostramos do hotel antigo
+    } else if (activeBudgetVersionId && currentModule === 'BUDGET') {
+      // Only clear the version if we are strictly in the Budget module and found no mismatch/fallback
       setActiveBudgetVersionId('');
     }
-  }, [selectedHotel, currentModule, budgetVersions, hotels, activeBudgetVersionId]);
+  }, [selectedHotel, budgetVersions, hotels, activeBudgetVersionId, currentModule]);
   // -- SUPABASE INTEGRATION: Fetch Real Data on Auth --
   React.useEffect(() => {
     if (!session) return;
@@ -264,9 +268,11 @@ const App: React.FC = () => {
         }
 
         // --- FETCH FINANCIAL DATA ---
+        // Increase limit to 50,000 to ensure we get all records even in large datasets
         const { data: remoteFinancial, error: finError } = await (supabase as any)
           .from('financial_data')
-          .select('*');
+          .select('*')
+          .limit(50000);
 
         if (remoteFinancial && !finError && isMounted) {
           const mapped = remoteFinancial.map((r: any) => ({
