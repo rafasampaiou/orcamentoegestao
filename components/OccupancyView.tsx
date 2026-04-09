@@ -64,6 +64,30 @@ const BudgetOccupancyTable: React.FC<{
     onToggleDecimals: (rowId: string) => void
 }> = ({ title, rows, data, onUpdate, decimalOverrides, onToggleDecimals }) => {
 
+    const [focusedCell, setFocusedCell] = useState<{rowId: string, colIdx: number} | null>(null);
+    const [localInputValue, setLocalInputValue] = useState<string>('');
+
+    const commitValue = (rowId: string, idx: number, rawValue: string) => {
+        let cleanStr = rawValue.trim();
+        if (cleanStr.includes('.') && cleanStr.includes(',')) {
+            cleanStr = cleanStr.replace(/\./g, '').replace(',', '.');
+        } else if (cleanStr.includes(',')) {
+            cleanStr = cleanStr.replace(',', '.');
+        } else if (cleanStr.includes('.')) {
+            const parts = cleanStr.split('.');
+            if (parts[parts.length - 1].length === 3 || parseFloat(cleanStr.replace(/\./g, '')) > 999) {
+                cleanStr = cleanStr.replace(/\./g, '');
+            }
+        }
+        
+        const val = parseFloat(cleanStr);
+        if (!isNaN(val)) {
+            onUpdate(rowId, idx, val);
+        } else if (rawValue === '') {
+            onUpdate(rowId, idx, 0);
+        }
+    };
+
     const handlePaste = (e: React.ClipboardEvent, startRowId: string, startMonthIndex: number) => {
         e.preventDefault();
         const clipboardData = e.clipboardData.getData('text');
@@ -82,19 +106,11 @@ const BudgetOccupancyTable: React.FC<{
                 if (targetMonthIndex < 12) {
                     let cleanStr = cellStr.trim();
                     
-                    // Robust Brazilian Number Parsing
-                    // 1. If has both dot and comma (e.g. 1.203,50), remove dot and change comma to dot
                     if (cleanStr.includes('.') && cleanStr.includes(',')) {
                         cleanStr = cleanStr.replace(/\./g, '').replace(',', '.');
-                    } 
-                    // 2. If has ONLY comma (e.g. 203,50), change to dot
-                    else if (cleanStr.includes(',')) {
+                    } else if (cleanStr.includes(',')) {
                         cleanStr = cleanStr.replace(',', '.');
-                    }
-                    // 3. If has ONLY dot AND looks like thousands (e.g. 203.500), remove dot
-                    // We assume it's a thousands separator if there are 3 digits after the dot at the end 
-                    // or if the number is large.
-                    else if (cleanStr.includes('.')) {
+                    } else if (cleanStr.includes('.')) {
                         const parts = cleanStr.split('.');
                         if (parts[parts.length - 1].length === 3 || parseFloat(cleanStr.replace(/\./g, '')) > 999) {
                             cleanStr = cleanStr.replace(/\./g, '');
@@ -104,13 +120,14 @@ const BudgetOccupancyTable: React.FC<{
                     const val = parseFloat(cleanStr);
                     if (!isNaN(val)) {
                         onUpdate(currentRow.id, targetMonthIndex, val);
+                        if (focusedCell?.rowId === currentRow.id && focusedCell?.colIdx === targetMonthIndex) {
+                            setLocalInputValue(String(val).replace('.', ','));
+                        }
                     }
                 }
             });
         });
     };
-
-    const [focusedCell, setFocusedCell] = useState<{rowId: string, colIdx: number} | null>(null);
 
     return (
         <div className="mb-8 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -174,26 +191,23 @@ const BudgetOccupancyTable: React.FC<{
                                                     }`}
                                                     value={
                                                         focusedCell?.rowId === row.id && focusedCell?.colIdx === idx 
-                                                        ? (rowValues[idx] || '') 
+                                                        ? localInputValue 
                                                         : formatValue(rowValues[idx], row.format, decimalOverrides[row.id])
                                                     }
-                                                    onFocus={() => setFocusedCell({ rowId: row.id, colIdx: idx })}
-                                                    onBlur={() => setFocusedCell(null)}
-                                                    onChange={(e) => {
-                                                        let cleanVal = e.target.value;
-                                                        // If it contains both dot and comma, it's definitely Brazilian formatted
-                                                        if (cleanVal.includes('.') && cleanVal.includes(',')) {
-                                                            cleanVal = cleanVal.replace(/\./g, '').replace(',', '.');
-                                                        } 
-                                                        // If it ONLY contains comma, change to dot
-                                                        else if (cleanVal.includes(',')) {
-                                                            cleanVal = cleanVal.replace(',', '.');
-                                                        }
-                                                        
-                                                        const val = parseFloat(cleanVal);
-                                                        if (!isNaN(val)) onUpdate(row.id, idx, val);
-                                                        else if (e.target.value === '') onUpdate(row.id, idx, 0);
+                                                    onFocus={() => {
+                                                        setFocusedCell({ rowId: row.id, colIdx: idx });
+                                                        setLocalInputValue(rowValues[idx] ? String(rowValues[idx]).replace('.', ',') : '');
                                                     }}
+                                                    onBlur={() => {
+                                                        setFocusedCell(null);
+                                                        commitValue(row.id, idx, localInputValue);
+                                                    }}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            e.currentTarget.blur();
+                                                        }
+                                                    }}
+                                                    onChange={(e) => setLocalInputValue(e.target.value)}
                                                     onPaste={(e) => handlePaste(e, row.id, idx)}
                                                 />
                                             ) : (
@@ -407,16 +421,26 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
   };
 
   // --- State resolution ---
-  // In Budget mode: ALWAYS use the parent's prop. Never fall back to localBudgetData,
-  // because that would make the table ignore hotel-filter changes from the parent.
-  // In Real mode: the prop isn't used for budget data, so localBudgetData is fine.
   const [localBudgetData, setLocalBudgetData] = useState<Record<string, number[]>>({});
 
-  const defaultBudgetData = useMemo(() => ({}), []);
+  // Fix: Sync controlled prop to internal state so uncontrolled edits are not lost
+  useEffect(() => {
+      if (propBudgetData !== undefined) {
+          setLocalBudgetData(propBudgetData);
+      } else {
+          setLocalBudgetData({});
+      }
+  }, [propBudgetData]);
 
-  const budgetData: Record<string, number[]> = isBudget
+  const defaultBudgetData = useMemo(() => ({}), []);
+  
+  // If parent provides setBudgetData, we operate in fully controlled mode.
+  // Otherwise, we operate in uncontrolled mode using our internal synced state.
+  const isControlled = propSetBudgetData !== undefined;
+
+  const budgetData: Record<string, number[]> = isControlled
       ? (propBudgetData || defaultBudgetData)
-      : (propBudgetData || localBudgetData);
+      : localBudgetData;
 
   const setBudgetData = propSetBudgetData || setLocalBudgetData;
 
@@ -566,6 +590,9 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
 
 
   // --- Real View ---
+  const [realFocusedCell, setRealFocusedCell] = useState<{rowId: string, col: string} | null>(null);
+  const [realLocalInputValue, setRealLocalInputValue] = useState<string>('');
+
   if (!isBudget) {
       const contextKey = `${selectedHotel}_${selectedYear}_${selectedMonth}`;
       const currentRealData = realOccupancyData?.[contextKey] || {};
@@ -694,10 +721,19 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
                                           <td className="px-2 py-2 text-right bg-purple-50/20 text-purple-800 font-medium border-r border-gray-100">
                                               {row.isManualReal ? (
                                                   <input 
-                                                      type="number"
+                                                      type="text"
                                                       className="w-full text-right bg-transparent focus:bg-white focus:ring-1 focus:ring-purple-300 rounded px-1 outline-none font-bold text-purple-900"
-                                                      value={previa || ''}
-                                                      onChange={(e) => handleRealUpdate(row.id, 'previa', parseFloat(e.target.value) || 0)}
+                                                      value={realFocusedCell?.rowId === row.id && realFocusedCell?.col === 'previa' ? realLocalInputValue : (previa || '')}
+                                                      onFocus={() => {
+                                                          setRealFocusedCell({ rowId: row.id, col: 'previa' });
+                                                          setRealLocalInputValue(String(previa || '').replace('.', ','));
+                                                      }}
+                                                      onBlur={() => {
+                                                          setRealFocusedCell(null);
+                                                          handleRealUpdate(row.id, 'previa', parseFloat(realLocalInputValue.replace(',', '.')) || 0);
+                                                      }}
+                                                      onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                                                      onChange={(e) => setRealLocalInputValue(e.target.value)}
                                                   />
                                               ) : (
                                                   <span className="font-bold text-purple-900">{formatValue(previa, row.format, decimalOverrides[row.id])}</span>
@@ -708,10 +744,19 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
                                           <td className="px-2 py-2 text-right bg-sky-50/30 border-r border-gray-100">
                                               {row.isManualReal ? (
                                                   <input 
-                                                      type="number"
+                                                      type="text"
                                                       className="w-full text-right bg-transparent focus:bg-white focus:ring-1 focus:ring-sky-300 rounded px-1 outline-none font-bold text-sky-900"
-                                                      value={forecast || ''}
-                                                      onChange={(e) => handleRealUpdate(row.id, 'forecast', parseFloat(e.target.value) || 0)}
+                                                      value={realFocusedCell?.rowId === row.id && realFocusedCell?.col === 'forecast' ? realLocalInputValue : (forecast || '')}
+                                                      onFocus={() => {
+                                                          setRealFocusedCell({ rowId: row.id, col: 'forecast' });
+                                                          setRealLocalInputValue(String(forecast || '').replace('.', ','));
+                                                      }}
+                                                      onBlur={() => {
+                                                          setRealFocusedCell(null);
+                                                          handleRealUpdate(row.id, 'forecast', parseFloat(realLocalInputValue.replace(',', '.')) || 0);
+                                                      }}
+                                                      onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                                                      onChange={(e) => setRealLocalInputValue(e.target.value)}
                                                   />
                                               ) : (
                                                   <span className="font-bold text-sky-900">{formatValue(forecast, row.format, decimalOverrides[row.id])}</span>
