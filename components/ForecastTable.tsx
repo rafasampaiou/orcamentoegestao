@@ -2,7 +2,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { getForecastData } from '../services/mockData';
 import { Download, ListFilter, LayoutList, Settings2, ChevronUp, Activity, TrendingUp, Lock, LockOpen, CheckCircle2, X } from 'lucide-react';
-import { ExpenseDriver, ImportedRow, Account, CostPackage, Hotel, ForecastRow, ForecastConfig, ForecastOperator, ColumnVisibility } from '../types';
+import { ExpenseDriver, ImportedRow, Account, CostPackage, Hotel, ForecastRow, ForecastConfig, ForecastOperator, ColumnVisibility, UserRole } from '../types';
 
 interface ForecastTableProps {
     selectedMonth?: number;
@@ -22,6 +22,13 @@ interface ForecastTableProps {
     activeRealVersionId?: string;
     activeBudgetVersionId?: string;
     budgetOccupancyData?: Record<string, number[]>;
+    
+    // Projections & Validation
+    activeProjectionType?: import('../types').ProjectionType;
+    setActiveProjectionType?: React.Dispatch<React.SetStateAction<import('../types').ProjectionType>>;
+    validations?: import('../types').ValidationRecord[];
+    setValidations?: React.Dispatch<React.SetStateAction<import('../types').ValidationRecord[]>>;
+    currentUser?: import('../types').User;
 }
 
 const ForecastTable: React.FC<ForecastTableProps> = ({ 
@@ -36,7 +43,12 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     realOccupancyData = {},
     budgetOccupancyData = {},
     activeRealVersionId,
-    activeBudgetVersionId
+    activeBudgetVersionId,
+    activeProjectionType,
+    setActiveProjectionType,
+    validations,
+    setValidations,
+    currentUser
 }) => {
   // Initialize state passing selectedHotel and dynamic structures
   const [data, setData] = useState<ForecastRow[]>(() => {
@@ -335,9 +347,23 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         <div className="bg-white rounded-xl shadow-lg border border-gray-200 flex flex-col h-full overflow-hidden font-sans w-full">
         <div className="px-5 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center shrink-0 gap-8">
             <div>
-            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2 capitalize">
-                Demonstrativo de Resultados (DRE) - {monthName} {selectedYear}
-            </h2>
+              <div className="flex items-center gap-3">
+                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2 capitalize">
+                    Demonstrativo de Resultados (DRE) - {monthName} {selectedYear}
+                </h2>
+                {setActiveProjectionType && activeProjectionType && (
+                    <select 
+                        className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 p-1.5 font-bold"
+                        value={activeProjectionType}
+                        onChange={(e) => setActiveProjectionType(e.target.value as import('../types').ProjectionType)}
+                    >
+                        <option value="Reunião de Ritmo">Reunião de Ritmo</option>
+                        <option value="FCA N1">FCA N1</option>
+                        <option value="FCA N2">FCA N2</option>
+                        <option value="Fechamento oficial">Fechamento oficial</option>
+                    </select>
+                )}
+              </div>
             <p className="text-xs text-gray-500 mt-1">
                 Visão consolidada por plano de contas e gestão matricial ({selectedHotel}).
             </p>
@@ -1048,8 +1074,28 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                         </button>
                         <button 
                             onClick={() => {
-                                // Simulate sending notification to Admin
-                                const notificationMsg = `A unidade ${selectedHotel} atualizou uma projeção para ${monthName}/${selectedYear}.`;
+                                if (activeProjectionType === 'Fechamento oficial' && currentUser?.role !== UserRole.ADMIN) {
+                                  alert('Apenas o ADMIN GERAL pode criar o evento de Fechamento Oficial.');
+                                  return;
+                                }
+
+                                const newValidation: import('../types').ValidationRecord = {
+                                  id: `val_${Date.now()}`,
+                                  hotelId: selectedHotel || '',
+                                  userId: currentUser?.id || '',
+                                  userName: currentUser?.name || 'Desconhecido',
+                                  month: selectedMonth || 1,
+                                  year: selectedYear || 2026,
+                                  projectionType: activeProjectionType || 'Reunião de Ritmo',
+                                  validatedAt: new Date().toISOString(),
+                                  status: 'Validado'
+                                };
+
+                                if (setValidations) {
+                                  setValidations(prev => [...prev, newValidation]);
+                                }
+                                
+                                const notificationMsg = `A unidade ${selectedHotel} validou a projeção de ${activeProjectionType} para ${monthName}/${selectedYear}.`;
                                 console.log('Notification sent to Admin:', notificationMsg);
                                 
                                 alert(`Projeção validada com sucesso!\n\nNotificação enviada aos administradores: "${notificationMsg}"`);

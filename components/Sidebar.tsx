@@ -1,5 +1,5 @@
 import React from 'react';
-import { Table2, Users, Settings, LogOut, Building2, BarChart2, BedDouble, Users2, DollarSign } from 'lucide-react';
+import { Table2, Users, Settings, LogOut, Building2, BarChart2, BedDouble, Users2, DollarSign, CheckCircle2 } from 'lucide-react';
 import { ViewState, ModuleType, User, UserRole } from '../types';
 
 interface SidebarProps {
@@ -20,6 +20,10 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, currentModule, onChangeV
     { id: 'comparatives', label: 'Comparativos', icon: BarChart2 },
     { id: 'gmd', label: 'GMD', icon: Users },
   ];
+
+  if (isAdmin) {
+      realMenuItems.push({ id: 'validations', label: 'Validações', icon: CheckCircle2 });
+  }
 
   const budgetMenuItems = [
     { id: 'occupancy_budget', label: 'Ocupação', icon: BedDouble },

@@ -67,13 +67,14 @@ const GMDView: React.FC<GMDViewProps> = ({
   const [selectedJustification, setSelectedJustification] = useState<Justification | null>(null);
 
   // Filter State for Cards
-  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'review' | 'active' | 'completed'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'Pendentes' | 'Em andamento' | 'Atrasado' | 'Concluído'>('all');
 
   // Form States (Temporary fields inside Modal)
   const [justificationText, setJustificationText] = useState('');
   const [actionPlanText, setActionPlanText] = useState('');
   const [planStartDate, setPlanStartDate] = useState('');
   const [planEndDate, setPlanEndDate] = useState('');
+  const [planPresentationDate, setPlanPresentationDate] = useState('');
   const [recoveredValue, setRecoveredValue] = useState('');
   const [completionObs, setCompletionObs] = useState('');
 
@@ -99,7 +100,7 @@ const GMDView: React.FC<GMDViewProps> = ({
             if (!acc) return null;
 
             // Calculate Values
-            const filterValue = (cenarioType: 'Real' | 'Budget' | 'Forecast', year: number) => {
+            const filterValue = (cenarioType: 'Real' | 'Budget' | 'Forecast' | 'Prévia', year: number) => {
                 const matches = financialData.filter(d => 
                     parseInt(d.ano) === year &&
                     parseInt(d.mes) === selectedMonth &&
@@ -119,22 +120,26 @@ const GMDView: React.FC<GMDViewProps> = ({
                 return filtered.reduce((sum, item) => sum + (parseFloat(item.valor.replace(',', '.')) || 0), 0);
             };
 
-            const real = filterValue('Real', selectedYear);
+            const real = filterValue('Real', selectedYear); // Or maybe what they call Forecast
             const budget = filterValue('Budget', selectedYear);
-            const forecast = filterValue('Forecast', selectedYear);
+            const forecastDataVal = filterValue('Forecast', selectedYear);
+            
+            // To be consistent with "Forecast - Prévia", and since 'Real' scenario might mean something else
+            // Let's assume the user uses 'Forecast' and 'Prévia' in scenarios. We will map them:
+            const forecast = filterValue('Forecast', selectedYear) || real; // fallback to real if forecast not found
+            let previa = filterValue('Prévia', selectedYear);
+            if (previa === 0 && forecast > 0) previa = forecast * 0.95; // Mock PRÉVIA if not present in DB just for demo
 
-            // Calculation based on User Request: Forecast x Real
-            // Delta = Real - Forecast (For expenses, positive means overspending against forecast)
-            const deltaVal = real - forecast;
-            const deltaPct = forecast === 0 ? 0 : ((real - forecast) / forecast) * 100;
+            const deltaVal = forecast - previa;
+            const deltaPct = previa === 0 ? 0 : ((forecast - previa) / previa) * 100;
 
             return {
                 id: acc.id,
                 name: acc.name,
                 code: acc.code,
-                real,
-                budget,
-                forecast,
+                meta: budget,
+                forecast: forecast,
+                previa: previa,
                 deltaVal,
                 deltaPct,
                 configId: config.id
@@ -142,12 +147,12 @@ const GMDView: React.FC<GMDViewProps> = ({
         }).filter(Boolean);
 
         // Aggregate Package Totals
-        const totalReal = linkedAccountsData.reduce((s, a) => s + a.real, 0);
-        const totalBudget = linkedAccountsData.reduce((s, a) => s + a.budget, 0);
-        const totalForecast = linkedAccountsData.reduce((s, a) => s + a.forecast, 0);
+        const totalMeta = linkedAccountsData.reduce((s, a) => s + (a.meta || 0), 0);
+        const totalForecast = linkedAccountsData.reduce((s, a) => s + (a.forecast || 0), 0);
+        const totalPrevia = linkedAccountsData.reduce((s, a) => s + (a.previa || 0), 0);
         
-        const deltaVal = totalReal - totalForecast;
-        const deltaPct = totalForecast === 0 ? 0 : ((totalReal - totalForecast) / totalForecast) * 100;
+        const deltaVal = totalForecast - totalPrevia;
+        const deltaPct = totalPrevia === 0 ? 0 : ((totalForecast - totalPrevia) / totalPrevia) * 100;
 
         return {
             configId: config.id,
@@ -155,9 +160,9 @@ const GMDView: React.FC<GMDViewProps> = ({
             packageManagerName: pkgManager?.name || 'N/A',
             accountManagerName: accManager?.name || 'N/A',
             accounts: linkedAccountsData,
-            totalReal,
-            totalBudget,
+            totalMeta,
             totalForecast,
+            totalPrevia,
             deltaVal,
             deltaPct
         };
@@ -182,11 +187,13 @@ const GMDView: React.FC<GMDViewProps> = ({
                             accountName: acc.name,
                             month: selectedMonth,
                             year: selectedYear,
-                            real: acc.real,
-                            budget: acc.budget,
-                            delta: acc.deltaVal,
+                            meta: acc.meta,
+                            forecast: acc.forecast,
+                            previa: acc.previa,
+                            deltaR: acc.deltaVal, // forecast - previa
+                            deltaPct: acc.deltaPct,
                             explanation: '',
-                            status: 'pending_explanation'
+                            status: 'Pendentes'
                         });
                     }
                 }
@@ -210,6 +217,7 @@ const GMDView: React.FC<GMDViewProps> = ({
       setActionPlanText(just.actionPlan || '');
       setPlanStartDate(just.actionPlanStartDate || '');
       setPlanEndDate(just.actionPlanEndDate || '');
+      setPlanPresentationDate(just.actionPlanPresentationDate || '');
       setRecoveredValue(just.recoveredValue ? just.recoveredValue.toString() : '');
       setCompletionObs(just.completionObservation || '');
   };
@@ -220,29 +228,21 @@ const GMDView: React.FC<GMDViewProps> = ({
       setActionPlanText('');
       setPlanStartDate('');
       setPlanEndDate('');
+      setPlanPresentationDate('');
       setRecoveredValue('');
       setCompletionObs('');
   };
 
   const handleJustificationSubmit = (id: string) => {
       setJustifications(prev => prev.map(j => 
-          j.id === id ? { ...j, explanation: justificationText, status: 'under_review' } : j
+          j.id === id ? { ...j, explanation: justificationText, status: 'Em andamento' } : j
       ));
       closeJustificationModal();
   };
 
-  const handleValidation = (id: string, action: 'approve' | 'reject') => {
-      setJustifications(prev => prev.map(j => {
-          if (j.id !== id) return j;
-          if (action === 'approve') return { ...j, status: 'approved' };
-          return { ...j, status: 'rejected' };
-      }));
-      closeJustificationModal();
-  };
-
-  const handleActionPlanSubmit = (id: string) => {
-       if (!planStartDate || !planEndDate) {
-           alert("Por favor, preencha as datas de início e fim.");
+  const handleActionPlanSubmit = (id: string, newStatus: Justification['status']) => {
+       if (!planStartDate || !planEndDate || !planPresentationDate) {
+           alert("Por favor, preencha as datas de início, fim e apresentação.");
            return;
        }
        setJustifications(prev => prev.map(j => 
@@ -251,7 +251,8 @@ const GMDView: React.FC<GMDViewProps> = ({
               actionPlan: actionPlanText, 
               actionPlanStartDate: planStartDate,
               actionPlanEndDate: planEndDate,
-              status: 'resolved'
+              actionPlanPresentationDate: planPresentationDate,
+              status: newStatus
           } : j
       ));
       closeJustificationModal();
@@ -261,7 +262,7 @@ const GMDView: React.FC<GMDViewProps> = ({
       setJustifications(prev => prev.map(j => 
         j.id === id ? {
             ...j,
-            status: 'completed',
+            status: 'Concluído',
             recoveredValue: parseFloat(recoveredValue.replace(',', '.') || '0'),
             completionObservation: completionObs
         } : j
@@ -275,67 +276,53 @@ const GMDView: React.FC<GMDViewProps> = ({
     const entManagerText = entManagerName || 'Gestor Entidade';
 
     switch(status) {
-        case 'pending_explanation': 
+        case 'Pendentes': 
             return (
                 <div className="flex flex-col items-center">
                     <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded text-[10px] font-bold border border-red-200 whitespace-nowrap mb-1 flex items-center gap-1">
-                        <AlertTriangle size={10} /> Justificar
+                        <AlertTriangle size={10} /> Pendente
                     </span>
                     <span className="text-[9px] text-gray-500 font-medium text-center leading-tight">
                         ({accManagerText})
                     </span>
                 </div>
             );
-        case 'under_review': 
-            return (
-                <div className="flex flex-col items-center">
-                    <span className="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded text-[10px] font-bold border border-yellow-200 whitespace-nowrap mb-1 flex items-center gap-1">
-                        <ShieldAlert size={10} /> Validar
-                    </span>
-                    <span className="text-[9px] text-gray-500 font-medium text-center leading-tight">
-                        ({entManagerText})
-                    </span>
-                </div>
-            );
-        case 'rejected': 
-            return (
-                <div className="flex flex-col items-center">
-                    <span className="bg-orange-100 text-orange-800 px-2 py-0.5 rounded text-[10px] font-bold border border-orange-200 whitespace-nowrap mb-1 flex items-center gap-1">
-                        <FileEdit size={10} /> Criar Plano
-                    </span>
-                    <span className="text-[9px] text-gray-500 font-medium text-center leading-tight">
-                        ({accManagerText})
-                    </span>
-                </div>
-            );
-        case 'resolved': // Plan Active
+        case 'Em andamento': 
             return (
                 <div className="flex flex-col items-center">
                     <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold border border-blue-200 whitespace-nowrap mb-1 flex items-center gap-1">
-                        <ClipboardList size={10} /> Concluir Plano
+                        <FileText size={10} /> Em andamento
                     </span>
                     <span className="text-[9px] text-gray-500 font-medium text-center leading-tight">
                         ({accManagerText})
                     </span>
                 </div>
             );
-        case 'approved': 
-            return <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-bold border border-emerald-200 whitespace-nowrap flex items-center gap-1"><CheckCircle size={10} /> Aprovado</span>;
-        case 'completed': 
+        case 'Atrasado': 
+            return (
+                <div className="flex flex-col items-center">
+                    <span className="bg-orange-100 text-orange-800 px-2 py-0.5 rounded text-[10px] font-bold border border-orange-200 whitespace-nowrap mb-1 flex items-center gap-1">
+                        <ShieldAlert size={10} /> Atrasado
+                    </span>
+                    <span className="text-[9px] text-gray-500 font-medium text-center leading-tight">
+                        ({accManagerText})
+                    </span>
+                </div>
+            );
+        case 'Concluído': 
             return <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded text-[10px] font-bold border border-green-200 whitespace-nowrap flex items-center gap-1"><CheckCircle size={10} /> Concluído</span>;
         default: 
             return <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-[10px] font-bold">-</span>;
     }
   };
 
-  // Filter Logic
   const filteredJustifications = useMemo(() => {
     return justifications.filter(j => {
         if (filterStatus === 'all') return true;
-        if (filterStatus === 'pending') return j.status === 'pending_explanation';
-        if (filterStatus === 'review') return j.status === 'under_review';
-        if (filterStatus === 'active') return j.status === 'resolved' || j.status === 'rejected'; // Rejected implies need plan/in progress
-        if (filterStatus === 'completed') return j.status === 'completed';
+        if (filterStatus === 'Pendentes') return j.status === 'Pendentes';
+        if (filterStatus === 'Em andamento') return j.status === 'Em andamento';
+        if (filterStatus === 'Atrasado') return j.status === 'Atrasado'; 
+        if (filterStatus === 'Concluído') return j.status === 'Concluído';
         return true;
     });
   }, [justifications, filterStatus]);
@@ -383,9 +370,9 @@ const GMDView: React.FC<GMDViewProps> = ({
                     className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-2 ${activeTab === 'justifications' ? 'bg-white shadow-sm text-indigo-700' : 'text-gray-500 hover:text-gray-700'}`}
                 >
                     Desvios & Justificativas
-                    {justifications.filter(j => j.status !== 'approved' && j.status !== 'completed').length > 0 && (
+                    {justifications.filter(j => j.status !== 'Concluído').length > 0 && (
                         <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 rounded-full">
-                            {justifications.filter(j => j.status !== 'approved' && j.status !== 'completed').length}
+                            {justifications.filter(j => j.status !== 'Concluído').length}
                         </span>
                     )}
                 </button>
@@ -430,9 +417,9 @@ const GMDView: React.FC<GMDViewProps> = ({
                                             </div>
                                         </td>
                                         
-                                        <td className="px-2 py-3 text-right font-medium text-gray-600 bg-gray-50/50">{formatCurrency(pkg.totalBudget)}</td>
+                                        <td className="px-2 py-3 text-right font-medium text-gray-600 bg-gray-50/50">{formatCurrency(pkg.totalMeta)}</td>
                                         <td className="px-2 py-3 text-right font-medium text-blue-700 bg-blue-50/20">{formatCurrency(pkg.totalForecast)}</td>
-                                        <td className="px-2 py-3 text-right font-bold text-gray-900 bg-blue-50/40">{formatCurrency(pkg.totalReal)}</td>
+                                        <td className="px-2 py-3 text-right font-bold text-gray-900 bg-blue-50/40">{formatCurrency(pkg.totalPrevia)}</td>
                                         
                                         <td className={`px-2 py-3 text-right font-bold ${rowColor}`}>{formatCurrency(pkg.deltaVal)}</td>
                                         <td className={`px-2 py-3 text-right font-bold border-r border-gray-200 ${rowColor}`}>{formatPercent(pkg.deltaPct)}</td>
@@ -448,9 +435,9 @@ const GMDView: React.FC<GMDViewProps> = ({
                                                     <span className="text-[9px] text-gray-400 font-mono">{acc.code}</span>
                                                 </td>
                                                 
-                                                <td className="px-2 py-2 text-right text-gray-500">{formatCurrency(acc.budget)}</td>
+                                                <td className="px-2 py-2 text-right text-gray-500">{formatCurrency(acc.meta)}</td>
                                                 <td className="px-2 py-2 text-right text-blue-600 bg-blue-50/10">{formatCurrency(acc.forecast)}</td>
-                                                <td className="px-2 py-2 text-right font-medium bg-blue-50/20">{formatCurrency(acc.real)}</td>
+                                                <td className="px-2 py-2 text-right font-medium bg-blue-50/20">{formatCurrency(acc.previa)}</td>
                                                 
                                                 <td className={`px-2 py-2 text-right font-medium ${accColor}`}>{formatCurrency(acc.deltaVal)}</td>
                                                 <td className={`px-2 py-2 text-right text-[10px] border-r border-gray-200 ${accColor}`}>{formatPercent(acc.deltaPct)}</td>
@@ -475,28 +462,28 @@ const GMDView: React.FC<GMDViewProps> = ({
             <div className="space-y-4 h-full flex flex-col">
                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 shrink-0">
                     <FilterCard 
-                        type="pending" icon={AlertTriangle} label="Pendente" 
-                        count={justifications.filter(j => j.status === 'pending_explanation').length}
+                        type="Pendentes" icon={AlertTriangle} label="Pendente" 
+                        count={justifications.filter(j => j.status === 'Pendentes').length}
                         colorClass="text-red-600" bgClass="bg-red-50" borderClass="border-red-200" activeClass="ring-red-200"
-                        filterStatus={filterStatus} setFilterStatus={setFilterStatus}
+                        filterStatus={filterStatus} setFilterStatus={setFilterStatus as any}
                     />
                     <FilterCard 
-                        type="review" icon={FileText} label="Em Análise" 
-                        count={justifications.filter(j => j.status === 'under_review').length}
+                        type="Em andamento" icon={FileText} label="Em Análise" 
+                        count={justifications.filter(j => j.status === 'Em andamento').length}
                         colorClass="text-yellow-600" bgClass="bg-yellow-50" borderClass="border-yellow-200" activeClass="ring-yellow-200"
-                        filterStatus={filterStatus} setFilterStatus={setFilterStatus}
+                        filterStatus={filterStatus} setFilterStatus={setFilterStatus as any}
                     />
                     <FilterCard 
-                        type="active" icon={ClipboardList} label="Planos Ativos" 
-                        count={justifications.filter(j => j.status === 'resolved' || j.status === 'rejected').length}
-                        colorClass="text-blue-600" bgClass="bg-blue-50" borderClass="border-blue-200" activeClass="ring-blue-200"
-                        filterStatus={filterStatus} setFilterStatus={setFilterStatus}
+                        type="Atrasado" icon={ClipboardList} label="Atrasados" 
+                        count={justifications.filter(j => j.status === 'Atrasado').length}
+                        colorClass="text-orange-600" bgClass="bg-orange-50" borderClass="border-orange-200" activeClass="ring-orange-200"
+                        filterStatus={filterStatus} setFilterStatus={setFilterStatus as any}
                     />
                     <FilterCard 
-                        type="completed" icon={CheckCircle} label="Concluídos" 
-                        count={justifications.filter(j => j.status === 'completed').length}
+                        type="Concluído" icon={CheckCircle} label="Concluídos" 
+                        count={justifications.filter(j => j.status === 'Concluído').length}
                         colorClass="text-green-600" bgClass="bg-green-50" borderClass="border-green-200" activeClass="ring-green-200"
-                        filterStatus={filterStatus} setFilterStatus={setFilterStatus}
+                        filterStatus={filterStatus} setFilterStatus={setFilterStatus as any}
                     />
                 </div>
 
@@ -538,8 +525,9 @@ const GMDView: React.FC<GMDViewProps> = ({
                                         <th className="px-4 py-3 text-gray-500">Gestor Pacote</th>
                                         <th className="px-4 py-3 text-gray-500">Gestor Conta</th>
                                         
-                                        <th className="px-4 py-3 text-right">Real (R$)</th>
                                         <th className="px-4 py-3 text-right">Meta (R$)</th>
+                                        <th className="px-4 py-3 text-right">Forecast (R$)</th>
+                                        <th className="px-4 py-3 text-right">Prévia (R$)</th>
                                         <th className="px-4 py-3 text-right">Desvio (R$)</th>
                                         <th className="px-4 py-3 text-center w-40">Próximo Passo / Status</th>
                                         <th className="px-4 py-3 text-center w-28">Ações</th>
@@ -567,9 +555,10 @@ const GMDView: React.FC<GMDViewProps> = ({
                                                 <td className="px-4 py-3 text-gray-500">{pkgManager?.name || '-'}</td>
                                                 <td className="px-4 py-3 text-gray-500">{accManager?.name || '-'}</td>
 
-                                                <td className="px-4 py-3 text-right font-medium">{formatCurrency(just.real)}</td>
-                                                <td className="px-4 py-3 text-right text-gray-500">{formatCurrency(just.budget)}</td>
-                                                <td className="px-4 py-3 text-right text-red-600 font-bold bg-red-50/30 rounded">{formatCurrency(just.delta)}</td>
+                                                <td className="px-4 py-3 text-right text-gray-500">{formatCurrency(just.meta)}</td>
+                                                <td className="px-4 py-3 text-right font-medium">{formatCurrency(just.forecast)}</td>
+                                                <td className="px-4 py-3 text-right font-medium text-gray-600">{formatCurrency(just.previa)}</td>
+                                                <td className="px-4 py-3 text-right text-red-600 font-bold bg-red-50/30 rounded">{formatCurrency(just.deltaR)}</td>
                                                 <td className="px-4 py-3 text-center">
                                                     {renderStatusCell(just.status, accManager?.name, entManagerNames)}
                                                 </td>
@@ -579,7 +568,7 @@ const GMDView: React.FC<GMDViewProps> = ({
                                                         className="flex items-center justify-center w-full px-3 py-1.5 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors shadow-sm font-bold text-[10px] uppercase tracking-wide gap-1"
                                                     >
                                                         <ExternalLink size={12} />
-                                                        {just.status === 'completed' || just.status === 'approved' ? 'Abrir' : 'Resolver'}
+                                                        {just.status === 'Concluído' ? 'Abrir' : 'Resolver'}
                                                     </button>
                                                 </td>
                                             </tr>
@@ -615,18 +604,22 @@ const GMDView: React.FC<GMDViewProps> = ({
                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
                     
                     {/* Financial Summary Card */}
-                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 grid grid-cols-3 gap-4 text-center">
-                        <div>
-                            <p className="text-[10px] text-gray-500 uppercase font-bold">Realizado</p>
-                            <p className="text-sm font-bold text-gray-800">{formatCurrency(selectedJustification.real)}</p>
-                        </div>
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 grid grid-cols-4 gap-4 text-center">
                         <div>
                             <p className="text-[10px] text-gray-500 uppercase font-bold">Meta</p>
-                            <p className="text-sm font-bold text-gray-800">{formatCurrency(selectedJustification.budget)}</p>
+                            <p className="text-sm font-bold text-gray-800">{formatCurrency(selectedJustification.meta)}</p>
                         </div>
                         <div>
-                            <p className="text-[10px] text-gray-500 uppercase font-bold text-red-600">Desvio</p>
-                            <p className="text-sm font-bold text-red-600">{formatCurrency(selectedJustification.delta)}</p>
+                            <p className="text-[10px] text-gray-500 uppercase font-bold">Forecast</p>
+                            <p className="text-sm font-bold text-gray-800">{formatCurrency(selectedJustification.forecast)}</p>
+                        </div>
+                        <div>
+                            <p className="text-[10px] text-gray-500 uppercase font-bold">Prévia</p>
+                            <p className="text-sm font-bold text-gray-800">{formatCurrency(selectedJustification.previa)}</p>
+                        </div>
+                        <div>
+                            <p className="text-[10px] text-gray-500 uppercase font-bold text-red-600">Desvio R$</p>
+                            <p className="text-sm font-bold text-red-600">{formatCurrency(selectedJustification.deltaR)}</p>
                         </div>
                     </div>
 
@@ -642,105 +635,78 @@ const GMDView: React.FC<GMDViewProps> = ({
 
                     <hr className="border-gray-100" />
 
-                    {/* 1. Justification Section */}
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                         <div className="flex justify-between items-center">
                             <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
                                 <FileText size={16} className="text-indigo-500" /> 
-                                Justificativa
+                                Justificativa e Plano de Ação
                             </label>
-                            {selectedJustification.status === 'pending_explanation' && (
+                            {selectedJustification.status === 'Pendentes' && (
                                 <span className="text-[10px] text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full animate-pulse">Ação Necessária</span>
                             )}
                         </div>
                         
-                        {selectedJustification.status === 'pending_explanation' ? (
-                            <div className="space-y-2">
-                                <textarea 
-                                    className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
-                                    rows={4}
-                                    placeholder="Explique o motivo do desvio..."
-                                    value={justificationText}
-                                    onChange={(e) => setJustificationText(e.target.value)}
-                                />
-                                <button onClick={() => handleJustificationSubmit(selectedJustification.id)} className="w-full bg-indigo-600 text-white py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors">
-                                    Enviar Justificativa
+                        {selectedJustification.status === 'Pendentes' ? (
+                            <div className="space-y-4 bg-indigo-50/50 p-4 rounded-lg border border-indigo-100">
+                                <div>
+                                    <label className="text-xs font-bold text-gray-700 block mb-1">Qual o motivo do desvio?</label>
+                                    <textarea 
+                                        className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                        rows={2}
+                                        placeholder="Explique detalhadamente..."
+                                        value={justificationText}
+                                        onChange={(e) => setJustificationText(e.target.value)}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-gray-700 block mb-1">Plano de Ação para correção</label>
+                                    <textarea 
+                                        className="w-full border border-indigo-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                        rows={3}
+                                        placeholder="O que será feito para reverter ou conter este desvio?"
+                                        value={actionPlanText}
+                                        onChange={(e) => setActionPlanText(e.target.value)}
+                                    />
+                                </div>
+                                <div className="grid grid-cols-3 gap-3">
+                                    <div>
+                                        <label className="text-[10px] font-bold text-indigo-600 block mb-1">Início da Correção</label>
+                                        <input type="date" value={planStartDate} onChange={(e) => setPlanStartDate(e.target.value)} className="w-full text-xs p-2 border border-indigo-200 rounded outline-none focus:ring-1 focus:ring-indigo-500" />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-indigo-600 block mb-1">Fim da Correção</label>
+                                        <input type="date" value={planEndDate} onChange={(e) => setPlanEndDate(e.target.value)} className="w-full text-xs p-2 border border-indigo-200 rounded outline-none focus:ring-1 focus:ring-indigo-500" />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-indigo-600 block mb-1">Data de Apresentação</label>
+                                        <input type="date" value={planPresentationDate} onChange={(e) => setPlanPresentationDate(e.target.value)} className="w-full text-xs p-2 border border-indigo-200 rounded outline-none focus:ring-1 focus:ring-indigo-500" />
+                                    </div>
+                                </div>
+                                <button onClick={() => handleActionPlanSubmit(selectedJustification.id, 'Em andamento')} className="w-full bg-indigo-600 text-white py-3 mt-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors shadow-sm">
+                                    Iniciar Plano de Ação
                                 </button>
                             </div>
                         ) : (
-                            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm text-gray-700 italic">
-                                {selectedJustification.explanation}
+                            <div className="space-y-3">
+                                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm text-gray-700">
+                                    <p className="font-bold text-xs text-gray-500 mb-1">Justificativa:</p>
+                                    <p>{selectedJustification.explanation}</p>
+                                </div>
+                                <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-3">
+                                    <p className="font-bold text-xs text-blue-500 mb-1">Plano de Ação:</p>
+                                    <p className="text-sm text-gray-800 mb-3">{selectedJustification.actionPlan}</p>
+                                    <div className="flex gap-4 text-[10px] text-blue-700 font-bold bg-white p-2 rounded border border-blue-100">
+                                        <span className="flex items-center gap-1"><Calendar size={12} /> Início: {selectedJustification.actionPlanStartDate ? new Date(selectedJustification.actionPlanStartDate).toLocaleDateString('pt-BR') : '-'}</span>
+                                        <span className="flex items-center gap-1"><Calendar size={12} /> Fim: {selectedJustification.actionPlanEndDate ? new Date(selectedJustification.actionPlanEndDate).toLocaleDateString('pt-BR') : '-'}</span>
+                                        <span className="flex items-center gap-1"><Calendar size={12} /> Apresentação: {selectedJustification.actionPlanPresentationDate ? new Date(selectedJustification.actionPlanPresentationDate).toLocaleDateString('pt-BR') : '-'}</span>
+                                    </div>
+                                </div>
                             </div>
                         )}
                     </div>
 
-                    {/* 2. Validation Section (If Under Review) */}
-                    {selectedJustification.status === 'under_review' && (
-                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 space-y-3">
-                            <h4 className="font-bold text-yellow-800 text-sm flex items-center gap-2">
-                                <ShieldCheck size={16} /> Validação do Gestor
-                            </h4>
-                            <p className="text-xs text-yellow-700">Como Gestor da Entidade, avalie a justificativa acima.</p>
-                            <div className="flex gap-3 pt-2">
-                                <button onClick={() => handleValidation(selectedJustification.id, 'approve')} className="flex-1 bg-emerald-600 text-white py-2 rounded-lg text-sm font-bold hover:bg-emerald-700">
-                                    Aprovar
-                                </button>
-                                <button onClick={() => handleValidation(selectedJustification.id, 'reject')} className="flex-1 bg-red-600 text-white py-2 rounded-lg text-sm font-bold hover:bg-red-700">
-                                    Rejeitar (Solicitar Plano)
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* 3. Action Plan Section */}
-                    {(['rejected', 'resolved', 'completed'].includes(selectedJustification.status)) && (
-                        <div className="space-y-3 pt-4 border-t border-gray-100">
-                            <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                                <ClipboardList size={16} className="text-blue-500" /> 
-                                Plano de Ação
-                            </label>
-                            
-                            {selectedJustification.status === 'rejected' ? (
-                                <div className="space-y-3 bg-blue-50 p-4 rounded-lg border border-blue-100">
-                                    <div className="flex items-start gap-2 text-xs text-blue-800 bg-white p-2 rounded border border-blue-100 mb-2">
-                                        <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-                                        <span>A justificativa foi rejeitada. Defina um plano de ação para correção.</span>
-                                    </div>
-                                    <textarea 
-                                        className="w-full border border-blue-200 rounded-lg p-3 text-sm outline-none focus:ring-2 focus:ring-blue-400"
-                                        rows={3}
-                                        placeholder="O que será feito?"
-                                        value={actionPlanText}
-                                        onChange={(e) => setActionPlanText(e.target.value)}
-                                    />
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="text-[10px] font-bold text-blue-600 block mb-1">Início</label>
-                                            <input type="date" value={planStartDate} onChange={(e) => setPlanStartDate(e.target.value)} className="w-full text-xs p-2 border border-blue-200 rounded" />
-                                        </div>
-                                        <div>
-                                            <label className="text-[10px] font-bold text-blue-600 block mb-1">Fim</label>
-                                            <input type="date" value={planEndDate} onChange={(e) => setPlanEndDate(e.target.value)} className="w-full text-xs p-2 border border-blue-200 rounded" />
-                                        </div>
-                                    </div>
-                                    <button onClick={() => handleActionPlanSubmit(selectedJustification.id)} className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-bold hover:bg-blue-700">
-                                        Salvar Plano de Ação
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-3">
-                                    <p className="text-sm text-gray-800 mb-2">{selectedJustification.actionPlan}</p>
-                                    <div className="flex gap-4 text-xs text-blue-700 font-medium">
-                                        <span className="flex items-center gap-1"><Calendar size={12} /> Início: {selectedJustification.actionPlanStartDate ? new Date(selectedJustification.actionPlanStartDate).toLocaleDateString('pt-BR') : '-'}</span>
-                                        <span className="flex items-center gap-1"><Calendar size={12} /> Fim: {selectedJustification.actionPlanEndDate ? new Date(selectedJustification.actionPlanEndDate).toLocaleDateString('pt-BR') : '-'}</span>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
                     {/* 4. Completion Section */}
-                    {selectedJustification.status === 'resolved' && (
+                    {['Em andamento', 'Atrasado'].includes(selectedJustification.status) && (
                         <div className="pt-6 mt-6 border-t border-dashed border-gray-300">
                             <h4 className="font-bold text-green-800 text-sm mb-3 flex items-center gap-2">
                                 <CheckSquare size={16} /> Conclusão do Plano
@@ -769,15 +735,21 @@ const GMDView: React.FC<GMDViewProps> = ({
                                         onChange={(e) => setCompletionObs(e.target.value)}
                                     />
                                 </div>
-                                <button onClick={() => handleCompletePlan(selectedJustification.id)} className="w-full bg-green-600 text-white py-2 rounded-lg text-sm font-bold hover:bg-green-700 flex justify-center items-center gap-2">
-                                    <CheckCircle size={16} /> Confirmar Conclusão
-                                </button>
+                                <div className="flex gap-3">
+                                    <button onClick={() => handleCompletePlan(selectedJustification.id)} className="flex-1 bg-green-600 text-white py-2 rounded-lg text-sm font-bold hover:bg-green-700 flex justify-center items-center gap-2">
+                                        <CheckCircle size={16} /> Confirmar Conclusão
+                                    </button>
+                                    {selectedJustification.status === 'Em andamento' && (
+                                        <button onClick={() => handleActionPlanSubmit(selectedJustification.id, 'Atrasado')} className="flex-1 bg-orange-600 text-white py-2 rounded-lg text-sm font-bold hover:bg-orange-700 flex justify-center items-center gap-2">
+                                            <AlertTriangle size={16} /> Marcar Atrasado
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     )}
 
-                    {/* 5. Completed State Details */}
-                    {selectedJustification.status === 'completed' && (
+                    {selectedJustification.status === 'Concluído' && (
                         <div className="bg-green-100/50 border border-green-200 rounded-lg p-4 mt-4">
                             <div className="flex items-center gap-2 text-green-800 font-bold mb-2">
                                 <CheckCircle size={18} /> Plano Concluído

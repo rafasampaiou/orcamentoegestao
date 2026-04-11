@@ -15,10 +15,11 @@ import ReplicateBudgetModal, { ReplicationOptions } from './components/Replicate
 import ErrorBoundary from './components/ErrorBoundary';
 import Header from './components/Header';
 import Auth from './components/Auth';
+import ValidationsView from './components/ValidationsView';
 import { supabase } from './services/supabaseClient';
 import { supabaseService } from './services/supabaseService';
 import { Session } from '@supabase/supabase-js';
-import { ViewState, ImportedRow, User, Hotel, CostCenter, CostPackage, Account, GMDConfiguration, ModuleType, UserRole, BudgetVersion, LaborParameters, ScheduleItem } from './types';
+import { ViewState, ImportedRow, User, Hotel, CostCenter, CostPackage, Account, GMDConfiguration, ModuleType, UserRole, BudgetVersion, LaborParameters, ScheduleItem, ProjectionType, ValidationRecord } from './types';
 import { Calendar, ArrowLeft, ArrowRight, Building2 as Building2Icon, Layers } from 'lucide-react';
 import { mockUsers, mockHotels, mockCostCenters, mockPackages, mockAccounts, mockGMDConfigs } from './services/mockData';
 import { Toaster, toast } from 'react-hot-toast';
@@ -60,6 +61,10 @@ const App: React.FC = () => {
   const [replicateTarget, setReplicateTarget] = useState<{ year: number, month: number } | null>(null);
   const [replicateMode, setReplicateMode] = useState<'BUDGET' | 'REAL'>('BUDGET');
   const [projectedBudgetVersionId] = useState<string>('v2');
+  
+  // --- PROJECTION TYPE STATE ---
+  const [activeProjectionType, setActiveProjectionType] = useState<ProjectionType>('Reunião de Ritmo');
+  const [validations, setValidations] = useState<ValidationRecord[]>([]);
 
   // --- REAL VERSIONING STATE ---
   const [realVersions, setRealVersions] = useState<BudgetVersion[]>([
@@ -541,6 +546,11 @@ const App: React.FC = () => {
           budgetOccupancyData={budgetOccupancyDataMap[activeBudgetVersionId] || {}}
           activeRealVersionId={activeRealVersionId}
           activeBudgetVersionId={activeBudgetVersionId}
+          activeProjectionType={activeProjectionType}
+          setActiveProjectionType={setActiveProjectionType}
+          validations={validations}
+          setValidations={setValidations}
+          currentUser={currentUser}
         />
       );
       case 'occupancy_real': return (
@@ -553,6 +563,8 @@ const App: React.FC = () => {
           realOccupancyData={realOccupancyData}
           setRealOccupancyData={setRealOccupancyData}
           financialData={importedFinancialData}
+          activeProjectionType={activeProjectionType}
+          setActiveProjectionType={setActiveProjectionType}
         />
       );
       case 'comparatives': return <ComparativesView />;
@@ -567,6 +579,13 @@ const App: React.FC = () => {
           selectedMonth={selectedDate.getMonth() + 1}
           selectedYear={selectedDate.getFullYear()}
           initialSelectedHotel={selectedHotel}
+        />
+      );
+      case 'validations': return (
+        <ValidationsView
+            validations={validations}
+            hotels={hotels}
+            currentUser={currentUser}
         />
       );
       case 'admin':

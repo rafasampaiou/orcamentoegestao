@@ -1,4 +1,3 @@
-
 export enum UserRole {
   ENTITY_MANAGER = 'Gestor de Entidade',
   PACKAGE_MANAGER = 'Gestor de Pacote',
@@ -154,6 +153,7 @@ export type ViewState =
   | 'occupancy_real' 
   | 'comparatives'
   | 'gmd'
+  | 'validations' // New: Validations Log
   | 'settings' // Administrativo
   
   // BUDGET Module
@@ -284,6 +284,20 @@ export interface RevenueDriverConfig {
     budgetFactor: number;
 }
 
+export type ProjectionType = 'Reunião de Ritmo' | 'FCA N1' | 'FCA N2' | 'Fechamento oficial';
+
+export interface ValidationRecord {
+    id: string;
+    hotelId: string;
+    userId: string;
+    userName: string;
+    month: number;
+    year: number;
+    projectionType: ProjectionType;
+    validatedAt: string;
+    status: 'Validado';
+}
+
 export interface Justification {
   id: string;
   gmdConfigId: string;
@@ -291,13 +305,17 @@ export interface Justification {
   accountName: string;
   month: number;
   year: number;
+  projectionType?: ProjectionType;
   
-  real: number;
-  budget: number;
-  delta: number;
+  meta: number;
+  forecast: number;
+  previa: number;
+  deltaR: number; // forecast - previa
+  deltaPct: number;
 
   explanation: string;
-  status: 'pending_explanation' | 'under_review' | 'approved' | 'rejected' | 'pending_action_plan' | 'resolved' | 'completed';
+  // Action Plan System Statuses
+  status: 'Pendentes' | 'Em andamento' | 'Atrasado' | 'Concluído';
   
   rejectionReason?: string;
   
@@ -305,8 +323,10 @@ export interface Justification {
   actionPlan?: string;
   actionPlanStartDate?: string;
   actionPlanEndDate?: string;
+  actionPlanPresentationDate?: string;
   
   // Completion Fields
   recoveredValue?: number;
   completionObservation?: string;
 }
+

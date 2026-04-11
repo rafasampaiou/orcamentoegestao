@@ -17,6 +17,9 @@ interface OccupancyViewProps {
     realOccupancyData?: Record<string, Record<string, number>>;
     setRealOccupancyData?: React.Dispatch<React.SetStateAction<Record<string, Record<string, number>>>>;
     financialData?: ImportedRow[];
+    // Naming & type
+    activeProjectionType?: import('../types').ProjectionType;
+    setActiveProjectionType?: React.Dispatch<React.SetStateAction<import('../types').ProjectionType>>;
 }
 
 interface BudgetRow {
@@ -334,7 +337,9 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
     selectedHotel,
     realOccupancyData,
     setRealOccupancyData,
-    financialData
+    financialData,
+    activeProjectionType,
+    setActiveProjectionType
 }) => {
 
     const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>({
@@ -602,6 +607,9 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
                 setRealOccupancyData(prev => {
                     const contextData = prev[contextKey] || {};
                     const newData = { ...contextData, [`${rowId}_${col}`]: value };
+                    if (col === 'previa') {
+                        newData[`${rowId}_forecast`] = value;
+                    }
                     const recalculated = recalculateReal(newData);
                     return {
                         ...prev,
@@ -798,7 +806,21 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             <div className="p-8 w-full">
                 <div className="mb-6 flex justify-between items-center">
                     <div>
-                        <h2 className="text-2xl font-bold text-gray-900">Ocupação (Real)</h2>
+                        <div className="flex items-center gap-3">
+                            <h2 className="text-2xl font-bold text-gray-900">Ocupação (Real)</h2>
+                            {!isBudget && setActiveProjectionType && (
+                                <select 
+                                    className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 p-1.5 font-bold"
+                                    value={activeProjectionType}
+                                    onChange={(e) => setActiveProjectionType(e.target.value as import('../types').ProjectionType)}
+                                >
+                                    <option value="Reunião de Ritmo">Reunião de Ritmo</option>
+                                    <option value="FCA N1">FCA N1</option>
+                                    <option value="FCA N2">FCA N2</option>
+                                    <option value="Fechamento oficial">Fechamento oficial</option>
+                                </select>
+                            )}
+                        </div>
                         <p className="text-gray-500 mt-1">Análise detalhada de ocupação por segmento para {selectedMonth}/{selectedYear}.</p>
                     </div>
                     <div className="flex gap-3 relative">
