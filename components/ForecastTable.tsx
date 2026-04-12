@@ -342,8 +342,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
   const inputClass = "w-full text-right bg-transparent border border-transparent hover:bg-gray-50 focus:bg-white focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 rounded px-1 text-indigo-900 font-semibold outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
 
   return (
-    <div className="flex flex-col h-full w-full">
-        <div className="bg-white rounded-xl shadow-lg border border-gray-200 flex flex-col h-full overflow-hidden font-sans w-full">
+    <div className="flex flex-col h-full w-full p-8 bg-slate-50/50 overflow-auto">
+        <div className="bg-white rounded-3xl shadow-2xl shadow-indigo-100/40 border-[12px] border-white flex flex-col min-h-full font-sans max-w-[1700px] mx-auto w-full">
         <div className="px-5 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center shrink-0 gap-8">
             <div>
               <div className="flex items-center gap-3">
@@ -488,7 +488,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 {/* Description - Flexible Width */}
                 <th 
                     style={{ width: columnWidths.description }}
-                    className="px-2 py-3 border-b border-sky-200 bg-sky-100 text-sky-900 truncate group relative z-40 sticky left-0 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]"
+                    className="px-6 py-4 text-left bg-sky-100 text-sky-800 border-b border-sky-200 sticky left-0 z-50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] text-xs font-black uppercase tracking-widest"
                 >
                     Descrição
                     <div 
@@ -873,7 +873,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                     return (
                     <tr key={row.id} className={rowClass}>
 
-                        <td className={`px-2 py-3 text-sm font-bold ${textClass} uppercase tracking-wide flex items-center truncate sticky left-0 z-20 ${stickyClass}`}>
+                        <td className={`px-6 py-4 text-sm font-bold ${textClass} uppercase tracking-wide flex items-center truncate sticky left-0 z-20 shadow-sm ${stickyClass}`}>
                         {!isBlueHighlight && <div className="w-1 h-4 bg-indigo-500 mr-2 rounded-full"></div>}
                         {row.label}
                         </td>
@@ -889,7 +889,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                     return (
                     <tr key={row.id} className="bg-gray-50 text-gray-800 font-bold border-b border-gray-200 hover:bg-gray-100 transition-colors">
 
-                        <td className="px-2 py-2 text-sm uppercase align-middle border-r border-gray-200 sticky left-0 z-20 bg-gray-50">
+                        <td className="px-6 py-3 text-sm uppercase align-middle border-r border-gray-200 sticky left-0 z-20 bg-gray-50 font-bold tracking-wider">
                              <div style={{ paddingLeft: `${(row.indentLevel || 0) * 16}px` }} className="truncate">
                                 {row.label}
                             </div>
@@ -904,7 +904,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                     return (
                     <tr key={row.id} className="bg-gray-50 text-gray-600 font-semibold border-b border-gray-200 hover:bg-gray-100 transition-colors">
 
-                        <td className="px-2 py-2 text-sm uppercase pl-8 truncate sticky left-0 z-20 bg-gray-50 border-r border-gray-200">
+                        <td className="px-6 py-2.5 text-sm uppercase pl-12 truncate sticky left-0 z-20 bg-gray-50 border-r border-gray-200 font-semibold text-gray-500 italic">
                             {row.label}
                         </td>
                         {renderFinancialCells(true, "bg-gray-50 border-r border-gray-200")}
@@ -925,10 +925,10 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                     className={`
                         transition-colors text-slate-700 hover:bg-indigo-50/30
                         ${isTotal ? 'bg-indigo-50 font-bold border-y-2 border-gray-300 text-indigo-900' : 'border-b border-gray-50'}
-                        ${row.id === 'REV-IMP' ? 'bg-sky-50 border-y-2 border-sky-300 font-bold text-sky-950' : ''}
+                        ${row.id === 'REV-IMP' ? 'bg-sky-100 border-y border-sky-200 font-bold text-sky-900 shadow-sm' : ''}
                     `}
                     >
-                    <td className={`px-2 py-1 border-r border-gray-100 align-middle sticky left-0 z-20 bg-white group-hover:bg-indigo-50/30 ${isTotal ? 'bg-indigo-50' : ''}`}>
+                    <td className={`px-6 py-1.5 border-r border-gray-100 align-middle sticky left-0 z-20 bg-white group-hover:bg-indigo-50/30 ${isTotal ? 'bg-indigo-50 shadow-sm' : ''}`}>
                         <div style={{ paddingLeft: `${(row.indentLevel || 0) * 16}px` }} className={`truncate text-xs ${isTotal ? 'uppercase tracking-wide' : ''}`}>
                         {displayLabel}
                         </div>
@@ -1159,13 +1159,14 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
         const revpar = rowMap.get('IND-6');
         if (revpar) revpar[field] = avail > 0 ? revApt / avail : 0;
 
-        // TREVPOR
+        // TREVPOR: (Receita de Apartamentos + Receitas Extras - Receitas Inclusas) / UH Ocupada
+        const ts = rowMap.get('REV-TIME')?.[field] || 0;
         const trevpor = rowMap.get('IND-TREVPOR');
-        if (trevpor) trevpor[field] = occ > 0 ? (revApt + revExtra) / occ : 0;
+        if (trevpor) trevpor[field] = occ > 0 ? (revApt + revExtra - ts) / occ : 0;
 
-        // TREVPAR
+        // TREVPAR: (Receita de Apartamentos + Receitas Extras - Receitas Inclusas) / UH Disponível
         const trevpar = rowMap.get('IND-TREVPAR');
-        if (trevpar) trevpar[field] = avail > 0 ? (revApt + revExtra) / avail : 0;
+        if (trevpar) trevpar[field] = avail > 0 ? (revApt + revExtra - ts) / avail : 0;
     });
 
     // --- REVENUE CALCULATIONS ---
