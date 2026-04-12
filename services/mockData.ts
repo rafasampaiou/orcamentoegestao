@@ -1,5 +1,5 @@
 
-import { ForecastRow, Hotel, User, UserRole, Account, CostPackage, ExpenseType, ExpenseDriver, CostCenter, GMDConfiguration, ImportedRow, ForecastConfig } from '../types';
+import { ForecastRow, Hotel, User, UserRole, Account, CostPackage, ExpenseType, ExpenseDriver, CostCenter, GMDConfiguration, ImportedRow, ForecastConfig, DreSection, DrePackage } from '../types';
 
 export const mockHotels: Hotel[] = [
   { id: '1', code: 'ATB', name: 'Atibaia' },
@@ -402,7 +402,7 @@ const generateRow = (
   isTotal = false, 
   indentLevel = 0,
   gmdManagerName?: string,
-  config?: { type?: ExpenseType, driver?: ExpenseDriver, taxRate?: number, inputType?: 'expense' | 'tax', format?: 'currency' | 'percent' | 'integer' | 'decimal', method?: 'Fixed' | 'Variable', factor?: number },
+  config?: { type?: ExpenseType, driver?: ExpenseDriver, taxRate?: number, inputType?: 'expense' | 'tax' | 'none', format?: 'currency' | 'percent' | 'integer' | 'decimal', method?: 'Fixed' | 'Variable', factor?: number },
   indicatorSection?: string
 ): ForecastRow => {
   
@@ -757,6 +757,158 @@ export const getForecastData = (
   // KPI: Transformação / Reatividade
   rows.push(generateRow('KPI-TRANS-BUDGET', '', 'Result', 'Transformação/Reatividade (Meta)', 0, 0, 0, 0, true, true, 0));
   rows.push(generateRow('KPI-TRANS-LY', '', 'Result', 'Transformação/Reatividade (Ano Anterior)', 0, 0, 0, 0, true, true, 0));
+
+  return rows;
+};
+
+export const getDynamicForecastData = (
+    structure: DreSection[],
+    selectedMonth?: number, 
+    selectedYear?: number, 
+    importedData: ImportedRow[] = [],
+    selectedHotelName?: string,
+    currentHotels: Hotel[] = mockHotels,
+    realOccupancyData: Record<string, Record<string, number>> = {},
+    activeRealVersionId?: string,
+    activeBudgetVersionId?: string,
+    currentAccounts: Account[] = mockAccounts,
+    currentPackages: CostPackage[] = mockPackages,
+    budgetOccupancyData: Record<string, number[]> = {}
+): ForecastRow[] => {
+  const rows: ForecastRow[] = [];
+
+  // --- REUSE INDEXING LOGIC FROM getForecastData (Internal implementation) ---
+  const dataIndex = new Map<string, number>();
+  if (selectedMonth && selectedYear && importedData.length > 0) {
+      importedData.forEach(row => {
+          if (row.status !== 'valid') return;
+          const rYear = parseInt(row.ano);
+          const rMonth = parseInt(row.mes);
+          if (rMonth !== selectedMonth) return;
+          if (rYear !== selectedYear && rYear !== (selectedYear - 1)) return;
+          const scen = (row.cenario || '').trim().toLowerCase();
+          let normScenario = '';
+          if (scen === 'real' || scen === 'realizado') normScenario = 'REAL';
+          else if (scen === 'budget' || scen === 'meta' || scen === 'orcamento' || scen === 'orçamento') normScenario = 'BUDGET';
+          else if (scen === 'previa' || scen === 'prévia' || scen === 'flash') normScenario = 'PREVIA';
+          else return; 
+          if (normScenario === 'REAL') {
+              if (activeRealVersionId && row.versionId && row.versionId !== activeRealVersionId) return;
+          } else if (normScenario === 'BUDGET') {
+              if (row.versionId) {
+                const matchesBudget = activeBudgetVersionId && row.versionId === activeBudgetVersionId;
+                const matchesReal = activeRealVersionId && row.versionId === activeRealVersionId;
+                if (!matchesBudget && !matchesReal) return;
+              }
+          }
+          const normHotel = row.hotel.trim().toUpperCase();
+          const val = parseFloat(row.valor.replace(',', '.'));
+          if (isNaN(val)) return;
+          const normConta = row.conta.trim().toLowerCase();
+          const normCR = (row.cr || '').trim().toLowerCase();
+          const keyConta = `${rYear}|${rMonth}|${normHotel}|${normScenario}|${normConta}`;
+          dataIndex.set(keyConta, (dataIndex.get(keyConta) || 0) + val);
+          if (normCR) {
+              const keyContaCR = `${rYear}|${rMonth}|${normHotel}|${normScenario}|${normConta}|${normCR}`;
+              dataIndex.set(keyContaCR, (dataIndex.get(keyContaCR) || 0) + val);
+          }
+      });
+  }
+
+  const activeHotel = currentHotels.find(h => h.name === selectedHotelName);
+  const activeHotelCode = activeHotel ? activeHotel.code : '';
+
+  const getImportedValue = (accountName: string, targetYear: number | undefined, valueCategory: 'Real' | 'Budget' | 'Previa', crFilter?: string) => {
+    if (!selectedMonth || !targetYear) return 0;
+    const targetName = accountName.trim().toLowerCase();
+    const targetCR = crFilter?.trim().toLowerCase();
+    let targetScenario = '';
+    if (valueCategory === 'Real') targetScenario = 'REAL';
+    else if (valueCategory === 'Budget') targetScenario = 'BUDGET';
+    else targetScenario = 'PREVIA';
+    const hotelsToTry = [selectedHotelName, activeHotelCode].filter(Boolean) as string[];
+    let total = 0;
+    hotelsToTry.forEach(h => {
+        const baseKey = `${targetYear}|${selectedMonth}|${h.trim().toUpperCase()}|${targetScenario}|${targetName}`;
+        if (targetCR) {
+            total += dataIndex.get(`${baseKey}|${targetCR}`) || 0;
+        } else {
+            total += dataIndex.get(baseKey) || 0;
+        }
+    });
+    return total;
+  };
+
+  const getRealOccValue = (rowId: string) => {
+    const contextKey = `${selectedHotelName}_${selectedYear}_${selectedMonth}`;
+    return realOccupancyData[contextKey]?.[rowId];
+  };
+
+  // --- BUILD ROWS BASED ON STRUCTURE ---
+  structure.forEach(section => {
+    // 1. Header Row
+    rows.push(generateRow(
+      section.id, 
+      '', 
+      'Section', 
+      section.name, 
+      0, 0, 0, 0, 
+      true, 
+      section.isTotal, 
+      0,
+      undefined,
+      { inputType: 'none', format: 'currency' }
+    ));
+
+    // 2. Packages within section
+    section.packages.forEach(pkg => {
+      // Special indicators check
+      if (pkg.name.startsWith('IND-')) {
+          // Handle built-in indicators like REVPAR, etc.
+          // For now, let's just map them if they exist in our indicator logic
+          // (Simplified for this version)
+      }
+
+      const valBudget = getImportedValue(pkg.name, selectedYear, 'Budget');
+      const valReal = getImportedValue(pkg.name, selectedYear, 'Real');
+      const valPrevia = getImportedValue(pkg.name, selectedYear, 'Previa');
+      const valLY = getImportedValue(pkg.name, (selectedYear || 0) - 1, 'Real');
+
+      rows.push(generateRow(
+        pkg.id, 
+        '', 
+        'Package', 
+        pkg.name, 
+        valBudget, valReal, valLY, valPrevia, 
+        true, 
+        pkg.isTotal, 
+        1
+      ));
+
+      // 3. Optional: Accounts within package
+      const pkgAccs = currentAccounts.filter(a => a.package === pkg.name || a.packageId === pkg.id);
+      pkgAccs.forEach(acc => {
+        const accBudget = getImportedValue(acc.name, selectedYear, 'Budget');
+        const accReal = getImportedValue(acc.name, selectedYear, 'Real');
+        const accPrevia = getImportedValue(acc.name, selectedYear, 'Previa');
+        const accLY = getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
+
+        rows.push(generateRow(
+          acc.id, 
+          acc.code, 
+          'Account', 
+          acc.name, 
+          accBudget, accReal, accLY, accPrevia, 
+          false, 
+          false, 
+          2
+        ));
+      });
+    });
+
+    // Add a spacer after each section
+    rows.push(generateRow(`spacer-${section.id}`, '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
+  });
 
   return rows;
 };

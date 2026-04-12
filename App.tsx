@@ -185,6 +185,7 @@ const App: React.FC = () => {
   const [packages, setPackages] = useState<CostPackage[]>(mockPackages);
   const [accounts, setAccounts] = useState<Account[]>(mockAccounts);
   const [gmdConfigs, setGmdConfigs] = useState<GMDConfiguration[]>(mockGMDConfigs);
+  const [dreConfigs, setDreConfigs] = useState<{ name: string, structure: any }[]>([]);
 
   React.useEffect(() => {
     // We want to update the active budget version whenever the hotel changes,
@@ -245,6 +246,11 @@ const App: React.FC = () => {
         const remoteGmd = await supabaseService.getGmdConfigs();
         if (remoteGmd && remoteGmd.length > 0 && isMounted) {
           setGmdConfigs(remoteGmd);
+        }
+
+        const remoteDreConfigs = await supabaseService.getDreConfigs();
+        if (remoteDreConfigs && remoteDreConfigs.length > 0 && isMounted) {
+          setDreConfigs(remoteDreConfigs);
         }
 
         const remoteVersions = await supabaseService.getBudgetVersions();
@@ -613,6 +619,8 @@ const App: React.FC = () => {
             setLaborParametersMap={setLaborParametersMap}
             budgetSchedule={budgetSchedule}
             setBudgetSchedule={setBudgetSchedule}
+            dreConfigs={dreConfigs}
+            setDreConfigs={setDreConfigs}
           />
         );
 

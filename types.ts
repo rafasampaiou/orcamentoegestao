@@ -169,6 +169,19 @@ export interface ForecastRow {
   }
 }
 
+export interface DrePackage {
+  id: string;
+  name: string;
+  isTotal?: boolean;
+}
+
+export interface DreSection {
+  id: string;
+  name: string;
+  packages: DrePackage[];
+  isTotal?: boolean;
+}
+
 export type ViewState = 
   // REAL Module
   | 'real_home'

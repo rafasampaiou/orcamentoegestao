@@ -483,5 +483,23 @@ export const supabaseService = {
         .insert(batch);
       if (error) throw error;
     }
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // DRE CONFIGURATIONS
+  // ═══════════════════════════════════════════════════════════════════════════
+  async getDreConfigs(): Promise<{ name: string, structure: any }[]> {
+    const { data, error } = await supabase
+      .from('dre_configurations')
+      .select('name, structure');
+    if (error) throw error;
+    return data || [];
+  },
+
+  async upsertDreConfig(name: string, structure: any): Promise<void> {
+    const { error } = await supabase
+      .from('dre_configurations')
+      .upsert({ name, structure, updated_at: new Date().toISOString() }, { onConflict: 'name' });
+    if (error) throw error;
   }
 };

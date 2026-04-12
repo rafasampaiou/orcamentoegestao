@@ -304,6 +304,10 @@ interface UnifiedAdministrationViewProps {
     // Schedule
     budgetSchedule: ScheduleItem[];
     setBudgetSchedule: React.Dispatch<React.SetStateAction<ScheduleItem[]>>;
+
+    // DRE Config
+    dreConfigs: { name: string, structure: any }[];
+    setDreConfigs: React.Dispatch<React.SetStateAction<{ name: string, structure: any }[]>>;
 }
 
 const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({ 
@@ -320,7 +324,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     realVersions, setRealVersions,
     activeRealVersionId, setActiveRealVersionId,
     laborParametersMap, setLaborParametersMap,
-    budgetSchedule, setBudgetSchedule
+    budgetSchedule, setBudgetSchedule,
+    dreConfigs, setDreConfigs
 }) => {
   // Main Module Tabs
   const [mainTab, setMainTab] = useState<'real' | 'budget' | 'geral'>('real');
@@ -343,6 +348,11 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const [activeImportTab, setActiveImportTab] = useState<'financial' | 'revenue' | 'occupancy' | 'costCenters' | 'accounts'>('financial');
 
   // Logs & Permissions state
+  const [activeDreName, setActiveDreName] = useState<'Forecast' | 'Budget'>('Forecast');
+  const [isSavingDre, setIsSavingDre] = useState(false);
+  const [pickingFor, setPickingFor] = useState<{ sectionId: string, packageId: string } | null>(null);
+  const [accSearchTerm, setAccSearchTerm] = useState('');
+
   const [userLogs, setUserLogs] = useState([
     { id: '1', userId: 'u1', userName: 'Carlos Silva', userUnit: 'Tauá Resort Caeté', action: 'Atualizou Forecast DRE', timestamp: new Date(Date.now() - 3600000).toISOString() },
     { id: '2', userId: 'u2', userName: 'Ana Souza', userUnit: 'Tauá Resort Atibaia', action: 'Criou Nova Versão GMD', timestamp: new Date(Date.now() - 86400000).toISOString() }
@@ -426,7 +436,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const [accImportStep, setAccImportStep] = useState<'input' | 'preview'>('input');
   const [accParsedData, setAccParsedData] = useState<ImportedAccount[]>([]);
   const [accImportMode, setAccImportMode] = useState<'append' | 'replace'>('append');
-  const [accSearchTerm, setAccSearchTerm] = useState('');
 
   // Account View Customization
   const [collapsedMasterPackages, setCollapsedMasterPackages] = useState<Set<string>>(new Set());
@@ -482,8 +491,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       }
   };
 
-  const [pickingFor, setPickingFor] = useState<{ sectionId: string, packageId: string } | null>(null);
-
   const handleAccountDragStart = (e: React.DragEvent, id: string, type: 'account' | 'pkg' | 'master') => {
     e.dataTransfer.setData('sourceId', id);
     e.dataTransfer.setData('sourceType', type);
@@ -511,15 +518,19 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         } else if (sourceType === 'pkg' && targetType === 'pkg') {
             const srcSet = sorted.filter(a => a.package === sourceId);
             const rest = sorted.filter(a => a.package !== sourceId);
-            const tgtIdx = srcSet[0].masterPackage === sourceId ? -1 : rest.findIndex(a => a.package === targetId);
-            if (tgtIdx !== -1) rest.splice(tgtIdx, 0, ...srcSet);
-            return rest.map((a, i) => ({ ...a, sortOrder: i }));
+            const tgtIdx = rest.findIndex(a => a.package === targetId);
+            if (tgtIdx !== -1) {
+                rest.splice(tgtIdx, 0, ...srcSet);
+                return rest.map((a, i) => ({ ...a, sortOrder: i }));
+            }
         } else if (sourceType === 'master' && targetType === 'master') {
             const srcSet = sorted.filter(a => a.masterPackage === sourceId);
             const rest = sorted.filter(a => a.masterPackage !== sourceId);
             const tgtIdx = rest.findIndex(a => a.masterPackage === targetId);
-            if (tgtIdx !== -1) rest.splice(tgtIdx, 0, ...srcSet);
-            return rest.map((a, i) => ({ ...a, sortOrder: i }));
+            if (tgtIdx !== -1) {
+                rest.splice(tgtIdx, 0, ...srcSet);
+                return rest.map((a, i) => ({ ...a, sortOrder: i }));
+            }
         }
         
         return sorted.map((a, i) => ({ ...a, sortOrder: i }));
@@ -777,6 +788,64 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     });
     return sections;
   });
+
+  // Sync dreStructure with activeDreName
+  React.useEffect(() => {
+    const config = dreConfigs.find(c => c.name === activeDreName);
+    if (config && config.structure && Array.isArray(config.structure) && config.structure.length > 0) {
+      setDreStructure(config.structure);
+    } else {
+      // Fallback to default if no config found or if it's empty
+      const rawData = getForecastData();
+      const sections: DreSection[] = [];
+      let currentSection: DreSection | undefined;
+      let currentPackage: DrePackage | undefined;
+
+      rawData.forEach(row => {
+          if (['Indicators', 'Spacer', 'Staff'].includes(row.category)) return;
+
+          if (row.indentLevel === 0) {
+              const isResult = row.isTotal || row.id === 'REV-NET' || row.category === 'Result';
+              currentSection = {
+                  id: row.id,
+                  name: row.label,
+                  type: isResult ? 'result' : 'section',
+                  items: []
+              };
+              sections.push(currentSection);
+              currentPackage = undefined;
+          } else if (row.indentLevel === 1 && currentSection && currentSection.type === 'section') {
+              currentPackage = {
+                  id: row.id,
+                  name: row.label,
+                  accounts: [],
+                  isExpanded: false
+              };
+              currentSection.items.push(currentPackage);
+          } else if (row.indentLevel === 2 && currentPackage) {
+              currentPackage.accounts.push({ id: row.id, name: row.label });
+          }
+      });
+      setDreStructure(sections);
+    }
+  }, [activeDreName, dreConfigs]);
+
+  const handleSaveDreConfig = async () => {
+    setIsSavingDre(true);
+    try {
+      await supabaseService.upsertDreConfig(activeDreName, dreStructure);
+      setDreConfigs(prev => {
+        const other = prev.filter(c => c.name !== activeDreName);
+        return [...other, { name: activeDreName, structure: dreStructure }];
+      });
+      alert(`Configuração de DRE do ${activeDreName} salva com sucesso!`);
+    } catch (err: any) {
+      console.error("Erro ao salvar DRE:", err);
+      alert(`Erro ao salvar DRE: ${err.message || JSON.stringify(err)}`);
+    } finally {
+      setIsSavingDre(false);
+    }
+  };
 
   // --- MODAL & FORM STATE ---
   const [activeModal, setActiveModal] = useState<ModalType>(null);
@@ -2861,7 +2930,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                 </tr>
                               );
                             }
-                            
                             lastMaster = acc.masterPackage || '';
                             lastPackage = acc.package || '';
                           });
@@ -2875,24 +2943,49 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               )}
               {activeRegistryTab === 'dre_structure' && (
                 <div className="space-y-6">
-                  <div className="flex justify-between items-center">
-                    <h4 className="font-bold text-gray-700">Estrutura do DRE</h4>
-                    {!isAddingSection ? (
-                      <button onClick={() => setIsAddingSection(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all active:scale-95"><Plus size={16}/> Nova Seção</button>
-                    ) : (
-                      <div className="flex gap-2">
-                        <input 
-                          type="text" 
-                          value={newSectionName} 
-                          onChange={e => setNewSectionName(e.target.value)}
-                          placeholder="Nome da Seção..."
-                          className="p-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                          autoFocus
-                        />
-                        <button onClick={addDreSection} className="bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700">Adicionar</button>
-                        <button onClick={() => setIsAddingSection(false)} className="bg-gray-200 text-gray-600 px-3 py-2 rounded-lg text-sm font-bold hover:bg-gray-300">Cancelar</button>
+                  <div className="flex justify-between items-center bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <div className="flex items-center gap-6">
+                      <h4 className="font-bold text-slate-800 text-lg">Configuração da Estrutura DRE</h4>
+                      <div className="flex bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
+                        <button 
+                          onClick={() => setActiveDreName('Forecast')}
+                          className={`px-6 py-1.5 text-xs font-bold rounded-md transition-all ${activeDreName === 'Forecast' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-100' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                          Forecast
+                        </button>
+                        <button 
+                          onClick={() => setActiveDreName('Budget')}
+                          className={`px-6 py-1.5 text-xs font-bold rounded-md transition-all ${activeDreName === 'Budget' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-100' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                          Orçamento
+                        </button>
                       </div>
-                    )}
+                    </div>
+                    <div className="flex gap-3">
+                      <button 
+                        onClick={handleSaveDreConfig}
+                        disabled={isSavingDre}
+                        className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-100 disabled:opacity-50 transition-all active:scale-95"
+                      >
+                        {isSavingDre ? <><span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> Salvando...</> : <><Save size={18}/> Salvar Estrutura {activeDreName}</>}
+                      </button>
+                      {!isAddingSection ? (
+                        <button onClick={() => setIsAddingSection(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all active:scale-95"><Plus size={16}/> Nova Seção</button>
+                      ) : (
+                        <div className="flex gap-2">
+                          <input 
+                            type="text" 
+                            value={newSectionName} 
+                            onChange={e => setNewSectionName(e.target.value)}
+                            placeholder="Nome da Seção..."
+                            className="p-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                            autoFocus
+                          />
+                          <button onClick={addDreSection} className="bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700">Add</button>
+                          <button onClick={() => setIsAddingSection(false)} className="bg-gray-200 text-gray-600 px-3 py-2 rounded-lg text-sm font-bold hover:bg-gray-300">X</button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div className="space-y-4">
                     {dreStructure.map(section => (
