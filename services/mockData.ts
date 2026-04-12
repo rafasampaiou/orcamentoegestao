@@ -599,6 +599,8 @@ export const getForecastData = (
   const gAvailReal = getRealOccValue('geral_avail') ?? 100;
   const gOccReal = getRealOccValue('geral_sold') ?? 75;
   const gPaxReal = getRealOccValue('geral_pax') ?? 210;
+  const gAdultsReal = getRealOccValue('geral_adults') ?? 150;
+  const gChdReal = getRealOccValue('geral_chd') ?? 60;
 
   // Retrieve budget values from budgetOccupancyData based on the selectedMonth (0-indexed)
   const monthIdx = selectedMonth ? selectedMonth - 1 : 0;
@@ -607,21 +609,36 @@ export const getForecastData = (
   const gOccPctBudget = gAvailBudget > 0 ? (gOccBudget / gAvailBudget) * 100 : 0;
   // Get Budget Revenue values to compute Budget DM & RevPAR (Approximation or zeros if missing)
   const gPaxBudget = budgetOccupancyData['geral_pax'] ? budgetOccupancyData['geral_pax'][monthIdx] : 0;
+  const gAdultsBudget = budgetOccupancyData['geral_adults'] ? budgetOccupancyData['geral_adults'][monthIdx] : 0;
+  const gChdBudget = budgetOccupancyData['geral_chd'] ? budgetOccupancyData['geral_chd'][monthIdx] : 0;
   
   // DM and Revpar Budget calculation based on imported budget vs occupancy, or from budgetOccupancyData if there were a field.
   // We'll calculate it from imported if possible, otherwise 0 or basic calc.
   const revLazerBudget = getImportedValue('Lazer', selectedYear, 'Budget'); 
   const revEventosBudget = getImportedValue('Eventos', selectedYear, 'Budget');
-  const revOcupacaoBudget = revLazerBudget + revEventosBudget; 
-  const dmBudget = gOccBudget > 0 ? revOcupacaoBudget / gOccBudget : 0;
-  const revparBudget = gAvailBudget > 0 ? revOcupacaoBudget / gAvailBudget : 0;
+  const revAptBudget = revLazerBudget + revEventosBudget; 
+
+  const revExtraLazerBudget = getImportedValue('Extra Lazer', selectedYear, 'Budget');
+  const revExtraEventosBudget = getImportedValue('Extra Eventos', selectedYear, 'Budget');
+  const revExtraTotalBudget = revExtraLazerBudget + revExtraEventosBudget;
+
+  const dmBudget = gOccBudget > 0 ? revAptBudget / gOccBudget : 0;
+  const revparBudget = gAvailBudget > 0 ? revAptBudget / gAvailBudget : 0;
+  const trevporBudget = gOccBudget > 0 ? (revAptBudget + revExtraTotalBudget) / gOccBudget : 0;
+  const trevparBudget = gAvailBudget > 0 ? (revAptBudget + revExtraTotalBudget) / gAvailBudget : 0;
 
   rows.push(generateRow('IND-1', '', 'Indicators', 'UH Disponível', gAvailBudget, gAvailReal, 100, 0, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
   rows.push(generateRow('IND-2', '', 'Indicators', 'UH Ocupada', gOccBudget, gOccReal, 70, 0, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
   rows.push(generateRow('IND-3', '', 'Indicators', '% Ocupação', gOccPctBudget, gAvailReal > 0 ? (gOccReal / gAvailReal) * 100 : 0, 70, 0, false, false, 0, undefined, { format: 'percent' }, 'INDICADORES GERAIS'));
   rows.push(generateRow('IND-4', '', 'Indicators', 'DM Bruta', dmBudget, 850, 800, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
   rows.push(generateRow('IND-5', '', 'Indicators', 'PAX', gPaxBudget, gPaxReal, 190, 0, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
+  rows.push(generateRow('IND-ADULTOS', '', 'Indicators', 'Adultos', gAdultsBudget, gAdultsReal, 140, 0, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
+  rows.push(generateRow('IND-CHD', '', 'Indicators', 'CHD', gChdBudget, gChdReal, 50, 0, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
+  rows.push(generateRow('IND-COEF-ADULTOS', '', 'Indicators', 'Coef. Adultos', gOccBudget > 0 ? gAdultsBudget / gOccBudget : 0, gOccReal > 0 ? gAdultsReal / gOccReal : 0, 2, 0, false, false, 0, undefined, { format: 'decimal' }, 'INDICADORES GERAIS'));
+  rows.push(generateRow('IND-COEF-CHD', '', 'Indicators', 'Coef. CHD', gOccBudget > 0 ? gChdBudget / gOccBudget : 0, gOccReal > 0 ? gChdReal / gOccReal : 0, 0.7, 0, false, false, 0, undefined, { format: 'decimal' }, 'INDICADORES GERAIS'));
   rows.push(generateRow('IND-6', '', 'Indicators', 'REVPAR', revparBudget, 637.5, 560, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
+  rows.push(generateRow('IND-TREVPOR', '', 'Indicators', 'TREVPOR', trevporBudget, 0, 0, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
+  rows.push(generateRow('IND-TREVPAR', '', 'Indicators', 'TREVPAR', trevparBudget, 0, 0, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
 
   rows.push(generateRow('SPACER-IND-REV', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
 

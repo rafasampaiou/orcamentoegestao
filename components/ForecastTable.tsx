@@ -556,7 +556,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                         style={{ width: columnWidths.deltaPreviaBudget }}
                         className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 whitespace-pre-line leading-tight group relative"
                     >
-                        Δ R$<br/>PRÉVIA - META
+                        Δ<br/>PRÉVIA - META
                         <div 
                             onMouseDown={(e) => handleResizeStart(e, 'deltaPreviaBudget')}
                             className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
@@ -584,7 +584,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                         style={{ width: columnWidths.lastYear }}
                         className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 group relative"
                     >
-                        LAST YEAR
+                        2025 (LY)
                         <div 
                             onMouseDown={(e) => handleResizeStart(e, 'lastYear')}
                             className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
@@ -598,7 +598,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                         style={{ width: columnWidths.deltaLY }}
                         className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 whitespace-pre-line leading-tight group relative"
                     >
-                        PRÉVIA<br/>x<br/>LY R$
+                        Δ<br/>PRÉVIA - 2025
                         <div 
                             onMouseDown={(e) => handleResizeStart(e, 'deltaLY')}
                             className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
@@ -612,7 +612,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                         style={{ width: columnWidths.deltaLYPct }}
                         className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 whitespace-pre-line leading-tight group relative"
                     >
-                        PRÉVIA<br/>x<br/>LY %
+                        Δ %<br/>PRÉVIA - 2025
                         <div 
                             onMouseDown={(e) => handleResizeStart(e, 'deltaLYPct')}
                             className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
@@ -772,41 +772,43 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                         }
                     } else if (isIndicator) {
                         // Special handling for Indicators that should be inputs (Fixed)
-                        const isInputIndicator = ['IND-1', 'IND-LZ-2', 'IND-LZ-4', 'IND-LZ-5', 'IND-EV-2', 'IND-EV-4', 'IND-EV-5'].includes(row.id);
+                        const isInputIndicator = ['IND-1', 'IND-2', 'IND-ADULTOS', 'IND-CHD', 'IND-LZ-2', 'IND-LZ-4', 'IND-LZ-5', 'IND-EV-2', 'IND-EV-4', 'IND-EV-5'].includes(row.id);
                         
                         if ((isInputIndicator || isManualRow) && !isMonthClosed) {
                              realCellContent = (
                                 <input 
                                     type="number" 
                                     className={inputClass}
-                                    value={row.real}
+                                    value={row.real === 0 ? '' : row.real}
                                     onChange={(e) => {
+                                        const val = parseFloat(e.target.value) || 0;
                                         if (isManualRow) {
-                                            handleManualValueChange(row.id, 'real', parseFloat(e.target.value));
+                                            handleManualValueChange(row.id, 'real', val);
                                         } else {
-                                            handleConfigChange(row.id, { method: 'Fixed', manualValue: parseFloat(e.target.value) });
+                                            handleConfigChange(row.id, { method: 'Fixed', manualValue: val });
                                         }
                                     }}
                                     onPaste={(e) => handlePaste(e, row.id, 'real')}
                                     step="0.01"
                                 />
                              );
-                        } else if ((isInputIndicator || isManualRow) && isMonthClosed) {
-                             realCellContent = <span className="font-medium">{formatValue(row.real, formatType)}</span>;
-                        }
 
-                        // Handle Previa Editing for Manual Rows
-                        if (isManualRow && !isMonthClosed) {
-                            previaCellContent = (
+                             previaCellContent = (
                                 <input 
                                     type="number" 
                                     className={inputClass}
-                                    value={row.previa}
-                                    onChange={(e) => handleManualValueChange(row.id, 'previa', parseFloat(e.target.value))}
+                                    value={row.previa === 0 ? '' : row.previa}
+                                    onChange={(e) => {
+                                        const val = parseFloat(e.target.value) || 0;
+                                        handleManualValueChange(row.id, 'previa', val);
+                                    }}
                                     onPaste={(e) => handlePaste(e, row.id, 'previa')}
                                     step="0.01"
                                 />
-                            );
+                             );
+                        } else if ((isInputIndicator || isManualRow) && isMonthClosed) {
+                             realCellContent = <span className="font-medium">{formatValue(row.real, formatType)}</span>;
+                             previaCellContent = <span className="font-medium">{formatValue(row.previa, formatType)}</span>;
                         }
                     }
 
@@ -1169,12 +1171,21 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
     };
 
     // --- INDICATORS ---
+    // --- INDICATORS ---
     ['real', 'budget', 'lastYear', 'previa'].forEach(f => {
         const field = f as 'real' | 'budget' | 'lastYear' | 'previa';
         
         const avail = rowMap.get('IND-1')?.[field] || 0;
         const occ = rowMap.get('IND-2')?.[field] || 0;
+        const adults = rowMap.get('IND-ADULTOS')?.[field] || 0;
+        const chd = rowMap.get('IND-CHD')?.[field] || 0;
+        
+        // PAX: Soma Adultos e CHD
+        const paxRow = rowMap.get('IND-5');
+        if (paxRow) paxRow[field] = adults + chd;
+
         const revApt = rowMap.get('REV-APT')?.[field] || 0;
+        const revExtra = rowMap.get('REV-EXTRA')?.[field] || 0;
 
         // % Ocupação
         const occPct = rowMap.get('IND-3');
@@ -1184,9 +1195,25 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
         const dm = rowMap.get('IND-4');
         if (dm) dm[field] = occ > 0 ? revApt / occ : 0;
 
+        // Coef. Adultos
+        const coefAdults = rowMap.get('IND-COEF-ADULTOS');
+        if (coefAdults) coefAdults[field] = occ > 0 ? adults / occ : 0;
+
+        // Coef. CHD
+        const coefChd = rowMap.get('IND-COEF-CHD');
+        if (coefChd) coefChd[field] = occ > 0 ? chd / occ : 0;
+
         // RevPAR
         const revpar = rowMap.get('IND-6');
         if (revpar) revpar[field] = avail > 0 ? revApt / avail : 0;
+
+        // TREVPOR
+        const trevpor = rowMap.get('IND-TREVPOR');
+        if (trevpor) trevpor[field] = occ > 0 ? (revApt + revExtra) / occ : 0;
+
+        // TREVPAR
+        const trevpar = rowMap.get('IND-TREVPAR');
+        if (trevpar) trevpar[field] = avail > 0 ? (revApt + revExtra) / avail : 0;
     });
 
     // --- REVENUE CALCULATIONS ---
@@ -1281,8 +1308,8 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
         row.deltaBudgetVal = row.real - row.budget;
         row.deltaBudgetPct = row.budget === 0 ? 0 : ((row.real - row.budget) / Math.abs(row.budget)) * 100;
         
-        row.deltaLYVal = row.real - row.lastYear;
-        row.deltaLYPct = row.lastYear === 0 ? 0 : ((row.real - row.lastYear) / Math.abs(row.lastYear)) * 100;
+        row.deltaLYVal = (row.previa || 0) - row.lastYear;
+        row.deltaLYPct = row.lastYear === 0 ? 0 : (((row.previa || 0) - row.lastYear) / Math.abs(row.lastYear)) * 100;
         
         row.deltaPreviaVal = row.real - (row.previa || 0);
         row.deltaPreviaPct = (row.previa || 0) === 0 ? 0 : ((row.real - (row.previa || 0)) / Math.abs(row.previa || 0)) * 100;
