@@ -403,7 +403,15 @@ const generateRow = (
   indentLevel = 0,
   gmdManagerName?: string,
   config?: { type?: ExpenseType, driver?: ExpenseDriver, taxRate?: number, inputType?: 'expense' | 'tax' | 'none', format?: 'currency' | 'percent' | 'integer' | 'decimal', method?: 'Fixed' | 'Variable', factor?: number },
-  indicatorSection?: string
+  indicatorSection?: string,
+  dreConfig?: { 
+    isCalculated?: boolean, 
+    formula?: string, 
+    textColor?: string, 
+    bgColor?: string, 
+    isBold?: boolean, 
+    isItalic?: boolean 
+  }
 ): ForecastRow => {
   
   const budget = budgetVal || 0;
@@ -452,7 +460,15 @@ const generateRow = (
       expenseDriver: config.driver,
       taxRate: config.taxRate,
       format: config.format || 'currency'
-    } : { inputType: 'none', format: 'currency' }
+    } : { inputType: 'none', format: 'currency' },
+
+    // Intelligent DRE fields
+    isCalculated: dreConfig?.isCalculated,
+    formula: dreConfig?.formula,
+    textColor: dreConfig?.textColor,
+    bgColor: dreConfig?.bgColor,
+    isBold: dreConfig?.isBold,
+    isItalic: dreConfig?.isItalic
   };
 };
 

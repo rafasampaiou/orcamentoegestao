@@ -3,6 +3,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { getForecastData, getDynamicForecastData } from '../services/mockData';
 import { Download, ListFilter, LayoutList, Settings2, ChevronUp, Activity, TrendingUp, Lock, LockOpen, CheckCircle2, X } from 'lucide-react';
 import { ExpenseDriver, ImportedRow, Account, CostPackage, Hotel, ForecastRow, ForecastConfig, ForecastOperator, ColumnVisibility, UserRole } from '../types';
+import { evaluateFormula } from '../utils/formulaEngine';
 
 interface ForecastTableProps {
     selectedMonth?: number;
@@ -675,9 +676,14 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
                                 // --- COMMON FINANCIAL CELLS RENDERER ---
                                 const renderFinancialCells = (isHeaderOrTotal = false, customBg = "") => {
-                                    const effectiveBg = isBlueHighlight ? 'bg-sky-100 border-sky-200' : (customBg || 'bg-blue-50/20 border-r border-blue-50');
-                                    const effectiveText = isBlueHighlight ? 'text-sky-900' : (isHeaderOrTotal ? 'text-black' : 'text-slate-800');
+                                    const effectiveBg = row.bgColor || (isBlueHighlight ? 'bg-sky-100 border-sky-200' : (customBg || 'bg-blue-50/20 border-r border-blue-50'));
+                                    const effectiveText = row.textColor || (isBlueHighlight ? 'text-sky-900' : (isHeaderOrTotal ? 'text-black' : 'text-slate-800'));
                                     const previaBg = isBlueHighlight ? 'bg-sky-100 text-sky-800' : 'bg-purple-50/20 text-slate-500';
+                                    const textStyle = {
+                                        color: row.textColor || undefined,
+                                        fontWeight: row.isBold || isHeaderOrTotal ? 'bold' : 'normal',
+                                        fontStyle: row.isItalic ? 'italic' : 'normal'
+                                    };
 
                                     // FORECAST (REAL) CELL LOGIC
                                     let realCellContent: React.ReactNode = formatValue(row.real, formatType);
@@ -801,21 +807,30 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         <>
                                             {/* PRÉVIA */}
                                             {columnVisibility.previa && (
-                                                <td className={`px-2 py-1 text-right border-r border-gray-100 tabular-nums ${isHeaderOrTotal ? 'font-semibold' : ''} ${previaBg} truncate`}>
+                                                <td 
+                                                    style={textStyle}
+                                                    className={`px-2 py-1 text-right border-r border-gray-100 tabular-nums ${previaBg} truncate`}
+                                                >
                                                     {previaCellContent}
                                                 </td>
                                             )}
 
                                             {/* FORECAST */}
                                             {columnVisibility.real && (
-                                                <td className={`px-2 py-1 text-right border-l border-gray-200 tabular-nums ${isHeaderOrTotal ? 'font-bold' : ''} ${effectiveText} ${effectiveBg} truncate`}>
+                                                <td 
+                                                    style={textStyle}
+                                                    className={`px-2 py-1 text-right border-l border-gray-200 tabular-nums ${effectiveText} ${effectiveBg} truncate`}
+                                                >
                                                     {realCellContent}
                                                 </td>
                                             )}
 
                                             {/* META */}
                                             {columnVisibility.budget && (
-                                                <td className={`px-2 py-1 text-right border-r border-gray-100 tabular-nums ${isHeaderOrTotal ? 'font-semibold' : ''} ${isBlueHighlight ? 'text-sky-900' : 'text-slate-500'} truncate`}>
+                                                <td 
+                                                    style={textStyle}
+                                                    className={`px-2 py-1 text-right border-r border-gray-100 tabular-nums ${isBlueHighlight ? 'text-sky-900' : 'text-slate-500'} truncate`}
+                                                >
                                                     {formatValue(row.budget, formatType)}
                                                 </td>
                                             )}
@@ -836,7 +851,10 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
                                             {/* LAST YEAR */}
                                             {columnVisibility.lastYear && (
-                                                <td className={`px-2 py-1 text-right tabular-nums border-r border-gray-100 ${isHeaderOrTotal ? 'font-semibold' : ''} bg-orange-50/20 text-slate-500 truncate`}>
+                                                <td 
+                                                    style={textStyle}
+                                                    className={`px-2 py-1 text-right tabular-nums border-r border-gray-100 bg-orange-50/20 text-slate-500 truncate`}
+                                                >
                                                     {formatValue(row.lastYear, formatType)}
                                                 </td>
                                             )}
@@ -931,16 +949,26 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     displayLabel = displayLabel.trim().replace(/^(\d{2})(\d{3})$/, '$1.$2');
                                 }
 
+                                const rowTextStyle = {
+                                    color: row.textColor || undefined,
+                                    fontWeight: row.isBold ? 'bold' : (isTotal ? 'bold' : 'normal'),
+                                    fontStyle: row.isItalic ? 'italic' : 'normal'
+                                };
+
                                 return (
                                     <tr
                                         key={row.id}
+                                        style={{ backgroundColor: row.bgColor || undefined }}
                                         className={`
                         transition-colors text-slate-700 hover:bg-indigo-50/30
                         ${isTotal ? 'bg-indigo-50 font-bold border-y-2 border-gray-300 text-indigo-900' : 'border-b border-gray-50'}
                         ${row.id === 'REV-IMP' ? 'bg-sky-100 border-y-2 border-sky-300 font-bold text-sky-950 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.5)]' : ''}
                     `}
                                     >
-                                        <td className={`px-2 py-1 border-r border-gray-100 align-middle sticky left-0 z-20 bg-white group-hover:bg-indigo-50/30 ${isTotal ? 'bg-indigo-50' : ''}`}>
+                                        <td 
+                                            style={rowTextStyle}
+                                            className={`px-2 py-1 border-r border-gray-100 align-middle sticky left-0 z-20 bg-white group-hover:bg-indigo-50/30 ${isTotal ? 'bg-indigo-50' : ''}`}
+                                        >
                                             <div style={{ paddingLeft: `${(row.indentLevel || 0) * 16 + 12}px` }} className={`truncate text-xs ${isTotal ? 'uppercase tracking-wide' : ''}`}>
                                                 {displayLabel}
                                             </div>
@@ -1123,6 +1151,7 @@ function calculateRowValue(config: ForecastConfig, allRows: ForecastRow[], base:
 
 function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], accounts: Account[]) {
     const rowMap = new Map(rows.map(r => [r.id, r]));
+    const nameMap = new Map(rows.map(r => [r.label.trim(), r])); // For formula lookups by name
 
     const sumAndSet = (targetId: string, sources: { id: string }[], fieldToSet: 'real' | 'budget' | 'lastYear' | 'previa') => {
         let total = 0;
@@ -1132,6 +1161,18 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
         });
         const target = rowMap.get(targetId);
         if (target) target[fieldToSet] = total;
+    };
+
+    const runFormulas = (field: 'real' | 'budget' | 'lastYear' | 'previa') => {
+        const context = {
+            getValue: (name: string) => nameMap.get(name.trim())?.[field] || 0
+        };
+
+        rows.forEach(row => {
+            if (row.isCalculated && row.formula) {
+                row[field] = evaluateFormula(row.formula, context);
+            }
+        });
     };
 
     // --- REVENUE CALCULATIONS ---
@@ -1148,60 +1189,36 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
         sumAndSet('REV-TOTAL', [{ id: 'REV-APT' }, { id: 'REV-EXTRA' }], field);
 
         // REV-NET = REV-TOTAL - REV-TIME - REV-ISS - REV-IMP
-        const total = rowMap.get('REV-TOTAL')?.[field] || 0;
-        const ts = rowMap.get('REV-TIME')?.[field] || 0;
-        const iss = rowMap.get('REV-ISS')?.[field] || 0;
-        const imp = rowMap.get('REV-IMP')?.[field] || 0;
-        const net = rowMap.get('REV-NET');
-        if (net) net[field] = total - ts - iss - imp;
-    });
+        const revTotal = rowMap.get('REV-TOTAL')?.[field] || 0;
+        const revTime = rowMap.get('REV-TIME')?.[field] || 0;
+        const revIss = rowMap.get('REV-ISS')?.[field] || 0;
+        const revImp = rowMap.get('REV-IMP')?.[field] || 0;
+        const revNet = rowMap.get('REV-NET');
+        if (revNet) revNet[field] = revTotal - revTime - revIss - revImp;
 
-    // --- INDICATORS ---
-    ['real', 'budget', 'lastYear', 'previa'].forEach(f => {
-        const field = f as 'real' | 'budget' | 'lastYear' | 'previa';
-
+        // KPI: DM e RevPAR (Real time updates)
         const avail = rowMap.get('IND-1')?.[field] || 0;
         const occ = rowMap.get('IND-2')?.[field] || 0;
-        const adults = rowMap.get('IND-ADULTOS')?.[field] || 0;
-        const chd = rowMap.get('IND-CHD')?.[field] || 0;
-
-        // PAX: Soma Adultos e CHD
-        const paxRow = rowMap.get('IND-5');
-        if (paxRow) paxRow[field] = adults + chd;
-
         const revApt = rowMap.get('REV-APT')?.[field] || 0;
         const revExtra = rowMap.get('REV-EXTRA')?.[field] || 0;
-
-        // % Ocupação
-        const occPct = rowMap.get('IND-3');
-        if (occPct) occPct[field] = avail > 0 ? (occ / avail) * 100 : 0;
-
-        // DM Bruta
+        
         const dm = rowMap.get('IND-4');
         if (dm) dm[field] = occ > 0 ? revApt / occ : 0;
 
-        // Coef. Adultos
-        const coefAdults = rowMap.get('IND-COEF-ADULTOS');
-        if (coefAdults) coefAdults[field] = occ > 0 ? adults / occ : 0;
-
-        // Coef. CHD
-        const coefChd = rowMap.get('IND-COEF-CHD');
-        if (coefChd) coefChd[field] = occ > 0 ? chd / occ : 0;
-
-        // RevPAR
         const revpar = rowMap.get('IND-6');
         if (revpar) revpar[field] = avail > 0 ? revApt / avail : 0;
 
-        // TREVPOR
         const trevpor = rowMap.get('IND-TREVPOR');
         if (trevpor) trevpor[field] = occ > 0 ? (revApt + revExtra) / occ : 0;
 
-        // TREVPAR
         const trevpar = rowMap.get('IND-TREVPAR');
         if (trevpar) trevpar[field] = avail > 0 ? (revApt + revExtra) / avail : 0;
+
+        // Run Dynamic Formulas from Intelligent DRE
+        runFormulas(field);
     });
 
-    // --- COSTS CALCULATIONS ---
+    // --- COSTS CALCULATIONS (Aggregating Package Totals) ---
     const updatedRows = Array.from(rowMap.values());
     packages.forEach(pkg => {
         const pkgRow = rowMap.get(pkg.id);
@@ -1215,20 +1232,14 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
             let sumPrevia = 0;
 
             children.forEach(child => {
-                // Forecast (Real)
+                // Forecast (Real) - Variable Logic
                 if (child.forecastConfig.method === 'Variable') {
-                    const driverValue = getDriverValue(child.forecastConfig.driver, updatedRows, 'forecast');
-                    const factor = child.forecastConfig.factor || 0;
-                    const newVal = child.forecastConfig.operator === 'divide' && factor !== 0 ? driverValue / factor : driverValue * factor;
-                    child.real = newVal;
+                    child.real = calculateRowValue(child.forecastConfig, updatedRows, 'forecast');
                 }
 
-                // Previa
+                // Previa - Variable Logic
                 if (child.previaConfig?.method === 'Variable') {
-                    const driverValue = getDriverValue(child.previaConfig.driver, updatedRows, 'previa');
-                    const factor = child.previaConfig.factor || 0;
-                    const newVal = child.previaConfig.operator === 'divide' && factor !== 0 ? driverValue / factor : driverValue * factor;
-                    child.previa = newVal;
+                    child.previa = calculateRowValue(child.previaConfig, updatedRows, 'previa');
                 }
 
                 sumReal += child.real;
@@ -1248,12 +1259,8 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
     ['real', 'budget', 'lastYear', 'previa'].forEach(f => {
         const field = f as 'real' | 'budget' | 'lastYear' | 'previa';
         sumAndSet('CST-HEAD', pkgIds.map(id => ({ id })), field);
-    });
-
-    // --- RESULTS CALCULATIONS ---
-    ['real', 'budget', 'lastYear', 'previa'].forEach(f => {
-        const field = f as 'real' | 'budget' | 'lastYear' | 'previa';
-
+        
+        // Results after costs
         const revTotal = rowMap.get('REV-TOTAL')?.[field] || 0;
         const revIss = rowMap.get('REV-ISS')?.[field] || 0;
         const revImp = rowMap.get('REV-IMP')?.[field] || 0;
@@ -1284,12 +1291,12 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
     // --- TRANSFORMATION / REACTIVITY KPIs ---
     const kpiBudget = rowMap.get('KPI-TRANS-BUDGET');
     const kpiLY = rowMap.get('KPI-TRANS-LY');
-    const revTotal = rowMap.get('REV-TOTAL');
+    const revTotalRow = rowMap.get('REV-TOTAL');
     const gopRow = rowMap.get('RES-OP-COM-IMP');
     const costHead = rowMap.get('CST-HEAD');
 
-    if (kpiBudget && revTotal && gopRow && costHead) {
-        const deltaRev = revTotal.real - revTotal.budget;
+    if (kpiBudget && revTotalRow && gopRow && costHead) {
+        const deltaRev = revTotalRow.real - revTotalRow.budget;
         const deltaGop = gopRow.real - gopRow.budget;
         const deltaCost = costHead.real - costHead.budget;
 
@@ -1302,8 +1309,8 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
         }
     }
 
-    if (kpiLY && revTotal && gopRow && costHead) {
-        const deltaRevLY = revTotal.real - revTotal.lastYear;
+    if (kpiLY && revTotalRow && gopRow && costHead) {
+        const deltaRevLY = revTotalRow.real - revTotalRow.lastYear;
         const deltaGopLY = gopRow.real - gopRow.lastYear;
         const deltaCostLY = costHead.real - costHead.lastYear;
 

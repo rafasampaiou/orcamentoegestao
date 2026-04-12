@@ -24,7 +24,17 @@ export const supabaseService = {
       packageId: a.package_id,
       type: a.type || 'Fixed',
       sortOrder: a.sort_order || 0,
-      outOfScope: a.out_of_scope || false
+      outOfScope: a.out_of_scope || false,
+      parentId: a.parent_id,
+      formula: a.formula,
+      classification: a.classification,
+      textColor: a.text_color,
+      bgColor: a.bg_color,
+      isBold: a.is_bold,
+      isItalic: a.is_italic,
+      isCalculated: a.is_calculated,
+      allocationRules: a.allocation_rules,
+      budgetSource: a.budget_source
     })) as Account[];
   },
 
@@ -42,6 +52,16 @@ export const supabaseService = {
       type: a.type || 'Fixed',
       sort_order: a.sortOrder || 0,
       out_of_scope: a.outOfScope || false,
+      parent_id: a.parentId,
+      formula: a.formula,
+      classification: a.classification,
+      text_color: a.textColor,
+      bg_color: a.bgColor,
+      is_bold: a.isBold,
+      is_italic: a.isItalic,
+      is_calculated: a.isCalculated,
+      allocation_rules: a.allocationRules,
+      budget_source: a.budgetSource,
       updated_at: new Date().toISOString()
     }));
 

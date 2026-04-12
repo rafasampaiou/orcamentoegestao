@@ -94,6 +94,18 @@ export interface Account {
   sortOrder?: number;
   outOfScope?: boolean;
   level?: 'master' | 'pkg' | 'account';
+
+  // New fields for Intelligent DRE Engine
+  parentId?: string;
+  formula?: string;
+  classification?: 'Indicator' | 'Revenue' | 'Tax' | 'Expense' | 'GOP' | 'Occupancy';
+  textColor?: string;
+  bgColor?: string;
+  isBold?: boolean;
+  isItalic?: boolean;
+  isCalculated?: boolean;
+  allocationRules?: any[];
+  budgetSource?: string;
 }
 
 export interface GMDConfiguration {
@@ -166,7 +178,15 @@ export interface ForecastRow {
     expenseDriver?: ExpenseDriver;
     taxRate?: number;
     format?: 'currency' | 'percent' | 'integer' | 'decimal'; // Added decimal for ratios
-  }
+  };
+  
+  // Intelligent DRE fields
+  isCalculated?: boolean;
+  formula?: string;
+  textColor?: string;
+  bgColor?: string;
+  isBold?: boolean;
+  isItalic?: boolean;
 }
 
 export interface DrePackage {

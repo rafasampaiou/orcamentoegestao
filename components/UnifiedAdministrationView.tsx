@@ -343,6 +343,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   
   // Registry Sub-tabs (Now under Geral)
   const [activeRegistryTab, setActiveRegistryTab] = useState<'users' | 'logs' | 'hotels' | 'costCenters' | 'packages' | 'accounts' | 'dre_structure'>('users');
+  const [dreContext, setDreContext] = useState<'forecast' | 'budget'>('forecast');
+  const [isSavingPerms, setIsSavingPerms] = useState(false);
 
   // Import Sub-tabs
   const [activeImportTab, setActiveImportTab] = useState<'financial' | 'revenue' | 'occupancy' | 'costCenters' | 'accounts'>('financial');
@@ -412,7 +414,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     }
   });
   
-  const [isSavingPerms, setIsSavingPerms] = useState(false);
   
   // Load permissions matrix from Supabase
   React.useEffect(() => {
@@ -916,7 +917,17 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     type: 'Fixed',
     sortOrder: 0,
     outOfScope: false,
-    level: 'account'
+    level: 'account',
+    parentId: '',
+    formula: '',
+    classification: 'Revenue',
+    textColor: '#1e293b',
+    bgColor: '#ffffff',
+    isBold: false,
+    isItalic: false,
+    isCalculated: false,
+    allocationRules: [],
+    budgetSource: ''
   });
   
   const [gmdForm, setGmdForm] = useState<Partial<GMDConfiguration>>({
@@ -1027,17 +1038,27 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const openNewAccount = () => {
       setEditingId(null);
       setAccountForm({ 
-        id: '', 
-        code: '', 
-        name: '', 
-        package: '', 
-        packageCode: '',
-        masterPackage: '', 
-        masterPackageCode: '',
-        type: 'Fixed',
-        sortOrder: accounts.length,
-        outOfScope: false,
-        level: 'account'
+          id: '', 
+          code: '', 
+          name: '', 
+          package: '', 
+          packageCode: '', 
+          masterPackage: '', 
+          masterPackageCode: '', 
+          type: 'Fixed',
+          sortOrder: accounts.length,
+          outOfScope: false,
+          level: 'account',
+          parentId: '',
+          formula: '',
+          classification: 'Revenue',
+          textColor: '#1e293b',
+          bgColor: '#ffffff',
+          isBold: false,
+          isItalic: false,
+          isCalculated: false,
+          allocationRules: [],
+          budgetSource: ''
       });
       setActiveModal('account');
   };
@@ -1047,11 +1068,19 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       if (id) {
           const acc = accounts.find(i => i.id === id);
           if (acc) {
-              setAccountForm({ 
+              setAccountForm({
                 ...acc,
-                level: acc.level || 'account'
+                parentId: acc.parentId || '',
+                formula: acc.formula || '',
+                classification: acc.classification || 'Revenue',
+                textColor: acc.textColor || '#1e293b',
+                bgColor: acc.bgColor || '#ffffff',
+                isBold: acc.isBold || false,
+                isItalic: acc.isItalic || false,
+                isCalculated: acc.isCalculated || false,
+                allocationRules: acc.allocationRules || [],
+                budgetSource: acc.budgetSource || ''
               });
-              return;
           }
       }
       
@@ -1088,6 +1117,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               outOfScope: false
           });
       }
+      setActiveModal('account');
   };
 
   const openNewGMD = () => {
@@ -2879,10 +2909,39 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <div className="flex bg-gray-200 p-0.5 rounded-lg border border-gray-300">
-                          <button onClick={() => setAllLevel('master')} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${accountViewLevel === 'master' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Masters</button>
-                          <button onClick={() => setAllLevel('package')} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${accountViewLevel === 'package' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Pacotes</button>
-                          <button onClick={() => setAllLevel('account')} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${accountViewLevel === 'account' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Contas</button>
+                        <div className="flex items-center gap-2 bg-slate-200/50 p-1 rounded-lg border border-slate-300">
+                          <button 
+                            onClick={() => setDreContext('forecast')}
+                            className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-md transition-all ${dreContext === 'forecast' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-indigo-600'}`}
+                          >
+                            DRE Forecast
+                          </button>
+                          <button 
+                            onClick={() => setDreContext('budget')}
+                            className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-md transition-all ${dreContext === 'budget' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-indigo-600'}`}
+                          >
+                            DRE Budget
+                          </button>
+                        </div>
+                        <div className="flex bg-slate-200/50 p-1 rounded-lg border border-slate-300">
+                          <button 
+                            onClick={() => setAllLevel('master')}
+                            className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-md transition-all ${accountViewLevel === 'master' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-indigo-600'}`}
+                          >
+                            Ocultar Tudo
+                          </button>
+                          <button 
+                            onClick={() => setAllLevel('package')}
+                            className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-md transition-all ${accountViewLevel === 'package' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-indigo-600'}`}
+                          >
+                            Masters
+                          </button>
+                          <button 
+                            onClick={() => setAllLevel('account')}
+                            className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-md transition-all ${accountViewLevel === 'account' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-indigo-600'}`}
+                          >
+                            Exibir Tudo
+                          </button>
                         </div>
                         <button 
                           onClick={() => {
@@ -2918,69 +2977,114 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
                             const rows: React.ReactNode[] = [];
                             filtered.forEach(acc => {
-                               const isNewMaster = acc.masterPackage !== lastMaster;
-                               const isNewPkg = (acc.package !== lastPackage || isNewMaster) && acc.package;
-                               
-                               if (isNewMaster && acc.masterPackage) {
-                                  rows.push(
-                                    <tr 
-                                      key={`m-${acc.masterPackage}`} 
-                                      draggable
-                                      onDragStart={(e) => handleAccountDragStart(e, acc.masterPackage!, 'master')}
-                                      onDragOver={(e) => e.preventDefault()}
-                                      onDrop={(e) => handleAccountDrop(e, acc.masterPackage!, 'master')}
-                                      className="bg-indigo-50 border-y border-indigo-100 cursor-move hover:bg-indigo-100 transition-colors" 
-                                      onClick={() => openEditAccount('', 'master', acc.masterPackage!)}
-                                    >
-                                      <td className="px-4 py-1.5 text-[9px] font-black text-indigo-900 flex items-center gap-2">
-                                         <GripVertical size={10} className="text-indigo-300" />
-                                         {acc.sortOrder || 0}
-                                      </td>
-                                      <td className="px-4 py-1.5 text-[9px] font-black text-indigo-900">-</td>
-                                      <td className="px-4 py-1.5 text-[10px] font-black text-indigo-900 uppercase tracking-widest">{acc.masterPackage}</td>
-                                    </tr>
-                                  );
-                               }
-                               if (isNewPkg && acc.package) {
-                                  rows.push(
-                                    <tr 
-                                      key={`p-${acc.masterPackage}-${acc.package}`} 
-                                      draggable
-                                      onDragStart={(e) => handleAccountDragStart(e, acc.package!, 'pkg')}
-                                      onDragOver={(e) => e.preventDefault()}
-                                      onDrop={(e) => handleAccountDrop(e, acc.package!, 'pkg')}
-                                      className="bg-slate-50 border-b border-slate-100 cursor-move hover:bg-slate-100 transition-colors" 
-                                      onClick={() => openEditAccount('', 'pkg', `${acc.masterPackage}|${acc.package}`)}
-                                    >
-                                      <td className="px-4 py-1 text-[9px] font-bold text-slate-500 pl-6 flex items-center gap-2">
-                                         <GripVertical size={10} className="text-slate-300" />
-                                         {acc.sortOrder || 0}
-                                      </td>
-                                      <td className="px-4 py-1 text-[9px] font-bold text-slate-500">-</td>
-                                      <td className="px-4 py-1 text-[10px] font-bold text-slate-700 uppercase tracking-wider pl-6">{acc.package}</td>
-                                    </tr>
-                                  );
-                               }
-                               rows.push(
-                                 <tr 
-                                   key={acc.id} 
-                                   draggable
-                                   onDragStart={(e) => handleAccountDragStart(e, acc.id, 'account')}
-                                   onDragOver={(e) => e.preventDefault()}
-                                   onDrop={(e) => handleAccountDrop(e, acc.id, 'account')}
-                                   className="hover:bg-slate-50 transition-colors group cursor-move" 
-                                   onClick={() => openEditAccount(acc.id)}
-                                 >
-                                   <td className="px-4 py-2 text-[9px] text-gray-400 pl-10 flex items-center gap-2">
-                                      <GripVertical size={10} className="text-gray-200 opacity-0 group-hover:opacity-100" />
-                                      {acc.sortOrder || 0}
-                                   </td>
-                                   <td className="px-4 py-2 text-[10px] font-mono text-gray-500">{acc.code}</td>
-                                   <td className="px-4 py-2 text-[11px] font-bold text-gray-900 pl-10">{acc.name}</td>
-                                 </tr>
-                               );
-                               lastMaster = acc.masterPackage || '';
-                               lastPackage = acc.package || '';
+                                const isNewMaster = acc.masterPackage !== lastMaster;
+                                const isNewPkg = (acc.package !== lastPackage || isNewMaster) && acc.package;
+                                const masterCollapsed = collapsedMasterPackages.has(acc.masterPackage || '');
+                                const pkgKey = `${acc.masterPackage}|${acc.package}`;
+                                const pkgCollapsed = collapsedPackages.has(pkgKey);
+
+                                if (isNewMaster && acc.masterPackage) {
+                                   rows.push(
+                                     <tr 
+                                       key={`m-${acc.masterPackage}`} 
+                                       style={{ 
+                                         backgroundColor: acc.bgColor || '#f1f5f9',
+                                         color: acc.textColor || '#0f172a'
+                                       }}
+                                       className="border-y border-slate-200 transition-colors group h-10" 
+                                     >
+                                       <td className="px-4 py-2 text-[10px] font-black text-slate-400">
+                                          {acc.sortOrder || 0}
+                                       </td>
+                                       <td className="px-4 py-2 text-[10px] font-mono font-black">{acc.masterPackageCode || '-'}</td>
+                                       <td className="px-4 py-2 flex items-center gap-3">
+                                          <button 
+                                            onClick={(e) => { e.stopPropagation(); toggleMasterExpand(acc.masterPackage!); }}
+                                            className="w-5 h-5 flex items-center justify-center border-2 border-slate-300 rounded shadow-sm bg-white text-slate-500 hover:border-indigo-500 hover:text-indigo-600 transition-all transform active:scale-90"
+                                          >
+                                            {masterCollapsed ? <Plus size={12} strokeWidth={3}/> : <span className="text-[18px] leading-none mb-1 font-black">-</span>}
+                                          </button>
+                                          <span 
+                                            onClick={() => openEditAccount('', 'master', acc.masterPackage!)}
+                                            className={`text-xs uppercase tracking-widest cursor-pointer hover:underline ${acc.isBold ? 'font-black' : 'font-bold'} ${acc.isItalic ? 'italic' : ''}`}
+                                          >
+                                            {acc.masterPackage}
+                                          </span>
+                                       </td>
+                                     </tr>
+                                   );
+                                   lastMaster = acc.masterPackage || '';
+                                }
+
+                                if (masterCollapsed) return;
+
+                                if (isNewPkg && acc.package) {
+                                   rows.push(
+                                     <tr 
+                                       key={`p-${pkgKey}`} 
+                                       style={{ 
+                                         backgroundColor: acc.bgColor || '#f8fafc',
+                                         color: acc.textColor || '#334155'
+                                       }}
+                                       className="border-b border-slate-100 hover:bg-slate-50 transition-colors group h-9" 
+                                     >
+                                       <td className="px-4 py-1.5 text-[9px] font-bold text-slate-300 pl-8">
+                                          {acc.sortOrder || 0}
+                                       </td>
+                                       <td className="px-4 py-1.5 text-[10px] font-mono text-slate-400">{acc.packageCode || '-'}</td>
+                                       <td className="px-4 py-1.5 flex items-center gap-3 pl-10 border-l-2 border-slate-200 ml-4">
+                                          <button 
+                                            onClick={(e) => { e.stopPropagation(); togglePackageExpand(pkgKey); }}
+                                            className="w-4 h-4 flex items-center justify-center border border-slate-300 rounded bg-white text-slate-400 hover:border-indigo-400 hover:text-indigo-500 transition-all transform active:scale-90"
+                                          >
+                                            {pkgCollapsed ? <Plus size={10} strokeWidth={2}/> : <span className="text-[14px] leading-none mb-0.5 font-bold">-</span>}
+                                          </button>
+                                          <span 
+                                            onClick={() => openEditAccount('', 'pkg', pkgKey)}
+                                            className={`text-[11px] uppercase tracking-normal cursor-pointer hover:underline ${acc.isBold ? 'font-bold' : 'font-medium'} ${acc.isItalic ? 'italic' : ''}`}
+                                          >
+                                            {acc.package}
+                                          </span>
+                                       </td>
+                                     </tr>
+                                   );
+                                   lastPackage = acc.package || '';
+                                }
+
+                                if (pkgCollapsed) return;
+
+                                rows.push(
+                                  <tr 
+                                    key={acc.id} 
+                                    style={{ 
+                                      backgroundColor: acc.bgColor || 'transparent',
+                                      color: acc.textColor || '#64748b'
+                                    }}
+                                    className="hover:bg-slate-50/80 transition-colors group h-8 border-b border-slate-50" 
+                                  >
+                                    <td className="px-4 py-1 text-[9px] font-medium text-slate-200 pl-12">
+                                       {acc.sortOrder || 0}
+                                    </td>
+                                    <td className="px-4 py-1 text-[10px] font-mono text-slate-300">{acc.code}</td>
+                                    <td className="px-4 py-1 pl-20 relative">
+                                       <div className="absolute left-[52px] top-0 bottom-0 w-0.5 bg-slate-100"></div>
+                                       <div className="absolute left-[52px] top-4 w-4 h-0.5 bg-slate-100"></div>
+                                       <div className="flex justify-between items-center group/item">
+                                         <span 
+                                           onClick={() => openEditAccount(acc.id)}
+                                           className={`text-[11px] cursor-pointer hover:text-indigo-600 hover:underline ${acc.isBold ? 'font-bold' : ''} ${acc.isItalic ? 'italic' : ''}`}
+                                         >
+                                           {acc.name}
+                                           {acc.isCalculated && <span className="ml-2 text-[9px] font-black text-amber-500 bg-amber-50 px-1 rounded border border-amber-100">f(x)</span>}
+                                         </span>
+                                         <div className="flex gap-1 opacity-0 group-hover/item:opacity-100 transition-all">
+                                           <button onClick={() => openEditAccount(acc.id)} className="p-1 text-slate-300 hover:text-indigo-600"><Pencil size={12}/></button>
+                                           <button onClick={() => handleDeleteAccountRow(acc.id)} className="p-1 text-slate-300 hover:text-red-500"><Trash2 size={12}/></button>
+                                         </div>
+                                       </div>
+                                    </td>
+                                  </tr>
+                                );
                             });
                             return rows;
                           })()}
@@ -2989,7 +3093,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Right Side: Edit Panel */}
+{/* Right Side: Edit Panel */}
                   <div className={`w-[400px] shrink-0 border border-gray-200 rounded-xl bg-gray-50 shadow-lg flex flex-col overflow-hidden transition-all duration-300 ${editingId || accountForm.name ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-10 pointer-events-none'}`}>
                     <div className="p-4 bg-indigo-600 text-white flex justify-between items-center">
                       <div className="flex items-center gap-2">
@@ -3024,9 +3128,77 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                 <input type="text" value={accountForm.masterPackage} onChange={e => setAccountForm({...accountForm, masterPackage: e.target.value})} className="w-full bg-slate-50 border-none rounded-lg p-2 text-xs focus:ring-2 focus:ring-indigo-500" />
                              </div>
                           </div>
-                          <div className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
-                             <input type="checkbox" id="outOfScopeSide" checked={accountForm.outOfScope} onChange={e => setAccountForm({...accountForm, outOfScope: e.target.checked})} className="rounded text-indigo-600" />
-                             <label htmlFor="outOfScopeSide" className="text-xs font-bold text-gray-600">Fora do Escopo DRE</label>
+
+                          <div className="pt-2 border-t border-slate-100 mt-4">
+                             <label className="block text-[11px] font-black text-indigo-600 uppercase tracking-widest mb-3">Configuração Intelligent DRE</label>
+                             
+                             <div className="space-y-4">
+                               <div>
+                                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Classificação</label>
+                                  <select 
+                                     value={accountForm.classification} 
+                                     onChange={e => setAccountForm({...accountForm, classification: e.target.value})}
+                                     className="w-full bg-slate-50 border-none rounded-lg p-2 text-xs font-bold focus:ring-2 focus:ring-indigo-500"
+                                  >
+                                     <option value="Revenue">Receita</option>
+                                     <option value="Tax">Imposto</option>
+                                     <option value="Expense">Despesa</option>
+                                     <option value="Result">Resultado / Margem</option>
+                                  </select>
+                               </div>
+
+                               <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
+                                  <label className="text-xs font-bold text-gray-600">Considerar como Calculado?</label>
+                                  <input 
+                                     type="checkbox" 
+                                     checked={accountForm.isCalculated} 
+                                     onChange={e => setAccountForm({...accountForm, isCalculated: e.target.checked})} 
+                                     className="rounded text-indigo-600" 
+                                  />
+                               </div>
+
+                               {accountForm.isCalculated && (
+                                  <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                                     <label className="block text-[10px] font-bold text-amber-600 uppercase mb-1">Fórmula Dinâmica</label>
+                                     <textarea 
+                                        value={accountForm.formula} 
+                                        onChange={e => setAccountForm({...accountForm, formula: e.target.value})}
+                                        placeholder="Ex: [Receita Total] - [Impostos]"
+                                        className="w-full bg-amber-50 border border-amber-100 rounded-lg p-2 text-[11px] font-mono focus:ring-2 focus:ring-amber-500 min-h-[60px]"
+                                     />
+                                     <p className="text-[9px] text-amber-500 italic mt-1 leading-tight">
+                                        Use colchetes [Nome da Conta] para referenciar outras contas. Operadores: +, -, *, /, ( )
+                                     </p>
+                                  </div>
+                               )}
+
+                               <div className="grid grid-cols-2 gap-3 pt-2">
+                                  <div>
+                                     <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cor do Texto</label>
+                                     <input type="color" value={accountForm.textColor} onChange={e => setAccountForm({...accountForm, textColor: e.target.value})} className="w-full h-8 rounded-lg cursor-pointer border-none p-0 bg-transparent" />
+                                  </div>
+                                  <div>
+                                     <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Fundo (BG)</label>
+                                     <input type="color" value={accountForm.bgColor} onChange={e => setAccountForm({...accountForm, bgColor: e.target.value})} className="w-full h-8 rounded-lg cursor-pointer border-none p-0 bg-transparent" />
+                                  </div>
+                               </div>
+
+                               <div className="flex gap-4 pt-1">
+                                  <label className="flex items-center gap-2 cursor-pointer group">
+                                     <input type="checkbox" checked={accountForm.isBold} onChange={e => setAccountForm({...accountForm, isBold: e.target.checked})} className="rounded text-indigo-600" />
+                                     <span className="text-[10px] font-black group-hover:text-indigo-600 transition-colors uppercase">Negrito</span>
+                                  </label>
+                                  <label className="flex items-center gap-2 cursor-pointer group">
+                                     <input type="checkbox" checked={accountForm.isItalic} onChange={e => setAccountForm({...accountForm, isItalic: e.target.checked})} className="rounded text-indigo-600" />
+                                     <span className="text-[10px] font-bold italic group-hover:text-indigo-600 transition-colors uppercase">Itálico</span>
+                                  </label>
+                               </div>
+
+                               <div className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
+                                  <input type="checkbox" id="outOfScopeSide" checked={accountForm.outOfScope} onChange={e => setAccountForm({...accountForm, outOfScope: e.target.checked})} className="rounded text-indigo-600" />
+                                  <label htmlFor="outOfScopeSide" className="text-xs font-bold text-gray-600">Fora do Escopo DRE</label>
+                               </div>
+                             </div>
                           </div>
                        </div>
                     </div>
@@ -3371,29 +3543,75 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                         </div>
                       </div>
                       
-                      <div className="overflow-hidden border border-gray-200 rounded-xl">
+                      <div className="overflow-hidden border border-gray-200 rounded-xl shadow-sm">
                         <table className="min-w-full divide-y divide-gray-200">
-                          <thead className="bg-gray-50">
+                          <thead className="bg-gray-50 uppercase tracking-widest text-[9px] font-black text-gray-500">
                             <tr>
-                              <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Status</th>
-                              <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Código</th>
-                              <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Conta Contábil</th>
-                              <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Pacote</th>
-                              <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Pacote Master</th>
-                              <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Mensagem</th>
+                              <th className="px-4 py-3 text-left w-12">Status</th>
+                              <th className="px-4 py-3 text-left w-32">Código</th>
+                              <th className="px-4 py-3 text-left">Conta Contábil</th>
+                              <th className="px-4 py-3 text-left">Pacote</th>
+                              <th className="px-4 py-3 text-left">Pacote Master</th>
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
                             {accParsedData.map((row, idx) => (
-                              <tr key={idx} className={row.status === 'error' ? 'bg-red-50' : ''}>
-                                <td className="px-4 py-3 whitespace-nowrap">
-                                  {row.status === 'valid' ? <div className="w-2 h-2 rounded-full bg-emerald-500" /> : <div className="w-2 h-2 rounded-full bg-red-500" />}
+                              <tr key={idx} className={`${row.status === 'error' ? 'bg-red-50' : 'hover:bg-slate-50'} transition-colors`}>
+                                <td className="px-4 py-2">
+                                  {row.status === 'valid' ? (
+                                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm" title="Válido" />
+                                  ) : (
+                                    <div className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-sm" title={row.msg} />
+                                  )}
                                 </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-xs font-mono">{row.id}</td>
-                                <td className="px-4 py-3 whitespace-nowrap text-xs font-bold">{row.name}</td>
-                                <td className="px-4 py-3 whitespace-nowrap text-xs">{row.package || '-'}</td>
-                                <td className="px-4 py-3 whitespace-nowrap text-xs">{row.masterPackage || '-'}</td>
-                                <td className="px-4 py-3 whitespace-nowrap text-[10px] text-red-600 italic">{row.msg}</td>
+                                <td className="px-2 py-1">
+                                  <input 
+                                    type="text" 
+                                    value={row.id} 
+                                    onChange={e => {
+                                      const newData = [...accParsedData];
+                                      newData[idx].id = e.target.value;
+                                      setAccParsedData(newData);
+                                    }}
+                                    className="w-full bg-transparent border-none focus:ring-1 focus:ring-indigo-500 rounded p-1 text-xs font-mono"
+                                  />
+                                </td>
+                                <td className="px-2 py-1">
+                                  <input 
+                                    type="text" 
+                                    value={row.name} 
+                                    onChange={e => {
+                                      const newData = [...accParsedData];
+                                      newData[idx].name = e.target.value;
+                                      setAccParsedData(newData);
+                                    }}
+                                    className="w-full bg-transparent border-none focus:ring-1 focus:ring-indigo-500 rounded p-1 text-xs font-bold"
+                                  />
+                                </td>
+                                <td className="px-2 py-1">
+                                  <input 
+                                    type="text" 
+                                    value={row.package} 
+                                    onChange={e => {
+                                      const newData = [...accParsedData];
+                                      newData[idx].package = e.target.value;
+                                      setAccParsedData(newData);
+                                    }}
+                                    className="w-full bg-transparent border-none focus:ring-1 focus:ring-indigo-500 rounded p-1 text-xs"
+                                  />
+                                </td>
+                                <td className="px-2 py-1">
+                                  <input 
+                                    type="text" 
+                                    value={row.masterPackage} 
+                                    onChange={e => {
+                                      const newData = [...accParsedData];
+                                      newData[idx].masterPackage = e.target.value;
+                                      setAccParsedData(newData);
+                                    }}
+                                    className="w-full bg-transparent border-none focus:ring-1 focus:ring-indigo-500 rounded p-1 text-xs"
+                                  />
+                                </td>
                               </tr>
                             ))}
                           </tbody>
@@ -3737,6 +3955,87 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                   </div>
                 </div>
               )}
+
+              <div className="pt-4 border-t border-gray-100">
+                <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Inteligência & Estilo</h5>
+                
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Classificação</label>
+                        <select 
+                            value={accountForm.classification} 
+                            onChange={e => setAccountForm({...accountForm, classification: e.target.value as any})}
+                            className="w-full p-2 text-sm border border-gray-300 rounded-lg outline-none focus:ring-1 focus:ring-indigo-500"
+                        >
+                            <option value="Occupancy">Ocupação</option>
+                            <option value="Revenue">Receita</option>
+                            <option value="Tax">Imposto</option>
+                            <option value="Expense">Despesa</option>
+                            <option value="GOP">GOP</option>
+                            <option value="Indicator">Indicador</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Origem no Orçamento</label>
+                        <select 
+                            value={accountForm.budgetSource} 
+                            onChange={e => setAccountForm({...accountForm, budgetSource: e.target.value})}
+                            className="w-full p-2 text-sm border border-gray-300 rounded-lg outline-none focus:ring-1 focus:ring-indigo-500"
+                        >
+                            <option value="">Input Manual</option>
+                            <option value="occupancy">Ocupação</option>
+                            <option value="labor">Mão de Obra</option>
+                            <option value="extra_rev">Receitas Extras</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div className="flex gap-4 mb-4">
+                    <div className="flex-1">
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cor da Fonte</label>
+                        <div className="flex gap-2 items-center">
+                            <input type="color" value={accountForm.textColor} onChange={e => setAccountForm({...accountForm, textColor: e.target.value})} className="w-8 h-8 rounded border-none cursor-pointer" />
+                            <span className="text-xs font-mono">{accountForm.textColor}</span>
+                        </div>
+                    </div>
+                    <div className="flex-1">
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cor do Fundo</label>
+                        <div className="flex gap-2 items-center">
+                            <input type="color" value={accountForm.bgColor} onChange={e => setAccountForm({...accountForm, bgColor: e.target.value})} className="w-8 h-8 rounded border-none cursor-pointer" />
+                            <span className="text-xs font-mono">{accountForm.bgColor}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex gap-4 mb-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={accountForm.isBold} onChange={e => setAccountForm({...accountForm, isBold: e.target.checked})} className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500" />
+                        <span className="text-xs font-bold text-gray-700">Negrito</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={accountForm.isItalic} onChange={e => setAccountForm({...accountForm, isItalic: e.target.checked})} className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500" />
+                        <span className="text-xs italic text-gray-700">Itálico</span>
+                    </label>
+                </div>
+
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    <label className="flex items-center gap-2 cursor-pointer mb-2">
+                        <input type="checkbox" checked={accountForm.isCalculated} onChange={e => setAccountForm({...accountForm, isCalculated: e.target.checked})} className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500" />
+                        <span className="text-xs font-bold text-slate-800">Linha de Cálculo / Somatória</span>
+                    </label>
+                    {accountForm.isCalculated && (
+                        <div>
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Fórmula (ex: @Ocupação * @DiariaMedia)</label>
+                            <textarea 
+                                value={accountForm.formula} 
+                                onChange={e => setAccountForm({...accountForm, formula: e.target.value})}
+                                className="w-full p-2 text-xs font-mono border border-slate-200 rounded-lg outline-none focus:border-indigo-500 transition-all h-20"
+                                placeholder="Digite a fórmula aqui..."
+                            />
+                        </div>
+                    )}
+                </div>
+              </div>
             </div>
             
             <div className="p-6 bg-gray-50 flex gap-3">
