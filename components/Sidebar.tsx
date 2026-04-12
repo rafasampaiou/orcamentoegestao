@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   Table2, Users, Settings, LogOut, Building2, BarChart2, 
   BedDouble, Users2, DollarSign, CheckCircle2, ChevronDown, ChevronRight,
-  TrendingUp, PieChart, Database, HardDrive
+  TrendingUp, PieChart, Database, HardDrive, Layers
 } from 'lucide-react';
 import { ViewState, ModuleType, User, UserRole } from '../types';
 
@@ -139,20 +139,97 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, currentModule, onChangeV
         {/* Admin Section (Standalone or Grouped) */}
         {isAdmin && (
            <div className="pt-4 mt-4 border-t border-slate-800/50">
-              <button
-                onClick={() => {
-                   onChangeView('admin');
-                   setExpandedSections(prev => ({...prev, admin: true}));
-                }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-black uppercase tracking-widest transition-all duration-200 ${
-                  currentView === 'admin'
-                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                } ${collapsed ? 'justify-center px-0' : ''}`}
-              >
-                <Settings size={20} className="shrink-0 text-indigo-400" />
-                {!collapsed && <span>Administração</span>}
-              </button>
+              {!collapsed && (
+                <button 
+                  onClick={() => toggleSection('admin')}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all ${currentView.startsWith('admin') ? 'text-white' : 'hover:bg-slate-800/50 text-slate-400'}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Settings size={16} className={currentView.startsWith('admin') ? 'text-indigo-400' : ''} />
+                    <span className="text-[11px] font-black uppercase tracking-wider">Administração</span>
+                  </div>
+                  {expandedSections['admin'] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                </button>
+              )}
+
+              {collapsed && (
+                <div className="flex flex-col items-center py-2">
+                  <button onClick={() => onChangeView('admin')}>
+                    <Settings size={20} className={currentView.startsWith('admin') ? 'text-indigo-400' : 'text-slate-500'} />
+                  </button>
+                </div>
+              )}
+
+              {expandedSections['admin'] && !collapsed && (
+                <div className="space-y-0.5 ml-2 border-l border-slate-800/50 pl-2 py-1">
+                  <button
+                    onClick={() => onChangeView('admin_geral')}
+                    className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-lg transition-all duration-200 ${
+                      currentView === 'admin_geral'
+                        ? 'bg-gradient-to-r from-indigo-600/20 to-transparent text-indigo-400 border-l-2 border-indigo-500 rounded-l-none'
+                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <Database size={16} className="shrink-0" />
+                    <span className="truncate">Plano de Contas</span>
+                  </button>
+                  <button
+                    onClick={() => onChangeView('admin_real')}
+                    className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-lg transition-all duration-200 ${
+                      currentView === 'admin_real'
+                        ? 'bg-gradient-to-r from-indigo-600/20 to-transparent text-indigo-400 border-l-2 border-indigo-500 rounded-l-none'
+                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <BarChart2 size={16} className="shrink-0" />
+                    <span className="truncate">DRE Forecast</span>
+                  </button>
+                  <button
+                    onClick={() => onChangeView('admin_budget')}
+                    className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-lg transition-all duration-200 ${
+                      currentView === 'admin_budget'
+                        ? 'bg-gradient-to-r from-indigo-600/20 to-transparent text-indigo-400 border-l-2 border-indigo-500 rounded-l-none'
+                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <Table2 size={16} className="shrink-0" />
+                    <span className="truncate">USALI Budget</span>
+                  </button>
+                  <button
+                    onClick={() => onChangeView('admin_hotels')}
+                    className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-lg transition-all duration-200 ${
+                      currentView === 'admin_hotels'
+                        ? 'bg-gradient-to-r from-indigo-600/20 to-transparent text-indigo-400 border-l-2 border-indigo-500 rounded-l-none'
+                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <Building2 size={16} className="shrink-0" />
+                    <span className="truncate">Hotéis e Setores</span>
+                  </button>
+                  <button
+                    onClick={() => onChangeView('admin_users')}
+                    className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-lg transition-all duration-200 ${
+                      currentView === 'admin_users'
+                        ? 'bg-gradient-to-r from-indigo-600/20 to-transparent text-indigo-400 border-l-2 border-indigo-500 rounded-l-none'
+                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <Users size={16} className="shrink-0" />
+                    <span className="truncate">Usuários e Logs</span>
+                  </button>
+                  <button
+                    onClick={() => onChangeView('admin_gmd')}
+                    className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-lg transition-all duration-200 ${
+                      currentView === 'admin_gmd'
+                        ? 'bg-gradient-to-r from-indigo-600/20 to-transparent text-indigo-400 border-l-2 border-indigo-500 rounded-l-none'
+                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <CheckCircle2 size={16} className="shrink-0" />
+                    <span className="truncate">Config GMD</span>
+                  </button>
+                </div>
+              )}
            </div>
         )}
       </nav>

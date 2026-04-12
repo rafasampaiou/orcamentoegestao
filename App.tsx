@@ -598,9 +598,16 @@ const App: React.FC = () => {
             currentUser={currentUser}
         />
       );
+      case 'admin_geral':
+      case 'admin_real':
+      case 'admin_budget':
+      case 'admin_users':
+      case 'admin_hotels':
+      case 'admin_gmd':
       case 'admin':
         return (
           <UnifiedAdministrationView
+            currentView={currentView}
             users={users}
             setUsers={setUsers}
             hotels={hotels} setHotels={setHotels}
@@ -835,7 +842,7 @@ const App: React.FC = () => {
         collapsed={sidebarCollapsed}
       />
 
-      <div className={`flex-1 ${sidebarCollapsed ? 'ml-20' : 'ml-64'} flex flex-col h-screen overflow-hidden transition-all duration-300`}>
+      <div className={`flex-1 ${sidebarCollapsed ? 'ml-20' : 'ml-[280px]'} flex flex-col h-screen overflow-hidden transition-all duration-300`}>
         <Header
           sidebarCollapsed={sidebarCollapsed}
           setSidebarCollapsed={setSidebarCollapsed}

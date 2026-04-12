@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { getForecastData } from '../services/mockData';
 import { Plus, Trash2, X, Save, Briefcase, Pencil, Calendar, PieChart, Lock, LockOpen, Settings as SettingsIcon, Users, Search, Upload, Settings, Eye, FileText, Layout, Info, ChevronUp, GripVertical } from 'lucide-react';
-import { User, UserRole, CostCenter, ImportedRow, Hotel, Account, BudgetVersion, LaborParameters, ScheduleItem, ImportedCostCenter, CostPackage, GMDConfiguration } from '../types';
+import { User, UserRole, CostCenter, ImportedRow, Hotel, Account, BudgetVersion, LaborParameters, ScheduleItem, ImportedCostCenter, CostPackage, GMDConfiguration, ViewState } from '../types';
 import TimelineView from './TimelineView';
 import { supabaseService } from '../services/supabaseService';
 import { supabaseTemp } from '../services/supabaseClient';
@@ -308,6 +308,8 @@ interface UnifiedAdministrationViewProps {
     // DRE Config
     dreConfigs: { name: string, structure: any }[];
     setDreConfigs: React.Dispatch<React.SetStateAction<{ name: string, structure: any }[]>>;
+
+    currentView: ViewState;
 }
 
 const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({ 
@@ -325,10 +327,41 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     activeRealVersionId, setActiveRealVersionId,
     laborParametersMap, setLaborParametersMap,
     budgetSchedule, setBudgetSchedule,
-    dreConfigs, setDreConfigs
+    dreConfigs, setDreConfigs,
+    currentView
 }) => {
   // Main Module Tabs
   const [mainTab, setMainTab] = useState<'real' | 'budget' | 'geral'>('real');
+
+  // Sync internal tabs when sidebar view changes
+  React.useEffect(() => {
+    if (currentView === 'admin_geral') {
+      setMainTab('geral');
+      setActiveGeralTab('registries');
+      setActiveRegistryTab('accounts');
+    } else if (currentView === 'admin_real') {
+      setMainTab('real');
+      setActiveRealTab('dre_params');
+      setActiveRegistryTab('dre_structure');
+      setActiveDreName('Forecast');
+    } else if (currentView === 'admin_budget') {
+      setMainTab('budget');
+      setActiveBudgetTab('expense_characteristics');
+      setActiveRegistryTab('dre_structure');
+      setActiveDreName('Budget');
+    } else if (currentView === 'admin_users') {
+      setMainTab('geral');
+      setActiveGeralTab('registries');
+      setActiveRegistryTab('users');
+    } else if (currentView === 'admin_hotels') {
+      setMainTab('geral');
+      setActiveGeralTab('registries');
+      setActiveRegistryTab('hotels');
+    } else if (currentView === 'admin_gmd') {
+      setMainTab('geral');
+      setActiveGeralTab('gmd');
+    }
+  }, [currentView]);
 
   // Sub-tabs for Tauá Real
   const [activeRealTab, setActiveRealTab] = useState<'versions' | 'closure' | 'import' | 'labor' | 'schedule' | 'dre_params'>('versions');
@@ -2892,7 +2925,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               )}
 
               {activeRegistryTab === 'accounts' && (
-                <div className="flex gap-6 h-[calc(100vh-350px)]">
+                <div className="flex gap-6 h-[calc(100vh-280px)]">
                   {/* Left Side: Table */}
                   <div className="flex-1 flex flex-col min-w-0 bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
                     <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center shrink-0">
@@ -3137,13 +3170,15 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                   <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Classificação</label>
                                   <select 
                                      value={accountForm.classification} 
-                                     onChange={e => setAccountForm({...accountForm, classification: e.target.value})}
+                                     onChange={e => setAccountForm({...accountForm, classification: e.target.value as Account['classification']})}
                                      className="w-full bg-slate-50 border-none rounded-lg p-2 text-xs font-bold focus:ring-2 focus:ring-indigo-500"
                                   >
                                      <option value="Revenue">Receita</option>
                                      <option value="Tax">Imposto</option>
                                      <option value="Expense">Despesa</option>
-                                     <option value="Result">Resultado / Margem</option>
+                                     <option value="GOP">GOP / Resultado</option>
+                                     <option value="Indicator">Indicador Operacional</option>
+                                     <option value="Occupancy">Ocupação</option>
                                   </select>
                                </div>
 
@@ -3638,47 +3673,27 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     );
   };
 
+  const viewTitles: Record<string, { title: string; subtitle: string }> = {
+    admin_geral:  { title: 'Plano de Contas', subtitle: 'Cadastro e ordenação de Pacotes Master, Pacotes e Contas.' },
+    admin_real:   { title: 'DRE Forecast', subtitle: 'Edite a estrutura e ordem da DRE do Forecast.' },
+    admin_budget: { title: 'USALI Budget', subtitle: 'Configure a estrutura USALI do orçamento.' },
+    admin_users:  { title: 'Usuários e Logs', subtitle: 'Gerenciamento de usuários e auditoria de acessos.' },
+    admin_hotels: { title: 'Hotéis e Setores', subtitle: 'Cadastro de unidades e centros de resultado.' },
+    admin_gmd:    { title: 'Configuração GMD', subtitle: 'Matriz GMD: pacotes, gestores e associações.' },
+    admin:        { title: 'Administração', subtitle: 'Configure os parâmetros globais do sistema Tauá.' },
+  };
+  const vt = viewTitles[currentView] || viewTitles.admin;
+
   return (
     <div className="p-8 max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h2 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
             <SettingsIcon className="text-indigo-600" size={32} />
-            Administração
+            {vt.title}
           </h2>
-          <p className="text-slate-500 mt-1">Configure os parâmetros globais do sistema Tauá.</p>
+          <p className="text-slate-500 mt-1">{vt.subtitle}</p>
         </div>
-      </div>
-
-      {/* Main Module Tabs */}
-      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mb-8 w-fit">
-        <button
-          onClick={() => setMainTab('real')}
-          className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
-            mainTab === 'real' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          <PieChart size={18} />
-          Tauá Real
-        </button>
-        <button
-          onClick={() => setMainTab('budget')}
-          className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
-            mainTab === 'budget' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          <Briefcase size={18} />
-          Tauá Budget
-        </button>
-        <button
-          onClick={() => setMainTab('geral')}
-          className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
-            mainTab === 'geral' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          <SettingsIcon size={18} />
-          Tauá Geral
-        </button>
       </div>
 
       {mainTab === 'real' && renderTauáReal()}

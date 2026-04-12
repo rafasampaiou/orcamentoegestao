@@ -209,16 +209,22 @@ export type ViewState =
   | 'occupancy_real' 
   | 'comparatives'
   | 'gmd'
-  | 'validations' // New: Validations Log
-  | 'settings' // Administrativo
-  
+  | 'validations'
+
   // BUDGET Module
   | 'budget_home'
   | 'occupancy_budget'
   | 'labor_budget'
   | 'extra_revenue_budget'
   | 'dre_budget'
+
+  // ADMIN Module
+  | 'admin_geral'
+  | 'admin_real'
   | 'admin_budget'
+  | 'admin_users'
+  | 'admin_hotels'
+  | 'admin_gmd'
   | 'admin';
 
 export type ModuleType = 'REAL' | 'BUDGET';
