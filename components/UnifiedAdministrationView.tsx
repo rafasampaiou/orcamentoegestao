@@ -445,15 +445,23 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const uniqueMasterPackages = useMemo(() => {
     const map = new Map<string, {name: string, code: string}>();
     accounts.forEach(a => {
-        if (a.masterPackage) map.set(a.masterPackage, { name: a.masterPackage, code: a.masterPackageCode || '' });
+        if (a.masterPackage) {
+            const trimmed = a.masterPackage.trim();
+            map.set(trimmed, { name: trimmed, code: a.masterPackageCode || '' });
+        }
     });
     return Array.from(map.values());
   }, [accounts]);
 
   const uniqueSubPackages = useMemo(() => {
-    const map = new Map<string, {name: string, code: string, masterName: string}>();
+    const map = new Map<string, {name: string, code: string, masterName: string, key: string}>();
     accounts.forEach(a => {
-        if (a.package) map.set(a.package, { name: a.package, code: a.packageCode || '', masterName: a.masterPackage || '' });
+        if (a.package) {
+            const mTrim = (a.masterPackage || '').trim();
+            const pTrim = a.package.trim();
+            const key = `${mTrim}|${pTrim}`;
+            map.set(key, { name: pTrim, code: a.packageCode || '', masterName: mTrim, key });
+        }
     });
     return Array.from(map.values());
   }, [accounts]);
@@ -480,12 +488,15 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const setAllLevel = (level: 'master' | 'package' | 'account') => {
       setAccountViewLevel(level);
       if (level === 'master') {
+          // LEVEL 1: Only show Masters. Everything else collapsed.
           setCollapsedMasterPackages(new Set(uniqueMasterPackages.map(m => m.name)));
-          setCollapsedPackages(new Set(uniqueSubPackages.map(p => p.name)));
+          setCollapsedPackages(new Set(uniqueSubPackages.map(p => p.key)));
       } else if (level === 'package') {
+          // LEVEL 2: Show Masters and Packages. Accounts collapsed.
           setCollapsedMasterPackages(new Set());
-          setCollapsedPackages(new Set(uniqueSubPackages.map(p => p.name)));
+          setCollapsedPackages(new Set(uniqueSubPackages.map(p => p.key)));
       } else {
+          // LEVEL 3: Show Everything. All expanded.
           setCollapsedMasterPackages(new Set());
           setCollapsedPackages(new Set());
       }
@@ -2886,10 +2897,11 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                               );
                             }
 
-                            const masterCollapsed = acc.masterPackage && collapsedMasterPackages.has(acc.masterPackage);
+                            const masterCollapsed = acc.masterPackage && collapsedMasterPackages.has(acc.masterPackage.trim());
 
                             if (isNewPackage && !masterCollapsed) {
-                              const isCollapsed = collapsedPackages.has(acc.package!);
+                              const pkgKey = `${(acc.masterPackage || '').trim()}|${(acc.package || '').trim()}`;
+                              const isCollapsed = collapsedPackages.has(pkgKey);
                               rows.push(
                                 <tr 
                                   key={`pkg-${acc.package}`} 
@@ -2900,12 +2912,12 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                   onDrop={(e) => handleAccountDrop(e, acc.package!, 'pkg')}
                                   className="bg-slate-50 border-b border-slate-100 group cursor-pointer hover:bg-slate-100 transition-colors" 
                                 >
-                                  <td className="px-4 py-1.5 flex items-center gap-2 pl-8" onClick={() => togglePackageExpand(acc.package!)}>
+                                  <td className="px-4 py-1.5 flex items-center gap-2 pl-8" onClick={() => togglePackageExpand(pkgKey)}>
                                     <GripVertical size={12} className="text-slate-300 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing" />
                                     <ChevronUp size={12} className={`text-slate-500 transition-transform ${isCollapsed ? 'rotate-180' : ''}`} />
                                     <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">{acc.packageCode}</span>
                                   </td>
-                                  <td colSpan={1} className="px-4 py-1.5 text-[10px] font-bold text-slate-600 uppercase tracking-wider" onClick={() => togglePackageExpand(acc.package!)}>
+                                  <td colSpan={1} className="px-4 py-1.5 text-[10px] font-bold text-slate-600 uppercase tracking-wider" onClick={() => togglePackageExpand(pkgKey)}>
                                     {acc.package}
                                   </td>
                                   <td className="px-4 py-1.5 text-right">
@@ -2921,7 +2933,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                               );
                             }
 
-                            const pkgCollapsed = acc.package && collapsedPackages.has(acc.package);
+                            const pkgKey = acc.package ? `${(acc.masterPackage || '').trim()}|${acc.package.trim()}` : '';
+                            const pkgCollapsed = pkgKey && collapsedPackages.has(pkgKey);
 
                             if (!masterCollapsed && !pkgCollapsed) {
                               rows.push(
