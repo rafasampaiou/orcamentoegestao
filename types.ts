@@ -218,7 +218,30 @@ export type ViewState =
   | 'extra_revenue_budget'
   | 'dre_budget'
 
-  // ADMIN Module
+  // ADMIN > Tauá Real
+  | 'admin_real_versions'
+  | 'admin_real_closure'
+  | 'admin_real_import'
+  | 'admin_real_schedule'
+  | 'admin_real_dre'
+
+  // ADMIN > Tauá Budget
+  | 'admin_budget_versions'
+  | 'admin_budget_usali'
+  | 'admin_budget_labor'
+  | 'admin_budget_import'
+
+  // ADMIN > Tauá Geral
+  | 'admin_geral_accounts'
+  | 'admin_geral_hotels'
+  | 'admin_geral_costcenters'
+  | 'admin_geral_users'
+  | 'admin_geral_logs'
+  | 'admin_geral_gmd'
+  | 'admin_geral_permissions'
+  | 'admin_geral_import'
+
+  // Legacy (redirect targets)
   | 'admin_geral'
   | 'admin_real'
   | 'admin_budget'

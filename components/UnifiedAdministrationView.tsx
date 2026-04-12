@@ -335,31 +335,56 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
   // Sync internal tabs when sidebar view changes
   React.useEffect(() => {
-    if (currentView === 'admin_geral') {
-      setMainTab('geral');
-      setActiveGeralTab('registries');
-      setActiveRegistryTab('accounts');
+    // ── Admin > Tauá Real ──────────────────────────────────────────
+    if (currentView === 'admin_real_versions') {
+      setMainTab('real'); setActiveRealTab('versions');
+    } else if (currentView === 'admin_real_closure') {
+      setMainTab('real'); setActiveRealTab('closure');
+    } else if (currentView === 'admin_real_import') {
+      setMainTab('real'); setActiveRealTab('import');
+    } else if (currentView === 'admin_real_schedule') {
+      setMainTab('real'); setActiveRealTab('schedule');
+    } else if (currentView === 'admin_real_dre') {
+      setMainTab('real'); setActiveRealTab('dre_params');
+    // ── Admin > Tauá Budget ────────────────────────────────────────
+    } else if (currentView === 'admin_budget_versions') {
+      setMainTab('budget'); setActiveBudgetTab('versions');
+    } else if (currentView === 'admin_budget_usali') {
+      setMainTab('budget'); setActiveBudgetTab('expense_characteristics');
+    } else if (currentView === 'admin_budget_labor') {
+      setMainTab('budget'); setActiveBudgetTab('labor');
+    } else if (currentView === 'admin_budget_import') {
+      setMainTab('budget'); setActiveBudgetTab('import');
+    // ── Admin > Tauá Geral ─────────────────────────────────────────
+    } else if (currentView === 'admin_geral_accounts') {
+      setMainTab('geral'); setActiveGeralTab('registries'); setActiveRegistryTab('accounts');
+    } else if (currentView === 'admin_geral_hotels') {
+      setMainTab('geral'); setActiveGeralTab('registries'); setActiveRegistryTab('hotels');
+    } else if (currentView === 'admin_geral_costcenters') {
+      setMainTab('geral'); setActiveGeralTab('registries'); setActiveRegistryTab('costCenters');
+    } else if (currentView === 'admin_geral_users') {
+      setMainTab('geral'); setActiveGeralTab('registries'); setActiveRegistryTab('users');
+    } else if (currentView === 'admin_geral_logs') {
+      setMainTab('geral'); setActiveGeralTab('registries'); setActiveRegistryTab('logs');
+    } else if (currentView === 'admin_geral_gmd') {
+      setMainTab('geral'); setActiveGeralTab('gmd');
+    } else if (currentView === 'admin_geral_permissions') {
+      setMainTab('geral'); setActiveGeralTab('permissions');
+    } else if (currentView === 'admin_geral_import') {
+      setMainTab('geral'); setActiveGeralTab('import');
+    // ── Legacy redirects ───────────────────────────────────────────
+    } else if (currentView === 'admin_geral') {
+      setMainTab('geral'); setActiveGeralTab('registries'); setActiveRegistryTab('accounts');
     } else if (currentView === 'admin_real') {
-      setMainTab('real');
-      setActiveRealTab('dre_params');
-      setActiveRegistryTab('dre_structure');
-      setActiveDreName('Forecast');
+      setMainTab('real'); setActiveRealTab('versions');
     } else if (currentView === 'admin_budget') {
-      setMainTab('budget');
-      setActiveBudgetTab('expense_characteristics');
-      setActiveRegistryTab('dre_structure');
-      setActiveDreName('Budget');
+      setMainTab('budget'); setActiveBudgetTab('versions');
     } else if (currentView === 'admin_users') {
-      setMainTab('geral');
-      setActiveGeralTab('registries');
-      setActiveRegistryTab('users');
+      setMainTab('geral'); setActiveGeralTab('registries'); setActiveRegistryTab('users');
     } else if (currentView === 'admin_hotels') {
-      setMainTab('geral');
-      setActiveGeralTab('registries');
-      setActiveRegistryTab('hotels');
+      setMainTab('geral'); setActiveGeralTab('registries'); setActiveRegistryTab('hotels');
     } else if (currentView === 'admin_gmd') {
-      setMainTab('geral');
-      setActiveGeralTab('gmd');
+      setMainTab('geral'); setActiveGeralTab('gmd');
     }
   }, [currentView]);
 
@@ -2298,14 +2323,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const renderTauáReal = () => {
     return (
       <div className="space-y-6">
-        <div className="flex border-b border-gray-200 mb-6 overflow-x-auto">
-          <button onClick={() => setActiveRealTab('versions')} className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeRealTab === 'versions' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Versões</button>
-          <button onClick={() => setActiveRealTab('closure')} className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeRealTab === 'closure' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Fechamento</button>
-          <button onClick={() => setActiveRealTab('import')} className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeRealTab === 'import' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Importação</button>
-          <button onClick={() => setActiveRealTab('labor')} className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeRealTab === 'labor' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Mão de Obra</button>
-          <button onClick={() => setActiveRealTab('schedule')} className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeRealTab === 'schedule' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Cronograma</button>
-          <button onClick={() => setActiveRealTab('dre_params')} className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeRealTab === 'dre_params' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Parâmetros DRE</button>
-        </div>
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm min-h-[400px]">
           {activeRealTab === 'versions' && (
             <TimelineView
@@ -2453,12 +2470,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const renderTauáBudget = () => {
     return (
       <div className="space-y-6">
-        <div className="flex border-b border-gray-200 mb-6 overflow-x-auto">
-          <button onClick={() => setActiveBudgetTab('versions')} className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeBudgetTab === 'versions' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Versões</button>
-          <button onClick={() => setActiveBudgetTab('labor')} className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeBudgetTab === 'labor' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Mão de Obra</button>
-          <button onClick={() => setActiveBudgetTab('expense_characteristics')} className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeBudgetTab === 'expense_characteristics' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Característica da despesa</button>
-          <button onClick={() => setActiveBudgetTab('import')} className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeBudgetTab === 'import' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Importação</button>
-        </div>
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm min-h-[400px]">
           {activeBudgetTab === 'versions' && (
             <TimelineView
@@ -2728,23 +2739,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const renderTauáGeral = () => {
     return (
       <div className="space-y-6">
-        <div className="flex border-b border-gray-200 mb-6 overflow-x-auto">
-          <button onClick={() => setActiveGeralTab('registries')} className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeGeralTab === 'registries' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Cadastros</button>
-          <button onClick={() => setActiveGeralTab('gmd')} className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeGeralTab === 'gmd' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>GMD</button>
-          <button onClick={() => setActiveGeralTab('permissions')} className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeGeralTab === 'permissions' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Matriz de Permissões</button>
-          <button onClick={() => setActiveGeralTab('import')} className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeGeralTab === 'import' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Importação</button>
-        </div>
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm min-h-[400px]">
           {activeGeralTab === 'registries' && (
             <div className="space-y-6">
-              <div className="flex border-b border-gray-100 mb-6 overflow-x-auto">
-                <button onClick={() => setActiveRegistryTab('users')} className={`px-4 py-2 text-sm font-medium border-b-2 ${activeRegistryTab === 'users' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500'}`}>Usuários</button>
-                <button onClick={() => setActiveRegistryTab('logs')} className={`px-4 py-2 text-sm font-medium border-b-2 ${activeRegistryTab === 'logs' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500'}`}>Logs</button>
-                <button onClick={() => setActiveRegistryTab('hotels')} className={`px-4 py-2 text-sm font-medium border-b-2 ${activeRegistryTab === 'hotels' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500'}`}>Hotéis</button>
-                <button onClick={() => setActiveRegistryTab('costCenters')} className={`px-4 py-2 text-sm font-medium border-b-2 ${activeRegistryTab === 'costCenters' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500'}`}>Setores</button>
-                <button onClick={() => setActiveRegistryTab('accounts')} className={`px-4 py-2 text-sm font-medium border-b-2 ${activeRegistryTab === 'accounts' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500'}`}>Contas</button>
-                <button onClick={() => setActiveRegistryTab('dre_structure')} className={`px-4 py-2 text-sm font-medium border-b-2 ${activeRegistryTab === 'dre_structure' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500'}`}>Estrutura DRE</button>
-              </div>
               {activeRegistryTab === 'users' && (
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
@@ -3673,27 +3670,49 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     );
   };
 
-  const viewTitles: Record<string, { title: string; subtitle: string }> = {
-    admin_geral:  { title: 'Plano de Contas', subtitle: 'Cadastro e ordenação de Pacotes Master, Pacotes e Contas.' },
-    admin_real:   { title: 'DRE Forecast', subtitle: 'Edite a estrutura e ordem da DRE do Forecast.' },
-    admin_budget: { title: 'USALI Budget', subtitle: 'Configure a estrutura USALI do orçamento.' },
-    admin_users:  { title: 'Usuários e Logs', subtitle: 'Gerenciamento de usuários e auditoria de acessos.' },
-    admin_hotels: { title: 'Hotéis e Setores', subtitle: 'Cadastro de unidades e centros de resultado.' },
-    admin_gmd:    { title: 'Configuração GMD', subtitle: 'Matriz GMD: pacotes, gestores e associações.' },
-    admin:        { title: 'Administração', subtitle: 'Configure os parâmetros globais do sistema Tauá.' },
+  const viewTitles: Record<string, { title: string; subtitle: string; breadcrumb: string }> = {
+    // Admin > Tauá Real
+    admin_real_versions: { title: 'Versões de Realizado',   subtitle: 'Crie e gerencie as versões do Forecast (Real).', breadcrumb: 'Administração › Tauá Real › Versões' },
+    admin_real_closure:  { title: 'Fechamento',             subtitle: 'Configure o fechamento mensal do Realizado.',     breadcrumb: 'Administração › Tauá Real › Fechamento' },
+    admin_real_import:   { title: 'Importação de Dados',   subtitle: 'Importe dados financeiros reais em lote.',        breadcrumb: 'Administração › Tauá Real › Importação' },
+    admin_real_schedule: { title: 'Cronograma',             subtitle: 'Defina o cronograma de elaboração do forecast.',  breadcrumb: 'Administração › Tauá Real › Cronograma' },
+    admin_real_dre:      { title: 'Parâmetros DRE',         subtitle: 'Edite a estrutura e ordem da DRE do Forecast.',   breadcrumb: 'Administração › Tauá Real › Parâmetros DRE' },
+    // Admin > Tauá Budget
+    admin_budget_versions: { title: 'Versões de Orçamento', subtitle: 'Crie e gerencie as versões do orçamento.',         breadcrumb: 'Administração › Tauá Budget › Versões' },
+    admin_budget_usali:    { title: 'USALI / Config',        subtitle: 'Configure a estrutura USALI e características.',   breadcrumb: 'Administração › Tauá Budget › USALI' },
+    admin_budget_labor:    { title: 'Mão de Obra',           subtitle: 'Parâmetros de encargos e projeções de pessoal.',   breadcrumb: 'Administração › Tauá Budget › Mão de Obra' },
+    admin_budget_import:   { title: 'Importação Budget',     subtitle: 'Importe dados orçamentários em lote.',             breadcrumb: 'Administração › Tauá Budget › Importação' },
+    // Admin > Tauá Geral
+    admin_geral_accounts:    { title: 'Plano de Contas',      subtitle: 'Cadastro e ordenação de Pacotes Master, Pacotes e Contas.', breadcrumb: 'Administração › Tauá Geral › Plano de Contas' },
+    admin_geral_hotels:      { title: 'Hotéis e Unidades',    subtitle: 'Cadastro de unidades hoteleiras.',                          breadcrumb: 'Administração › Tauá Geral › Hotéis' },
+    admin_geral_costcenters: { title: 'Setores (CR)',          subtitle: 'Centros de resultado e centros de custo.',                  breadcrumb: 'Administração › Tauá Geral › Setores' },
+    admin_geral_users:       { title: 'Usuários',              subtitle: 'Gerenciamento de usuários e perfis de acesso.',             breadcrumb: 'Administração › Tauá Geral › Usuários' },
+    admin_geral_logs:        { title: 'Logs de Auditoria',     subtitle: 'Registros de acesso e ações no sistema.',                   breadcrumb: 'Administração › Tauá Geral › Logs' },
+    admin_geral_gmd:         { title: 'Configuração GMD',      subtitle: 'Matriz GMD: pacotes, gestores e associações.',              breadcrumb: 'Administração › Tauá Geral › Config GMD' },
+    admin_geral_permissions: { title: 'Matriz de Permissões',  subtitle: 'Configure os perfis e acessos por funcionalidade.',        breadcrumb: 'Administração › Tauá Geral › Permissões' },
+    admin_geral_import:      { title: 'Importação de Cadastros', subtitle: 'Importe plano de contas e centros de resultado.',         breadcrumb: 'Administração › Tauá Geral › Importação' },
+    // Legacy
+    admin_geral:  { title: 'Plano de Contas',    subtitle: 'Cadastro e ordenação do plano de contas.',         breadcrumb: 'Administração › Tauá Geral' },
+    admin_real:   { title: 'Config Tauá Real',   subtitle: 'Versões e configurações do Forecast.',              breadcrumb: 'Administração › Tauá Real' },
+    admin_budget: { title: 'Config Tauá Budget', subtitle: 'Versões e configurações do Orçamento.',             breadcrumb: 'Administração › Tauá Budget' },
+    admin_users:  { title: 'Usuários e Logs',    subtitle: 'Gerenciamento de usuários e auditoria de acessos.', breadcrumb: 'Administração › Usuários' },
+    admin_hotels: { title: 'Hotéis e Setores',   subtitle: 'Cadastro de unidades e centros de resultado.',       breadcrumb: 'Administração › Hotéis' },
+    admin_gmd:    { title: 'Configuração GMD',   subtitle: 'Matriz GMD: pacotes, gestores e associações.',       breadcrumb: 'Administração › GMD' },
+    admin:        { title: 'Administração',       subtitle: 'Configure os parâmetros globais do sistema Tauá.',  breadcrumb: 'Administração' },
+
   };
   const vt = viewTitles[currentView] || viewTitles.admin;
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h2 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
-            <SettingsIcon className="text-indigo-600" size={32} />
-            {vt.title}
-          </h2>
-          <p className="text-slate-500 mt-1">{vt.subtitle}</p>
-        </div>
+    <div className="p-6 max-w-7xl mx-auto">
+      {/* Breadcrumb + Page Title */}
+      <div className="mb-6">
+        <p className="text-[11px] font-bold text-indigo-400 uppercase tracking-widest mb-1">{vt.breadcrumb}</p>
+        <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2.5">
+          <SettingsIcon className="text-indigo-600" size={26} />
+          {vt.title}
+        </h2>
+        <p className="text-slate-400 text-sm mt-0.5">{vt.subtitle}</p>
       </div>
 
       {mainTab === 'real' && renderTauáReal()}

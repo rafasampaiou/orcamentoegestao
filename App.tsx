@@ -598,6 +598,27 @@ const App: React.FC = () => {
             currentUser={currentUser}
         />
       );
+      // Admin > Tauá Real
+      case 'admin_real_versions':
+      case 'admin_real_closure':
+      case 'admin_real_import':
+      case 'admin_real_schedule':
+      case 'admin_real_dre':
+      // Admin > Tauá Budget
+      case 'admin_budget_versions':
+      case 'admin_budget_usali':
+      case 'admin_budget_labor':
+      case 'admin_budget_import':
+      // Admin > Tauá Geral
+      case 'admin_geral_accounts':
+      case 'admin_geral_hotels':
+      case 'admin_geral_costcenters':
+      case 'admin_geral_users':
+      case 'admin_geral_logs':
+      case 'admin_geral_gmd':
+      case 'admin_geral_permissions':
+      case 'admin_geral_import':
+      // Legacy
       case 'admin_geral':
       case 'admin_real':
       case 'admin_budget':
