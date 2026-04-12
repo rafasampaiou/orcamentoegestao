@@ -2747,17 +2747,10 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                             (acc.package || '').toLowerCase().includes(accSearchTerm.toLowerCase()) ||
                             (acc.masterPackage || '').toLowerCase().includes(accSearchTerm.toLowerCase())
                           ).sort((a, b) => {
-                            // 1. Sort by Master
-                            const masterA = (a.masterPackage || '').toLowerCase();
-                            const masterB = (b.masterPackage || '').toLowerCase();
-                            if (masterA !== masterB) return masterA.localeCompare(masterB);
-
-                            // 2. Sort by Package
-                            const pkgA = (a.package || '').toLowerCase();
-                            const pkgB = (b.package || '').toLowerCase();
-                            if (pkgA !== pkgB) return pkgA.localeCompare(pkgB);
-
-                            // 3. Fallback to Name
+                            if (a.sortOrder !== b.sortOrder) {
+                              return (a.sortOrder || 0) - (b.sortOrder || 0);
+                            }
+                            // Fallback to name if order is the same
                             return a.name.localeCompare(b.name);
                           });
 

@@ -80,17 +80,16 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
   // Column Resizing State
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
-      parameters: 280,
-      description: 350,
-      previa: 150,
-      real: 160,
-      budget: 150,
-      deltaPreviaBudget: 150,
-      deltaPreviaBudgetPct: 130,
-      lastYear: 150,
-      deltaLY: 150,
-      deltaLYPct: 130,
-  });
+        description: 300,
+        previa: 120,
+        real: 120,
+        budget: 120,
+        deltaPreviaBudget: 120,
+        deltaPreviaBudgetPct: 90,
+        lastYear: 120,
+        deltaLY: 120,
+        deltaLYPct: 90,
+    });
 
   const [resizingColumn, setResizingColumn] = useState<string | null>(null);
   const [startX, setStartX] = useState(0);
@@ -484,22 +483,12 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             <table className="text-base text-left border-collapse table-fixed w-max">
             <thead className="bg-sky-100 sticky top-0 z-30 shadow-sm font-bold text-sky-900 uppercase tracking-tight text-sm">
                 <tr>
-                {/* Parameter Column - WIDENED */}
-                <th 
-                    style={{ width: columnWidths.parameters }}
-                    className="px-1 py-3 border-b border-sky-200 text-center bg-sky-100 text-sky-900 z-40 sticky left-0 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] group relative"
-                >
-                    Parâmetros ({calculationBase === 'previa' ? 'Prévia' : isMonthClosed ? 'Fechado' : 'Forecast'})
-                    <div 
-                        onMouseDown={(e) => handleResizeStart(e, 'parameters')}
-                        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
-                    />
-                </th>
+
 
                 {/* Description - Flexible Width */}
                 <th 
                     style={{ width: columnWidths.description }}
-                    className="px-2 py-3 border-b border-sky-200 bg-sky-100 text-sky-900 truncate group relative"
+                    className="px-2 py-3 border-b border-sky-200 bg-sky-100 text-sky-900 truncate group relative z-40 sticky left-0 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]"
                 >
                     Descrição
                     <div 
@@ -628,7 +617,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                     const isTransformation = row.label.includes('Transformação');
                     return (
                         <tr key={row.id}>
-                            <td colSpan={13} className="px-4 py-2 border-b border-gray-100 bg-white">
+                            <td colSpan={12} className="px-4 py-2 border-b border-gray-100 bg-white">
                                 <div className={`flex items-center gap-3 p-3 rounded-lg border shadow-sm max-w-lg mx-auto ${isTransformation ? 'bg-emerald-50 border-emerald-100' : 'bg-blue-50 border-blue-100'}`}>
                                     <div className={`p-2 rounded-full ${isTransformation ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'}`}>
                                         {isTransformation ? <TrendingUp size={20} /> : <Activity size={20} />}
@@ -654,7 +643,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 if (row.category === 'Spacer') {
                     return (
                         <tr key={row.id} className="bg-gray-100/50">
-                            <td colSpan={13} className="h-6 border-y border-gray-200"></td>
+                            <td colSpan={12} className="h-6 border-y border-gray-200"></td>
                         </tr>
                     );
                 }
@@ -671,45 +660,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 const isSpecialRevenue = ['REV-HOSP', 'REV-EXTRA', 'REV-ISS', 'REV-APT'].includes(row.id);
 
                 const formatType = row.rowConfig?.format || 'currency';
-
-                // --- CONFIG CELL LOGIC ---
-                let configCell: React.ReactNode = <div className="h-6"></div>; // Placeholder
-                let cellStyle = `px-2 py-1 border-r border-gray-200 bg-white sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] align-middle ${isTotal ? 'bg-indigo-50' : ''}`;
-                let shouldRenderCell = true;
-                let rowSpan = 1;
-
-                if (isIndicator && row.indicatorSection) {
-                    const currentSection = row.indicatorSection;
-                    
-                    // Determine if this is the start of a new section in the visible list
-                    const prevRow = visibleData[idx - 1];
-                    const isFirstOfSection = !prevRow || prevRow.indicatorSection !== currentSection;
-                    
-                    if (isFirstOfSection) {
-                        // Calculate rowSpan
-                        let count = 0;
-                        for (let i = idx; i < visibleData.length; i++) {
-                            if (visibleData[i].indicatorSection === currentSection) count++;
-                            else break;
-                        }
-                        rowSpan = count;
-                        
-                        // Horizontal Title with Line Breaks
-                        configCell = (
-                            <div className="h-full w-full flex items-center justify-center bg-sky-50 p-1">
-                                <span className="text-sky-800 font-bold text-[10px] uppercase tracking-wider text-center leading-snug whitespace-normal break-words">
-                                    {currentSection}
-                                </span>
-                            </div>
-                        );
-                        cellStyle = `px-0 py-0 border-r border-gray-300 bg-sky-50 sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] align-middle border-b border-white`;
-                    } else {
-                        shouldRenderCell = false;
-                    }
-                } else if (!isIndicator && !row.isHeader && !row.isTotal) {
-                    // Coluna Parâmetros vazia — edição é feita diretamente nas células
-                    configCell = <div className="h-6" />;
-                }
 
                 // --- COMMON FINANCIAL CELLS RENDERER ---
                 const renderFinancialCells = (isHeaderOrTotal = false, customBg = "") => {
@@ -801,6 +751,20 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     onChange={(e) => {
                                         const val = parseFloat(e.target.value) || 0;
                                         handleManualValueChange(row.id, 'previa', val);
+                                        // Sync Forecast with Prévia for indicators
+                                        if (isInputIndicator) {
+                                            setData(prevData => {
+                                                const newData = prevData.map(r => {
+                                                    if (r.id !== row.id) return r;
+                                                    return { 
+                                                        ...r, 
+                                                        real: val,
+                                                        forecastConfig: { ...r.forecastConfig, method: 'Fixed' as const, manualValue: val }
+                                                    };
+                                                });
+                                                return recalculateTotals(newData, packages, accounts);
+                                            });
+                                        }
                                     }}
                                     onPaste={(e) => handlePaste(e, row.id, 'previa')}
                                     step="0.01"
@@ -886,12 +850,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 if (isIndicator) {
                     return (
                         <tr key={row.id} className="border-b border-gray-100 hover:bg-sky-50/30 transition-colors h-8">
-                            {shouldRenderCell && (
-                                <td rowSpan={rowSpan} className={cellStyle}>
-                                    {configCell}
-                                </td>
-                            )}
-                            <td className="px-2 py-1 border-r border-gray-100 align-middle">
+
+                            <td className="px-2 py-1 border-r border-gray-100 align-middle sticky left-0 z-20 bg-white">
                                 <div className="truncate text-xs font-bold text-slate-700 pl-2">
                                 {row.label}
                                 </div>
@@ -912,10 +872,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
                     return (
                     <tr key={row.id} className={rowClass}>
-                        <td className={`${stickyClass} sticky left-0 z-20`}>
-                            {configCell}
-                        </td>
-                        <td className={`px-2 py-3 text-sm font-bold ${textClass} uppercase tracking-wide flex items-center truncate`}>
+
+                        <td className={`px-2 py-3 text-sm font-bold ${textClass} uppercase tracking-wide flex items-center truncate sticky left-0 z-20 ${stickyClass}`}>
                         {!isBlueHighlight && <div className="w-1 h-4 bg-indigo-500 mr-2 rounded-full"></div>}
                         {row.label}
                         </td>
@@ -930,10 +888,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 if (isGroupHeader || isSpecialRevenue) {
                     return (
                     <tr key={row.id} className="bg-gray-50 text-gray-800 font-bold border-b border-gray-200 hover:bg-gray-100 transition-colors">
-                        <td className="bg-gray-50 border-r border-gray-200 sticky left-0 z-20 px-1 py-1">
-                            {!isTotal && configCell}
-                        </td>
-                        <td className="px-2 py-2 text-sm uppercase align-middle border-r border-gray-200">
+
+                        <td className="px-2 py-2 text-sm uppercase align-middle border-r border-gray-200 sticky left-0 z-20 bg-gray-50">
                              <div style={{ paddingLeft: `${(row.indentLevel || 0) * 16}px` }} className="truncate">
                                 {row.label}
                             </div>
@@ -947,8 +903,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 if (isSubGroupHeader || (!showDetails && (row.indentLevel === 2 || row.indentLevel === 1))) {
                     return (
                     <tr key={row.id} className="bg-gray-50 text-gray-600 font-semibold border-b border-gray-200 hover:bg-gray-100 transition-colors">
-                        <td className="bg-gray-50 border-r border-gray-200 sticky left-0 z-20"></td>
-                        <td className="px-2 py-2 text-sm uppercase pl-8 truncate">
+
+                        <td className="px-2 py-2 text-sm uppercase pl-8 truncate sticky left-0 z-20 bg-gray-50 border-r border-gray-200">
                             {row.label}
                         </td>
                         {renderFinancialCells(true, "bg-gray-50 border-r border-gray-200")}
@@ -972,11 +928,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                         ${row.id === 'REV-IMP' ? 'bg-sky-50 border-y-2 border-sky-300 font-bold text-sky-950' : ''}
                     `}
                     >
-                    <td className={`px-1 py-1 border-r border-gray-200 bg-white sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] align-middle ${isTotal ? 'bg-indigo-50' : ''}`}>
-                        {!isTotal && configCell}
-                    </td>
-
-                    <td className="px-2 py-1 border-r border-gray-100 align-middle">
+                    <td className={`px-2 py-1 border-r border-gray-100 align-middle sticky left-0 z-20 bg-white group-hover:bg-indigo-50/30 ${isTotal ? 'bg-indigo-50' : ''}`}>
                         <div style={{ paddingLeft: `${(row.indentLevel || 0) * 16}px` }} className={`truncate text-xs ${isTotal ? 'uppercase tracking-wide' : ''}`}>
                         {displayLabel}
                         </div>
