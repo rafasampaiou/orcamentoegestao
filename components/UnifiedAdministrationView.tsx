@@ -1417,33 +1417,57 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     const validData = accParsedData.filter(r => r.status === 'valid');
     if (validData.length === 0) return;
 
-    const newAccounts: Account[] = validData.map((a, i) => ({ 
+    const newAccounts: Account[] = validData.map((a) => ({ 
         id: a.id, 
         code: a.id, 
         name: a.name, 
         package: a.package, 
         masterPackage: a.masterPackage,
         type: 'Fixed' as const,
-        sortOrder: accounts.length + i // Ensure unique sequential order
+        sortOrder: 0 // Will be recalculated below
     }));
 
     // DEDUPLICATE: Postgres throws error if same ID appears twice in one upsert batch
     const deduplicatedRecordMap = new Map<string, Account>();
     newAccounts.forEach(acc => deduplicatedRecordMap.set(acc.id, acc));
-    const uniqueAccountsToSave = Array.from(deduplicatedRecordMap.values());
+    const uniqueNewAccounts = Array.from(deduplicatedRecordMap.values());
 
-    const updated = accImportMode === 'replace' ? uniqueAccountsToSave : (() => {
+    // Combine with existing accounts if not in 'replace' mode
+    let updated = accImportMode === 'replace' ? uniqueNewAccounts : (() => {
         const map = new Map(accounts.map(acc => [acc.id, acc]));
-        uniqueAccountsToSave.forEach(acc => map.set(acc.id, acc));
+        uniqueNewAccounts.forEach(acc => map.set(acc.id, acc));
         return Array.from(map.values());
     })();
 
+    // SORT SYSTEMATICALLY: Pacote Master (D) -> Pacote (C) -> Nome (B) -> Código (A)
+    updated.sort((a, b) => {
+        const masterA = (a.masterPackage || '').trim();
+        const masterB = (b.masterPackage || '').trim();
+        if (masterA !== masterB) return masterA.localeCompare(masterB, undefined, { numeric: true, sensitivity: 'base' });
+
+        const pkgA = (a.package || '').trim();
+        const pkgB = (b.package || '').trim();
+        if (pkgA !== pkgB) return pkgA.localeCompare(pkgB, undefined, { numeric: true, sensitivity: 'base' });
+
+        const nameA = (a.name || '').trim();
+        const nameB = (b.name || '').trim();
+        if (nameA !== nameB) return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+
+        return (a.code || '').localeCompare((b.code || ''), undefined, { numeric: true, sensitivity: 'base' });
+    });
+
+    // Re-assign sortOrder for the entire collection to maintain the requested sequence
+    updated = updated.map((acc, index) => ({
+        ...acc,
+        sortOrder: index
+    }));
+
     setAccounts(updated);
     
-    // PERSIST TO SUPABASE
+    // PERSIST TO SUPABASE (Upsert all to update sortOrder)
     try {
-        await supabaseService.upsertAccounts(uniqueAccountsToSave);
-        alert(`${uniqueAccountsToSave.length} contas importadas e sincronizadas com sucesso!`);
+        await supabaseService.upsertAccounts(updated);
+        alert(`Sucesso! ${updated.length} contas foram importadas, ordenadas e sincronizadas.`);
     } catch (err: any) {
         console.error("Erro ao salvar no Supabase:", err);
         alert(`Erro ao sincronizar com banco de dados: ${err.message || JSON.stringify(err)}`);
