@@ -809,7 +809,7 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
                         <div className="flex items-center gap-3">
                             <h2 className="text-2xl font-bold text-gray-900">Ocupação (Real)</h2>
                             {!isBudget && setActiveProjectionType && (
-                                <select 
+                                <select
                                     className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 p-1.5 font-bold"
                                     value={activeProjectionType}
                                     onChange={(e) => setActiveProjectionType(e.target.value as import('../types').ProjectionType)}
@@ -908,8 +908,8 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
                     <button
                         onClick={handleManualSave}
                         className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-all shadow-sm border ${savedIndicator
-                                ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
-                                : 'bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700'
+                            ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
+                            : 'bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700'
                             }`}
                     >
                         {savedIndicator ? <CheckCircle size={16} /> : <Save size={16} />}

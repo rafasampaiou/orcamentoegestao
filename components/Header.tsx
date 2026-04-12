@@ -79,7 +79,7 @@ const Header: React.FC<HeaderProps> = ({
                         </div>
                         <div className="text-sm hidden sm:block">
                             <p className="font-semibold text-gray-700 leading-none">{currentUser.name}</p>
-                            <p className="text-xs text-gray-500 leading-none mt-1">{currentUser.role === UserRole.ADMIN ? 'Administrador' : 'Gestor'}</p>
+                            <p className="text-xs text-gray-500 leading-none mt-1">{currentUser.role || 'Gestor'}</p>
                         </div>
                     </div>
 

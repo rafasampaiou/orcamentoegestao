@@ -1,8 +1,27 @@
 export enum UserRole {
-  ENTITY_MANAGER = 'Gestor de Entidade',
-  PACKAGE_MANAGER = 'Gestor de Pacote',
-  ACCOUNT_MANAGER = 'Gestor de Conta',
-  ADMIN = 'Administrador'
+  ADMIN = 'ADMIN geral',
+  DIRETORIA = 'Diretoria',
+  ADMIN_UNIDADE = 'ADMIN de unidade',
+  ENTITY_MANAGER = 'Gerente de Entidade',
+  PACKAGE_MANAGER = 'Gerente de Pacotes',
+  AREA_MANAGER = 'Gerente de Área',
+  COST_ANALYST = 'Analista de Custos',
+  AREA_ANALYST = 'Analista de área'
+}
+
+export interface UserLog {
+  id: string;
+  userId: string;
+  userName: string;
+  userUnit: string;
+  action: string;
+  timestamp: string;
+}
+
+export interface PermissionMatrix {
+  [actionName: string]: {
+    [role in UserRole]: boolean;
+  };
 }
 
 export interface User {
@@ -13,6 +32,8 @@ export interface User {
   avatarUrl?: string;
   hotelId?: string; // Link user to a specific Hotel/Entity
   tempPassword?: string; // Storing temporary password for admin viewing
+  createdAt?: string;
+  lastAccess?: string;
 }
 
 // Profile represents a user account managed in the `profiles` table in Supabase.

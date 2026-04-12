@@ -14,7 +14,7 @@ export const mockHotels: Hotel[] = [
 export const mockUsers: User[] = [
   { id: 'u1', name: 'Carlos Silva', email: 'carlos@hotel.com', role: UserRole.ENTITY_MANAGER, hotelId: '1' },
   { id: 'u2', name: 'Ana Souza', email: 'ana@hotel.com', role: UserRole.PACKAGE_MANAGER, hotelId: '1' },
-  { id: 'u3', name: 'Roberto Lima', email: 'roberto@hotel.com', role: UserRole.ACCOUNT_MANAGER, hotelId: '7' },
+  { id: 'u3', name: 'Roberto Lima', email: 'roberto@hotel.com', role: UserRole.AREA_MANAGER, hotelId: '7' },
   { id: 'u4', name: 'Fernanda RH', email: 'fernanda@hotel.com', role: UserRole.PACKAGE_MANAGER, hotelId: '1' },
   { id: 'u5', name: 'João Manutenção', email: 'joao@hotel.com', role: UserRole.PACKAGE_MANAGER, hotelId: '2' },
   { id: 'u6', name: 'Marcos MKT', email: 'marcos@hotel.com', role: UserRole.PACKAGE_MANAGER, hotelId: '7' },

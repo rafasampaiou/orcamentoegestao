@@ -330,17 +330,41 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const [realFilterYear, setRealFilterYear] = useState<number>(new Date().getFullYear());
 
   // Sub-tabs for Tauá Geral
-  const [activeGeralTab, setActiveGeralTab] = useState<'registries' | 'gmd' | 'import' | 'dre_view'>('registries');
+  const [activeGeralTab, setActiveGeralTab] = useState<'registries' | 'gmd' | 'permissions' | 'import' | 'dre_view'>('registries');
 
   // Sub-tabs for Tauá Budget
   const [activeBudgetTab, setActiveBudgetTab] = useState<'versions' | 'labor' | 'expense_characteristics' | 'import'>('versions');
   const [budgetFilterYear, setBudgetFilterYear] = useState<number>(new Date().getFullYear());
   
   // Registry Sub-tabs (Now under Geral)
-  const [activeRegistryTab, setActiveRegistryTab] = useState<'users' | 'hotels' | 'costCenters' | 'packages' | 'accounts' | 'dre_structure'>('users');
+  const [activeRegistryTab, setActiveRegistryTab] = useState<'users' | 'logs' | 'hotels' | 'costCenters' | 'packages' | 'accounts' | 'dre_structure'>('users');
 
   // Import Sub-tabs
   const [activeImportTab, setActiveImportTab] = useState<'financial' | 'revenue' | 'occupancy' | 'costCenters' | 'accounts'>('financial');
+
+  // Logs & Permissions state
+  const [userLogs, setUserLogs] = useState([
+    { id: '1', userId: 'u1', userName: 'Carlos Silva', userUnit: 'Tauá Resort Caeté', action: 'Atualizou Forecast DRE', timestamp: new Date(Date.now() - 3600000).toISOString() },
+    { id: '2', userId: 'u2', userName: 'Ana Souza', userUnit: 'Tauá Resort Atibaia', action: 'Criou Nova Versão GMD', timestamp: new Date(Date.now() - 86400000).toISOString() }
+  ]);
+  
+  const [permissionsMatrix, setPermissionsMatrix] = useState<Record<string, Record<UserRole, boolean>>>({
+    'Criar Versão Forecast': {
+      [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false, [UserRole.ADMIN_UNIDADE]: true,
+      [UserRole.ENTITY_MANAGER]: false, [UserRole.PACKAGE_MANAGER]: false, [UserRole.AREA_MANAGER]: false,
+      [UserRole.COST_ANALYST]: true, [UserRole.AREA_ANALYST]: false
+    },
+    'Aprovar Fechamento GMD': {
+      [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: true, [UserRole.ADMIN_UNIDADE]: false,
+      [UserRole.ENTITY_MANAGER]: false, [UserRole.PACKAGE_MANAGER]: false, [UserRole.AREA_MANAGER]: false,
+      [UserRole.COST_ANALYST]: false, [UserRole.AREA_ANALYST]: false
+    },
+    'Editar Cadastros Gerais': {
+      [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false, [UserRole.ADMIN_UNIDADE]: true,
+      [UserRole.ENTITY_MANAGER]: false, [UserRole.PACKAGE_MANAGER]: false, [UserRole.AREA_MANAGER]: false,
+      [UserRole.COST_ANALYST]: false, [UserRole.AREA_ANALYST]: false
+    }
+  });
   
   // Financial Import State (shared for Real tab)
   const [importText, setImportText] = useState('');
@@ -2426,6 +2450,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         <div className="flex border-b border-gray-200 mb-6 overflow-x-auto">
           <button onClick={() => setActiveGeralTab('registries')} className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeGeralTab === 'registries' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Cadastros</button>
           <button onClick={() => setActiveGeralTab('gmd')} className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeGeralTab === 'gmd' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>GMD</button>
+          <button onClick={() => setActiveGeralTab('permissions')} className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeGeralTab === 'permissions' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Matriz de Permissões</button>
           <button onClick={() => setActiveGeralTab('import')} className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeGeralTab === 'import' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Importação</button>
         </div>
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm min-h-[400px]">
@@ -2433,6 +2458,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
             <div className="space-y-6">
               <div className="flex border-b border-gray-100 mb-6 overflow-x-auto">
                 <button onClick={() => setActiveRegistryTab('users')} className={`px-4 py-2 text-sm font-medium border-b-2 ${activeRegistryTab === 'users' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500'}`}>Usuários</button>
+                <button onClick={() => setActiveRegistryTab('logs')} className={`px-4 py-2 text-sm font-medium border-b-2 ${activeRegistryTab === 'logs' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500'}`}>Logs</button>
                 <button onClick={() => setActiveRegistryTab('hotels')} className={`px-4 py-2 text-sm font-medium border-b-2 ${activeRegistryTab === 'hotels' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500'}`}>Hotéis</button>
                 <button onClick={() => setActiveRegistryTab('costCenters')} className={`px-4 py-2 text-sm font-medium border-b-2 ${activeRegistryTab === 'costCenters' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500'}`}>Setores</button>
                 <button onClick={() => setActiveRegistryTab('accounts')} className={`px-4 py-2 text-sm font-medium border-b-2 ${activeRegistryTab === 'accounts' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500'}`}>Contas</button>
@@ -2444,33 +2470,70 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                     <h4 className="font-bold text-gray-700">Gestão de Usuários</h4>
                     <button onClick={openNewUser} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700"><Plus size={16}/> Novo Usuário</button>
                   </div>
-                  <div className="overflow-hidden border border-gray-200 rounded-lg">
+                  <div className="overflow-x-auto border border-gray-200 rounded-lg">
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Senha (Temporária)</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unidade</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Perfil</th>
+                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Data Cadastro</th>
+                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Últ. Acesso</th>
                           <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {users.map(u => (
+                        {users.map(u => {
+                          const userHotel = hotels.find(h => h.id === u.hotelId);
+                          return (
                           <tr key={u.id}>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{u.name}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{u.email}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{userHotel?.name || '-'}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-medium">
+                              <span className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[10px] uppercase font-bold">{u.role}</span>
+                            </td>
                             <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-mono text-gray-500">
-                              {u.tempPassword ? (
-                                <div className="flex items-center justify-center gap-2 group cursor-pointer" title="Clique para copiar" onClick={() => {navigator.clipboard.writeText(u.tempPassword!); alert('Criado copiado!');}}>
-                                  <span className="blur-sm group-hover:blur-none transition-all select-all">{u.tempPassword}</span>
-                                </div>
-                              ) : (
-                                <span className="text-gray-300 italic text-xs">Oculta / Não Definida</span>
-                              )}
+                              {u.createdAt ? new Date(u.createdAt).toLocaleDateString('pt-BR') : '-'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-mono text-gray-500">
+                              {u.lastAccess ? new Date(u.lastAccess).toLocaleDateString('pt-BR') : '-'}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                               <button onClick={() => openEditUser(u.id)} className="text-indigo-600 hover:text-indigo-900 mr-3"><Pencil size={16}/></button>
                               <button onClick={() => handleDelete('users', u.id)} className="text-red-600 hover:text-red-900"><Trash2 size={16}/></button>
+                            </td>
+                          </tr>
+                        )})}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+              {activeRegistryTab === 'logs' && (
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h4 className="font-bold text-gray-700">Registros de Atividades (Logs)</h4>
+                  </div>
+                  <div className="overflow-hidden border border-gray-200 rounded-lg">
+                    <table className="min-w-full divide-y divide-gray-200 text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase text-xs">Usuário</th>
+                          <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase text-xs">Ação</th>
+                          <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase text-xs">Unidade</th>
+                          <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase text-xs">Horário</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {userLogs.map(log => (
+                          <tr key={log.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-6 py-4 whitespace-nowrap font-medium text-slate-800">{log.userName}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-indigo-600 font-medium">{log.action}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-slate-500">{log.userUnit}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-slate-500 font-mono text-xs">
+                              {new Date(log.timestamp).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
                             </td>
                           </tr>
                         ))}
@@ -2905,6 +2968,60 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                         <td colSpan={6} className="px-4 py-8 text-center text-gray-400 italic text-sm">Nenhuma configuração GMD encontrada.</td>
                       </tr>
                     )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+          {activeGeralTab === 'permissions' && (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h4 className="font-bold text-gray-700">Matriz de Permissões</h4>
+                <div className="text-xs text-slate-500 italic">Configure as permissões de acesso por perfil de usuário.</div>
+              </div>
+              <div className="overflow-x-auto border border-gray-200 rounded-xl shadow-sm">
+                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                  <thead className="bg-[linear-gradient(to_right,#f8fafc,#f1f5f9)]">
+                    <tr>
+                      <th className="px-6 py-4 text-left font-bold text-slate-700 uppercase text-[10px] tracking-wider border-r border-slate-200 sticky left-0 z-10 bg-[#f8fafc]">
+                        Ação \ Perfil
+                      </th>
+                      {Object.values(UserRole).map(role => (
+                        <th key={role} className="px-3 py-4 text-center font-bold text-slate-600 uppercase text-[10px] tracking-wider whitespace-nowrap">
+                          {role}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-100">
+                    {Object.entries(permissionsMatrix).map(([actionName, roleMap]) => (
+                      <tr key={actionName} className="hover:bg-slate-50/50 transition-colors group">
+                        <td className="px-6 py-4 font-medium text-slate-800 border-r border-slate-100 sticky left-0 bg-white group-hover:bg-slate-50/50 transition-colors shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
+                          {actionName}
+                        </td>
+                        {Object.values(UserRole).map(role => (
+                          <td key={role} className="px-3 py-4 text-center">
+                            <label className="flex items-center justify-center cursor-pointer w-full h-full">
+                              <input 
+                                type="checkbox" 
+                                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 transition-transform hover:scale-110 active:scale-95"
+                                checked={roleMap[role]}
+                                onChange={e => {
+                                  const newVal = e.target.checked;
+                                  setPermissionsMatrix(prev => ({
+                                    ...prev,
+                                    [actionName]: {
+                                      ...prev[actionName],
+                                      [role]: newVal
+                                    }
+                                  }));
+                                }}
+                              />
+                            </label>
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
