@@ -222,6 +222,12 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         setData(prevData => {
             const newData = prevData.map(row => {
                 if (row.id !== rowId) return row;
+                
+                // Sync Forecast with Prévia for Occupancy Indicators
+                if (field === 'previa' && (row.id === 'IND-1' || row.id === 'IND-2')) {
+                    return { ...row, previa: value, real: value };
+                }
+                
                 return { ...row, [field]: value };
             });
             return recalculateTotals(newData, packages, accounts);
@@ -858,7 +864,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         <tr key={row.id} className="border-b border-gray-100 hover:bg-sky-50/30 transition-colors h-8">
 
                                             <td className="px-2 py-1 border-r border-gray-100 align-middle sticky left-0 z-20 bg-white">
-                                                <div className="truncate text-xs font-bold text-slate-700 pl-2">
+                                                <div className="truncate text-xs font-bold text-slate-700 pl-4">
                                                     {row.label}
                                                 </div>
                                             </td>
@@ -931,11 +937,11 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         className={`
                         transition-colors text-slate-700 hover:bg-indigo-50/30
                         ${isTotal ? 'bg-indigo-50 font-bold border-y-2 border-gray-300 text-indigo-900' : 'border-b border-gray-50'}
-                        ${row.id === 'REV-IMP' ? 'bg-sky-50 border-y-2 border-sky-300 font-bold text-sky-950' : ''}
+                        ${row.id === 'REV-IMP' ? 'bg-sky-100 border-y-2 border-sky-300 font-bold text-sky-950 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.5)]' : ''}
                     `}
                                     >
                                         <td className={`px-2 py-1 border-r border-gray-100 align-middle sticky left-0 z-20 bg-white group-hover:bg-indigo-50/30 ${isTotal ? 'bg-indigo-50' : ''}`}>
-                                            <div style={{ paddingLeft: `${(row.indentLevel || 0) * 16}px` }} className={`truncate text-xs ${isTotal ? 'uppercase tracking-wide' : ''}`}>
+                                            <div style={{ paddingLeft: `${(row.indentLevel || 0) * 16 + 12}px` }} className={`truncate text-xs ${isTotal ? 'uppercase tracking-wide' : ''}`}>
                                                 {displayLabel}
                                             </div>
                                         </td>
@@ -1128,7 +1134,28 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
         if (target) target[fieldToSet] = total;
     };
 
-    // --- INDICATORS ---
+    // --- REVENUE CALCULATIONS ---
+    ['real', 'budget', 'lastYear', 'previa'].forEach(f => {
+        const field = f as 'real' | 'budget' | 'lastYear' | 'previa';
+
+        // REV-APT = Lazer + Eventos + Inclusas
+        sumAndSet('REV-APT', [{ id: 'REV-APT-LAZER' }, { id: 'REV-APT-EVENTOS' }, { id: 'REV-APT-INCLUSAS' }], field);
+
+        // REV-EXTRA = Extra Lazer + Extra Eventos
+        sumAndSet('REV-EXTRA', [{ id: 'REV-EXTRA-LAZER' }, { id: 'REV-EXTRA-EVENTOS' }], field);
+
+        // REV-TOTAL = REV-APT + REV-EXTRA
+        sumAndSet('REV-TOTAL', [{ id: 'REV-APT' }, { id: 'REV-EXTRA' }], field);
+
+        // REV-NET = REV-TOTAL - REV-TIME - REV-ISS - REV-IMP
+        const total = rowMap.get('REV-TOTAL')?.[field] || 0;
+        const ts = rowMap.get('REV-TIME')?.[field] || 0;
+        const iss = rowMap.get('REV-ISS')?.[field] || 0;
+        const imp = rowMap.get('REV-IMP')?.[field] || 0;
+        const net = rowMap.get('REV-NET');
+        if (net) net[field] = total - ts - iss - imp;
+    });
+
     // --- INDICATORS ---
     ['real', 'budget', 'lastYear', 'previa'].forEach(f => {
         const field = f as 'real' | 'budget' | 'lastYear' | 'previa';
@@ -1172,28 +1199,6 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
         // TREVPAR
         const trevpar = rowMap.get('IND-TREVPAR');
         if (trevpar) trevpar[field] = avail > 0 ? (revApt + revExtra) / avail : 0;
-    });
-
-    // --- REVENUE CALCULATIONS ---
-    ['real', 'budget', 'lastYear', 'previa'].forEach(f => {
-        const field = f as 'real' | 'budget' | 'lastYear' | 'previa';
-
-        // REV-APT = Lazer + Eventos + Inclusas
-        sumAndSet('REV-APT', [{ id: 'REV-APT-LAZER' }, { id: 'REV-APT-EVENTOS' }, { id: 'REV-APT-INCLUSAS' }], field);
-
-        // REV-EXTRA = Extra Lazer + Extra Eventos
-        sumAndSet('REV-EXTRA', [{ id: 'REV-EXTRA-LAZER' }, { id: 'REV-EXTRA-EVENTOS' }], field);
-
-        // REV-TOTAL = REV-APT + REV-EXTRA
-        sumAndSet('REV-TOTAL', [{ id: 'REV-APT' }, { id: 'REV-EXTRA' }], field);
-
-        // REV-NET = REV-TOTAL - REV-TIME - REV-ISS - REV-IMP
-        const total = rowMap.get('REV-TOTAL')?.[field] || 0;
-        const ts = rowMap.get('REV-TIME')?.[field] || 0;
-        const iss = rowMap.get('REV-ISS')?.[field] || 0;
-        const imp = rowMap.get('REV-IMP')?.[field] || 0;
-        const net = rowMap.get('REV-NET');
-        if (net) net[field] = total - ts - iss - imp;
     });
 
     // --- COSTS CALCULATIONS ---

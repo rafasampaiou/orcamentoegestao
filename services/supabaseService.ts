@@ -299,6 +299,37 @@ export const supabaseService = {
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // PERMISSIONS (Matriz de Permissões)
+  // ═══════════════════════════════════════════════════════════════════════════
+  async getPermissions(): Promise<Record<string, Record<string, Record<UserRole, boolean>>>> {
+    const { data, error } = await supabase
+      .from('permissions')
+      .select('*');
+    if (error) throw error;
+
+    const matrix: any = {};
+    (data || []).forEach(p => {
+      if (!matrix[p.category]) matrix[p.category] = {};
+      matrix[p.category][p.action] = p.roles;
+    });
+    return matrix;
+  },
+
+  async upsertPermissions(category: string, action: string, roles: Record<UserRole, boolean>): Promise<void> {
+    const id = `${category}|${action}`;
+    const { error } = await supabase
+      .from('permissions')
+      .upsert({
+        id,
+        category,
+        action,
+        roles,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'id' });
+    if (error) throw error;
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // GMD CONFIGURATIONS (Matriz de Gestão por conta)
   // ═══════════════════════════════════════════════════════════════════════════
   async getGmdConfigs(): Promise<GMDConfiguration[]> {

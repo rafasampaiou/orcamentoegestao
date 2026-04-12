@@ -412,6 +412,42 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     }
   });
   
+  const [isSavingPerms, setIsSavingPerms] = useState(false);
+  
+  // Load permissions matrix from Supabase
+  React.useEffect(() => {
+    const loadPerms = async () => {
+        try {
+            const matrix = await supabaseService.getPermissions();
+            if (Object.keys(matrix).length > 0) {
+                setPermissionsMatrix(matrix);
+            }
+        } catch (e) {
+            console.error("Failed to load permissions", e);
+        }
+    };
+    if (activeGeralTab === 'permissions') {
+        loadPerms();
+    }
+  }, [activeGeralTab]);
+
+  const handleSavePermissions = async () => {
+      setIsSavingPerms(true);
+      try {
+          for (const [cat, actions] of Object.entries(permissionsMatrix)) {
+              for (const [act, roles] of Object.entries(actions)) {
+                  await supabaseService.upsertPermissions(cat, act, roles as Record<UserRole, boolean>);
+              }
+          }
+          alert('Permissões salvas com sucesso!');
+      } catch (e: any) {
+          console.error(e);
+          alert(`Erro ao salvar permissões: ${e.message}`);
+      } finally {
+          setIsSavingPerms(false);
+      }
+  };
+  
   // Financial Import State (shared for Real tab)
   const [importText, setImportText] = useState('');
   const [parsedData, setParsedData] = useState<ImportedRow[]>([]);
@@ -544,7 +580,10 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
             }
         }
         
-        return sorted.map((a, i) => ({ ...a, sortOrder: i }));
+        const updated = sorted.map((a, i) => ({ ...a, sortOrder: i }));
+        // Persist the new sequence to the database
+        supabaseService.upsertAccounts(updated).catch(err => console.error("Falha ao salvar ordem:", err));
+        return updated;
     });
   };
   const [newSectionName, setNewSectionName] = useState('');
@@ -1003,24 +1042,51 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       setActiveModal('account');
   };
 
-  const openEditAccount = (id: string) => {
-      const acc = accounts.find(i => i.id === id);
-      if (acc) {
-          setEditingId(id);
-          setAccountForm({ 
-            id: acc.id, 
-            code: acc.code || acc.id, 
-            name: acc.name, 
-            package: acc.package || '', 
-            packageCode: acc.packageCode || '',
-            masterPackage: acc.masterPackage || '', 
-            masterPackageCode: acc.masterPackageCode || '',
-            type: acc.type || 'Fixed',
-            sortOrder: acc.sortOrder || 0,
-            outOfScope: acc.outOfScope || false,
-            level: acc.level || 'account'
+  const openEditAccount = (id: string, level: 'account' | 'pkg' | 'master' = 'account', name?: string) => {
+      setEditingId(id || name || null);
+      if (id) {
+          const acc = accounts.find(i => i.id === id);
+          if (acc) {
+              setAccountForm({ 
+                ...acc,
+                level: acc.level || 'account'
+              });
+              return;
+          }
+      }
+      
+      // If no ID, it's a virtual entry (pkg or master)
+      if (level === 'master' && name) {
+          const first = accounts.find(a => a.masterPackage === name);
+          setAccountForm({
+              id: '', 
+              code: first?.masterPackageCode || '', 
+              name, 
+              level: 'master',
+              masterPackage: name, 
+              masterPackageCode: first?.masterPackageCode || '',
+              package: '', 
+              packageCode: '', 
+              type: 'Fixed', 
+              sortOrder: first?.sortOrder || 0,
+              outOfScope: false
           });
-          setActiveModal('account');
+      } else if (level === 'pkg' && name) {
+          const [masterName, pkgName] = name.split('|');
+          const first = accounts.find(a => a.masterPackage === masterName && a.package === pkgName);
+          setAccountForm({
+              id: '', 
+              code: first?.packageCode || '', 
+              name: pkgName, 
+              level: 'pkg',
+              masterPackage: masterName, 
+              masterPackageCode: first?.masterPackageCode || '',
+              package: pkgName, 
+              packageCode: first?.packageCode || '',
+              type: 'Fixed', 
+              sortOrder: first?.sortOrder || 0,
+              outOfScope: false
+          });
       }
   };
 
@@ -1130,51 +1196,63 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   };
 
   const handleSaveAccount = async () => {
-      if (!accountForm.name || (accountForm.level === 'account' && !accountForm.id)) return;
-      
-      let finalForm = { ...accountForm };
-      
-      // Level-specific logic
-      if (accountForm.level === 'master') {
-          finalForm.masterPackage = accountForm.name;
-          finalForm.masterPackageCode = accountForm.code;
-          finalForm.package = '';
-          finalForm.packageCode = '';
-          if (!editingId) finalForm.id = `master-${Date.now()}`;
-      } else if (accountForm.level === 'pkg') {
-          finalForm.package = accountForm.name;
-          finalForm.packageCode = accountForm.code;
-          if (!editingId) finalForm.id = `pkg-${Date.now()}`;
-      } else if (accountForm.level === 'account') {
-          // Normal account logic
-      }
+    if (!accountForm.name || (accountForm.level === 'account' && !accountForm.id)) return;
+    
+    let updated: Account[] = [...accounts];
+    let affected: Account[] = [];
 
-      if (editingId) {
-          const updated = accounts.map(acc => acc.id === editingId ? { ...acc, ...finalForm } : acc);
-          setAccounts(updated);
-          try { 
-              await supabaseService.upsertAccounts(updated.filter(a => a.id === editingId)); 
-          } catch(e: any) { 
-              console.error(e); 
-              alert(`Erro ao atualizar conta: ${e?.message || JSON.stringify(e)}`);
-          }
-      } else {
-          const newAcc: Account = { 
-              ...finalForm, 
-              id: finalForm.id || `gen-${Date.now()}`, 
-              code: finalForm.id || `gen-${Date.now()}`,
-              sortOrder: accounts.length
-          };
-          const updated = [...accounts, newAcc];
-          setAccounts(updated);
-          try { 
-              await supabaseService.upsertAccounts([newAcc]); 
-          } catch(e: any) { 
-              console.error(e);
-              alert(`Erro ao criar conta: ${e?.message || JSON.stringify(e)}`);
-          }
-      }
-      setActiveModal(null);
+    if (accountForm.level === 'master') {
+        const oldName = editingId; 
+        updated = accounts.map(acc => {
+            if (acc.masterPackage === oldName) {
+                return { 
+                    ...acc, 
+                    masterPackage: accountForm.name, 
+                    masterPackageCode: accountForm.code,
+                    sortOrder: accountForm.sortOrder // We'll keep individual sort orders in sync or just use the same base
+                };
+            }
+            return acc;
+        });
+        affected = updated.filter(acc => acc.masterPackage === accountForm.name);
+    } else if (accountForm.level === 'pkg') {
+        const [oldMaster, oldPkg] = (editingId || '').split('|');
+        updated = accounts.map(acc => {
+            if (acc.masterPackage === oldMaster && acc.package === oldPkg) {
+                return { 
+                    ...acc, 
+                    package: accountForm.name, 
+                    packageCode: accountForm.code,
+                    sortOrder: accountForm.sortOrder
+                };
+            }
+            return acc;
+        });
+        affected = updated.filter(acc => acc.masterPackage === oldMaster && acc.package === accountForm.name);
+    } else {
+        if (editingId && accounts.some(a => a.id === editingId)) {
+           updated = accounts.map(acc => acc.id === editingId ? { ...acc, ...accountForm } : acc);
+           affected = updated.filter(a => a.id === editingId);
+        } else {
+           const newAcc = { 
+             ...accountForm, 
+             id: accountForm.id || `gen-${Date.now()}`,
+             code: accountForm.code || accountForm.id || `gen-${Date.now()}`
+           };
+           updated = [...accounts, newAcc];
+           affected = [newAcc];
+        }
+    }
+
+    setAccounts(updated);
+    try {
+        await supabaseService.upsertAccounts(affected);
+        alert('Alterações salvas e sincronizadas com sucesso!');
+    } catch (err: any) {
+        console.error("Save failed:", err);
+        alert(`Erro ao sincronizar: ${err.message || JSON.stringify(err)}`);
+    }
+    setEditingId(null);
   };
 
   const handleDeleteAccountRow = async (id: string, type: 'account' | 'pkg' | 'master' = 'account', name?: string) => {
@@ -2782,298 +2860,232 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                   </div>
                 </div>
               )}
+
               {activeRegistryTab === 'accounts' && (
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-4">
-                      <h4 className="font-bold text-gray-700">Plano de Contas</h4>
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14}/>
-                        <input 
-                          type="text" 
-                          placeholder="Buscar conta..." 
-                          className="pl-9 pr-4 py-1.5 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 outline-none w-64"
-                          onChange={(e) => setAccSearchTerm(e.target.value)}
-                        />
+                <div className="flex gap-6 h-[calc(100vh-350px)]">
+                  {/* Left Side: Table */}
+                  <div className="flex-1 flex flex-col min-w-0 bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                    <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center shrink-0">
+                      <div className="flex items-center gap-4">
+                        <h4 className="font-bold text-gray-700">Plano de Contas</h4>
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14}/>
+                          <input 
+                            type="text" 
+                            placeholder="Buscar conta..." 
+                            className="pl-9 pr-4 py-1.5 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 outline-none w-48"
+                            onChange={(e) => setAccSearchTerm(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <div className="flex bg-gray-200 p-0.5 rounded-lg border border-gray-300">
+                          <button onClick={() => setAllLevel('master')} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${accountViewLevel === 'master' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Masters</button>
+                          <button onClick={() => setAllLevel('package')} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${accountViewLevel === 'package' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Pacotes</button>
+                          <button onClick={() => setAllLevel('account')} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${accountViewLevel === 'account' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Contas</button>
+                        </div>
+                        <button 
+                          onClick={() => {
+                            setActiveGeralTab('import');
+                            setActiveImportTab('accounts');
+                            setAccImportStep('input');
+                          }} 
+                          className="bg-white border border-gray-200 text-gray-700 px-3 py-1 rounded-lg text-xs font-bold hover:bg-gray-50 flex items-center gap-2"
+                        >
+                          <Upload size={14}/> Importar
+                        </button>
+                        <button onClick={openNewAccount} className="bg-indigo-600 text-white px-3 py-1 rounded-lg text-xs font-bold hover:bg-indigo-700 shadow-sm flex items-center gap-2"><Plus size={14}/> Novo</button>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200">
-                        <button 
-                          onClick={() => setAllLevel('master')}
-                          className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${accountViewLevel === 'master' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                        >
-                          Masters
-                        </button>
-                        <button 
-                          onClick={() => setAllLevel('package')}
-                          className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${accountViewLevel === 'package' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                        >
-                          Pacotes
-                        </button>
-                        <button 
-                          onClick={() => setAllLevel('account')}
-                          className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${accountViewLevel === 'account' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                        >
-                          Contas
-                        </button>
-                      </div>
-                      <button 
-                        onClick={() => {
-                          setActiveGeralTab('import');
-                          setActiveImportTab('accounts');
-                          setAccImportStep('input');
-                        }} 
-                        className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-50"
-                      >
-                        <Upload size={16}/> Importar
-                      </button>
-                      <button onClick={openNewAccount} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all active:scale-95"><Plus size={16}/> Nova Conta</button>
+                    <div className="overflow-auto flex-1 custom-scrollbar">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50 sticky top-0 z-10">
+                          <tr>
+                            <th className="px-4 py-2 text-left text-[10px] font-bold text-gray-500 uppercase w-16">Ordem</th>
+                            <th className="px-4 py-2 text-left text-[10px] font-bold text-gray-500 uppercase w-28">Código</th>
+                            <th className="px-4 py-2 text-left text-[10px] font-bold text-gray-500 uppercase">Conta Contábil</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-100">
+                          {(() => {
+                            let lastMaster = '';
+                            let lastPackage = '';
+                            const filtered = accounts.filter(acc => 
+                              acc.name.toLowerCase().includes(accSearchTerm.toLowerCase()) || 
+                              acc.code.toLowerCase().includes(accSearchTerm.toLowerCase()) ||
+                              (acc.masterPackage || '').toLowerCase().includes(accSearchTerm.toLowerCase())
+                            ).sort((a,b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+
+                            const rows: React.ReactNode[] = [];
+                            filtered.forEach(acc => {
+                               const isNewMaster = acc.masterPackage !== lastMaster;
+                               const isNewPkg = (acc.package !== lastPackage || isNewMaster) && acc.package;
+                               
+                               if (isNewMaster && acc.masterPackage) {
+                                  rows.push(
+                                    <tr 
+                                      key={`m-${acc.masterPackage}`} 
+                                      draggable
+                                      onDragStart={(e) => handleAccountDragStart(e, acc.masterPackage!, 'master')}
+                                      onDragOver={(e) => e.preventDefault()}
+                                      onDrop={(e) => handleAccountDrop(e, acc.masterPackage!, 'master')}
+                                      className="bg-indigo-50 border-y border-indigo-100 cursor-move hover:bg-indigo-100 transition-colors" 
+                                      onClick={() => openEditAccount('', 'master', acc.masterPackage!)}
+                                    >
+                                      <td className="px-4 py-1.5 text-[9px] font-black text-indigo-900 flex items-center gap-2">
+                                         <GripVertical size={10} className="text-indigo-300" />
+                                         {acc.sortOrder || 0}
+                                      </td>
+                                      <td className="px-4 py-1.5 text-[9px] font-black text-indigo-900">-</td>
+                                      <td className="px-4 py-1.5 text-[10px] font-black text-indigo-900 uppercase tracking-widest">{acc.masterPackage}</td>
+                                    </tr>
+                                  );
+                               }
+                               if (isNewPkg && acc.package) {
+                                  rows.push(
+                                    <tr 
+                                      key={`p-${acc.masterPackage}-${acc.package}`} 
+                                      draggable
+                                      onDragStart={(e) => handleAccountDragStart(e, acc.package!, 'pkg')}
+                                      onDragOver={(e) => e.preventDefault()}
+                                      onDrop={(e) => handleAccountDrop(e, acc.package!, 'pkg')}
+                                      className="bg-slate-50 border-b border-slate-100 cursor-move hover:bg-slate-100 transition-colors" 
+                                      onClick={() => openEditAccount('', 'pkg', `${acc.masterPackage}|${acc.package}`)}
+                                    >
+                                      <td className="px-4 py-1 text-[9px] font-bold text-slate-500 pl-6 flex items-center gap-2">
+                                         <GripVertical size={10} className="text-slate-300" />
+                                         {acc.sortOrder || 0}
+                                      </td>
+                                      <td className="px-4 py-1 text-[9px] font-bold text-slate-500">-</td>
+                                      <td className="px-4 py-1 text-[10px] font-bold text-slate-700 uppercase tracking-wider pl-6">{acc.package}</td>
+                                    </tr>
+                                  );
+                               }
+                               rows.push(
+                                 <tr 
+                                   key={acc.id} 
+                                   draggable
+                                   onDragStart={(e) => handleAccountDragStart(e, acc.id, 'account')}
+                                   onDragOver={(e) => e.preventDefault()}
+                                   onDrop={(e) => handleAccountDrop(e, acc.id, 'account')}
+                                   className="hover:bg-slate-50 transition-colors group cursor-move" 
+                                   onClick={() => openEditAccount(acc.id)}
+                                 >
+                                   <td className="px-4 py-2 text-[9px] text-gray-400 pl-10 flex items-center gap-2">
+                                      <GripVertical size={10} className="text-gray-200 opacity-0 group-hover:opacity-100" />
+                                      {acc.sortOrder || 0}
+                                   </td>
+                                   <td className="px-4 py-2 text-[10px] font-mono text-gray-500">{acc.code}</td>
+                                   <td className="px-4 py-2 text-[11px] font-bold text-gray-900 pl-10">{acc.name}</td>
+                                 </tr>
+                               );
+                               lastMaster = acc.masterPackage || '';
+                               lastPackage = acc.package || '';
+                            });
+                            return rows;
+                          })()}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
-                  <div className="overflow-hidden border border-gray-200 rounded-lg shadow-sm">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider w-32">Código</th>
-                          <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Conta Contábil</th>
-                          <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider w-32">Fora do Escopo</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {(() => {
-                          let lastMaster = '';
-                          let lastPackage = '';
-                          
-                          const filteredAccounts = accounts.filter(acc => 
-                            acc.name.toLowerCase().includes(accSearchTerm.toLowerCase()) || 
-                            acc.id.toLowerCase().includes(accSearchTerm.toLowerCase()) ||
-                            (acc.package || '').toLowerCase().includes(accSearchTerm.toLowerCase()) ||
-                            (acc.masterPackage || '').toLowerCase().includes(accSearchTerm.toLowerCase())
-                          ).sort((a, b) => {
-                            if (a.sortOrder !== b.sortOrder) {
-                              return (a.sortOrder || 0) - (b.sortOrder || 0);
-                            }
-                            // Fallback to name if order is the same
-                            return a.name.localeCompare(b.name);
-                          });
 
-                          const rows: React.ReactNode[] = [];
-
-                          filteredAccounts.forEach((acc) => {
-                            const isNewMaster = acc.masterPackage !== lastMaster;
-                            const isNewPackage = (acc.package !== lastPackage || isNewMaster) && acc.package;
-                            
-                            if (isNewMaster && acc.masterPackage) {
-                              const isCollapsed = collapsedMasterPackages.has(acc.masterPackage);
-                              rows.push(
-                                <tr 
-                                  key={`master-${acc.masterPackage}`} 
-                                  draggable={true}
-                                  onDragStart={(e) => handleAccountDragStart(e, acc.masterPackage!, 'master')}
-                                  onDragEnd={handleAccountDragEnd}
-                                  onDragOver={(e) => e.preventDefault()}
-                                  onDrop={(e) => handleAccountDrop(e, acc.masterPackage!, 'master')}
-                                  className="bg-indigo-50 border-y border-indigo-100 group cursor-pointer hover:bg-indigo-100 transition-colors" 
-                                >
-                                  <td className="px-4 py-2 flex items-center gap-2" onClick={() => toggleMasterExpand(acc.masterPackage!)}>
-                                    <GripVertical size={14} className="text-indigo-300 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing" />
-                                    <ChevronUp size={14} className={`text-indigo-600 transition-transform ${isCollapsed ? 'rotate-180' : ''}`} />
-                                    <span className="text-[10px] font-black text-indigo-900 uppercase tracking-widest">{acc.masterPackageCode}</span>
-                                  </td>
-                                  <td colSpan={1} className="px-4 py-2 text-[10px] font-black text-indigo-900 uppercase tracking-widest" onClick={() => toggleMasterExpand(acc.masterPackage!)}>
-                                    {acc.masterPackage}
-                                  </td>
-                                  <td className="px-4 py-2 text-right">
-                                    <button 
-                                      onClick={(e) => { e.stopPropagation(); handleDeleteAccountRow('', 'master', acc.masterPackage!); }}
-                                      className="text-indigo-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                                      title="Excluir Pacote Master"
-                                    >
-                                      <Trash2 size={14} />
-                                    </button>
-                                  </td>
-                                </tr>
-                              );
-                            }
-
-                            const masterCollapsed = acc.masterPackage && collapsedMasterPackages.has(acc.masterPackage.trim());
-
-                            if (isNewPackage && !masterCollapsed) {
-                              const pkgKey = `${(acc.masterPackage || '').trim()}|${(acc.package || '').trim()}`;
-                              const isCollapsed = collapsedPackages.has(pkgKey);
-                              rows.push(
-                                <tr 
-                                  key={`pkg-${acc.package}`} 
-                                  draggable={true}
-                                  onDragStart={(e) => handleAccountDragStart(e, acc.package!, 'pkg')}
-                                  onDragEnd={handleAccountDragEnd}
-                                  onDragOver={(e) => e.preventDefault()}
-                                  onDrop={(e) => handleAccountDrop(e, acc.package!, 'pkg')}
-                                  className="bg-slate-50 border-b border-slate-100 group cursor-pointer hover:bg-slate-100 transition-colors" 
-                                >
-                                  <td className="px-4 py-1.5 flex items-center gap-2 pl-8" onClick={() => togglePackageExpand(pkgKey)}>
-                                    <GripVertical size={12} className="text-slate-300 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing" />
-                                    <ChevronUp size={12} className={`text-slate-500 transition-transform ${isCollapsed ? 'rotate-180' : ''}`} />
-                                    <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">{acc.packageCode}</span>
-                                  </td>
-                                  <td colSpan={1} className="px-4 py-1.5 text-[10px] font-bold text-slate-600 uppercase tracking-wider" onClick={() => togglePackageExpand(pkgKey)}>
-                                    {acc.package}
-                                  </td>
-                                  <td className="px-4 py-1.5 text-right">
-                                    <button 
-                                      onClick={(e) => { e.stopPropagation(); handleDeleteAccountRow('', 'pkg', acc.package!); }}
-                                      className="text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                                      title="Excluir Pacote"
-                                    >
-                                      <Trash2 size={14} />
-                                    </button>
-                                  </td>
-                                </tr>
-                              );
-                            }
-
-                            const pkgKey = acc.package ? `${(acc.masterPackage || '').trim()}|${acc.package.trim()}` : '';
-                            const pkgCollapsed = pkgKey && collapsedPackages.has(pkgKey);
-
-                            if (!masterCollapsed && !pkgCollapsed) {
-                              rows.push(
-                                <tr 
-                                  key={acc.id} 
-                                  draggable={true}
-                                  onDragStart={(e) => handleAccountDragStart(e, acc.id, 'account')}
-                                  onDragEnd={handleAccountDragEnd}
-                                  onDragOver={(e) => e.preventDefault()}
-                                  onDrop={(e) => handleAccountDrop(e, acc.id, 'account')}
-                                  className="hover:bg-gray-50 transition-colors group cursor-pointer" 
-                                >
-                                  <td className="px-4 py-3 whitespace-nowrap text-xs font-mono text-gray-500 pl-14 flex items-center gap-2" onClick={() => openEditAccount(acc.id)}>
-                                    <GripVertical size={12} className="text-gray-300 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing" />
-                                    {acc.code}
-                                  </td>
-                                  <td className="px-4 py-3 whitespace-nowrap text-xs font-bold text-gray-900" onClick={() => openEditAccount(acc.id)}>{acc.name}</td>
-                                  <td className="px-4 py-3 whitespace-nowrap text-xs font-bold text-gray-900 flex items-center justify-center gap-4">
-                                    <span className={acc.outOfScope ? "text-red-600" : "text-emerald-600"}>
-                                      {acc.outOfScope ? 'Sim' : 'Não'}
-                                    </span>
-                                    <button 
-                                      onClick={(e) => { e.stopPropagation(); handleDeleteAccountRow(acc.id); }}
-                                      className="text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                                      title="Excluir Conta"
-                                    >
-                                      <Trash2 size={14} />
-                                    </button>
-                                  </td>
-                                </tr>
-                              );
-                            }
-                            lastMaster = acc.masterPackage || '';
-                            lastPackage = acc.package || '';
-                          });
-
-                          return rows;
-                        })()}
-                      </tbody>
-                    </table>
+                  {/* Right Side: Edit Panel */}
+                  <div className={`w-[400px] shrink-0 border border-gray-200 rounded-xl bg-gray-50 shadow-lg flex flex-col overflow-hidden transition-all duration-300 ${editingId || accountForm.name ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-10 pointer-events-none'}`}>
+                    <div className="p-4 bg-indigo-600 text-white flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <Pencil size={18} />
+                        <h3 className="font-bold">Editor de Conta</h3>
+                      </div>
+                      <button onClick={() => setEditingId(null)} className="hover:bg-black/10 p-1 rounded-full"><X size={20} /></button>
+                    </div>
+                    <div className="p-5 flex-1 overflow-auto space-y-4">
+                       <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-4">
+                          <div className="grid grid-cols-4 gap-4">
+                             <div className="col-span-1">
+                                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Ordem</label>
+                                <input type="number" value={accountForm.sortOrder} onChange={e => setAccountForm({...accountForm, sortOrder: parseInt(e.target.value)||0})} className="w-full bg-slate-50 border-none rounded-lg p-2 text-xs font-bold focus:ring-2 focus:ring-indigo-500" />
+                             </div>
+                             <div className="col-span-3">
+                                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Código (Opcional)</label>
+                                <input type="text" value={accountForm.code} onChange={e => setAccountForm({...accountForm, code: e.target.value})} className="w-full bg-slate-50 border-none rounded-lg p-2 text-xs font-mono focus:ring-2 focus:ring-indigo-500" />
+                             </div>
+                          </div>
+                          <div>
+                             <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nome</label>
+                             <input type="text" value={accountForm.name} onChange={e => setAccountForm({...accountForm, name: e.target.value})} className="w-full bg-slate-50 border-none rounded-lg p-2 text-sm font-bold focus:ring-2 focus:ring-indigo-500" />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                             <div>
+                                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Pacote</label>
+                                <input type="text" value={accountForm.package} onChange={e => setAccountForm({...accountForm, package: e.target.value})} className="w-full bg-slate-50 border-none rounded-lg p-2 text-xs focus:ring-2 focus:ring-indigo-500" />
+                             </div>
+                             <div>
+                                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Master</label>
+                                <input type="text" value={accountForm.masterPackage} onChange={e => setAccountForm({...accountForm, masterPackage: e.target.value})} className="w-full bg-slate-50 border-none rounded-lg p-2 text-xs focus:ring-2 focus:ring-indigo-500" />
+                             </div>
+                          </div>
+                          <div className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
+                             <input type="checkbox" id="outOfScopeSide" checked={accountForm.outOfScope} onChange={e => setAccountForm({...accountForm, outOfScope: e.target.checked})} className="rounded text-indigo-600" />
+                             <label htmlFor="outOfScopeSide" className="text-xs font-bold text-gray-600">Fora do Escopo DRE</label>
+                          </div>
+                       </div>
+                    </div>
+                    <div className="p-4 bg-white border-t border-gray-100 flex gap-2">
+                       <button onClick={() => setEditingId(null)} className="flex-1 py-2 text-xs font-bold text-gray-400 hover:text-gray-600">Cancelar</button>
+                       <button onClick={handleSaveAccount} className="flex-[2] py-2 bg-indigo-600 text-white rounded-lg font-bold text-xs hover:bg-indigo-700 flex items-center justify-center gap-2 shadow-sm"><Save size={14}/> Salvar</button>
+                    </div>
                   </div>
                 </div>
               )}
+
               {activeRegistryTab === 'dre_structure' && (
                 <div className="space-y-6">
                   <div className="flex justify-between items-center bg-slate-50 p-4 rounded-xl border border-slate-200">
                     <div className="flex items-center gap-6">
                       <h4 className="font-bold text-slate-800 text-lg">Configuração da Estrutura DRE</h4>
                       <div className="flex bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
-                        <button 
-                          onClick={() => setActiveDreName('Forecast')}
-                          className={`px-6 py-1.5 text-xs font-bold rounded-md transition-all ${activeDreName === 'Forecast' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-100' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                          Forecast
-                        </button>
-                        <button 
-                          onClick={() => setActiveDreName('Budget')}
-                          className={`px-6 py-1.5 text-xs font-bold rounded-md transition-all ${activeDreName === 'Budget' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-100' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                          Orçamento
-                        </button>
+                        <button onClick={() => setActiveDreName('Forecast')} className={`px-6 py-1.5 text-xs font-bold rounded-md transition-all ${activeDreName === 'Forecast' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'}`}>Forecast</button>
+                        <button onClick={() => setActiveDreName('Budget')} className={`px-6 py-1.5 text-xs font-bold rounded-md transition-all ${activeDreName === 'Budget' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'}`}>Orçamento</button>
                       </div>
                     </div>
                     <div className="flex gap-3">
-                      <button 
-                        onClick={handleSaveDreConfig}
-                        disabled={isSavingDre}
-                        className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-100 disabled:opacity-50 transition-all active:scale-95"
-                      >
-                        {isSavingDre ? <><span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> Salvando...</> : <><Save size={18}/> Salvar Estrutura {activeDreName}</>}
+                      <button onClick={handleSaveDreConfig} disabled={isSavingDre} className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-emerald-700 shadow-md disabled:opacity-50 transition-all active:scale-95">
+                        {isSavingDre ? <><span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> Salvando...</> : <><Save size={18}/> Salvar Estrutura</>}
                       </button>
-                      {!isAddingSection ? (
-                        <button onClick={() => setIsAddingSection(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all active:scale-95"><Plus size={16}/> Nova Seção</button>
-                      ) : (
-                        <div className="flex gap-2">
-                          <input 
-                            type="text" 
-                            value={newSectionName} 
-                            onChange={e => setNewSectionName(e.target.value)}
-                            placeholder="Nome da Seção..."
-                            className="p-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                            autoFocus
-                          />
-                          <button onClick={addDreSection} className="bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700">Add</button>
-                          <button onClick={() => setIsAddingSection(false)} className="bg-gray-200 text-gray-600 px-3 py-2 rounded-lg text-sm font-bold hover:bg-gray-300">X</button>
-                        </div>
-                      )}
+                      <button onClick={() => setIsAddingSection(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-md transition-all active:scale-95"><Plus size={16}/> Nova Seção</button>
                     </div>
                   </div>
+
                   <div className="space-y-4">
                     {dreStructure.map(section => (
-                      <div key={section.id} className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                      <div key={section.id} className="border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white">
                         <div className="bg-gray-50 p-4 flex justify-between items-center border-b border-gray-200">
                           <h5 className="font-bold text-gray-900">{section.name}</h5>
                           <div className="flex gap-2">
-                            <button onClick={() => setAddingPackageTo(section.id)} className="p-1.5 text-gray-400 hover:text-indigo-600 transition-colors" title="Adicionar Pacote"><Plus size={16}/></button>
-                            <button onClick={() => deleteDreSection(section.id)} className="p-1.5 text-gray-400 hover:text-red-600 transition-colors" title="Excluir Seção"><Trash2 size={16}/></button>
+                             <button onClick={() => setAddingPackageTo(section.id)} className="p-1.5 text-gray-400 hover:text-indigo-600 transition-colors"><Plus size={16}/></button>
+                             <button onClick={() => deleteDreSection(section.id)} className="p-1.5 text-gray-400 hover:text-red-600 transition-colors"><Trash2 size={16}/></button>
                           </div>
                         </div>
                         <div className="p-4 space-y-3">
-                          {addingPackageTo === section.id && (
-                            <div className="flex gap-2 mb-3 p-2 bg-indigo-50 rounded-lg">
-                              <input 
-                                type="text" 
-                                value={newPackageName} 
-                                onChange={e => setNewPackageName(e.target.value)}
-                                placeholder="Nome do Pacote..."
-                                className="flex-1 p-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                                autoFocus
-                              />
-                              <button onClick={() => addDrePackage(section.id)} className="bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700">Ok</button>
-                              <button onClick={() => setAddingPackageTo(null)} className="bg-gray-200 text-gray-600 px-3 py-2 rounded-lg text-sm font-bold hover:bg-gray-300">X</button>
-                            </div>
-                          )}
-                          {section.items.map(pkg => (
-                            <div key={pkg.id} className="bg-white border border-gray-100 rounded-lg p-3 shadow-sm hover:border-indigo-200 transition-colors">
-                              <div className="flex justify-between items-center mb-2">
-                                <span className="text-sm font-bold text-slate-700">{pkg.name}</span>
-                                <div className="flex gap-1">
-                                  <button onClick={() => setPickingFor({ sectionId: section.id, packageId: pkg.id })} className="p-1 text-gray-400 hover:text-indigo-600 transition-colors" title="Adicionar Conta"><Plus size={14}/></button>
-                                  <button onClick={() => deleteDrePackage(section.id, pkg.id)} className="p-1 text-gray-400 hover:text-red-600 transition-colors" title="Excluir Pacote"><Trash2 size={14}/></button>
-                                </div>
-                              </div>
-                              <div className="flex flex-wrap gap-2">
-                                {pkg.accounts.map(acc => (
-                                  <span key={acc.id} className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-600 rounded text-[10px] font-medium border border-slate-200">
-                                    {acc.name}
-                                    <button onClick={() => deleteDreAccount(section.id, pkg.id, acc.id)} className="hover:text-red-600 ml-1"><X size={10}/></button>
-                                  </span>
-                                ))}
-                                {pkg.accounts.length === 0 && (
-                                  <span className="text-[10px] text-gray-400 italic">Nenhuma conta vinculada</span>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                          {section.items.length === 0 && (
-                            <div className="text-center py-4 text-gray-400 text-xs italic">Nenhum pacote nesta seção</div>
-                          )}
+                           {section.items.map(pkg => (
+                             <div key={pkg.id} className="bg-white border border-gray-100 rounded-lg p-3 shadow-sm hover:border-indigo-200 transition-colors">
+                               <div className="flex justify-between items-center mb-2">
+                                  <span className="text-sm font-bold text-slate-700">{pkg.name}</span>
+                                  <div className="flex gap-1">
+                                    <button onClick={() => setPickingFor({ sectionId: section.id, packageId: pkg.id })} className="p-1 text-gray-400 hover:text-indigo-600"><Plus size={14}/></button>
+                                    <button onClick={() => deleteDrePackage(section.id, pkg.id)} className="p-1 text-gray-400 hover:text-red-600"><Trash2 size={14}/></button>
+                                  </div>
+                               </div>
+                               <div className="flex flex-wrap gap-2">
+                                 {pkg.accounts.map(acc => (
+                                   <span key={acc.id} className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-600 rounded text-[10px] font-medium border border-slate-200">
+                                     {acc.name}
+                                     <button onClick={() => deleteDreAccount(section.id, pkg.id, acc.id)} className="hover:text-red-600 ml-1"><X size={10}/></button>
+                                   </span>
+                                 ))}
+                               </div>
+                             </div>
+                           ))}
                         </div>
                       </div>
                     ))}
@@ -3134,9 +3146,22 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
           )}
           {activeGeralTab === 'permissions' && (
             <div className="space-y-6">
-              <div className="flex justify-between items-center">
-                <h4 className="font-bold text-gray-700">Matriz de Permissões</h4>
-                <div className="text-xs text-slate-500 italic">Configure as permissões de acesso por perfil de usuário.</div>
+              <div className="flex justify-between items-center bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <div>
+                  <h4 className="font-bold text-slate-800">Matriz de Permissões</h4>
+                  <div className="text-xs text-slate-500 italic">Configure as permissões de acesso por perfil de usuário.</div>
+                </div>
+                <button 
+                  onClick={handleSavePermissions}
+                  disabled={isSavingPerms}
+                  className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 disabled:opacity-50 flex items-center gap-2 transition-all active:scale-95"
+                >
+                  {isSavingPerms ? (
+                    <><span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> Salvando...</>
+                  ) : (
+                    <><Save size={18} /> Salvar Alterações</>
+                  )}
+                </button>
               </div>
               <div className="overflow-x-auto border border-gray-200 rounded-xl shadow-sm">
                 <table className="min-w-full divide-y divide-gray-200 text-sm">

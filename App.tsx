@@ -539,25 +539,29 @@ const App: React.FC = () => {
         </div>
       );
       case 'dashboard': return (
-        <ForecastTable
-          selectedMonth={selectedDate.getMonth() + 1}
-          selectedYear={selectedDate.getFullYear()}
-          financialData={importedFinancialData}
-          selectedHotel={selectedHotel}
-          accounts={accounts}
-          packages={packages}
-          hotels={hotels}
-          isMonthClosed={isClosed}
-          realOccupancyData={realOccupancyData}
-          budgetOccupancyData={budgetOccupancyDataMap[activeBudgetVersionId] || {}}
-          activeRealVersionId={activeRealVersionId}
-          activeBudgetVersionId={activeBudgetVersionId}
-          activeProjectionType={activeProjectionType}
-          setActiveProjectionType={setActiveProjectionType}
-          validations={validations}
-          setValidations={setValidations}
-          currentUser={currentUser}
-        />
+        <div className="max-w-[98%] mx-auto px-4 py-6">
+          <div className="bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-2">
+            <ForecastTable
+              selectedMonth={selectedDate.getMonth() + 1}
+              selectedYear={selectedDate.getFullYear()}
+              financialData={importedFinancialData}
+              selectedHotel={selectedHotel}
+              accounts={accounts}
+              packages={packages}
+              hotels={hotels}
+              isMonthClosed={isClosed}
+              realOccupancyData={realOccupancyData}
+              budgetOccupancyData={budgetOccupancyDataMap[activeBudgetVersionId] || {}}
+              activeRealVersionId={activeRealVersionId}
+              activeBudgetVersionId={activeBudgetVersionId}
+              activeProjectionType={activeProjectionType}
+              setActiveProjectionType={setActiveProjectionType}
+              validations={validations}
+              setValidations={setValidations}
+              currentUser={currentUser}
+            />
+          </div>
+        </div>
       );
       case 'occupancy_real': return (
         <OccupancyView
