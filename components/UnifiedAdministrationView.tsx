@@ -348,21 +348,57 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     { id: '2', userId: 'u2', userName: 'Ana Souza', userUnit: 'Tauá Resort Atibaia', action: 'Criou Nova Versão GMD', timestamp: new Date(Date.now() - 86400000).toISOString() }
   ]);
   
-  const [permissionsMatrix, setPermissionsMatrix] = useState<Record<string, Record<UserRole, boolean>>>({
-    'Criar Versão Forecast': {
-      [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false, [UserRole.ADMIN_UNIDADE]: true,
-      [UserRole.ENTITY_MANAGER]: false, [UserRole.PACKAGE_MANAGER]: false, [UserRole.AREA_MANAGER]: false,
-      [UserRole.COST_ANALYST]: true, [UserRole.AREA_ANALYST]: false
+  const [permissionsMatrix, setPermissionsMatrix] = useState<Record<string, Record<string, Record<UserRole, boolean>>>>({
+    'GMD': {
+      'Criar Nova Versão GMD': {
+        [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false, [UserRole.ADMIN_UNIDADE]: true,
+        [UserRole.ENTITY_MANAGER]: false, [UserRole.PACKAGE_MANAGER]: false, [UserRole.AREA_MANAGER]: false,
+        [UserRole.COST_ANALYST]: true, [UserRole.AREA_ANALYST]: false
+      },
+      'Aprovar Fechamento GMD': {
+        [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: true, [UserRole.ADMIN_UNIDADE]: false,
+        [UserRole.ENTITY_MANAGER]: false, [UserRole.PACKAGE_MANAGER]: false, [UserRole.AREA_MANAGER]: false,
+        [UserRole.COST_ANALYST]: false, [UserRole.AREA_ANALYST]: false
+      },
+      'Justificar Desvios': {
+        [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false, [UserRole.ADMIN_UNIDADE]: true,
+        [UserRole.ENTITY_MANAGER]: true, [UserRole.PACKAGE_MANAGER]: true, [UserRole.AREA_MANAGER]: true,
+        [UserRole.COST_ANALYST]: true, [UserRole.AREA_ANALYST]: true
+      }
     },
-    'Aprovar Fechamento GMD': {
-      [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: true, [UserRole.ADMIN_UNIDADE]: false,
-      [UserRole.ENTITY_MANAGER]: false, [UserRole.PACKAGE_MANAGER]: false, [UserRole.AREA_MANAGER]: false,
-      [UserRole.COST_ANALYST]: false, [UserRole.AREA_ANALYST]: false
+    'Orçamento': {
+      'Criar Versão de Orçamento': {
+        [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false, [UserRole.ADMIN_UNIDADE]: true,
+        [UserRole.ENTITY_MANAGER]: false, [UserRole.PACKAGE_MANAGER]: false, [UserRole.AREA_MANAGER]: false,
+        [UserRole.COST_ANALYST]: true, [UserRole.AREA_ANALYST]: false
+      },
+      'Importar Massivo (Excel)': {
+        [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false, [UserRole.ADMIN_UNIDADE]: false,
+        [UserRole.ENTITY_MANAGER]: false, [UserRole.PACKAGE_MANAGER]: false, [UserRole.AREA_MANAGER]: false,
+        [UserRole.COST_ANALYST]: true, [UserRole.AREA_ANALYST]: false
+      },
+      'Editar Parâmetros de Mão de Obra': {
+        [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false, [UserRole.ADMIN_UNIDADE]: true,
+        [UserRole.ENTITY_MANAGER]: false, [UserRole.PACKAGE_MANAGER]: false, [UserRole.AREA_MANAGER]: false,
+        [UserRole.COST_ANALYST]: true, [UserRole.AREA_ANALYST]: false
+      }
     },
-    'Editar Cadastros Gerais': {
-      [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false, [UserRole.ADMIN_UNIDADE]: true,
-      [UserRole.ENTITY_MANAGER]: false, [UserRole.PACKAGE_MANAGER]: false, [UserRole.AREA_MANAGER]: false,
-      [UserRole.COST_ANALYST]: false, [UserRole.AREA_ANALYST]: false
+    'Cadastros e Configurações': {
+      'Tabela de Usuários': {
+        [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false, [UserRole.ADMIN_UNIDADE]: true,
+        [UserRole.ENTITY_MANAGER]: false, [UserRole.PACKAGE_MANAGER]: false, [UserRole.AREA_MANAGER]: false,
+        [UserRole.COST_ANALYST]: false, [UserRole.AREA_ANALYST]: false
+      },
+      'Plano de Contas Master/Pacote': {
+        [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false, [UserRole.ADMIN_UNIDADE]: false,
+        [UserRole.ENTITY_MANAGER]: false, [UserRole.PACKAGE_MANAGER]: false, [UserRole.AREA_MANAGER]: false,
+        [UserRole.COST_ANALYST]: true, [UserRole.AREA_ANALYST]: false
+      },
+      'Configuração de Setores (CR/PDV)': {
+        [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false, [UserRole.ADMIN_UNIDADE]: true,
+        [UserRole.ENTITY_MANAGER]: false, [UserRole.PACKAGE_MANAGER]: false, [UserRole.AREA_MANAGER]: false,
+        [UserRole.COST_ANALYST]: true, [UserRole.AREA_ANALYST]: false
+      }
     }
   });
   
@@ -2994,33 +3030,46 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-100">
-                    {Object.entries(permissionsMatrix).map(([actionName, roleMap]) => (
-                      <tr key={actionName} className="hover:bg-slate-50/50 transition-colors group">
-                        <td className="px-6 py-4 font-medium text-slate-800 border-r border-slate-100 sticky left-0 bg-white group-hover:bg-slate-50/50 transition-colors shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
-                          {actionName}
-                        </td>
-                        {Object.values(UserRole).map(role => (
-                          <td key={role} className="px-3 py-4 text-center">
-                            <label className="flex items-center justify-center cursor-pointer w-full h-full">
-                              <input 
-                                type="checkbox" 
-                                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 transition-transform hover:scale-110 active:scale-95"
-                                checked={roleMap[role]}
-                                onChange={e => {
-                                  const newVal = e.target.checked;
-                                  setPermissionsMatrix(prev => ({
-                                    ...prev,
-                                    [actionName]: {
-                                      ...prev[actionName],
-                                      [role]: newVal
-                                    }
-                                  }));
-                                }}
-                              />
-                            </label>
+                    {Object.entries(permissionsMatrix).map(([categoryName, actionsMap]) => (
+                      <React.Fragment key={categoryName}>
+                        <tr className="bg-slate-100/80">
+                          <td colSpan={Object.keys(UserRole).length + 1} className="px-6 py-3 text-xs font-bold text-slate-700 uppercase tracking-widest border-y border-slate-200">
+                            {categoryName}
                           </td>
+                        </tr>
+                        {Object.entries(actionsMap).map(([actionName, roleMap]) => (
+                          <tr key={actionName} className="hover:bg-slate-50/50 transition-colors group">
+                            <td className="px-6 py-4 text-sm font-medium text-slate-800 border-r border-slate-100 sticky left-0 bg-white group-hover:bg-slate-50/50 transition-colors shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] pl-8 relative">
+                              <span className="absolute left-4 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+                              {actionName}
+                            </td>
+                            {Object.values(UserRole).map(role => (
+                              <td key={role} className="px-3 py-4 text-center">
+                                <label className="flex items-center justify-center cursor-pointer w-full h-full">
+                                  <input 
+                                    type="checkbox" 
+                                    className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 transition-transform hover:scale-110 active:scale-95"
+                                    checked={roleMap[role]}
+                                    onChange={e => {
+                                      const newVal = e.target.checked;
+                                      setPermissionsMatrix(prev => ({
+                                        ...prev,
+                                        [categoryName]: {
+                                          ...prev[categoryName],
+                                          [actionName]: {
+                                            ...prev[categoryName][actionName],
+                                            [role]: newVal
+                                          }
+                                        }
+                                      }));
+                                    }}
+                                  />
+                                </label>
+                              </td>
+                            ))}
+                          </tr>
                         ))}
-                      </tr>
+                      </React.Fragment>
                     ))}
                   </tbody>
                 </table>

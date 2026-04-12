@@ -19,8 +19,10 @@ export interface UserLog {
 }
 
 export interface PermissionMatrix {
-  [actionName: string]: {
-    [role in UserRole]: boolean;
+  [categoryName: string]: {
+    [actionName: string]: {
+      [role in UserRole]: boolean;
+    };
   };
 }
 
