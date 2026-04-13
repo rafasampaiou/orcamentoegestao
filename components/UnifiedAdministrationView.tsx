@@ -535,6 +535,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const [accImportStep, setAccImportStep] = useState<'input' | 'preview'>('input');
   const [accParsedData, setAccParsedData] = useState<ImportedAccount[]>([]);
   const [accImportMode, setAccImportMode] = useState<'append' | 'replace'>('append');
+  const accFileInputRef = useRef<HTMLInputElement>(null);
 
   // Account View Customization
   const [collapsedMasterPackages, setCollapsedMasterPackages] = useState<Set<string>>(new Set());
@@ -1542,6 +1543,19 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     }
   };
 
+  const handleAccCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        const text = event.target?.result as string;
+        setImportText(text);
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   const processAccountImport = () => {
     if (!importText.trim()) return;
 
@@ -1656,21 +1670,11 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         return Array.from(map.values());
     })();
 
-    // SORT SYSTEMATICALLY: Pacote Master (D) -> Pacote (C) -> Nome (B) -> Código (A)
+    // SORT SYSTEMATICALLY: By Code (numeric aware) to maintain hierarchy
     updated.sort((a, b) => {
-        const masterA = (a.masterPackage || '').trim();
-        const masterB = (b.masterPackage || '').trim();
-        if (masterA !== masterB) return masterA.localeCompare(masterB, undefined, { numeric: true, sensitivity: 'base' });
-
-        const pkgA = (a.package || '').trim();
-        const pkgB = (b.package || '').trim();
-        if (pkgA !== pkgB) return pkgA.localeCompare(pkgB, undefined, { numeric: true, sensitivity: 'base' });
-
-        const nameA = (a.name || '').trim();
-        const nameB = (b.name || '').trim();
-        if (nameA !== nameB) return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
-
-        return (a.code || '').localeCompare((b.code || ''), undefined, { numeric: true, sensitivity: 'base' });
+        const codeA = (a.code || a.id || '').trim();
+        const codeB = (b.code || b.id || '').trim();
+        return codeA.localeCompare(codeB, undefined, { numeric: true, sensitivity: 'base' });
     });
 
     // Re-assign sortOrder for the entire collection to maintain the requested sequence
@@ -3597,6 +3601,12 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                     <div className="space-y-4">
                       <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl text-sm text-amber-800">
                         <p className="font-bold mb-1">Instruções para Importação de Contas:</p>
+                        <div className="mt-2 mb-3">
+                          <input type="file" ref={accFileInputRef} onChange={handleAccCsvUpload} accept=".csv,.txt" className="hidden" />
+                          <button onClick={() => accFileInputRef.current?.click()} className="px-3 py-1.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-[10px] font-bold shadow-sm transition-all">
+                            Selecionar Arquivo CSV de Contas
+                          </button>
+                        </div>
                         <p>Cole os dados do Excel com as seguintes colunas (separadas por TAB ou Ponto e Vírgula):</p>
                         <code className="block mt-2 bg-white/50 p-2 rounded border border-amber-100 text-[10px]">
                           Tipo | Escopo ou Fora | Pacote Master | Pacote | Código | Conta Contábil
