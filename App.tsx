@@ -52,11 +52,8 @@ const App: React.FC = () => {
   };
 
   // --- BUDGET VERSIONING STATE ---
-  const [budgetVersions, setBudgetVersions] = useState<BudgetVersion[]>([
-    { id: 'v1', name: '2025 Oficial', year: 2025, isLocked: false, createdAt: '2024-10-01', isMain: false },
-    { id: 'v2', name: '2026 Oficial', year: 2026, isLocked: false, createdAt: '2025-10-01', isMain: true }
-  ]);
-  const [activeBudgetVersionId, setActiveBudgetVersionId] = useState<string>('v2');
+  const [budgetVersions, setBudgetVersions] = useState<BudgetVersion[]>([]);
+  const [activeBudgetVersionId, setActiveBudgetVersionId] = useState<string>('');
   const [replicateModalOpen, setReplicateModalOpen] = useState(false);
   const [replicateTarget, setReplicateTarget] = useState<{ year: number, month: number } | null>(null);
   const [replicateMode, setReplicateMode] = useState<'BUDGET' | 'REAL'>('BUDGET');
@@ -67,11 +64,8 @@ const App: React.FC = () => {
   const [validations, setValidations] = useState<ValidationRecord[]>([]);
 
   // --- REAL VERSIONING STATE ---
-  const [realVersions, setRealVersions] = useState<BudgetVersion[]>([
-    { id: 'r1', name: '2024 Oficial', year: 2024, isLocked: true, createdAt: '2024-01-01' },
-    { id: 'r2', name: '2025 Oficial', year: 2025, isLocked: false, createdAt: '2025-01-01' }
-  ]);
-  const [activeRealVersionId, setActiveRealVersionId] = useState<string>('r2');
+  const [realVersions, setRealVersions] = useState<BudgetVersion[]>([]);
+  const [activeRealVersionId, setActiveRealVersionId] = useState<string>('');
 
   // --- LABOR PARAMETERS STATE ---
   const defaultLaborParams: LaborParameters = {
@@ -140,10 +134,11 @@ const App: React.FC = () => {
   const globalLaborDataMapRef = useRef(globalLaborDataMap);
   React.useEffect(() => { globalLaborDataMapRef.current = globalLaborDataMap; }, [globalLaborDataMap]);
 
-  const extraRevenueDataMapRef = useRef(extraRevenueDataMap);
+  const [extraRevenueDataMapRef] = [useRef(extraRevenueDataMap)];
   React.useEffect(() => { extraRevenueDataMapRef.current = extraRevenueDataMap; }, [extraRevenueDataMap]);
 
   const isInitialMount = useRef(true);
+  const hasLoadedFromSupabase = useRef(false);
 
   // Central Auto-Save Effect (Debounces and sends everything to Supabase)
   React.useEffect(() => {
@@ -179,12 +174,13 @@ const App: React.FC = () => {
 
   // --- REGISTRY STATE (LIFTED FROM SETTINGS) ---
   // This ensures data persists when switching tabs
-  const [users, setUsers] = useState<User[]>(mockUsers);
-  const [hotels, setHotels] = useState<Hotel[]>(mockHotels);
-  const [costCenters, setCostCenters] = useState<CostCenter[]>(mockCostCenters);
-  const [packages, setPackages] = useState<CostPackage[]>(mockPackages);
-  const [accounts, setAccounts] = useState<Account[]>(mockAccounts);
-  const [gmdConfigs, setGmdConfigs] = useState<GMDConfiguration[]>(mockGMDConfigs);
+  // --- REGISTRY STATE ---
+  const [users, setUsers] = useState<User[]>([]);
+  const [hotels, setHotels] = useState<Hotel[]>([]);
+  const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
+  const [packages, setPackages] = useState<CostPackage[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [gmdConfigs, setGmdConfigs] = useState<GMDConfiguration[]>([]);
   const [dreConfigs, setDreConfigs] = useState<{ name: string, structure: any }[]>([]);
 
   React.useEffect(() => {
@@ -222,36 +218,40 @@ const App: React.FC = () => {
     let isMounted = true;
 
     const fetchRealData = async () => {
+      if (hasLoadedFromSupabase.current) return; // Prevent multiple global fetches
+      
       try {
         const remoteHotels = await supabaseService.getHotels();
-        if (remoteHotels && remoteHotels.length > 0 && isMounted) {
-          setHotels(remoteHotels);
+        if (remoteHotels && isMounted) {
+          setHotels(remoteHotels.length > 0 ? remoteHotels : mockHotels);
         }
 
         const remoteCostCenters = await supabaseService.getCostCenters();
-        if (remoteCostCenters && remoteCostCenters.length > 0 && isMounted) {
-          setCostCenters(remoteCostCenters);
+        if (remoteCostCenters && isMounted) {
+          setCostCenters(remoteCostCenters.length > 0 ? remoteCostCenters : mockCostCenters);
         }
 
         const remoteAccounts = await supabaseService.getAccounts();
-        if (remoteAccounts && remoteAccounts.length > 0 && isMounted) {
-          setAccounts(remoteAccounts);
+        if (remoteAccounts && isMounted) {
+          setAccounts(remoteAccounts.length > 0 ? remoteAccounts : mockAccounts);
         }
 
         const remoteProfiles = await supabaseService.getProfiles();
-        if (remoteProfiles && remoteProfiles.length > 0 && isMounted) {
-          setUsers(remoteProfiles);
+        if (remoteProfiles && isMounted) {
+          setUsers(remoteProfiles.length > 0 ? remoteProfiles : mockUsers);
         }
 
         const remoteGmd = await supabaseService.getGmdConfigs();
-        if (remoteGmd && remoteGmd.length > 0 && isMounted) {
-          setGmdConfigs(remoteGmd);
+        if (remoteGmd && isMounted) {
+          setGmdConfigs(remoteGmd.length > 0 ? remoteGmd : mockGMDConfigs);
         }
 
         const remoteDreConfigs = await supabaseService.getDreConfigs();
-        if (remoteDreConfigs && remoteDreConfigs.length > 0 && isMounted) {
+        if (remoteDreConfigs && isMounted) {
           setDreConfigs(remoteDreConfigs);
         }
+        
+        hasLoadedFromSupabase.current = true;
 
         const remoteVersions = await supabaseService.getBudgetVersions();
         if (remoteVersions && remoteVersions.length > 0 && isMounted) {
