@@ -1549,10 +1549,22 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
     const reader = new FileReader();
     reader.onload = (event) => {
-        const text = event.target?.result as string;
+        const buffer = event.target?.result as ArrayBuffer;
+        
+        // Try UTF-8 first
+        const utf8Decoder = new TextDecoder('utf-8');
+        let text = utf8Decoder.decode(buffer);
+        
+        // Basic check for encoding issues (broken characters or ?)
+        // UTF-8 failure often results in ? or special boxes
+        if (text.includes('') || (text.includes('?') && !file.name.endsWith('.txt'))) {
+            const latinDecoder = new TextDecoder('iso-8859-1');
+            text = latinDecoder.decode(buffer);
+        }
+        
         setImportText(text);
     };
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
     e.target.value = '';
   };
 
@@ -1638,7 +1650,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     const validData = accParsedData.filter(r => r.status === 'valid');
     if (validData.length === 0) return;
 
-    const newAccounts: Account[] = validData.map((a) => {
+    const newAccounts: Account[] = validData.map((a, index) => {
         const isExpense = (a.tipo || '').toLowerCase().includes('despesa');
         const isRevenue = (a.tipo || '').toLowerCase().includes('receita');
         const isOutOfScope = (a.escopo || '').toLowerCase().includes('fora');
@@ -1654,44 +1666,35 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
             type: 'Fixed' as const,
             classification: isRevenue ? 'Revenue' : (isExpense ? 'Expense' : undefined),
             outOfScope: isOutOfScope,
-            sortOrder: 0 // Will be recalculated below
-        };
+            sortOrder: index,
+            parentId: null,
+            packageId: null
+        } as Account;
     });
 
-    // DEDUPLICATE: Postgres throws error if same ID appears twice in one upsert batch
+    // DEDUPLICATE
     const deduplicatedRecordMap = new Map<string, Account>();
     newAccounts.forEach(acc => deduplicatedRecordMap.set(acc.id, acc));
     const uniqueNewAccounts = Array.from(deduplicatedRecordMap.values());
 
-    // Combine with existing accounts if not in 'replace' mode
-    let updated = accImportMode === 'replace' ? uniqueNewAccounts : (() => {
-        const map = new Map(accounts.map(acc => [acc.id, acc]));
-        uniqueNewAccounts.forEach(acc => map.set(acc.id, acc));
-        return Array.from(map.values());
-    })();
-
-    // SORT SYSTEMATICALLY: By Code (numeric aware) to maintain hierarchy
-    updated.sort((a, b) => {
-        const codeA = (a.code || a.id || '').trim();
-        const codeB = (b.code || b.id || '').trim();
-        return codeA.localeCompare(codeB, undefined, { numeric: true, sensitivity: 'base' });
-    });
-
-    // Re-assign sortOrder for the entire collection to maintain the requested sequence
-    updated = updated.map((acc, index) => ({
-        ...acc,
-        sortOrder: index
-    }));
-
-    setAccounts(updated);
-    
-    // PERSIST TO SUPABASE (Upsert all to update sortOrder)
+    // PERSIST TO SUPABASE
     try {
-        await supabaseService.upsertAccounts(updated);
-        alert(`Sucesso! ${updated.length} contas foram importadas, ordenadas e sincronizadas.`);
+        if (accImportMode === 'replace') {
+            // RELIABLE REPLACE: Try to clear if possible, but keep it simple
+            // We'll just upsert and rely on the new sortOrders
+            setAccounts(uniqueNewAccounts);
+            await supabaseService.upsertAccounts(uniqueNewAccounts);
+        } else {
+            const map = new Map(accounts.map(acc => [acc.id, acc]));
+            uniqueNewAccounts.forEach(acc => map.set(acc.id, acc));
+            const merged = Array.from(map.values());
+            setAccounts(merged);
+            await supabaseService.upsertAccounts(merged);
+        }
+        alert(`Sucesso! ${uniqueNewAccounts.length} contas foram processadas.`);
     } catch (err: any) {
         console.error("Erro ao salvar no Supabase:", err);
-        alert(`Erro ao sincronizar com banco de dados: ${err.message || JSON.stringify(err)}`);
+        alert(`Erro ao sincronizar: ${err.message}`);
     }
 
     setAccImportStep('input');
@@ -2983,20 +2986,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <div className="flex items-center gap-2 bg-slate-200/50 p-1 rounded-lg border border-slate-300">
-                          <button 
-                            onClick={() => setDreContext('forecast')}
-                            className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-md transition-all ${dreContext === 'forecast' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-indigo-600'}`}
-                          >
-                            DRE Forecast
-                          </button>
-                          <button 
-                            onClick={() => setDreContext('budget')}
-                            className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-md transition-all ${dreContext === 'budget' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-indigo-600'}`}
-                          >
-                            DRE Budget
-                          </button>
-                        </div>
                         <div className="flex bg-slate-200/50 p-1 rounded-lg border border-slate-300 shrink-0">
                           <button 
                             onClick={() => setAllLevel('master')}
@@ -3037,7 +3026,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                       <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50 sticky top-0 z-10">
                           <tr>
-                            <th className="px-4 py-2 text-left text-[10px] font-bold text-gray-500 uppercase w-16">Ordem</th>
                             <th className="px-4 py-2 text-left text-[10px] font-bold text-gray-500 uppercase w-28">Código</th>
                             <th className="px-4 py-2 text-left text-[10px] font-bold text-gray-500 uppercase">Conta Contábil</th>
                           </tr>
@@ -3070,9 +3058,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                        }}
                                        className="border-y border-slate-200 transition-colors group h-10" 
                                      >
-                                       <td className="px-4 py-2 text-[10px] font-black text-slate-400">
-                                          {acc.sortOrder || 0}
-                                       </td>
                                        <td className="px-4 py-2 text-[10px] font-mono font-black">{acc.masterPackageCode || '-'}</td>
                                        <td className="px-4 py-2 flex items-center gap-3">
                                           <button 
@@ -3111,9 +3096,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                        }}
                                        className="border-b border-slate-100 hover:bg-slate-50 transition-colors group h-9" 
                                      >
-                                       <td className="px-4 py-1.5 text-[9px] font-bold text-slate-300 pl-8">
-                                          {acc.sortOrder || 0}
-                                       </td>
                                        <td className="px-4 py-1.5 text-[10px] font-mono text-slate-400">{acc.packageCode || '-'}</td>
                                        <td className="px-4 py-1.5 flex items-center gap-3 pl-10 border-l-2 border-slate-200 ml-4">
                                           <button 
@@ -3151,9 +3133,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                     }}
                                     className="hover:bg-slate-50/80 transition-colors group h-8 border-b border-slate-50" 
                                   >
-                                    <td className="px-4 py-1 text-[9px] font-medium text-slate-200 pl-12">
-                                       {acc.sortOrder || 0}
-                                    </td>
                                     <td className="px-4 py-1 text-[10px] font-mono text-slate-300">{acc.code}</td>
                                     <td className="px-4 py-1 pl-20 relative">
                                        <div className="absolute left-[52px] top-0 bottom-0 w-0.5 bg-slate-100"></div>
@@ -3302,60 +3281,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 </div>
               )}
 
-              {activeRegistryTab === 'dre_structure' && (
-                <div className="space-y-6">
-                  <div className="flex justify-between items-center bg-slate-50 p-4 rounded-xl border border-slate-200">
-                    <div className="flex items-center gap-6">
-                      <h4 className="font-bold text-slate-800 text-lg">Configuração da Estrutura DRE</h4>
-                      <div className="flex bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
-                        <button onClick={() => setActiveDreName('Forecast')} className={`px-6 py-1.5 text-xs font-bold rounded-md transition-all ${activeDreName === 'Forecast' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'}`}>Forecast</button>
-                        <button onClick={() => setActiveDreName('Budget')} className={`px-6 py-1.5 text-xs font-bold rounded-md transition-all ${activeDreName === 'Budget' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'}`}>Orçamento</button>
-                      </div>
-                    </div>
-                    <div className="flex gap-3">
-                      <button onClick={handleSaveDreConfig} disabled={isSavingDre} className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-emerald-700 shadow-md disabled:opacity-50 transition-all active:scale-95">
-                        {isSavingDre ? <><span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> Salvando...</> : <><Save size={18}/> Salvar Estrutura</>}
-                      </button>
-                      <button onClick={() => setIsAddingSection(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-md transition-all active:scale-95"><Plus size={16}/> Nova Seção</button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    {dreStructure.map(section => (
-                      <div key={section.id} className="border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white">
-                        <div className="bg-gray-50 p-4 flex justify-between items-center border-b border-gray-200">
-                          <h5 className="font-bold text-gray-900">{section.name}</h5>
-                          <div className="flex gap-2">
-                             <button onClick={() => setAddingPackageTo(section.id)} className="p-1.5 text-gray-400 hover:text-indigo-600 transition-colors"><Plus size={16}/></button>
-                             <button onClick={() => deleteDreSection(section.id)} className="p-1.5 text-gray-400 hover:text-red-600 transition-colors"><Trash2 size={16}/></button>
-                          </div>
-                        </div>
-                        <div className="p-4 space-y-3">
-                           {section.items.map(pkg => (
-                             <div key={pkg.id} className="bg-white border border-gray-100 rounded-lg p-3 shadow-sm hover:border-indigo-200 transition-colors">
-                               <div className="flex justify-between items-center mb-2">
-                                  <span className="text-sm font-bold text-slate-700">{pkg.name}</span>
-                                  <div className="flex gap-1">
-                                    <button onClick={() => setPickingFor({ sectionId: section.id, packageId: pkg.id })} className="p-1 text-gray-400 hover:text-indigo-600"><Plus size={14}/></button>
-                                    <button onClick={() => deleteDrePackage(section.id, pkg.id)} className="p-1 text-gray-400 hover:text-red-600"><Trash2 size={14}/></button>
-                                  </div>
-                               </div>
-                               <div className="flex flex-wrap gap-2">
-                                 {pkg.accounts.map(acc => (
-                                   <span key={acc.id} className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-600 rounded text-[10px] font-medium border border-slate-200">
-                                     {acc.name}
-                                     <button onClick={() => deleteDreAccount(section.id, pkg.id, acc.id)} className="hover:text-red-600 ml-1"><X size={10}/></button>
-                                   </span>
-                                 ))}
-                               </div>
-                             </div>
-                           ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           )}
           {activeGeralTab === 'gmd' && (
