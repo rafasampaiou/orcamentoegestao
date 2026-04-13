@@ -959,6 +959,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   // --- MODAL & FORM STATE ---
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [showAccountEditor, setShowAccountEditor] = useState(false);
 
   // Form States
   const [userForm, setUserForm] = useState({ name: '', email: '', role: UserRole.PACKAGE_MANAGER, hotelId: '', password: '' });
@@ -1093,20 +1094,22 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       }
   };
 
-  const openNewAccount = () => {
+  const openNewAccount = (initialMaster?: string, initialPkg?: string, insertAfterSortOrder?: number) => {
       setEditingId(null);
+      const nextSortOrder = insertAfterSortOrder !== undefined ? insertAfterSortOrder + 1 : accounts.length;
+      
       setAccountForm({ 
           id: '', 
           code: '', 
           name: '', 
-          package: '', 
-          packageCode: '', 
-          masterPackage: '', 
-          masterPackageCode: '', 
+          package: initialPkg || '', 
+          packageCode: initialPkg ? (accounts.find(a => a.package === initialPkg)?.packageCode || (accounts.find(a => a.masterPackage === initialMaster)?.masterPackageCode || '')) : '', 
+          masterPackage: initialMaster || '', 
+          masterPackageCode: initialMaster ? (accounts.find(a => a.masterPackage === initialMaster)?.masterPackageCode || '') : '', 
           type: 'Fixed',
-          sortOrder: accounts.length,
+          sortOrder: nextSortOrder,
           outOfScope: false,
-          level: 'account',
+          level: initialPkg ? 'account' : (initialMaster ? 'pkg' : 'master'),
           parentId: '',
           formula: '',
           classification: 'Revenue',
@@ -1118,7 +1121,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
           allocationRules: [],
           budgetSource: ''
       });
-      setActiveModal('account');
+      setActiveModal(null); 
+      setShowAccountEditor(true);
   };
 
   const openEditAccount = (id: string, level: 'account' | 'pkg' | 'master' = 'account', name?: string) => {
@@ -1128,6 +1132,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
           if (acc) {
               setAccountForm({
                 ...acc,
+                level: 'account',
                 parentId: acc.parentId || '',
                 formula: acc.formula || '',
                 classification: acc.classification || 'Revenue',
@@ -1156,7 +1161,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               packageCode: '', 
               type: 'Fixed', 
               sortOrder: first?.sortOrder || 0,
-              outOfScope: false
+              outOfScope: false,
+              classification: first?.classification || 'Revenue'
           });
       } else if (level === 'pkg' && name) {
           const [masterName, pkgName] = name.split('|');
@@ -1172,10 +1178,12 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               packageCode: first?.packageCode || '',
               type: 'Fixed', 
               sortOrder: first?.sortOrder || 0,
-              outOfScope: false
+              outOfScope: false,
+              classification: first?.classification || 'Revenue'
           });
       }
-      setActiveModal('account');
+      setActiveModal(null); // Ensure sidebar editor is the only one
+      setShowAccountEditor(true);
   };
 
   const openNewGMD = () => {
@@ -1287,60 +1295,56 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     if (!accountForm.name || (accountForm.level === 'account' && !accountForm.id)) return;
     
     let updated: Account[] = [...accounts];
-    let affected: Account[] = [];
 
-    if (accountForm.level === 'master') {
-        const oldName = editingId; 
+    if (accountForm.level === 'master' && editingId) {
+        // Update all accounts in this master
         updated = accounts.map(acc => {
-            if (acc.masterPackage === oldName) {
-                return { 
-                    ...acc, 
-                    masterPackage: accountForm.name, 
-                    masterPackageCode: accountForm.code,
-                    sortOrder: accountForm.sortOrder // We'll keep individual sort orders in sync or just use the same base
-                };
+            if (acc.masterPackage === editingId) {
+                return { ...acc, masterPackage: accountForm.name, masterPackageCode: accountForm.code };
             }
             return acc;
         });
-        affected = updated.filter(acc => acc.masterPackage === accountForm.name);
-    } else if (accountForm.level === 'pkg') {
+    } else if (accountForm.level === 'pkg' && editingId) {
+        // Update all accounts in this package
         const [oldMaster, oldPkg] = (editingId || '').split('|');
         updated = accounts.map(acc => {
             if (acc.masterPackage === oldMaster && acc.package === oldPkg) {
-                return { 
-                    ...acc, 
-                    package: accountForm.name, 
-                    packageCode: accountForm.code,
-                    sortOrder: accountForm.sortOrder
-                };
+                return { ...acc, package: accountForm.name, packageCode: accountForm.code };
             }
             return acc;
         });
-        affected = updated.filter(acc => acc.masterPackage === oldMaster && acc.package === accountForm.name);
     } else {
+        // Individual account update or NEW account/pkg/master
         if (editingId && accounts.some(a => a.id === editingId)) {
            updated = accounts.map(acc => acc.id === editingId ? { ...acc, ...accountForm } : acc);
-           affected = updated.filter(a => a.id === editingId);
         } else {
            const newAcc = { 
              ...accountForm, 
              id: accountForm.id || `gen-${Date.now()}`,
              code: accountForm.code || accountForm.id || `gen-${Date.now()}`
            };
-           updated = [...accounts, newAcc];
-           affected = [newAcc];
+           // We'll insert it and then the sort logic will take care of it
+           updated.push(newAcc);
         }
     }
 
-    setAccounts(updated);
+    // Always re-sort and re-index to maintain integrity
+    updated.sort((a,b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+    
+    // Ensure the current one takes precedence if sortOrder is equal
+    // This is a simple trick to handle "insert after"
+    const finalAccounts = updated.map((acc, idx) => ({ ...acc, sortOrder: idx }));
+
+    setAccounts(finalAccounts);
     try {
-        await supabaseService.upsertAccounts(affected);
+        await supabaseService.upsertAccounts(finalAccounts);
         alert('Alterações salvas e sincronizadas com sucesso!');
     } catch (err: any) {
         console.error("Save failed:", err);
         alert(`Erro ao sincronizar: ${err.message || JSON.stringify(err)}`);
     }
     setEditingId(null);
+    setShowAccountEditor(false);
   };
 
   const handleDeleteAccountRow = async (id: string, type: 'account' | 'pkg' | 'master' = 'account', name?: string) => {
@@ -2925,10 +2929,10 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 <div className="flex gap-6 h-[calc(100vh-280px)]">
                   {/* Left Side: Table */}
                   <div className="flex-1 flex flex-col min-w-0 bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                    <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center shrink-0">
-                      <div className="flex items-center gap-4">
-                        <h4 className="font-bold text-gray-700">Plano de Contas</h4>
-                        <div className="relative">
+                    <div className="p-4 border-b border-gray-100 bg-gray-50 flex flex-wrap gap-4 justify-between items-center shrink-0">
+                      <div className="flex items-center gap-4 min-w-0">
+                        <h4 className="font-bold text-gray-700 whitespace-nowrap">Plano de Contas</h4>
+                        <div className="relative flex-1 min-w-[120px] max-w-48">
                           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14}/>
                           <input 
                             type="text" 
@@ -2953,24 +2957,27 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                             DRE Budget
                           </button>
                         </div>
-                        <div className="flex bg-slate-200/50 p-1 rounded-lg border border-slate-300">
+                        <div className="flex bg-slate-200/50 p-1 rounded-lg border border-slate-300 shrink-0">
                           <button 
                             onClick={() => setAllLevel('master')}
-                            className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-md transition-all ${accountViewLevel === 'master' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-indigo-600'}`}
+                            title="Nível 1: Apenas Masters"
+                            className={`px-2 py-1 rounded-md transition-all ${accountViewLevel === 'master' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-indigo-600'}`}
                           >
-                            Ocultar Tudo
+                            <Layout size={14}/>
                           </button>
                           <button 
                             onClick={() => setAllLevel('package')}
-                            className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-md transition-all ${accountViewLevel === 'package' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-indigo-600'}`}
+                            title="Nível 2: Masters e Pacotes"
+                            className={`px-2 py-1 rounded-md transition-all ${accountViewLevel === 'package' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-indigo-600'}`}
                           >
-                            Masters
+                            <FileText size={14}/>
                           </button>
                           <button 
                             onClick={() => setAllLevel('account')}
-                            className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-md transition-all ${accountViewLevel === 'account' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-indigo-600'}`}
+                            title="Nível 3: Exibir Tudo"
+                            className={`px-2 py-1 rounded-md transition-all ${accountViewLevel === 'account' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-indigo-600'}`}
                           >
-                            Exibir Tudo
+                            <Eye size={14}/>
                           </button>
                         </div>
                         <button 
@@ -2979,11 +2986,11 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                             setActiveImportTab('accounts');
                             setAccImportStep('input');
                           }} 
-                          className="bg-white border border-gray-200 text-gray-700 px-3 py-1 rounded-lg text-xs font-bold hover:bg-gray-50 flex items-center gap-2"
+                          className="bg-white border border-gray-200 text-gray-700 px-3 py-1 rounded-lg text-xs font-bold hover:bg-gray-50 flex items-center gap-1.5 shrink-0"
                         >
-                          <Upload size={14}/> Importar
+                          <Upload size={14}/> <span className="hidden lg:inline">Importar</span>
                         </button>
-                        <button onClick={openNewAccount} className="bg-indigo-600 text-white px-3 py-1 rounded-lg text-xs font-bold hover:bg-indigo-700 shadow-sm flex items-center gap-2"><Plus size={14}/> Novo</button>
+                        <button onClick={() => openNewAccount()} className="bg-indigo-600 text-white px-3 py-1 rounded-lg text-xs font-bold hover:bg-indigo-700 shadow-sm flex items-center gap-1.5 shrink-0"><Plus size={14}/> <span className="hidden lg:inline">Novo</span></button>
                       </div>
                     </div>
                     <div className="overflow-auto flex-1 custom-scrollbar">
@@ -3034,12 +3041,18 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                           >
                                             {masterCollapsed ? <Plus size={12} strokeWidth={3}/> : <span className="text-[18px] leading-none mb-1 font-black">-</span>}
                                           </button>
-                                          <span 
-                                            onClick={() => openEditAccount('', 'master', acc.masterPackage!)}
-                                            className={`text-xs uppercase tracking-widest cursor-pointer hover:underline ${acc.isBold ? 'font-black' : 'font-bold'} ${acc.isItalic ? 'italic' : ''}`}
-                                          >
-                                            {acc.masterPackage}
-                                          </span>
+                                          <div className="flex items-center gap-2 group/title">
+                                            <span 
+                                              onClick={() => openEditAccount('', 'master', acc.masterPackage!)}
+                                              className={`text-xs uppercase tracking-widest cursor-pointer hover:underline ${acc.isBold ? 'font-black' : 'font-bold'} ${acc.isItalic ? 'italic' : ''}`}
+                                            >
+                                              {acc.masterPackage}
+                                            </span>
+                                            <div className="flex gap-1 opacity-0 group-hover/title:opacity-100 transition-all ml-4">
+                                              <button onClick={() => openNewAccount(acc.masterPackage, undefined, acc.sortOrder)} title="Adicionar Pacote neste Master" className="p-1 text-slate-400 hover:text-indigo-600 border border-slate-200 rounded bg-white shadow-sm"><FileText size={12}/></button>
+                                              <button onClick={() => openNewAccount(undefined, undefined, acc.sortOrder)} title="Adicionar Novo Master Abaixo" className="p-1 text-slate-400 hover:text-indigo-600 border border-slate-200 rounded bg-white shadow-sm"><Layout size={12}/></button>
+                                            </div>
+                                          </div>
                                        </td>
                                      </tr>
                                    );
@@ -3069,12 +3082,18 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                           >
                                             {pkgCollapsed ? <Plus size={10} strokeWidth={2}/> : <span className="text-[14px] leading-none mb-0.5 font-bold">-</span>}
                                           </button>
-                                          <span 
-                                            onClick={() => openEditAccount('', 'pkg', pkgKey)}
-                                            className={`text-[11px] uppercase tracking-normal cursor-pointer hover:underline ${acc.isBold ? 'font-bold' : 'font-medium'} ${acc.isItalic ? 'italic' : ''}`}
-                                          >
-                                            {acc.package}
-                                          </span>
+                                          <div className="flex items-center gap-2 group/title">
+                                            <span 
+                                              onClick={() => openEditAccount('', 'pkg', pkgKey)}
+                                              className={`text-[11px] uppercase tracking-normal cursor-pointer hover:underline ${acc.isBold ? 'font-bold' : 'font-medium'} ${acc.isItalic ? 'italic' : ''}`}
+                                            >
+                                              {acc.package}
+                                            </span>
+                                            <div className="flex gap-1 opacity-0 group-hover/title:opacity-100 transition-all ml-4">
+                                              <button onClick={() => openNewAccount(acc.masterPackage, acc.package, acc.sortOrder)} title="Adicionar Conta neste Pacote" className="p-1 text-slate-400 hover:text-indigo-600 border border-slate-200 rounded bg-white shadow-sm"><Plus size={12}/></button>
+                                              <button onClick={() => openNewAccount(acc.masterPackage, undefined, acc.sortOrder)} title="Adicionar Novo Pacote Abaixo" className="p-1 text-slate-400 hover:text-indigo-600 border border-slate-200 rounded bg-white shadow-sm"><FileText size={12}/></button>
+                                            </div>
+                                          </div>
                                        </td>
                                      </tr>
                                    );
@@ -3108,6 +3127,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                            {acc.isCalculated && <span className="ml-2 text-[9px] font-black text-amber-500 bg-amber-50 px-1 rounded border border-amber-100">f(x)</span>}
                                          </span>
                                          <div className="flex gap-1 opacity-0 group-hover/item:opacity-100 transition-all">
+                                           <button onClick={() => openNewAccount(acc.masterPackage, acc.package, acc.sortOrder)} title="Adicionar Conta Abaixo" className="p-1 text-slate-300 hover:text-indigo-600"><Plus size={12}/></button>
                                            <button onClick={() => openEditAccount(acc.id)} className="p-1 text-slate-300 hover:text-indigo-600"><Pencil size={12}/></button>
                                            <button onClick={() => handleDeleteAccountRow(acc.id)} className="p-1 text-slate-300 hover:text-red-500"><Trash2 size={12}/></button>
                                          </div>
@@ -3124,13 +3144,13 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                   </div>
 
 {/* Right Side: Edit Panel */}
-                  <div className={`w-[400px] shrink-0 border border-gray-200 rounded-xl bg-gray-50 shadow-lg flex flex-col overflow-hidden transition-all duration-300 ${editingId || accountForm.name ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-10 pointer-events-none'}`}>
+                  <div className={`w-[400px] shrink-0 border border-gray-200 rounded-xl bg-gray-50 shadow-lg flex flex-col overflow-hidden transition-all duration-300 ${showAccountEditor ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-10 pointer-events-none'}`}>
                     <div className="p-4 bg-indigo-600 text-white flex justify-between items-center">
                       <div className="flex items-center gap-2">
                         <Pencil size={18} />
                         <h3 className="font-bold">Editor de Conta</h3>
                       </div>
-                      <button onClick={() => setEditingId(null)} className="hover:bg-black/10 p-1 rounded-full"><X size={20} /></button>
+                      <button onClick={() => setShowAccountEditor(false)} className="hover:bg-black/10 p-1 rounded-full"><X size={20} /></button>
                     </div>
                     <div className="p-5 flex-1 overflow-auto space-y-4">
                        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-4">
@@ -3864,217 +3884,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
             <div className="p-6 bg-gray-50 flex gap-3">
               <button onClick={() => setActiveModal(null)} className="flex-1 py-3 border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-gray-100">Cancelar</button>
               <button onClick={handleSaveHotel} className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200">Salvar</button>
-            </div>
-          </div>
-        </div>
-      )}
-      {activeModal === 'account' && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-indigo-600 text-white">
-              <h3 className="text-xl font-bold">{editingId ? 'Editar Cadastro' : 'Novo Cadastro'}</h3>
-              <button onClick={() => setActiveModal(null)} className="text-white/80 hover:text-white"><X size={24}/></button>
-            </div>
-            
-            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto font-sans">
-              <div className="flex bg-gray-100 p-1 rounded-xl">
-                 {(['master', 'pkg', 'account'] as const).map(lvl => (
-                   <button
-                     key={lvl}
-                     onClick={() => setAccountForm({...accountForm, level: lvl})}
-                     className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${accountForm.level === lvl ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                   >
-                     {lvl === 'master' ? 'Pacote Master' : lvl === 'pkg' ? 'Pacote' : 'Conta'}
-                   </button>
-                 ))}
-              </div>
-
-              {accountForm.level === 'account' && (
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Código da Conta</label>
-                  <input type="text" value={accountForm.id} onChange={e => setAccountForm({...accountForm, id: e.target.value})} className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ex: 4.01.01.01.001" disabled={!!editingId} />
-                </div>
-              )}
-              
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">
-                  {accountForm.level === 'master' ? 'Nome do Pacote Master' : accountForm.level === 'pkg' ? 'Nome do Pacote' : 'Nome da Conta'}
-                </label>
-                <input type="text" value={accountForm.name} onChange={e => setAccountForm({...accountForm, name: e.target.value})} className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" placeholder={accountForm.level === 'master' ? 'Ex: Custos Variáveis' : 'Ex: Condimentos'} />
-              </div>
-
-              {(accountForm.level === 'pkg' || accountForm.level === 'account') && (
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="col-span-1">
-                    <label className="block text-sm font-bold text-gray-700 mb-1">Cód. Master</label>
-                    <input type="text" value={accountForm.masterPackageCode} onChange={e => setAccountForm({...accountForm, masterPackageCode: e.target.value})} className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none bg-gray-50" placeholder="Ex: 4.1" />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-sm font-bold text-gray-700 mb-1">Pacote Master</label>
-                    <select 
-                      value={accountForm.masterPackage} 
-                      onChange={e => {
-                          const val = e.target.value;
-                          const match = uniqueMasterPackages.find(m => m.name === val);
-                          setAccountForm({
-                              ...accountForm, 
-                              masterPackage: val,
-                              masterPackageCode: match ? match.code : accountForm.masterPackageCode
-                          });
-                      }} 
-                      className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
-                    >
-                      <option value="">Selecione um Master...</option>
-                      {uniqueMasterPackages.map(m => <option key={m.name} value={m.name}>{m.name}</option>)}
-                      <option value="CUSTOM">+ Novo Pacote Master...</option>
-                    </select>
-                  </div>
-                </div>
-              )}
-
-              {accountForm.level === 'account' && (
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="col-span-1">
-                    <label className="block text-sm font-bold text-gray-700 mb-1">Cód. Pacote</label>
-                    <input type="text" value={accountForm.packageCode} onChange={e => setAccountForm({...accountForm, packageCode: e.target.value})} className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none bg-gray-50" placeholder="Ex: 4.1.1" />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-sm font-bold text-gray-700 mb-1">Pacote</label>
-                    <select 
-                      value={accountForm.package} 
-                      onChange={e => {
-                          const val = e.target.value;
-                          const match = uniqueSubPackages.find(p => p.name === val);
-                          setAccountForm({
-                              ...accountForm, 
-                              package: val,
-                              packageCode: match ? match.code : accountForm.packageCode
-                          });
-                      }} 
-                      className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
-                    >
-                      <option value="">Selecione um Pacote...</option>
-                      {uniqueSubPackages
-                          .filter(p => !accountForm.masterPackage || p.masterName === accountForm.masterPackage)
-                          .map(p => <option key={p.name} value={p.name}>{p.name}</option>)
-                      }
-                      <option value="CUSTOM">+ Novo Pacote...</option>
-                    </select>
-                  </div>
-                </div>
-              )}
-
-              {accountForm.level === 'account' && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1">Comportamento (Budget)</label>
-                    <select value={accountForm.type} onChange={e => setAccountForm({...accountForm, type: e.target.value as Account['type']})} className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none">
-                      <option value="Fixed">Fixo</option>
-                      <option value="Variable_PAX">Variável (PAX)</option>
-                      <option value="Variable_UH">Variável (UH Ocupada)</option>
-                      <option value="Variable_Revenue">Variável (Receita)</option>
-                      <option value="Variable_Staff">Variável (Quadro de Pessoal)</option>
-                    </select>
-                  </div>
-                  <div className="flex items-end pb-3">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        className="w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500"
-                        checked={accountForm.outOfScope}
-                        onChange={e => setAccountForm({...accountForm, outOfScope: e.target.checked})}
-                      />
-                      <span className="text-sm font-bold text-gray-700">Fora do Escopo</span>
-                    </label>
-                  </div>
-                </div>
-              )}
-
-              <div className="pt-4 border-t border-gray-100">
-                <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Inteligência & Estilo</h5>
-                
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Classificação</label>
-                        <select 
-                            value={accountForm.classification} 
-                            onChange={e => setAccountForm({...accountForm, classification: e.target.value as any})}
-                            className="w-full p-2 text-sm border border-gray-300 rounded-lg outline-none focus:ring-1 focus:ring-indigo-500"
-                        >
-                            <option value="Occupancy">Ocupação</option>
-                            <option value="Revenue">Receita</option>
-                            <option value="Tax">Imposto</option>
-                            <option value="Expense">Despesa</option>
-                            <option value="GOP">GOP</option>
-                            <option value="Indicator">Indicador</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Origem no Orçamento</label>
-                        <select 
-                            value={accountForm.budgetSource} 
-                            onChange={e => setAccountForm({...accountForm, budgetSource: e.target.value})}
-                            className="w-full p-2 text-sm border border-gray-300 rounded-lg outline-none focus:ring-1 focus:ring-indigo-500"
-                        >
-                            <option value="">Input Manual</option>
-                            <option value="occupancy">Ocupação</option>
-                            <option value="labor">Mão de Obra</option>
-                            <option value="extra_rev">Receitas Extras</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div className="flex gap-4 mb-4">
-                    <div className="flex-1">
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cor da Fonte</label>
-                        <div className="flex gap-2 items-center">
-                            <input type="color" value={accountForm.textColor} onChange={e => setAccountForm({...accountForm, textColor: e.target.value})} className="w-8 h-8 rounded border-none cursor-pointer" />
-                            <span className="text-xs font-mono">{accountForm.textColor}</span>
-                        </div>
-                    </div>
-                    <div className="flex-1">
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cor do Fundo</label>
-                        <div className="flex gap-2 items-center">
-                            <input type="color" value={accountForm.bgColor} onChange={e => setAccountForm({...accountForm, bgColor: e.target.value})} className="w-8 h-8 rounded border-none cursor-pointer" />
-                            <span className="text-xs font-mono">{accountForm.bgColor}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="flex gap-4 mb-4">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" checked={accountForm.isBold} onChange={e => setAccountForm({...accountForm, isBold: e.target.checked})} className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500" />
-                        <span className="text-xs font-bold text-gray-700">Negrito</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" checked={accountForm.isItalic} onChange={e => setAccountForm({...accountForm, isItalic: e.target.checked})} className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500" />
-                        <span className="text-xs italic text-gray-700">Itálico</span>
-                    </label>
-                </div>
-
-                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                    <label className="flex items-center gap-2 cursor-pointer mb-2">
-                        <input type="checkbox" checked={accountForm.isCalculated} onChange={e => setAccountForm({...accountForm, isCalculated: e.target.checked})} className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500" />
-                        <span className="text-xs font-bold text-slate-800">Linha de Cálculo / Somatória</span>
-                    </label>
-                    {accountForm.isCalculated && (
-                        <div>
-                            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Fórmula (ex: @Ocupação * @DiariaMedia)</label>
-                            <textarea 
-                                value={accountForm.formula} 
-                                onChange={e => setAccountForm({...accountForm, formula: e.target.value})}
-                                className="w-full p-2 text-xs font-mono border border-slate-200 rounded-lg outline-none focus:border-indigo-500 transition-all h-20"
-                                placeholder="Digite a fórmula aqui..."
-                            />
-                        </div>
-                    )}
-                </div>
-              </div>
-            </div>
-            
-            <div className="p-6 bg-gray-50 flex gap-3">
-              <button onClick={() => setActiveModal(null)} className="flex-1 py-3 border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-gray-100">Cancelar</button>
-              <button onClick={handleSaveAccount} className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200">Salvar</button>
             </div>
           </div>
         </div>
