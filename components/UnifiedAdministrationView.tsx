@@ -30,8 +30,12 @@ interface DreSection {
 interface ImportedAccount {
     id: string;
     name: string;
+    tipo?: string;
+    escopo?: string;
     package?: string;
+    packageCode?: string;
     masterPackage?: string;
+    masterPackageCode?: string;
     status: 'valid' | 'error';
     msg: string;
     originalLine: number;
@@ -1553,26 +1557,32 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         const rowContent = rows[i].trim();
         if (!rowContent) continue;
 
-        // SKIP HEADER ROW: if the first column is 'Código', skip it
-        if (i === 0 && (rowContent.toLowerCase().includes('código') || rowContent.toLowerCase().includes('codigo'))) {
+        // SKIP HEADER ROW: if it looks like header, skip it
+        if (i === 0 && (rowContent.toLowerCase().includes('tipo') || rowContent.toLowerCase().includes('código'))) {
             continue;
         }
 
         const cols = rows[i].split(separator);
         
-        // Expected: Código | Conta Contábil | Pacote | Pacote Master
-        if (cols.length < 2) {
+        // Expected columns per USER request:
+        // 0: Tipo (despesa/receita)
+        // 1: Escopo ou Fora
+        // 2: Pacote Master
+        // 3: Pacote
+        // 4: Código
+        // 5: Conta Contábil
+        if (cols.length < 6) {
             parsed.push({
                 id: `error-${i}`,
                 name: rowContent,
                 status: 'error',
-                msg: 'Colunas insuficientes (Mínimo: Código, Nome)',
+                msg: 'Colunas insuficientes (Necessário 6: Tipo, Escopo, Pacote Master, Pacote, Código, Conta)',
                 originalLine: i + 1
             });
             continue;
         }
 
-        const [id, name, pacote, masterPacote] = cols.map(c => c?.trim() || '');
+        const [tipo, escopo, masterPacote, pacote, id, name] = cols.map(c => c?.trim() || '');
         
         let status: 'valid' | 'error' = 'valid';
         const msgParts: string[] = [];
@@ -1580,11 +1590,27 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         if (!id) { status = 'error'; msgParts.push('Código ausente'); }
         if (!name) { status = 'error'; msgParts.push('Nome ausente'); }
 
+        // Derive package codes from account code (id)
+        const codeParts = id.split('.');
+        let derivedPkgCode = '';
+        let derivedMasterPkgCode = '';
+        
+        if (codeParts.length > 1) {
+            derivedPkgCode = codeParts.slice(0, -1).join('.');
+        }
+        if (codeParts.length > 2) {
+            derivedMasterPkgCode = codeParts.slice(0, -2).join('.');
+        }
+
         parsed.push({
             id,
             name,
+            tipo,
+            escopo,
             package: pacote,
+            packageCode: derivedPkgCode,
             masterPackage: masterPacote,
+            masterPackageCode: derivedMasterPkgCode,
             status,
             msg: msgParts.join(' | '),
             originalLine: i + 1
@@ -1598,15 +1624,25 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     const validData = accParsedData.filter(r => r.status === 'valid');
     if (validData.length === 0) return;
 
-    const newAccounts: Account[] = validData.map((a) => ({ 
-        id: a.id, 
-        code: a.id, 
-        name: a.name, 
-        package: a.package, 
-        masterPackage: a.masterPackage,
-        type: 'Fixed' as const,
-        sortOrder: 0 // Will be recalculated below
-    }));
+    const newAccounts: Account[] = validData.map((a) => {
+        const isExpense = (a.tipo || '').toLowerCase().includes('despesa');
+        const isRevenue = (a.tipo || '').toLowerCase().includes('receita');
+        const isOutOfScope = (a.escopo || '').toLowerCase().includes('fora');
+        
+        return { 
+            id: a.id, 
+            code: a.id, 
+            name: a.name, 
+            package: a.package, 
+            packageCode: a.packageCode,
+            masterPackage: a.masterPackage,
+            masterPackageCode: a.masterPackageCode,
+            type: 'Fixed' as const,
+            classification: isRevenue ? 'Revenue' : (isExpense ? 'Expense' : undefined),
+            outOfScope: isOutOfScope,
+            sortOrder: 0 // Will be recalculated below
+        };
+    });
 
     // DEDUPLICATE: Postgres throws error if same ID appears twice in one upsert batch
     const deduplicatedRecordMap = new Map<string, Account>();
@@ -3562,8 +3598,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                       <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl text-sm text-amber-800">
                         <p className="font-bold mb-1">Instruções para Importação de Contas:</p>
                         <p>Cole os dados do Excel com as seguintes colunas (separadas por TAB ou Ponto e Vírgula):</p>
-                        <code className="block mt-2 bg-white/50 p-2 rounded border border-amber-100">
-                          Código | Conta Contábil | Pacote | Pacote Master
+                        <code className="block mt-2 bg-white/50 p-2 rounded border border-amber-100 text-[10px]">
+                          Tipo | Escopo ou Fora | Pacote Master | Pacote | Código | Conta Contábil
                         </code>
                       </div>
                       <textarea 
@@ -3600,7 +3636,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                           <thead className="bg-gray-50 uppercase tracking-widest text-[9px] font-black text-gray-500">
                             <tr>
                               <th className="px-4 py-3 text-left w-12">Status</th>
-                              <th className="px-4 py-3 text-left w-32">Código</th>
+                              <th className="px-4 py-3 text-left w-20">Tipo</th>
+                              <th className="px-4 py-3 text-left w-20">Escopo</th>
+                              <th className="px-4 py-3 text-left w-24">Código</th>
                               <th className="px-4 py-3 text-left">Conta Contábil</th>
                               <th className="px-4 py-3 text-left">Pacote</th>
                               <th className="px-4 py-3 text-left">Pacote Master</th>
@@ -3619,13 +3657,37 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                 <td className="px-2 py-1">
                                   <input 
                                     type="text" 
+                                    value={row.tipo} 
+                                    onChange={e => {
+                                      const newData = [...accParsedData];
+                                      newData[idx].tipo = e.target.value;
+                                      setAccParsedData(newData);
+                                    }}
+                                    className="w-full bg-transparent border-none focus:ring-1 focus:ring-indigo-500 rounded p-1 text-[10px]"
+                                  />
+                                </td>
+                                <td className="px-2 py-1">
+                                  <input 
+                                    type="text" 
+                                    value={row.escopo} 
+                                    onChange={e => {
+                                      const newData = [...accParsedData];
+                                      newData[idx].escopo = e.target.value;
+                                      setAccParsedData(newData);
+                                    }}
+                                    className="w-full bg-transparent border-none focus:ring-1 focus:ring-indigo-500 rounded p-1 text-[10px]"
+                                  />
+                                </td>
+                                <td className="px-2 py-1">
+                                  <input 
+                                    type="text" 
                                     value={row.id} 
                                     onChange={e => {
                                       const newData = [...accParsedData];
                                       newData[idx].id = e.target.value;
                                       setAccParsedData(newData);
                                     }}
-                                    className="w-full bg-transparent border-none focus:ring-1 focus:ring-indigo-500 rounded p-1 text-xs font-mono"
+                                    className="w-full bg-transparent border-none focus:ring-1 focus:ring-indigo-500 rounded p-1 text-[10px] font-mono"
                                   />
                                 </td>
                                 <td className="px-2 py-1">
@@ -3637,32 +3699,38 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                       newData[idx].name = e.target.value;
                                       setAccParsedData(newData);
                                     }}
-                                    className="w-full bg-transparent border-none focus:ring-1 focus:ring-indigo-500 rounded p-1 text-xs font-bold"
+                                    className="w-full bg-transparent border-none focus:ring-1 focus:ring-indigo-500 rounded p-1 text-[10px] font-bold"
                                   />
                                 </td>
                                 <td className="px-2 py-1">
-                                  <input 
-                                    type="text" 
-                                    value={row.package} 
-                                    onChange={e => {
-                                      const newData = [...accParsedData];
-                                      newData[idx].package = e.target.value;
-                                      setAccParsedData(newData);
-                                    }}
-                                    className="w-full bg-transparent border-none focus:ring-1 focus:ring-indigo-500 rounded p-1 text-xs"
-                                  />
+                                  <div className="flex flex-col">
+                                    <input 
+                                      type="text" 
+                                      value={row.package} 
+                                      onChange={e => {
+                                        const newData = [...accParsedData];
+                                        newData[idx].package = e.target.value;
+                                        setAccParsedData(newData);
+                                      }}
+                                      className="w-full bg-transparent border-none focus:ring-1 focus:ring-indigo-500 rounded p-0.5 text-[10px]"
+                                    />
+                                    <span className="text-[8px] text-gray-400 pl-0.5">{row.packageCode}</span>
+                                  </div>
                                 </td>
                                 <td className="px-2 py-1">
-                                  <input 
-                                    type="text" 
-                                    value={row.masterPackage} 
-                                    onChange={e => {
-                                      const newData = [...accParsedData];
-                                      newData[idx].masterPackage = e.target.value;
-                                      setAccParsedData(newData);
-                                    }}
-                                    className="w-full bg-transparent border-none focus:ring-1 focus:ring-indigo-500 rounded p-1 text-xs"
-                                  />
+                                  <div className="flex flex-col">
+                                    <input 
+                                      type="text" 
+                                      value={row.masterPackage} 
+                                      onChange={e => {
+                                        const newData = [...accParsedData];
+                                        newData[idx].masterPackage = e.target.value;
+                                        setAccParsedData(newData);
+                                      }}
+                                      className="w-full bg-transparent border-none focus:ring-1 focus:ring-indigo-500 rounded p-0.5 text-[10px]"
+                                    />
+                                    <span className="text-[8px] text-gray-400 pl-0.5">{row.masterPackageCode}</span>
+                                  </div>
                                 </td>
                               </tr>
                             ))}

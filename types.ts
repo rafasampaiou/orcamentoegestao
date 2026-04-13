@@ -305,8 +305,12 @@ export interface ImportedCostCenter {
 export interface ImportedAccount {
     id: string;
     name: string;
+    tipo?: string;
+    escopo?: string;
     package?: string;
+    packageCode?: string;
     masterPackage?: string;
+    masterPackageCode?: string;
     status: 'valid' | 'error';
     msg?: string;
     originalLine?: number;
