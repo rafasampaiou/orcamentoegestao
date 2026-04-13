@@ -1680,8 +1680,13 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     // PERSIST TO SUPABASE
     try {
         if (accImportMode === 'replace') {
-            // RELIABLE REPLACE: Try to clear if possible, but keep it simple
-            // We'll just upsert and rely on the new sortOrders
+            // TRUE DELETE before insert to avoid ghosts and mock data remains
+            const existingIds = accounts.map(a => a.id);
+            if (existingIds.length > 0) {
+              for (const tid of existingIds) {
+                await supabaseService.deleteAccount(tid);
+              }
+            }
             setAccounts(uniqueNewAccounts);
             await supabaseService.upsertAccounts(uniqueNewAccounts);
         } else {
@@ -1689,7 +1694,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
             uniqueNewAccounts.forEach(acc => map.set(acc.id, acc));
             const merged = Array.from(map.values());
             setAccounts(merged);
-            await supabaseService.upsertAccounts(merged);
+            await supabaseService.upsertAccounts(uniqueNewAccounts);
         }
         alert(`Sucesso! ${uniqueNewAccounts.length} contas foram processadas.`);
     } catch (err: any) {
