@@ -407,6 +407,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const [activeRegistryTab, setActiveRegistryTab] = useState<'users' | 'logs' | 'hotels' | 'costCenters' | 'packages' | 'accounts' | 'dre_structure'>('users');
   const [dreContext, setDreContext] = useState<'forecast' | 'budget'>('forecast');
   const [isSavingPerms, setIsSavingPerms] = useState(false);
+  const [isSavingRegistry, setIsSavingRegistry] = useState(false);
 
   // Import Sub-tabs
   const [activeImportTab, setActiveImportTab] = useState<'financial' | 'revenue' | 'occupancy' | 'costCenters' | 'accounts'>('financial');
@@ -1075,8 +1076,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
   const handleSaveHotel = async () => {
       if (!hotelForm.name) return;
+      setIsSavingRegistry(true);
       
-      // If user provided a specific ID in the form, use it. Otherwise use editingId or generate one.
       const targetId = hotelForm.id || editingId || hotelForm.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
       const hotelCode = hotelForm.id || hotelForm.name.substring(0, 3).toUpperCase();
       
@@ -1090,19 +1091,15 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
           await supabaseService.upsertHotels([newHotel]);
           
           if (editingId && editingId !== targetId) {
-              // RENAME CASE: If the ID changed, we need to delete the old record
               try {
                   await supabaseService.deleteHotel(editingId);
               } catch (delErr) {
-                  console.warn("Could not delete old hotel record (probably has foreign keys):", delErr);
-                  // We continue because the new one is already saved
+                  console.warn("Could not delete old hotel record:", delErr);
               }
               setHotels(prev => prev.filter(h => h.id !== editingId).concat(newHotel));
           } else if (editingId) {
-              // Standard update
               setHotels(prev => prev.map(h => h.id === editingId ? newHotel : h));
           } else {
-              // New record
               setHotels(prev => [...prev, newHotel]);
           }
           
@@ -1111,8 +1108,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
           alert('Hotel salvo com sucesso!');
       } catch (err: any) {
           console.error("Erro ao salvar hotel:", err);
-          const msg = err?.message || err?.details || JSON.stringify(err);
-          alert(`Erro ao salvar hotel: ${msg}`);
+          alert(`Erro ao salvar hotel: ${err.message || 'Verifique sua conexão.'}`);
+      } finally {
+          setIsSavingRegistry(false);
       }
   };
 
@@ -3905,8 +3903,20 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               </div>
             </div>
             <div className="p-6 bg-gray-50 flex gap-3">
-              <button onClick={() => setActiveModal(null)} className="flex-1 py-3 border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-gray-100">Cancelar</button>
-              <button onClick={handleSaveHotel} className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200">Salvar</button>
+              <button 
+                onClick={() => setActiveModal(null)} 
+                disabled={isSavingRegistry}
+                className="flex-1 py-3 border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={handleSaveHotel} 
+                disabled={isSavingRegistry}
+                className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 disabled:opacity-50"
+              >
+                {isSavingRegistry ? 'Salvando...' : 'Salvar'}
+              </button>
             </div>
           </div>
         </div>

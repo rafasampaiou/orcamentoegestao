@@ -222,34 +222,22 @@ const App: React.FC = () => {
       
       try {
         const remoteHotels = await supabaseService.getHotels();
-        if (remoteHotels && isMounted) {
-          setHotels(remoteHotels.length > 0 ? remoteHotels : mockHotels);
-        }
+        if (remoteHotels && isMounted) setHotels(remoteHotels);
 
         const remoteCostCenters = await supabaseService.getCostCenters();
-        if (remoteCostCenters && isMounted) {
-          setCostCenters(remoteCostCenters.length > 0 ? remoteCostCenters : mockCostCenters);
-        }
+        if (remoteCostCenters && isMounted) setCostCenters(remoteCostCenters);
 
         const remoteAccounts = await supabaseService.getAccounts();
-        if (remoteAccounts && isMounted) {
-          setAccounts(remoteAccounts.length > 0 ? remoteAccounts : mockAccounts);
-        }
+        if (remoteAccounts && isMounted) setAccounts(remoteAccounts);
 
         const remoteProfiles = await supabaseService.getProfiles();
-        if (remoteProfiles && isMounted) {
-          setUsers(remoteProfiles.length > 0 ? remoteProfiles : mockUsers);
-        }
+        if (remoteProfiles && isMounted) setUsers(remoteProfiles);
 
         const remoteGmd = await supabaseService.getGmdConfigs();
-        if (remoteGmd && isMounted) {
-          setGmdConfigs(remoteGmd.length > 0 ? remoteGmd : mockGMDConfigs);
-        }
+        if (remoteGmd && isMounted) setGmdConfigs(remoteGmd);
 
         const remoteDreConfigs = await supabaseService.getDreConfigs();
-        if (remoteDreConfigs && isMounted) {
-          setDreConfigs(remoteDreConfigs);
-        }
+        if (remoteDreConfigs && isMounted) setDreConfigs(remoteDreConfigs);
         
         hasLoadedFromSupabase.current = true;
 
