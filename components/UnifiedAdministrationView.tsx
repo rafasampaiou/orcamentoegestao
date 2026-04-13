@@ -526,6 +526,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const [budgetImportSavedCount, setBudgetImportSavedCount] = useState<number | null>(null);
 
   // Cost Center Import State
+  const [isImportingAccount, setIsImportingAccount] = useState(false);
   const [ccImportStep, setCcImportStep] = useState<'input' | 'preview'>('input');
   const [ccParsedData, setCcParsedData] = useState<ImportedCostCenter[]>([]);
   const [ccImportMode, setCcImportMode] = useState<'append' | 'replace'>('append');
@@ -1678,15 +1679,11 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     const uniqueNewAccounts = Array.from(deduplicatedRecordMap.values());
 
     // PERSIST TO SUPABASE
+    setIsImportingAccount(true);
     try {
         if (accImportMode === 'replace') {
-            // TRUE DELETE before insert to avoid ghosts and mock data remains
-            const existingIds = accounts.map(a => a.id);
-            if (existingIds.length > 0) {
-              for (const tid of existingIds) {
-                await supabaseService.deleteAccount(tid);
-              }
-            }
+            // TRUE DELETE in bulk to avoid slow loops
+            await (supabaseService as any).truncateAccounts();
             setAccounts(uniqueNewAccounts);
             await supabaseService.upsertAccounts(uniqueNewAccounts);
         } else {
@@ -1700,11 +1697,12 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     } catch (err: any) {
         console.error("Erro ao salvar no Supabase:", err);
         alert(`Erro ao sincronizar: ${err.message}`);
+    } finally {
+        setIsImportingAccount(false);
+        setAccImportStep('input');
+        setAccParsedData([]);
+        setImportText('');
     }
-
-    setAccImportStep('input');
-    setAccParsedData([]);
-    setImportText('');
   };
 
   // --- HANDLERS: DELETE ---
@@ -3682,9 +3680,10 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                         <button onClick={() => setAccImportStep('input')} className="px-6 py-3 border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-gray-50">Cancelar</button>
                         <button 
                           onClick={handleFinalAccountImport}
-                          className={`px-8 py-3 rounded-xl font-bold text-white shadow-lg ${accImportMode === 'replace' ? 'bg-red-600 hover:bg-red-700 shadow-red-100' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100'}`}
+                          disabled={isImportingAccount}
+                          className={`px-8 py-3 rounded-xl font-bold text-white shadow-lg transition-all ${isImportingAccount ? 'opacity-50 cursor-not-allowed' : ''} ${accImportMode === 'replace' ? 'bg-red-600 hover:bg-red-700 shadow-red-100' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100'}`}
                         >
-                          {accImportMode === 'replace' ? 'Confirmar Substituição' : 'Confirmar Importação'}
+                          {isImportingAccount ? 'Sincronizando...' : (accImportMode === 'replace' ? 'Confirmar Substituição' : 'Confirmar Importação')}
                         </button>
                       </div>
                     </div>

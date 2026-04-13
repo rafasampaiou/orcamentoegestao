@@ -79,6 +79,15 @@ export const supabaseService = {
     if (error) throw error;
   },
 
+  async truncateAccounts(): Promise<void> {
+    // This is a safety-first delete all for accounts table
+    const { error } = await supabase
+      .from('accounts')
+      .delete()
+      .neq('id', 'placeholder-non-existent'); 
+    if (error) throw error;
+  },
+
   // ═══════════════════════════════════════════════════════════════════════════
   // COST CENTERS (Setores / CR / PDV)
   // ═══════════════════════════════════════════════════════════════════════════
