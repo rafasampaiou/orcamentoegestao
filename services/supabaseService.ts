@@ -80,7 +80,10 @@ export const supabaseService = {
   },
 
   async truncateAccounts(): Promise<void> {
-    // This is a safety-first delete all for accounts table
+    // 1. Nullify self-references to avoid FK violations during mass delete
+    await supabase.from('accounts').update({ parent_id: null }).neq('id', 'placeholder-non-existent');
+    
+    // 2. Now safe to delete all
     const { error } = await supabase
       .from('accounts')
       .delete()
@@ -136,6 +139,13 @@ export const supabaseService = {
       .from('cost_centers')
       .delete()
       .eq('id', id);
+    if (error) throw error;
+  },
+  async truncateCostCenters(): Promise<void> {
+    const { error } = await supabase
+      .from('cost_centers')
+      .delete()
+      .neq('id', 'placeholder-non-existent');
     if (error) throw error;
   },
 
