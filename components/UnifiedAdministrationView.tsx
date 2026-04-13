@@ -1076,23 +1076,39 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const handleSaveHotel = async () => {
       if (!hotelForm.name) return;
       
-      const hotelId = editingId || hotelForm.id || hotelForm.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      // If user provided a specific ID in the form, use it. Otherwise use editingId or generate one.
+      const targetId = hotelForm.id || editingId || hotelForm.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
       const hotelCode = hotelForm.id || hotelForm.name.substring(0, 3).toUpperCase();
       
       const newHotel: Hotel = { 
-          id: hotelId, 
+          id: targetId, 
           name: hotelForm.name, 
           code: hotelCode 
       };
 
       try {
           await supabaseService.upsertHotels([newHotel]);
-          if (editingId) {
+          
+          if (editingId && editingId !== targetId) {
+              // RENAME CASE: If the ID changed, we need to delete the old record
+              try {
+                  await supabaseService.deleteHotel(editingId);
+              } catch (delErr) {
+                  console.warn("Could not delete old hotel record (probably has foreign keys):", delErr);
+                  // We continue because the new one is already saved
+              }
+              setHotels(prev => prev.filter(h => h.id !== editingId).concat(newHotel));
+          } else if (editingId) {
+              // Standard update
               setHotels(prev => prev.map(h => h.id === editingId ? newHotel : h));
           } else {
+              // New record
               setHotels(prev => [...prev, newHotel]);
           }
+          
           setActiveModal(null);
+          setEditingId(null);
+          alert('Hotel salvo com sucesso!');
       } catch (err: any) {
           console.error("Erro ao salvar hotel:", err);
           const msg = err?.message || err?.details || JSON.stringify(err);
