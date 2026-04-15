@@ -2986,7 +2986,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                       <button onClick={openNewCostCenter} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700"><Plus size={16} /> Novo Setor</button>
                     </div>
                   </div>
-                  <div className="overflow-hidden border border-gray-200 rounded-lg">
+                  <div className="overflow-x-auto border border-gray-200 rounded-lg">
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
@@ -3386,7 +3386,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 <h4 className="font-bold text-gray-700">Configuração de Matriz GMD</h4>
                 <button onClick={openNewGMD} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all active:scale-95"><Plus size={16} /> Nova Configuração</button>
               </div>
-              <div className="overflow-hidden border border-gray-200 rounded-xl shadow-sm">
+              <div className="overflow-x-auto border border-gray-200 rounded-xl shadow-sm">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
@@ -3671,7 +3671,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                         </div>
                       </div>
 
-                      <div className="overflow-hidden border border-gray-200 rounded-xl shadow-sm">
+                      <div className="overflow-x-auto border border-gray-200 rounded-xl shadow-sm">
                         <table className="min-w-full divide-y divide-gray-200">
                           <thead className="bg-gray-50 uppercase tracking-widest text-[9px] font-black text-gray-500">
                             <tr>
@@ -3833,7 +3833,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const vt = viewTitles[currentView] || viewTitles.admin;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-6 max-w-[98%] mx-auto">
       {/* Breadcrumb + Page Title */}
       <div className="mb-6">
         <p className="text-[11px] font-bold text-indigo-400 uppercase tracking-widest mb-1">{vt.breadcrumb}</p>
