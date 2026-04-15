@@ -123,8 +123,8 @@ export interface GMDConfiguration {
 
   linkedAccountIds: string[]; // Accounts belonging to this GMD Package
   
-  costCenterId: string; // The CR justifying the expense
-  accountManagerId: string; // "Dono do Pacote" / "Gestor da Conta"
+  costCenterIds: string[]; // Updated to array for multiple sectors
+  accountManagerId: string; // "Gerente de Área"
 }
 
 export type ExpenseType = 'Fixo' | 'Variável';

@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { Network, ChevronRight, ChevronDown, Filter, AlertTriangle, CheckCircle, FileText, ClipboardList, ShieldCheck, ShieldAlert, Calendar, DollarSign, CheckSquare, Search, X, FileEdit, ExternalLink } from 'lucide-react';
-import { GMDConfiguration, Account, CostPackage, Hotel, ImportedRow, User, Justification } from '../types';
+import { GMDConfiguration, Account, CostPackage, Hotel, ImportedRow, User, Justification, CostCenter } from '../types';
 
 interface FilterCardProps {
     type: string;
@@ -43,6 +43,7 @@ interface GMDViewProps {
     hotels: Hotel[];
     financialData: ImportedRow[];
     users: User[];
+    costCenters: CostCenter[]; // Added
     selectedMonth: number;
     selectedYear: number;
     initialSelectedHotel: string;
@@ -53,7 +54,7 @@ const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 
 const formatPercent = (val: number) => `${val.toFixed(1)}%`;
 
 const GMDView: React.FC<GMDViewProps> = ({ 
-    gmdConfigs, accounts, packages, hotels, financialData, users,
+    gmdConfigs, accounts, packages, hotels, financialData, users, costCenters,
     selectedMonth, selectedYear, initialSelectedHotel 
 }) => {
   const [activeTab, setActiveTab] = useState<'monitor' | 'justifications'>('monitor');
@@ -99,6 +100,11 @@ const GMDView: React.FC<GMDViewProps> = ({
             const acc = accounts.find(a => a.id === accId);
             if (!acc) return null;
 
+            // 3. Filter by Cost Centers belonging to this config
+            const configCCNames = costCenters
+                .filter(cc => config.costCenterIds?.includes(cc.id))
+                .map(cc => cc.name.trim().toLowerCase());
+
             // Calculate Values
             const filterValue = (cenarioType: 'Real' | 'Budget' | 'Forecast' | 'Prévia', year: number) => {
                 const matches = financialData.filter(d => 
@@ -106,7 +112,8 @@ const GMDView: React.FC<GMDViewProps> = ({
                     parseInt(d.mes) === selectedMonth &&
                     d.conta.trim().toLowerCase() === acc.name.trim().toLowerCase() &&
                     d.status === 'valid' &&
-                    (d.hotel.trim().toUpperCase() === activeHotelCode || d.hotel.trim() === currentHotel)
+                    (d.hotel.trim().toUpperCase() === activeHotelCode || d.hotel.trim() === currentHotel) &&
+                    (configCCNames.length === 0 || configCCNames.includes((d.cr || '').trim().toLowerCase()))
                 );
 
                 const filtered = matches.filter(d => {
@@ -272,8 +279,8 @@ const GMDView: React.FC<GMDViewProps> = ({
 
   // Helper to render the actionable status cell
   const renderStatusCell = (status: string, accManagerName?: string, entManagerName?: string) => {
-    const accManagerText = accManagerName || 'Gestor Conta';
-    const entManagerText = entManagerName || 'Gestor Entidade';
+    const accManagerText = accManagerName || 'Gerente de Área';
+    const entManagerText = entManagerName || 'Gerente de Entidade';
 
     switch(status) {
         case 'Pendentes': 

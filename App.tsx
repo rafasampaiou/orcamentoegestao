@@ -574,6 +574,7 @@ const App: React.FC = () => {
           hotels={hotels}
           financialData={importedFinancialData}
           users={users}
+          costCenters={costCenters}
           selectedMonth={selectedDate.getMonth() + 1}
           selectedYear={selectedDate.getFullYear()}
           initialSelectedHotel={selectedHotel}

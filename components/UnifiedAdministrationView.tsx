@@ -1004,7 +1004,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     packageManagerId: '',
     supportUserIds: [],
     linkedAccountIds: [],
-    costCenterId: '',
+    costCenterIds: [],
     accountManagerId: ''
   });
 
@@ -1045,9 +1045,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     if (cc) {
       setEditingId(id);
       setCcImportStep('input');
-      
+
       // Find all hotels that share this same identity to populate the multi-select
-      const identicalNodes = costCenters.filter(item => 
+      const identicalNodes = costCenters.filter(item =>
         item.name === cc.name && item.hierarchicalCode === cc.hierarchicalCode
       );
       const hotelsForThisSector = identicalNodes.map(n => n.hotelName || '').filter(Boolean);
@@ -1223,7 +1223,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       packageManagerId: '',
       supportUserIds: [],
       linkedAccountIds: [],
-      costCenterId: '',
+      costCenterIds: [],
       accountManagerId: ''
     });
     setActiveModal('gmd');
@@ -1239,8 +1239,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   };
 
   const handleSaveGMD = async () => {
-    if (!gmdForm.hotelId || !gmdForm.packageId || !gmdForm.costCenterId) {
-      alert("Por favor, preencha os campos obrigatórios (Hotel, Pacote e Setor).");
+    if (!gmdForm.hotelId || !gmdForm.packageId || !gmdForm.costCenterIds || gmdForm.costCenterIds.length === 0) {
+      alert("Por favor, preencha os campos obrigatórios (Hotel, Pacote e pelo menos um Setor).");
       return;
     }
 
@@ -1302,13 +1302,13 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       alert("Nome e Código Hierárquico são obrigatórios.");
       return;
     }
-    
+
     setIsSavingRegistry(true);
 
     try {
       // If no hotels selected, we use at least one record (maybe empty hotel) or block
       const hotelsToSave = costCenterForm.hotelNames.length > 0 ? costCenterForm.hotelNames : [''];
-      
+
       const newCCs: CostCenter[] = hotelsToSave.map(hName => ({
         id: `${hName}-${costCenterForm.hierarchicalCode}`.toLowerCase().replace(/\s+/g, '-'),
         code: costCenterForm.hierarchicalCode,
@@ -1322,16 +1322,16 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       }));
 
       await supabaseService.upsertCostCenters(newCCs);
-      
+
       if (editingId) {
         // If editing, we might need to handle deletions of hotels that were unselected
         // For simplicity in this complex many-to-many UI, we update the state properly
         setCostCenters(prev => {
-            const otherSetors = prev.filter(cc => {
-                const isIdenticalIdentity = cc.name === costCenterForm.name && cc.hierarchicalCode === costCenterForm.hierarchicalCode;
-                return !isIdenticalIdentity;
-            });
-            return [...otherSetors, ...newCCs];
+          const otherSetors = prev.filter(cc => {
+            const isIdenticalIdentity = cc.name === costCenterForm.name && cc.hierarchicalCode === costCenterForm.hierarchicalCode;
+            return !isIdenticalIdentity;
+          });
+          return [...otherSetors, ...newCCs];
         });
       } else {
         setCostCenters(prev => [...prev, ...newCCs]);
@@ -1780,13 +1780,13 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
           setCostCenters(prev => prev.filter(i => i.id !== id));
           break;
         case 'costCentersGrouped': {
-            // id here is "name|hierarchicalCode"
-            const [name, hCode] = id.split('|');
-            const toDelete = costCenters.filter(cc => cc.name === name && cc.hierarchicalCode === hCode);
-            for (const cc of toDelete) {
-              await supabaseService.deleteCostCenter(cc.id);
-            }
-            setCostCenters(prev => prev.filter(cc => !(cc.name === name && cc.hierarchicalCode === hCode)));
+          // id here is "name|hierarchicalCode"
+          const [name, hCode] = id.split('|');
+          const toDelete = costCenters.filter(cc => cc.name === name && cc.hierarchicalCode === hCode);
+          for (const cc of toDelete) {
+            await supabaseService.deleteCostCenter(cc.id);
+          }
+          setCostCenters(prev => prev.filter(cc => !(cc.name === name && cc.hierarchicalCode === hCode)));
           break;
         }
         case 'accounts':
@@ -3015,7 +3015,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                             return acc;
                           }, {} as Record<string, any>);
 
-                          const filtered = Object.values(grouped).filter((cc: any) => 
+                          const filtered = Object.values(grouped).filter((cc: any) =>
                             cc.name.toLowerCase().includes(ccSearchTerm.toLowerCase()) ||
                             (cc.hierarchicalCode || '').toLowerCase().includes(ccSearchTerm.toLowerCase())
                           );
@@ -3050,7 +3050,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                 <div className="flex justify-end gap-2">
                                   <button onClick={() => openEditCostCenter(cc.id)} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-all shadow-sm" title="Editar Grupo"><Pencil size={14} /></button>
                                   <button onClick={() => {
-                                    if(confirm(`Excluir o setor "${cc.name}" em todos os ${cc.hotelNames.length} hotéis? Esta ação não pode ser desfeita.`)) {
+                                    if (confirm(`Excluir o setor "${cc.name}" em todos os ${cc.hotelNames.length} hotéis? Esta ação não pode ser desfeita.`)) {
                                       handleDelete('costCentersGrouped', `${cc.name}|${cc.hierarchicalCode}`);
                                     }
                                   }} className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all shadow-sm" title="Excluir Grupo"><Trash2 size={14} /></button>
@@ -3392,9 +3392,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                     <tr>
                       <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Hotel</th>
                       <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Pacote</th>
-                      <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Setor (CR)</th>
+                      <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Setores (CR)</th>
                       <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Gestor do Pacote</th>
-                      <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Dono da Conta</th>
+                      <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Gerente de Área</th>
                       <th className="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase">Ações</th>
                     </tr>
                   </thead>
@@ -3402,7 +3402,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                     {gmdConfigs.map(config => {
                       const hotel = hotels.find(h => h.id === config.hotelId);
                       const pkg = packages.find(p => p.id === config.packageId);
-                      const cc = costCenters.find(c => c.id === config.costCenterId);
+                      const relatedCCs = costCenters.filter(c => config.costCenterIds?.includes(c.id));
+                      const ccNames = Array.from(new Set(relatedCCs.map(c => c.name))).join(', ');
                       const pkgManager = users.find(u => u.id === config.packageManagerId);
                       const accManager = users.find(u => u.id === config.accountManagerId);
 
@@ -3410,7 +3411,11 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                         <tr key={config.id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">{hotel?.name || '-'}</td>
                           <td className="px-4 py-3 whitespace-nowrap text-xs font-bold text-gray-900">{pkg?.name || '-'}</td>
-                          <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">{cc?.name || '-'}</td>
+                          <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500" title={ccNames}>
+                            <div className="max-w-[150px] overflow-hidden text-ellipsis">
+                              {relatedCCs.length > 2 ? `${relatedCCs.length} setores` : (ccNames || '-')}
+                            </div>
+                          </td>
                           <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">{pkgManager?.name || '-'}</td>
                           <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">{accManager?.name || '-'}</td>
                           <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
@@ -3915,13 +3920,13 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 <div className="p-3 border border-gray-200 rounded-xl bg-gray-50 max-h-40 overflow-y-auto space-y-2">
                   {hotels.map(h => (
                     <label key={h.id} className="flex items-center gap-2 text-xs font-medium text-gray-700 cursor-pointer hover:text-indigo-600">
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
                         checked={costCenterForm.hotelNames.includes(h.name)}
                         onChange={e => {
                           const names = costCenterForm.hotelNames;
-                          if (e.target.checked) setCostCenterForm({...costCenterForm, hotelNames: [...names, h.name]});
-                          else setCostCenterForm({...costCenterForm, hotelNames: names.filter(n => n !== h.name)});
+                          if (e.target.checked) setCostCenterForm({ ...costCenterForm, hotelNames: [...names, h.name] });
+                          else setCostCenterForm({ ...costCenterForm, hotelNames: names.filter(n => n !== h.name) });
                         }}
                         className="rounded text-indigo-600"
                       />
@@ -4034,41 +4039,67 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                     {hotels.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
                   </select>
                 </div>
+
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Pacote USALI</label>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Pacote</label>
                   <select value={gmdForm.packageId} onChange={e => setGmdForm({ ...gmdForm, packageId: e.target.value })} className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none">
                     <option value="">Selecione um pacote...</option>
                     {packages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 </div>
+
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Setor (CR/PDV)</label>
-                  <select value={gmdForm.costCenterId} onChange={e => setGmdForm({ ...gmdForm, costCenterId: e.target.value })} className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none">
-                    <option value="">Selecione um setor...</option>
-                    {costCenters.map(cc => <option key={cc.id} value={cc.id}>{cc.name}</option>)}
-                  </select>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Setores (CR/PDV)</label>
+                  <div className="p-3 border border-gray-300 rounded-xl max-h-60 overflow-y-auto space-y-2 bg-white shadow-inner">
+                    <label className="flex items-center gap-2 p-1 hover:bg-gray-50 rounded cursor-pointer text-xs font-bold text-indigo-600 border-b border-gray-100 mb-1">
+                      <input
+                        type="checkbox"
+                        checked={(gmdForm.costCenterIds || []).length === costCenters.filter(cc => !gmdForm.hotelId || cc.hotelName === hotels.find(h => h.id === gmdForm.hotelId)?.name).length && costCenters.filter(cc => !gmdForm.hotelId || cc.hotelName === hotels.find(h => h.id === gmdForm.hotelId)?.name).length > 0}
+                        onChange={e => {
+                          const hotelName = hotels.find(h => h.id === gmdForm.hotelId)?.name;
+                          const filtered = costCenters.filter(cc => !gmdForm.hotelId || cc.hotelName === hotelName);
+                          if (e.target.checked) setGmdForm({ ...gmdForm, costCenterIds: filtered.map(cc => cc.id) });
+                          else setGmdForm({ ...gmdForm, costCenterIds: [] });
+                        }}
+                        className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500"
+                      />
+                      Selecionar Todos
+                    </label>
+                    {costCenters
+                      .filter(cc => !gmdForm.hotelId || cc.hotelName === hotels.find(h => h.id === gmdForm.hotelId)?.name)
+                      // Deduplicate by name to fix user complaint
+                      .filter((cc, index, self) => index === self.findIndex(t => t.name === cc.name))
+                      .map(cc => (
+                        <label key={cc.id} className="flex items-center gap-2 p-1 hover:bg-gray-50 rounded cursor-pointer text-sm">
+                          <input
+                            type="checkbox"
+                            checked={gmdForm.costCenterIds?.includes(cc.id)}
+                            onChange={e => {
+                              const ids = gmdForm.costCenterIds || [];
+                              if (e.target.checked) setGmdForm({ ...gmdForm, costCenterIds: [...ids, cc.id] });
+                              else setGmdForm({ ...gmdForm, costCenterIds: ids.filter(id => id !== cc.id) });
+                            }}
+                            className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500"
+                          />
+                          <span className="flex flex-col">
+                            <span>{cc.name}</span>
+                            <span className="text-[10px] text-gray-400 font-mono">{cc.id}</span>
+                          </span>
+                        </label>
+                      ))}
+                    {costCenters.filter(cc => !gmdForm.hotelId || cc.hotelName === hotels.find(h => h.id === gmdForm.hotelId)?.name).length === 0 && (
+                      <div className="text-center py-4 text-gray-400 text-xs italic">Nenhum setor encontrado para este hotel.</div>
+                    )}
+                  </div>
                 </div>
               </div>
+
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Gestor do Pacote</label>
-                  <select value={gmdForm.packageManagerId} onChange={e => setGmdForm({ ...gmdForm, packageManagerId: e.target.value })} className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none">
-                    <option value="">Selecione um gestor...</option>
-                    {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Dono da Conta (Account Manager)</label>
-                  <select value={gmdForm.accountManagerId} onChange={e => setGmdForm({ ...gmdForm, accountManagerId: e.target.value })} className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none">
-                    <option value="">Selecione um gestor...</option>
-                    {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Gestores da Entidade (Entity Managers)</label>
-                  <div className="p-3 border border-gray-300 rounded-xl max-h-32 overflow-y-auto space-y-2">
+                  <label className="block text-sm font-bold text-gray-700 mb-1">1. Gerente de Entidade (Entity Managers)</label>
+                  <div className="p-3 border border-gray-300 rounded-xl max-h-40 overflow-y-auto space-y-2 bg-white">
                     {users.map(u => (
-                      <label key={u.id} className="flex items-center gap-2 text-sm">
+                      <label key={u.id} className="flex items-center gap-2 p-1 hover:bg-gray-50 rounded cursor-pointer text-sm">
                         <input
                           type="checkbox"
                           checked={gmdForm.entityManagerIds?.includes(u.id)}
@@ -4077,11 +4108,28 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                             if (e.target.checked) setGmdForm({ ...gmdForm, entityManagerIds: [...ids, u.id] });
                             else setGmdForm({ ...gmdForm, entityManagerIds: ids.filter(id => id !== u.id) });
                           }}
+                          className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500"
                         />
                         {u.name}
                       </label>
                     ))}
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">2. Gerente de Pacote</label>
+                  <select value={gmdForm.packageManagerId} onChange={e => setGmdForm({ ...gmdForm, packageManagerId: e.target.value })} className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none">
+                    <option value="">Selecione um gestor...</option>
+                    {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">3. Gerente de Área</label>
+                  <select value={gmdForm.accountManagerId} onChange={e => setGmdForm({ ...gmdForm, accountManagerId: e.target.value })} className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none">
+                    <option value="">Selecione um gestor...</option>
+                    {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                  </select>
                 </div>
               </div>
             </div>
