@@ -571,19 +571,21 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
 
   const toggleMasterExpand = (name: string) => {
+    const trimmedName = name.trim();
     setCollapsedMasterPackages(prev => {
       const next = new Set(prev);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
+      if (next.has(trimmedName)) next.delete(trimmedName);
+      else next.add(trimmedName);
       return next;
     });
   };
 
   const togglePackageExpand = (name: string) => {
+    const trimmedName = name.trim();
     setCollapsedPackages(prev => {
       const next = new Set(prev);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
+      if (next.has(trimmedName)) next.delete(trimmedName);
+      else next.add(trimmedName);
       return next;
     });
   };
@@ -3158,8 +3160,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                             filtered.forEach(acc => {
                               const isNewMaster = acc.masterPackage !== lastMaster;
                               const isNewPkg = (acc.package !== lastPackage || isNewMaster) && acc.package;
-                              const masterCollapsed = collapsedMasterPackages.has(acc.masterPackage || '');
-                              const pkgKey = `${acc.masterPackage}|${acc.package}`;
+                              const masterCollapsed = collapsedMasterPackages.has((acc.masterPackage || '').trim());
+                              const pkgKey = `${(acc.masterPackage || '').trim()}|${(acc.package || '').trim()}`;
                               const pkgCollapsed = collapsedPackages.has(pkgKey);
 
                               if (isNewMaster && acc.masterPackage) {
