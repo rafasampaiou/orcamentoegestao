@@ -870,6 +870,23 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     };
   }, [parsedData]);
 
+  // Derive Master Packages from Accounts for GMD Configuration
+  const masterPackages = useMemo(() => {
+    const masters = new Map<string, string>(); // name -> code
+    accounts.forEach(acc => {
+      if (acc.masterPackage) {
+        // We use the first code we find for this master package name if it's missing
+        if (!masters.has(acc.masterPackage) || !masters.get(acc.masterPackage)) {
+          masters.set(acc.masterPackage, acc.masterPackageCode || acc.masterPackage);
+        }
+      }
+    });
+    return Array.from(masters.entries()).map(([name, code]) => ({
+      id: code, // Using code as ID for consistency
+      name: name
+    }));
+  }, [accounts]);
+
 
   const [dreStructure, setDreStructure] = useState<DreSection[]>(() => {
     // Initial DRE generation logic
@@ -3401,7 +3418,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                   <tbody className="bg-white divide-y divide-gray-200">
                     {gmdConfigs.map(config => {
                       const hotel = hotels.find(h => h.id === config.hotelId);
-                      const pkg = packages.find(p => p.id === config.packageId);
+                      const pkg = masterPackages.find(p => p.id === config.packageId || p.name === config.packageId);
                       const relatedCCs = costCenters.filter(c => config.costCenterIds?.includes(c.id));
                       const ccNames = Array.from(new Set(relatedCCs.map(c => c.name))).join(', ');
                       const pkgManager = users.find(u => u.id === config.packageManagerId);
@@ -3410,7 +3427,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                       return (
                         <tr key={config.id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">{hotel?.name || '-'}</td>
-                          <td className="px-4 py-3 whitespace-nowrap text-xs font-bold text-gray-900">{pkg?.name || '-'}</td>
+                          <td className="px-4 py-3 whitespace-nowrap text-xs font-bold text-gray-900">{pkg?.name || config.packageId || '-'}</td>
                           <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500" title={ccNames}>
                             <div className="max-w-[150px] overflow-hidden text-ellipsis">
                               {relatedCCs.length > 2 ? `${relatedCCs.length} setores` : (ccNames || '-')}
@@ -4041,10 +4058,10 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Pacote</label>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Pacote Master</label>
                   <select value={gmdForm.packageId} onChange={e => setGmdForm({ ...gmdForm, packageId: e.target.value })} className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none">
-                    <option value="">Selecione um pacote...</option>
-                    {packages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    <option value="">Selecione um pacote master...</option>
+                    {masterPackages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 </div>
 

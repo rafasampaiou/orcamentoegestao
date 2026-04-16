@@ -79,6 +79,22 @@ const GMDView: React.FC<GMDViewProps> = ({
   const [recoveredValue, setRecoveredValue] = useState('');
   const [completionObs, setCompletionObs] = useState('');
 
+  // Derive Master Packages from Accounts for GMD
+  const masterPackages = useMemo(() => {
+    const masters = new Map<string, string>(); // name -> code
+    accounts.forEach(acc => {
+      if (acc.masterPackage) {
+        if (!masters.has(acc.masterPackage) || !masters.get(acc.masterPackage)) {
+          masters.set(acc.masterPackage, acc.masterPackageCode || acc.masterPackage);
+        }
+      }
+    });
+    return Array.from(masters.entries()).map(([name, code]) => ({
+      id: code,
+      name: name
+    }));
+  }, [accounts]);
+
   // --- CALCULATION LOGIC ---
   const reportData = useMemo(() => {
     // 1. Filter GMD Configs for the selected hotel
@@ -92,7 +108,7 @@ const GMDView: React.FC<GMDViewProps> = ({
 
     // 2. Build Hierarchy
     return hotelConfigs.map(config => {
-        const pkg = packages.find(p => p.id === config.packageId);
+        const pkg = masterPackages.find(p => p.id === config.packageId || p.name === config.packageId);
         const pkgManager = users.find(u => u.id === config.packageManagerId);
         const accManager = users.find(u => u.id === config.accountManagerId);
 
@@ -543,7 +559,7 @@ const GMDView: React.FC<GMDViewProps> = ({
                                 <tbody className="divide-y divide-gray-100">
                                     {filteredJustifications.map((just) => {
                                         const config = gmdConfigs.find(c => c.id === just.gmdConfigId);
-                                        const pkg = packages.find(p => p.id === config?.packageId);
+                                        const pkg = masterPackages.find(p => p.id === config?.packageId || p.name === config?.packageId);
                                         const pkgManager = users.find(u => u.id === config?.packageManagerId);
                                         const accManager = users.find(u => u.id === config?.accountManagerId);
                                         
