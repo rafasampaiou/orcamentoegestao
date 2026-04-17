@@ -111,6 +111,7 @@ export interface Account {
 export interface GMDConfiguration {
   id: string;
   hotelId: string;
+  subArea?: 'Martech' | 'Marketing' | 'Outras áreas'; // New field for TI/Mkt breakdown
   
   // Changed to array to support multiple managers
   entityManagerIds: string[]; 

@@ -1024,7 +1024,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     supportUserIds: [],
     linkedAccountIds: [],
     costCenterIds: [],
-    accountManagerId: ''
+    accountManagerId: '',
+    subArea: undefined
   });
 
   const [dreParams, setDreParams] = useState({
@@ -3429,7 +3430,14 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                       return (
                         <tr key={config.id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">{hotel?.name || '-'}</td>
-                          <td className="px-4 py-3 whitespace-nowrap text-xs font-bold text-gray-900">{pkg?.name || config.packageId || '-'}</td>
+                          <td className="px-4 py-3 whitespace-nowrap text-xs font-bold text-gray-900">
+                            <div>{pkg?.name || config.packageId || '-'}</div>
+                            {config.subArea && (
+                              <div className="text-[10px] text-indigo-500 font-bold uppercase tracking-tighter mt-0.5">
+                                • {config.subArea}
+                              </div>
+                            )}
+                          </td>
                           <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500" title={ccNames}>
                             <div className="max-w-[150px] overflow-hidden text-ellipsis">
                               {relatedCCs.length > 2 ? `${relatedCCs.length} setores` : (ccNames || '-')}
@@ -4061,11 +4069,32 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Pacote Master</label>
-                  <select value={gmdForm.packageId} onChange={e => setGmdForm({ ...gmdForm, packageId: e.target.value })} className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none">
+                  <select value={gmdForm.packageId} onChange={e => setGmdForm({ ...gmdForm, packageId: e.target.value, subArea: undefined })} className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none">
                     <option value="">Selecione um pacote master...</option>
                     {masterPackages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 </div>
+
+                {/* Sub-Area Selection (Conditional) */}
+                {(gmdForm.packageId === 'DESPESAS ADMINISTRATIVAS' || 
+                  gmdForm.packageId === 'DESPESAS COM VENDAS E MARKETING' ||
+                  masterPackages.find(p => p.id === gmdForm.packageId)?.name === 'DESPESAS ADMINISTRATIVAS' ||
+                  masterPackages.find(p => p.id === gmdForm.packageId)?.name === 'DESPESAS COM VENDAS E MARKETING') && (
+                  <div>
+                    <label className="block text-sm font-bold text-indigo-600 mb-1">Sub-Área (Breakdown)</label>
+                    <select 
+                      value={gmdForm.subArea || ''} 
+                      onChange={e => setGmdForm({ ...gmdForm, subArea: e.target.value as any })} 
+                      className="w-full p-3 border-2 border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none bg-indigo-50 font-bold text-indigo-900"
+                    >
+                      <option value="">Selecione a sub-área...</option>
+                      <option value="Martech">Martech</option>
+                      <option value="Marketing">Marketing</option>
+                      <option value="Outras áreas">Outras áreas</option>
+                    </select>
+                    <p className="text-[10px] text-gray-500 mt-1 italic">Necessário para o breakdown hierarchical de TI/Martech solicitado.</p>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Setores (CR/PDV)</label>

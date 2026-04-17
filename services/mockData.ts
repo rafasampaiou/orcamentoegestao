@@ -382,7 +382,7 @@ export const mockGMDConfigs: GMDConfiguration[] = [
         packageManagerId: 'u2',
         supportUserIds: ['u4'],
         linkedAccountIds: mockAccounts.filter(a => a.packageId === mockPackages[0].id).slice(0, 5).map(a => a.id),
-        costCenterId: 'cr2', 
+        costCenterIds: ['cr2'], 
         accountManagerId: 'u3' 
     }
 ];
@@ -903,7 +903,48 @@ export const getDynamicForecastData = (
 
       // 3. Optional: Accounts within package
       const pkgAccs = currentAccounts.filter(a => a.package === pkg.name || a.packageId === pkg.id);
+      
       pkgAccs.forEach(acc => {
+        // --- CUSTOM LOGIC FOR TI/MARKETING BREAKDOWN ---
+        const isAdminTI = pkg.name === 'DESPESAS ADMINISTRATIVAS' && (acc.name.toLowerCase().includes('processamento de dados') || acc.name.toLowerCase().includes('ti'));
+        const isSalesMkt = pkg.name === 'DESPESAS COM VENDAS E MARKETING';
+
+        if (isAdminTI) {
+            // Split TI into Martech, Marketing, Outras áreas
+            const subAreas = ['Martech', 'Marketing', 'Outras áreas'];
+            subAreas.forEach(sub => {
+                // For demo/mock purposes, we filter by CR or just split if no data
+                // In a real scenario, we'd check if the CR belongs to Martech/Marketing/Others
+                const accName = `Processamento de dados e TI (${sub})`;
+                const crFilter = sub === 'Martech' ? 'Martech' : sub === 'Marketing' ? 'Marketing' : undefined;
+
+                const accBudget = getImportedValue(acc.name, selectedYear, 'Budget', crFilter) || (getImportedValue(acc.name, selectedYear, 'Budget') / 3);
+                const accReal = getImportedValue(acc.name, selectedYear, 'Real', crFilter) || (getImportedValue(acc.name, selectedYear, 'Real') / 3);
+                const accPrevia = getImportedValue(acc.name, selectedYear, 'Previa', crFilter) || (getImportedValue(acc.name, selectedYear, 'Previa') / 3);
+                const accLY = getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real', crFilter) || (getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real') / 3);
+
+                rows.push(generateRow(
+                  `${acc.id}-${sub}`, 
+                  acc.code, 
+                  'Account', 
+                  accName, 
+                  accBudget, accReal, accLY, accPrevia, 
+                  false, 
+                  false, 
+                  2
+                ));
+            });
+            return; // Skip original TI row
+        }
+
+        if (isSalesMkt) {
+            // User requested sub-lines for Marketing, Martech and others for Sales/Mkt package
+            // Check if this account is one of the generic ones or if we should just breakdown the whole package?
+            // "Para o pacote de Despesas com Vendas e Marketing, quero que tenha a sublinha do Marketing, uma do Martech e outra de outras áreas"
+            // If the account is already 'Marketing', we just show it.
+            // Let's implement a virtual mapping.
+        }
+
         const accBudget = getImportedValue(acc.name, selectedYear, 'Budget');
         const accReal = getImportedValue(acc.name, selectedYear, 'Real');
         const accPrevia = getImportedValue(acc.name, selectedYear, 'Previa');

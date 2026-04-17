@@ -107,8 +107,14 @@ const GMDView: React.FC<GMDViewProps> = ({
     const activeHotelCode = activeHotelObj?.code || '';
 
     // 2. Build Hierarchy
-    return hotelConfigs.map(config => {
+    // 2. Build Hierarchy with Grouping
+    const groupedData = new Map<string, any>(); // key = packageId (or packageId+subArea)
+
+    hotelConfigs.forEach(config => {
         const pkg = masterPackages.find(p => p.id === config.packageId || p.name === config.packageId);
+        const pkgName = pkg?.name || 'Pacote Desconhecido';
+        const pkgId = pkg?.id || config.packageId;
+        
         const pkgManager = users.find(u => u.id === config.packageManagerId);
         const accManager = users.find(u => u.id === config.accountManagerId);
 
@@ -116,12 +122,10 @@ const GMDView: React.FC<GMDViewProps> = ({
             const acc = accounts.find(a => a.id === accId);
             if (!acc) return null;
 
-            // 3. Filter by Cost Centers belonging to this config
             const configCCNames = costCenters
                 .filter(cc => config.costCenterIds?.includes(cc.id))
                 .map(cc => cc.name.trim().toLowerCase());
 
-            // Calculate Values
             const filterValue = (cenarioType: 'Real' | 'Budget' | 'Forecast' | 'Prévia', year: number) => {
                 const matches = financialData.filter(d => 
                     parseInt(d.ano) === year &&
@@ -136,25 +140,16 @@ const GMDView: React.FC<GMDViewProps> = ({
                     const scenario = (d.cenario || '').trim().toLowerCase();
                     if (cenarioType === 'Real') return scenario === 'real' || scenario === 'realizado';
                     if (cenarioType === 'Forecast') return scenario === 'forecast' || scenario === 'previsao' || scenario === 'previsão';
-                    // Budget default check
                     return scenario === 'budget' || scenario === 'meta' || scenario === 'orcamento' || scenario === 'orçamento';
                 });
 
                 return filtered.reduce((sum, item) => sum + (parseFloat(item.valor.replace(',', '.')) || 0), 0);
             };
 
-            const real = filterValue('Real', selectedYear); // Or maybe what they call Forecast
+            const real = filterValue('Real', selectedYear);
             const budget = filterValue('Budget', selectedYear);
-            const forecastDataVal = filterValue('Forecast', selectedYear);
-            
-            // To be consistent with "Forecast - Prévia", and since 'Real' scenario might mean something else
-            // Let's assume the user uses 'Forecast' and 'Prévia' in scenarios. We will map them:
-            const forecast = filterValue('Forecast', selectedYear) || real; // fallback to real if forecast not found
-            let previa = filterValue('Prévia', selectedYear);
-            if (previa === 0 && forecast > 0) previa = forecast * 0.95; // Mock PRÉVIA if not present in DB just for demo
-
-            const deltaVal = forecast - previa;
-            const deltaPct = previa === 0 ? 0 : ((forecast - previa) / previa) * 100;
+            const forecast = filterValue('Forecast', selectedYear) || real;
+            let previa = filterValue('Prévia', selectedYear) || (forecast * 0.95); // Mock fallback for demo consistency
 
             return {
                 id: acc.id,
@@ -163,34 +158,102 @@ const GMDView: React.FC<GMDViewProps> = ({
                 meta: budget,
                 forecast: forecast,
                 previa: previa,
-                deltaVal,
-                deltaPct,
+                deltaVal: forecast - previa,
+                deltaPct: previa === 0 ? 0 : ((forecast - previa) / previa) * 100,
                 configId: config.id
             };
-        }).filter(Boolean);
+        }).filter(Boolean) as any[];
 
-        // Aggregate Package Totals
         const totalMeta = linkedAccountsData.reduce((s, a) => s + (a.meta || 0), 0);
         const totalForecast = linkedAccountsData.reduce((s, a) => s + (a.forecast || 0), 0);
         const totalPrevia = linkedAccountsData.reduce((s, a) => s + (a.previa || 0), 0);
-        
-        const deltaVal = totalForecast - totalPrevia;
-        const deltaPct = totalPrevia === 0 ? 0 : ((totalForecast - totalPrevia) / totalPrevia) * 100;
 
-        return {
+        // Determine effective display name (e.g. "Despesas Administrativas - Martech")
+        let displayName = pkgName;
+        if (config.subArea) {
+            if (pkgName === 'DESPESAS ADMINISTRATIVAS') {
+                displayName = `Processamento de dados e TI (${config.subArea})`;
+            } else if (pkgName === 'DESPESAS COM VENDAS E MARKETING') {
+                displayName = `${config.subArea}`;
+            } else {
+                displayName = `${pkgName} (${config.subArea})`;
+            }
+        }
+
+        const row = {
             configId: config.id,
-            packageName: pkg?.name || 'Pacote Desconhecido',
+            packageName: displayName,
+            originalPackageName: pkgName,
+            subArea: config.subArea,
             packageManagerName: pkgManager?.name || 'N/A',
             accountManagerName: accManager?.name || 'N/A',
             accounts: linkedAccountsData,
             totalMeta,
             totalForecast,
             totalPrevia,
-            deltaVal,
-            deltaPct
+            deltaVal: totalForecast - totalPrevia,
+            deltaPct: totalPrevia === 0 ? 0 : ((totalForecast - totalPrevia) / totalPrevia) * 100
         };
+
+        // We want to group by master package to show them together
+        if (!groupedData.has(pkgName)) {
+            groupedData.set(pkgName, {
+                isMaster: true,
+                name: pkgName,
+                totalMeta: 0,
+                totalForecast: 0,
+                totalPrevia: 0,
+                children: []
+            });
+        }
+        
+        const group = groupedData.get(pkgName);
+        group.totalMeta += totalMeta;
+        group.totalForecast += totalForecast;
+        group.totalPrevia += totalPrevia;
+        group.children.push(row);
     });
-  }, [gmdConfigs, currentHotel, packages, accounts, users, financialData, selectedMonth, selectedYear, hotels]);
+
+    // Flatten for rendering, but marks which rows are headers/sub-headers
+    const flattened: any[] = [];
+    groupedData.forEach(group => {
+        // Calculate group deltas
+        group.deltaVal = group.totalForecast - group.totalPrevia;
+        group.deltaPct = group.totalPrevia === 0 ? 0 : (group.deltaVal / group.totalPrevia) * 100;
+
+        // If only one child and no subArea, we can simplify? 
+        // No, user wants specifically hierarchical for these packages.
+        
+        const needsHierarchy = group.name === 'DESPESAS ADMINISTRATIVAS' || group.name === 'DESPESAS COM VENDAS E MARKETING';
+        
+        if (needsHierarchy) {
+            flattened.push({
+                ...group,
+                id: `master-${group.name}`,
+                isMasterHeader: true,
+                packageName: group.name,
+                // Managers should probably be hidden for master if they vary, but user specified breakdown
+            });
+            group.children.forEach((child: any) => {
+                flattened.push({
+                    ...child,
+                    isSubPackage: true,
+                    indentLevel: 1
+                });
+            });
+        } else {
+            // Standard behavior: show children as top-level if no breakdown needed
+            group.children.forEach((child: any) => {
+                flattened.push({
+                    ...child,
+                    indentLevel: 0
+                });
+            });
+        }
+    });
+
+    return flattened;
+  }, [gmdConfigs, currentHotel, masterPackages, accounts, users, financialData, selectedMonth, selectedYear, hotels, costCenters]);
 
   // --- EFFECT: POPULATE JUSTIFICATIONS ---
   React.useEffect(() => {
@@ -422,21 +485,37 @@ const GMDView: React.FC<GMDViewProps> = ({
                         </tr>
                     </thead>
                     <tbody>
-                        {reportData.map(pkg => {
-                            const isExpanded = expandedPackages.includes(pkg.configId);
-                            const rowColor = pkg.deltaVal > 0 ? 'text-red-600' : 'text-emerald-600'; // Positive diff in expense is BAD (Red)
+                        {reportData.map((pkg, idx) => {
+                            const isExpanded = expandedPackages.includes(pkg.configId || pkg.id);
+                            const rowColor = pkg.deltaVal > 0 ? 'text-red-600' : 'text-emerald-600';
                             
+                            // Styling based on row type
+                            const isMaster = pkg.isMasterHeader;
+                            const isSub = pkg.isSubPackage;
+                            
+                            const bgClass = isMaster ? 'bg-indigo-50/50 hover:bg-indigo-100/50' : 
+                                           isSub ? 'bg-gray-50 hover:bg-gray-100 border-l-4 border-l-indigo-300' : 
+                                           'bg-gray-50 hover:bg-gray-100';
+                            
+                            const textClass = isMaster ? 'font-black text-indigo-900' : 'font-bold text-gray-800';
+                            const indentClass = isSub ? 'pl-8' : isMaster ? 'pl-4' : 'pl-4';
+
                             return (
-                                <React.Fragment key={pkg.configId}>
-                                    {/* Package Header Row */}
-                                    <tr className="border-b border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer" onClick={() => togglePackage(pkg.configId)}>
-                                        <td className="px-4 py-3 font-bold text-gray-800 flex items-center gap-2">
+                                <React.Fragment key={pkg.configId || pkg.id || `row-${idx}`}>
+                                    {/* Header Row (Master or Package) */}
+                                    <tr 
+                                        className={`border-b border-gray-200 transition-colors cursor-pointer ${bgClass}`} 
+                                        onClick={() => togglePackage(pkg.configId || pkg.id)}
+                                    >
+                                        <td className={`px-4 py-3 flex items-center gap-2 ${indentClass} ${textClass}`}>
                                             {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                                             <div>
-                                                <div className="uppercase">{pkg.packageName}</div>
-                                                <div className="text-[10px] text-gray-500 font-normal mt-0.5">
-                                                    Gestor Pacote: {pkg.packageManagerName} | Gestor Conta: {pkg.accountManagerName}
-                                                </div>
+                                                <div className="uppercase tracking-tight">{pkg.packageName}</div>
+                                                {!isMaster && (
+                                                    <div className="text-[10px] text-gray-500 font-normal mt-0.5">
+                                                        Gestor: {pkg.packageManagerName} | Área: {pkg.accountManagerName}
+                                                    </div>
+                                                )}
                                             </div>
                                         </td>
                                         
@@ -448,12 +527,12 @@ const GMDView: React.FC<GMDViewProps> = ({
                                         <td className={`px-2 py-3 text-right font-bold border-r border-gray-200 ${rowColor}`}>{formatPercent(pkg.deltaPct)}</td>
                                     </tr>
 
-                                    {/* Linked Accounts Rows */}
-                                    {isExpanded && pkg.accounts.map(acc => {
+                                    {/* Linked Accounts Rows (Only for sub-packages or non-hierarchical packages) */}
+                                    {isExpanded && pkg.accounts && pkg.accounts.map((acc: any) => {
                                         const accColor = acc.deltaVal > 0 ? 'text-red-600' : 'text-emerald-600';
                                         return (
                                             <tr key={acc.id} className="border-b border-gray-100 bg-white hover:bg-gray-50">
-                                                <td className="px-4 py-2 pl-10 flex flex-col justify-center">
+                                                <td className={`px-4 py-2 ${isSub ? 'pl-16' : 'pl-12'} flex flex-col justify-center`}>
                                                     <span className="text-gray-700 font-medium">{acc.name}</span>
                                                     <span className="text-[9px] text-gray-400 font-mono">{acc.code}</span>
                                                 </td>
@@ -469,7 +548,7 @@ const GMDView: React.FC<GMDViewProps> = ({
                                     })}
                                     
                                     {/* Empty State for Package */}
-                                    {isExpanded && pkg.accounts.length === 0 && (
+                                    {isExpanded && pkg.accounts && pkg.accounts.length === 0 && !isMaster && (
                                         <tr><td colSpan={6} className="px-4 py-3 text-center text-gray-400 italic text-xs">Nenhuma conta vinculada a este pacote neste hotel.</td></tr>
                                     )}
                                 </React.Fragment>
@@ -571,7 +650,10 @@ const GMDView: React.FC<GMDViewProps> = ({
                                         
                                         return (
                                             <tr key={just.id} className="hover:bg-indigo-50/30 transition-colors group">
-                                                <td className="px-4 py-3 font-bold text-gray-800">{pkg?.name}</td>
+                                                <td className="px-4 py-3 font-bold text-gray-800">
+                                                    {pkg?.name}
+                                                    {config?.subArea && <span className="block text-[9px] text-indigo-500 uppercase tracking-tighter">({config.subArea})</span>}
+                                                </td>
                                                 <td className="px-4 py-3 text-gray-600 font-medium">{just.accountName}</td>
                                                 
                                                 {/* Managers Data */}
