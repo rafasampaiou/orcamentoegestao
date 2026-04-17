@@ -569,5 +569,50 @@ export const supabaseService = {
       .from('dre_configurations')
       .upsert({ name, structure, updated_at: new Date().toISOString() }, { onConflict: 'name' });
     if (error) throw error;
+  },
+
+  async saveForecastProjections(
+    hotelName: string,
+    month: number,
+    year: number,
+    versionId: string,
+    rows: { accountName: string, costCenter?: string, value: number, scenario: 'Real' | 'Previa' }[]
+  ): Promise<void> {
+    // 1. Delete existing overrides for this specific context
+    // We only delete Real and Previa scenarios to preserve meta/budget
+    const { error: deleteError } = await supabase
+      .from('financial_data')
+      .delete()
+      .eq('hotel', hotelName)
+      .eq('month', month)
+      .eq('year', year)
+      .eq('version_id', versionId)
+      .in('scenario', ['Real', 'Previa']);
+
+    if (deleteError) throw deleteError;
+
+    if (rows.length === 0) return;
+
+    // 2. Prepare new records
+    const records = rows.map(r => ({
+      hotel: hotelName,
+      month: month,
+      year: year,
+      version_id: versionId,
+      account_name: r.accountName,
+      cost_center: r.costCenter || '',
+      value: r.value,
+      scenario: r.scenario,
+      real_meta: r.scenario === 'Real' ? 'Real' : 'Previa'
+    }));
+
+    // 3. Batch insert
+    const batchSize = 100;
+    for (let i = 0; i < records.length; i += batchSize) {
+      const { error: insertError } = await supabase
+        .from('financial_data')
+        .insert(records.slice(i, i + batchSize));
+      if (insertError) throw insertError;
+    }
   }
 };

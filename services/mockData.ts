@@ -823,6 +823,40 @@ export const getForecastData = (
   rows.push(generateRow('KPI-TRANS-BUDGET', '', 'Result', 'Transformação/Reatividade (Meta)', 0, 0, 0, 0, true, true, 0));
   rows.push(generateRow('KPI-TRANS-LY', '', 'Result', 'Transformação/Reatividade (Ano Anterior)', 0, 0, 0, 0, true, true, 0));
 
+  const applyOverrides = () => {
+      const activeHotelCodeUpper = activeHotelCode.trim().toUpperCase();
+      const selHotelNameUpper = (selectedHotelName || '').trim().toUpperCase();
+      
+      rows.forEach(r => {
+          const targetName = `override_${r.id}`.toLowerCase();
+          
+          const tryOverride = (scenarioKey: string) => {
+              for (const h of [selHotelNameUpper, activeHotelCodeUpper].filter(Boolean)) {
+                 const key = `${selectedYear}|${selectedMonth}|${h}|${scenarioKey}|${targetName}`;
+                 if (dataIndex.has(key)) {
+                     return dataIndex.get(key);
+                 }
+              }
+              return undefined;
+          };
+
+          const realOverride = tryOverride('REAL');
+          if (realOverride !== undefined) {
+              r.real = realOverride;
+              r.isManualOverride = true;
+              if (r.forecastConfig) r.forecastConfig.manualValue = realOverride;
+          }
+
+          const previaOverride = tryOverride('PREVIA');
+          if (previaOverride !== undefined) {
+              r.previa = previaOverride;
+              r.isManualPreviaOverride = true;
+              if (r.previaConfig) r.previaConfig.manualValue = previaOverride;
+          }
+      });
+  };
+  applyOverrides();
+
   return rows;
 };
 
@@ -1027,6 +1061,40 @@ export const getDynamicForecastData = (
     // Add a spacer after each section
     rows.push(generateRow(`spacer-${section.id}`, '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
   });
+
+  const applyOverrides = () => {
+      const activeHotelCodeUpper = activeHotelCode.trim().toUpperCase();
+      const selHotelNameUpper = (selectedHotelName || '').trim().toUpperCase();
+      
+      rows.forEach(r => {
+          const targetName = `override_${r.id}`.toLowerCase();
+          
+          const tryOverride = (scenarioKey: string) => {
+              for (const h of [selHotelNameUpper, activeHotelCodeUpper].filter(Boolean)) {
+                 const key = `${selectedYear}|${selectedMonth}|${h}|${scenarioKey}|${targetName}`;
+                 if (dataIndex.has(key)) {
+                     return dataIndex.get(key);
+                 }
+              }
+              return undefined;
+          };
+
+          const realOverride = tryOverride('REAL');
+          if (realOverride !== undefined) {
+              r.real = realOverride;
+              r.isManualOverride = true;
+              if (r.forecastConfig) r.forecastConfig.manualValue = realOverride;
+          }
+
+          const previaOverride = tryOverride('PREVIA');
+          if (previaOverride !== undefined) {
+              r.previa = previaOverride;
+              r.isManualPreviaOverride = true;
+              if (r.previaConfig) r.previaConfig.manualValue = previaOverride;
+          }
+      });
+  };
+  applyOverrides();
 
   return rows;
 };

@@ -146,6 +146,8 @@ export interface ForecastRow {
   budget: number;
   lastYear: number;
   indentLevel?: number;
+  isManualOverride?: boolean;
+  isManualPreviaOverride?: boolean;
   // Computed fields
   deltaBudgetVal?: number;
   deltaBudgetPct?: number;

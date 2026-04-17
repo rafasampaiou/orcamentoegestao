@@ -4,6 +4,7 @@ import { getForecastData, getDynamicForecastData } from '../services/mockData';
 import { Download, ListFilter, LayoutList, Settings2, ChevronUp, Activity, TrendingUp, Lock, LockOpen, CheckCircle2, X } from 'lucide-react';
 import { ExpenseDriver, ImportedRow, Account, CostPackage, Hotel, ForecastRow, ForecastConfig, ForecastOperator, ColumnVisibility, UserRole } from '../types';
 import { evaluateFormula } from '../utils/formulaEngine';
+import { supabaseService } from '../services/supabaseService';
 
 interface ForecastTableProps {
     selectedMonth?: number;
@@ -250,9 +251,14 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 
                 // Sync Forecast with Prévia for Occupancy Indicators
                 if (field === 'previa' && (row.id === 'IND-1' || row.id === 'IND-2')) {
-                    return { ...row, previa: value, real: value };
+                    return { ...row, previa: value, real: value, isManualPreviaOverride: true, isManualOverride: true };
                 }
                 
+                if (field === 'real') {
+                    return { ...row, real: value, isManualOverride: true };
+                } else if (field === 'previa') {
+                    return { ...row, previa: value, isManualPreviaOverride: true };
+                }
                 return { ...row, [field]: value };
             });
             return recalculateTotals(newData, packages, accounts);
@@ -302,21 +308,30 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             if (field === 'real') {
                                 row.forecastConfig = { ...row.forecastConfig, method: 'Fixed', manualValue: val };
                                 row.real = val;
+                                row.isManualOverride = true;
                             } else {
                                 row.previaConfig = { ...(row.previaConfig || { method: 'Fixed' }), method: 'Fixed', manualValue: val };
                                 row.previa = val;
+                                row.isManualPreviaOverride = true;
                             }
                         } else {
                             if (isManualRow) {
-                                if (field === 'real') row.real = val;
-                                else row.previa = val;
+                                if (field === 'real') {
+                                    row.real = val;
+                                    row.isManualOverride = true;
+                                } else {
+                                    row.previa = val;
+                                    row.isManualPreviaOverride = true;
+                                }
                             } else {
                                 if (field === 'real') {
                                     row.forecastConfig = { ...row.forecastConfig, method: 'Fixed', manualValue: val };
                                     row.real = val;
+                                    row.isManualOverride = true;
                                 } else {
                                     row.previaConfig = { ...(row.previaConfig || { method: 'Fixed' }), method: 'Fixed', manualValue: val };
                                     row.previa = val;
+                                    row.isManualPreviaOverride = true;
                                 }
                             }
                         }
@@ -1102,33 +1117,55 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 Cancelar
                             </button>
                             <button
-                                onClick={() => {
+                                onClick={async () => {
                                     if (activeProjectionType === 'Fechamento oficial' && currentUser?.role !== UserRole.ADMIN) {
                                         alert('Apenas o ADMIN GERAL pode criar o evento de Fechamento Oficial.');
                                         return;
                                     }
 
-                                    const newValidation: import('../types').ValidationRecord = {
-                                        id: `val_${Date.now()}`,
-                                        hotelId: selectedHotel || '',
-                                        userId: currentUser?.id || '',
-                                        userName: currentUser?.name || 'Desconhecido',
-                                        month: selectedMonth || 1,
-                                        year: selectedYear || 2026,
-                                        projectionType: activeProjectionType || 'Reunião de Ritmo',
-                                        validatedAt: new Date().toISOString(),
-                                        status: 'Validado'
-                                    };
+                                    // Gather rows to save
+                                    const rowsToSave: { accountName: string; costCenter?: string; value: number; scenario: 'Real' | 'Previa' }[] = [];
+                                    data.forEach(row => {
+                                        if (row.category === 'Costs' || row.category === 'Indicators' || row.category === 'Revenue') {
+                                            // Using an 'override_' prefix combined with row ID to uniquely identify this row's manual edit
+                                            rowsToSave.push({ accountName: `override_${row.id}`, value: row.real, scenario: 'Real' });
+                                            if (row.previa !== undefined) {
+                                                rowsToSave.push({ accountName: `override_${row.id}`, value: row.previa, scenario: 'Previa' });
+                                            }
+                                        }
+                                    });
 
-                                    if (setValidations) {
-                                        setValidations(prev => [...prev, newValidation]);
+                                    try {
+                                        const hName = hotels?.find(h => h.id === selectedHotel)?.name || '';
+                                        if (hName) {
+                                            await supabaseService.saveForecastProjections(hName, selectedMonth || 1, selectedYear || 2026, activeRealVersionId || 'default', rowsToSave);
+                                        }
+
+                                        const newValidation: import('../types').ValidationRecord = {
+                                            id: `val_${Date.now()}`,
+                                            hotelId: selectedHotel || '',
+                                            userId: currentUser?.id || '',
+                                            userName: currentUser?.name || 'Desconhecido',
+                                            month: selectedMonth || 1,
+                                            year: selectedYear || 2026,
+                                            projectionType: activeProjectionType || 'Reunião de Ritmo',
+                                            validatedAt: new Date().toISOString(),
+                                            status: 'Validado'
+                                        };
+
+                                        if (setValidations) {
+                                            setValidations(prev => [...prev, newValidation]);
+                                        }
+
+                                        const notificationMsg = `A unidade ${selectedHotel} validou a projeção de ${activeProjectionType} para ${monthName}/${selectedYear}. Dados salvos no banco.`;
+                                        console.log('Notification sent to Admin:', notificationMsg);
+
+                                        alert(`Projeção validada e dados salvos com sucesso!\n\nNotificação enviada aos administradores: "${notificationMsg}"`);
+                                        setShowValidationModal(false);
+                                    } catch (err) {
+                                        console.error('Failed to save projections:', err);
+                                        alert('Ocorreu um erro ao salvar os dados no Supabase. Tente novamente.');
                                     }
-
-                                    const notificationMsg = `A unidade ${selectedHotel} validou a projeção de ${activeProjectionType} para ${monthName}/${selectedYear}.`;
-                                    console.log('Notification sent to Admin:', notificationMsg);
-
-                                    alert(`Projeção validada com sucesso!\n\nNotificação enviada aos administradores: "${notificationMsg}"`);
-                                    setShowValidationModal(false);
                                 }}
                                 className="px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-lg shadow-md hover:bg-indigo-700 transition-colors flex items-center gap-2"
                             >
@@ -1282,10 +1319,14 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
         });
 
         if (children.length > 0) {
-            pkgRow.real = children.reduce((sum, c) => sum + c.real, 0);
+            if (!pkgRow.isManualOverride) {
+                pkgRow.real = children.reduce((sum, c) => sum + c.real, 0);
+            }
             pkgRow.budget = children.reduce((sum, c) => sum + c.budget, 0);
             pkgRow.lastYear = children.reduce((sum, c) => sum + c.lastYear, 0);
-            pkgRow.previa = children.reduce((sum, c) => sum + (c.previa || 0), 0);
+            if (!pkgRow.isManualPreviaOverride) {
+                pkgRow.previa = children.reduce((sum, c) => sum + (c.previa || 0), 0);
+            }
         }
     });
 
