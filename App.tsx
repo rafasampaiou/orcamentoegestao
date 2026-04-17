@@ -19,7 +19,7 @@ import ValidationsView from './components/ValidationsView';
 import { supabase } from './services/supabaseClient';
 import { supabaseService } from './services/supabaseService';
 import { Session } from '@supabase/supabase-js';
-import { ViewState, ImportedRow, User, Hotel, CostCenter, CostPackage, Account, GMDConfiguration, ModuleType, UserRole, BudgetVersion, LaborParameters, ScheduleItem, ProjectionType, ValidationRecord } from './types';
+import { ViewState, ImportedRow, User, Hotel, CostCenter, CostPackage, Account, GMDConfiguration, ModuleType, UserRole, BudgetVersion, LaborParameters, ScheduleItem, ProjectionType, ValidationRecord, DreSection } from './types';
 import { Calendar, ArrowLeft, ArrowRight, Building2 as Building2Icon, Layers } from 'lucide-react';
 import { mockUsers, mockHotels, mockCostCenters, mockPackages, mockAccounts, mockGMDConfigs } from './services/mockData';
 import { Toaster, toast } from 'react-hot-toast';
@@ -181,7 +181,7 @@ const App: React.FC = () => {
   const [packages, setPackages] = useState<CostPackage[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [gmdConfigs, setGmdConfigs] = useState<GMDConfiguration[]>([]);
-  const [dreConfigs, setDreConfigs] = useState<{ name: string, structure: any }[]>([]);
+  const [dreConfigs, setDreConfigs] = useState<Record<string, DreSection[]>>({});
 
   React.useEffect(() => {
     // We want to update the active budget version whenever the hotel changes,
@@ -237,7 +237,13 @@ const App: React.FC = () => {
         if (remoteGmd && isMounted) setGmdConfigs(remoteGmd);
 
         const remoteDreConfigs = await supabaseService.getDreConfigs();
-        if (remoteDreConfigs && isMounted) setDreConfigs(remoteDreConfigs);
+        if (remoteDreConfigs && isMounted) {
+          const configRecord: Record<string, DreSection[]> = {};
+          remoteDreConfigs.forEach(cfg => {
+            configRecord[cfg.name] = cfg.structure;
+          });
+          setDreConfigs(configRecord);
+        }
         
         hasLoadedFromSupabase.current = true;
 

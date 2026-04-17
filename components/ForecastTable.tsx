@@ -55,7 +55,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 }) => {
     // Initialize state passing selectedHotel and dynamic structures
     const [data, setData] = useState<ForecastRow[]>(() => {
-        const initialData = getForecastData(selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData);
+        const forecastStructure = dreConfigs?.['Forecast'] || [];
+        const initialData = getDynamicForecastData(forecastStructure, selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData);
         // Initialize previaConfig if missing
         const initializedData = initialData.map(row => ({
             ...row,
@@ -141,10 +142,10 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     // We use useMemo to avoid the linter warning about setState in effect, 
     // and we only update state when the derived data actually changes from props.
     const derivedData = useMemo(() => {
-        const forecastStructure = dreConfigs?.['Forecast'];
+        const forecastStructure = dreConfigs?.['Forecast'] || [];
         
         let newData: ForecastRow[];
-        if (forecastStructure && forecastStructure.length > 0) {
+        if (forecastStructure.length > 0) {
             newData = getDynamicForecastData(forecastStructure, selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData);
         } else {
             newData = getForecastData(selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData);

@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { getForecastData } from '../services/mockData';
 import { Plus, Trash2, X, Save, Briefcase, Pencil, Calendar, PieChart, Lock, LockOpen, Settings as SettingsIcon, Users, Search, Upload, Settings, Eye, FileText, Layout, Info, ChevronUp, GripVertical } from 'lucide-react';
-import { User, UserRole, CostCenter, ImportedRow, Hotel, Account, BudgetVersion, LaborParameters, ScheduleItem, ImportedCostCenter, CostPackage, GMDConfiguration, ViewState } from '../types';
+import { User, UserRole, CostCenter, ImportedRow, Hotel, Account, BudgetVersion, LaborParameters, ScheduleItem, ImportedCostCenter, CostPackage, GMDConfiguration, ViewState, DreSection } from '../types';
 import TimelineView from './TimelineView';
 import { supabaseService } from '../services/supabaseService';
 import { supabaseTemp } from '../services/supabaseClient';
@@ -20,7 +20,7 @@ interface DrePackage {
   isExpanded?: boolean;
 }
 
-interface DreSection {
+interface LocalDreSection {
   id: string;
   name: string;
   type: 'section' | 'result';
@@ -310,8 +310,8 @@ interface UnifiedAdministrationViewProps {
   setBudgetSchedule: React.Dispatch<React.SetStateAction<ScheduleItem[]>>;
 
   // DRE Config
-  dreConfigs: { name: string, structure: any }[];
-  setDreConfigs: React.Dispatch<React.SetStateAction<{ name: string, structure: any }[]>>;
+  dreConfigs: Record<string, DreSection[]>;
+  setDreConfigs: React.Dispatch<React.SetStateAction<Record<string, DreSection[]>>>;
 
   currentView: ViewState;
 }
@@ -890,11 +890,11 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   }, [accounts]);
 
 
-  const [dreStructure, setDreStructure] = useState<DreSection[]>(() => {
+  const [dreStructure, setDreStructure] = useState<LocalDreSection[]>(() => {
     // Initial DRE generation logic
     const rawData = getForecastData();
-    const sections: DreSection[] = [];
-    let currentSection: DreSection | undefined;
+    const sections: LocalDreSection[] = [];
+    let currentSection: LocalDreSection | undefined;
     let currentPackage: DrePackage | undefined;
 
     rawData.forEach(row => {
@@ -927,14 +927,14 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
   // Sync dreStructure with activeDreName
   React.useEffect(() => {
-    const config = dreConfigs.find(c => c.name === activeDreName);
-    if (config && config.structure && Array.isArray(config.structure) && config.structure.length > 0) {
-      setDreStructure(config.structure);
+    const configStructure = dreConfigs[activeDreName];
+    if (configStructure && Array.isArray(configStructure) && configStructure.length > 0) {
+      setDreStructure(configStructure as unknown as LocalDreSection[]);
     } else {
       // Fallback to default if no config found or if it's empty
       const rawData = getForecastData();
-      const sections: DreSection[] = [];
-      let currentSection: DreSection | undefined;
+    const sections: LocalDreSection[] = [];
+    let currentSection: LocalDreSection | undefined;
       let currentPackage: DrePackage | undefined;
 
       rawData.forEach(row => {
@@ -970,10 +970,10 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     setIsSavingDre(true);
     try {
       await supabaseService.upsertDreConfig(activeDreName, dreStructure);
-      setDreConfigs(prev => {
-        const other = prev.filter(c => c.name !== activeDreName);
-        return [...other, { name: activeDreName, structure: dreStructure }];
-      });
+      setDreConfigs(prev => ({
+        ...prev,
+        [activeDreName]: dreStructure as unknown as DreSection[]
+      }));
       alert(`Configuração de DRE do ${activeDreName} salva com sucesso!`);
     } catch (err: any) {
       console.error("Erro ao salvar DRE:", err);
@@ -1452,7 +1452,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   // --- DRE STRUCTURE HANDLERS ---
   const addDreSection = () => {
     if (!newSectionName.trim()) return;
-    const newSection: DreSection = {
+    const newSection: LocalDreSection = {
       id: getNextId('sec'),
       name: newSectionName.trim(),
       type: 'section',
@@ -2425,7 +2425,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
             <label className="block text-sm font-bold text-gray-700">Direito a Benefícios</label>
             <select
               value={params.benefitsEligibility || 'emocionador'}
-              onChange={e => handleChange('benefitsEligibility', e.target.value as LaborParameters['benefitsEligibility'])}
+              onChange={e => handleChange('benefitsEligibility', e.target.value as any)}
               className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
             >
               <option value="emocionador">Só Emocionador (CLT)</option>
