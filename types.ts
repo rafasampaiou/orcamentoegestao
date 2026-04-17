@@ -97,13 +97,7 @@ export interface Account {
 
   // New fields for Intelligent DRE Engine
   parentId?: string;
-  formula?: string;
   classification?: 'Indicator' | 'Revenue' | 'Tax' | 'Expense' | 'GOP' | 'Occupancy';
-  textColor?: string;
-  bgColor?: string;
-  isBold?: boolean;
-  isItalic?: boolean;
-  isCalculated?: boolean;
   allocationRules?: any[];
   budgetSource?: string;
 }

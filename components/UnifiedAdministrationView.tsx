@@ -1005,13 +1005,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     outOfScope: false,
     level: 'account',
     parentId: '',
-    formula: '',
     classification: 'Revenue',
-    textColor: '#1e293b',
-    bgColor: '#ffffff',
-    isBold: false,
-    isItalic: false,
-    isCalculated: false,
     allocationRules: [],
     budgetSource: ''
   });
@@ -1159,13 +1153,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       outOfScope: false,
       level: initialPkg ? 'account' : (initialMaster ? 'pkg' : 'master'),
       parentId: '',
-      formula: '',
       classification: 'Revenue',
-      textColor: '#1e293b',
-      bgColor: '#ffffff',
-      isBold: false,
-      isItalic: false,
-      isCalculated: false,
       allocationRules: [],
       budgetSource: ''
     });
@@ -1182,13 +1170,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
           ...acc,
           level: 'account',
           parentId: acc.parentId || '',
-          formula: acc.formula || '',
           classification: acc.classification || 'Revenue',
-          textColor: acc.textColor || '#1e293b',
-          bgColor: acc.bgColor || '#ffffff',
-          isBold: acc.isBold || false,
-          isItalic: acc.isItalic || false,
-          isCalculated: acc.isCalculated || false,
           allocationRules: acc.allocationRules || [],
           budgetSource: acc.budgetSource || ''
         });
@@ -3169,11 +3151,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                 rows.push(
                                   <tr
                                     key={`m-${acc.masterPackage}`}
-                                    style={{
-                                      backgroundColor: acc.bgColor || '#f1f5f9',
-                                      color: acc.textColor || '#0f172a'
-                                    }}
-                                    className="border-y border-slate-200 transition-colors group h-10"
+                                    className="border-y border-slate-200 transition-colors group h-10 bg-slate-100/50"
                                   >
                                     <td className="px-4 py-2 text-[10px] font-mono font-black">{acc.masterPackageCode || '-'}</td>
                                     <td className="px-4 py-2 flex items-center gap-3">
@@ -3184,12 +3162,12 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                         {masterCollapsed ? <Plus size={12} strokeWidth={3} /> : <span className="text-[18px] leading-none mb-1 font-black">-</span>}
                                       </button>
                                       <div className="flex items-center gap-2 group/title">
-                                        <span
-                                          onClick={() => openEditAccount('', 'master', acc.masterPackage!)}
-                                          className={`text-xs uppercase tracking-widest cursor-pointer hover:underline ${acc.isBold ? 'font-black' : 'font-bold'} ${acc.isItalic ? 'italic' : ''}`}
-                                        >
-                                          {acc.masterPackage}
-                                        </span>
+                                          <span
+                                            onClick={() => openEditAccount('', 'master', acc.masterPackage!)}
+                                            className="text-xs uppercase tracking-widest cursor-pointer hover:underline font-black"
+                                          >
+                                            {acc.masterPackage}
+                                          </span>
                                         <div className="flex gap-1 opacity-0 group-hover/title:opacity-100 transition-all ml-4">
                                           <button onClick={() => openNewAccount(acc.masterPackage, undefined, acc.sortOrder)} title="Adicionar Pacote neste Master" className="p-1 text-slate-400 hover:text-indigo-600 border border-slate-200 rounded bg-white shadow-sm"><FileText size={12} /></button>
                                           <button onClick={() => openNewAccount(undefined, undefined, acc.sortOrder)} title="Adicionar Novo Master Abaixo" className="p-1 text-slate-400 hover:text-indigo-600 border border-slate-200 rounded bg-white shadow-sm"><Layout size={12} /></button>
@@ -3207,11 +3185,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                 rows.push(
                                   <tr
                                     key={`p-${pkgKey}`}
-                                    style={{
-                                      backgroundColor: acc.bgColor || '#f8fafc',
-                                      color: acc.textColor || '#334155'
-                                    }}
-                                    className="border-b border-slate-100 hover:bg-slate-50 transition-colors group h-9"
+                                    className="border-b border-slate-100 hover:bg-slate-50 transition-colors group h-9 bg-slate-50/30"
                                   >
                                     <td className="px-4 py-1.5 text-[10px] font-mono text-slate-400">{acc.packageCode || '-'}</td>
                                     <td className="px-4 py-1.5 flex items-center gap-3 pl-10 border-l-2 border-slate-200 ml-4">
@@ -3224,7 +3198,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                       <div className="flex items-center gap-2 group/title">
                                         <span
                                           onClick={() => openEditAccount('', 'pkg', pkgKey)}
-                                          className={`text-[11px] uppercase tracking-normal cursor-pointer hover:underline ${acc.isBold ? 'font-bold' : 'font-medium'} ${acc.isItalic ? 'italic' : ''}`}
+                                          className="text-[11px] uppercase tracking-normal cursor-pointer hover:underline font-bold"
                                         >
                                           {acc.package}
                                         </span>
@@ -3244,10 +3218,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                               rows.push(
                                 <tr
                                   key={acc.id}
-                                  style={{
-                                    backgroundColor: acc.bgColor || 'transparent',
-                                    color: acc.textColor || '#64748b'
-                                  }}
                                   className="hover:bg-slate-50/80 transition-colors group h-8 border-b border-slate-50"
                                 >
                                   <td className="px-4 py-1 text-[10px] font-mono text-slate-300">{acc.code}</td>
@@ -3257,10 +3227,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                     <div className="flex justify-between items-center group/item">
                                       <span
                                         onClick={() => openEditAccount(acc.id)}
-                                        className={`text-[11px] cursor-pointer hover:text-indigo-600 hover:underline ${acc.isBold ? 'font-bold' : ''} ${acc.isItalic ? 'italic' : ''}`}
+                                        className="text-[11px] cursor-pointer hover:text-indigo-600 hover:underline text-slate-600"
                                       >
                                         {acc.name}
-                                        {acc.isCalculated && <span className="ml-2 text-[9px] font-black text-amber-500 bg-amber-50 px-1 rounded border border-amber-100">f(x)</span>}
                                       </span>
                                       <div className="flex gap-1 opacity-0 group-hover/item:opacity-100 transition-all">
                                         <button onClick={() => openNewAccount(acc.masterPackage, acc.package, acc.sortOrder)} title="Adicionar Conta Abaixo" className="p-1 text-slate-300 hover:text-indigo-600"><Plus size={12} /></button>
@@ -3316,11 +3285,24 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                         </div>
 
                         <div className="pt-2 border-t border-slate-100 mt-4">
-                          <label className="block text-[11px] font-black text-indigo-600 uppercase tracking-widest mb-3">Configuração Intelligent DRE</label>
+                          <label className="block text-[11px] font-black text-indigo-600 uppercase tracking-widest mb-3">Definição da Conta</label>
 
                           <div className="space-y-4">
                             <div>
-                              <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Classificação</label>
+                              <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Tipo de Registro</label>
+                              <select
+                                value={accountForm.level}
+                                onChange={e => setAccountForm({ ...accountForm, level: e.target.value as Account['level'] })}
+                                className="w-full bg-slate-50 border-none rounded-lg p-2 text-xs font-bold focus:ring-2 focus:ring-indigo-500"
+                              >
+                                <option value="master">Pacote Master</option>
+                                <option value="pkg">Pacote</option>
+                                <option value="account">Conta Contábil</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Classificação DRE</label>
                               <select
                                 value={accountForm.classification}
                                 onChange={e => setAccountForm({ ...accountForm, classification: e.target.value as Account['classification'] })}
@@ -3333,53 +3315,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                 <option value="Indicator">Indicador Operacional</option>
                                 <option value="Occupancy">Ocupação</option>
                               </select>
-                            </div>
-
-                            <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
-                              <label className="text-xs font-bold text-gray-600">Considerar como Calculado?</label>
-                              <input
-                                type="checkbox"
-                                checked={accountForm.isCalculated}
-                                onChange={e => setAccountForm({ ...accountForm, isCalculated: e.target.checked })}
-                                className="rounded text-indigo-600"
-                              />
-                            </div>
-
-                            {accountForm.isCalculated && (
-                              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                                <label className="block text-[10px] font-bold text-amber-600 uppercase mb-1">Fórmula Dinâmica</label>
-                                <textarea
-                                  value={accountForm.formula}
-                                  onChange={e => setAccountForm({ ...accountForm, formula: e.target.value })}
-                                  placeholder="Ex: [Receita Total] - [Impostos]"
-                                  className="w-full bg-amber-50 border border-amber-100 rounded-lg p-2 text-[11px] font-mono focus:ring-2 focus:ring-amber-500 min-h-[60px]"
-                                />
-                                <p className="text-[9px] text-amber-500 italic mt-1 leading-tight">
-                                  Use colchetes [Nome da Conta] para referenciar outras contas. Operadores: +, -, *, /, ( )
-                                </p>
-                              </div>
-                            )}
-
-                            <div className="grid grid-cols-2 gap-3 pt-2">
-                              <div>
-                                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cor do Texto</label>
-                                <input type="color" value={accountForm.textColor} onChange={e => setAccountForm({ ...accountForm, textColor: e.target.value })} className="w-full h-8 rounded-lg cursor-pointer border-none p-0 bg-transparent" />
-                              </div>
-                              <div>
-                                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Fundo (BG)</label>
-                                <input type="color" value={accountForm.bgColor} onChange={e => setAccountForm({ ...accountForm, bgColor: e.target.value })} className="w-full h-8 rounded-lg cursor-pointer border-none p-0 bg-transparent" />
-                              </div>
-                            </div>
-
-                            <div className="flex gap-4 pt-1">
-                              <label className="flex items-center gap-2 cursor-pointer group">
-                                <input type="checkbox" checked={accountForm.isBold} onChange={e => setAccountForm({ ...accountForm, isBold: e.target.checked })} className="rounded text-indigo-600" />
-                                <span className="text-[10px] font-black group-hover:text-indigo-600 transition-colors uppercase">Negrito</span>
-                              </label>
-                              <label className="flex items-center gap-2 cursor-pointer group">
-                                <input type="checkbox" checked={accountForm.isItalic} onChange={e => setAccountForm({ ...accountForm, isItalic: e.target.checked })} className="rounded text-indigo-600" />
-                                <span className="text-[10px] font-bold italic group-hover:text-indigo-600 transition-colors uppercase">Itálico</span>
-                              </label>
                             </div>
 
                             <div className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
