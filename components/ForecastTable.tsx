@@ -1247,10 +1247,12 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
             return acc?.package === pkgName && acc?.masterPackage === masterName;
         });
 
-        pkgRow.real = children.reduce((sum, c) => sum + c.real, 0);
-        pkgRow.budget = children.reduce((sum, c) => sum + c.budget, 0);
-        pkgRow.lastYear = children.reduce((sum, c) => sum + c.lastYear, 0);
-        pkgRow.previa = children.reduce((sum, c) => sum + (c.previa || 0), 0);
+        if (children.length > 0) {
+            pkgRow.real = children.reduce((sum, c) => sum + c.real, 0);
+            pkgRow.budget = children.reduce((sum, c) => sum + c.budget, 0);
+            pkgRow.lastYear = children.reduce((sum, c) => sum + c.lastYear, 0);
+            pkgRow.previa = children.reduce((sum, c) => sum + (c.previa || 0), 0);
+        }
     });
 
     // 2. Sum Packages (Level 2) into Master Packages (Level 1)
