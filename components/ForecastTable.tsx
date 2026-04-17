@@ -695,14 +695,15 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     // Identify Manual Edit Rows (CLT / Extra Quantity)
                                     const isManualRow = ['IND-MO-2', 'IND-MO-3'].includes(row.id);
 
-                                    if (!isIndicator && !isHeaderOrTotal) {
+                                    const isEditableCost = row.category === 'Costs';
+                                    if (!isIndicator && (!isHeaderOrTotal || isEditableCost)) {
                                         if (isMonthClosed) {
                                             // CLOSED MONTH: Read Only Standard
                                             realCellContent = <span className="text-gray-800 font-medium">{formatValue(row.real, formatType)}</span>;
                                             previaCellContent = <span className="text-gray-800 font-medium">{formatValue(row.previa, formatType)}</span>;
                                         } else {
                                             // FORECAST (REAL) EDITING
-                                            if (row.forecastConfig.method === 'Fixed') {
+                                            if (row.forecastConfig.method === 'Fixed' || isEditableCost) {
                                                 realCellContent = (
                                                     <input
                                                         type="number"
@@ -722,7 +723,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             }
 
                                             // PREVIA EDITING
-                                            if ((row.previaConfig?.method || 'Fixed') === 'Fixed') {
+                                            if ((row.previaConfig?.method || 'Fixed') === 'Fixed' || isEditableCost) {
                                                 previaCellContent = (
                                                     <input
                                                         type="number"
