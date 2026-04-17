@@ -9,7 +9,8 @@ export const supabaseService = {
     const { data, error } = await supabase
       .from('accounts')
       .select('*')
-      .order('sort_order', { ascending: true });
+      .order('sort_order', { ascending: true })
+      .limit(50000);
     if (error) throw error;
 
     return (data || []).map(a => ({
@@ -102,7 +103,8 @@ export const supabaseService = {
     const { data, error } = await supabase
       .from('cost_centers')
       .select('*')
-      .order('name', { ascending: true });
+      .order('name', { ascending: true })
+      .limit(50000);
     if (error) throw error;
 
     return (data || []).map(cc => ({
