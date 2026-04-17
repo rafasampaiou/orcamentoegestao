@@ -1241,7 +1241,7 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
     });
 
     // --- COSTS HIERARCHICAL AGGREGATION ---
-    // 1. Sum Accounts (Level 3) into Packages (Level 2)
+    // 1. Sum Accounts (Level 2) into Packages (Level 1)
     const pkgRows = updatedRows.filter(r => r.category === 'Costs' && r.id.startsWith('p-'));
     pkgRows.forEach(pkgRow => {
         // pkgRow.id is "p-${masterName}-${pkgName}"
@@ -1251,7 +1251,7 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
 
         // Find children accounts. Account IDs might have suffixes (e.g. accId-Martech)
         const children = updatedRows.filter(r => {
-            if (r.category !== 'Costs' || r.indentLevel !== 3) return false;
+            if (r.category !== 'Costs' || r.indentLevel !== 2) return false;
             const originalAccId = r.id.split('-')[0];
             const acc = accounts.find(a => a.id === originalAccId);
             return acc?.package === pkgName && acc?.masterPackage === masterName;
@@ -1265,25 +1265,14 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
         }
     });
 
-    // 2. Sum Packages (Level 2) into Master Packages (Level 1)
-    const masterRows = updatedRows.filter(r => r.category === 'Costs' && r.id.startsWith('m-'));
-    masterRows.forEach(mRow => {
-        const masterName = mRow.label;
-        const children = updatedRows.filter(r => r.category === 'Costs' && r.id.startsWith(`p-${masterName}-`));
-        
-        mRow.real = children.reduce((sum, c) => sum + c.real, 0);
-        mRow.budget = children.reduce((sum, c) => sum + c.budget, 0);
-        mRow.lastYear = children.reduce((sum, c) => sum + c.lastYear, 0);
-        mRow.previa = children.reduce((sum, c) => sum + (c.previa || 0), 0);
-    });
-
-    // 3. Sum Master Packages (Level 1) into CUSTOS E DESPESAS OPERACIONAIS (Level 0)
+    // 2. Sum Packages (Level 1) directly into CUSTOS E DESPESAS OPERACIONAIS (Level 0)
+    // We skip Master Packages (Level 1) as they are no longer in the list
     const cstHead = rowMap.get('CST-HEAD');
     if (cstHead) {
-        cstHead.real = masterRows.reduce((sum, m) => sum + m.real, 0);
-        cstHead.budget = masterRows.reduce((sum, m) => sum + m.budget, 0);
-        cstHead.lastYear = masterRows.reduce((sum, m) => sum + m.lastYear, 0);
-        cstHead.previa = masterRows.reduce((sum, m) => sum + (m.previa || 0), 0);
+        cstHead.real = pkgRows.reduce((sum, p) => sum + p.real, 0);
+        cstHead.budget = pkgRows.reduce((sum, p) => sum + p.budget, 0);
+        cstHead.lastYear = pkgRows.reduce((sum, p) => sum + p.lastYear, 0);
+        cstHead.previa = pkgRows.reduce((sum, p) => sum + (p.previa || 0), 0);
     }
 
     // --- REVENUE & RESULTS CALCULATIONS ---

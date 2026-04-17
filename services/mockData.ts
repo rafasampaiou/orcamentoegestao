@@ -743,98 +743,90 @@ export const getForecastData = (
   // 3. COSTS & EXPENSES (Hierarchical Breakdown)
   rows.push(generateRow('CST-HEAD', '3.00', 'Costs', 'CUSTOS E DESPESAS OPERACIONAIS', 0, 0, 0, 0, true, true, 0));
 
-  // Get unique Master Packages for Expense accounts
+  // Get unique Package identifiers (Master + Package name) for Expense accounts
   const expenseAccounts = activeAccounts.filter(a => a.classification === 'Expense');
-  const masterPackageNames = Array.from(new Set(expenseAccounts.map(a => a.masterPackage))).filter(Boolean) as string[];
+  
+  // Create unique keys for each Package to avoid name collisions across Masters
+  const packageKeys = Array.from(new Set(expenseAccounts.map(a => `${a.masterPackage || ''}|${a.package || ''}`))).filter(k => k.split('|')[1]);
   
   const getMinOrder = (accs: Account[]) => Math.min(...accs.map(a => a.sortOrder || 999));
 
-  // Sort masters primarily by minimum sortOrder of their accounts, then by name
-  const sortedMasters = masterPackageNames.sort((a, b) => {
-    const orderA = getMinOrder(expenseAccounts.filter(acc => acc.masterPackage === a));
-    const orderB = getMinOrder(expenseAccounts.filter(acc => acc.masterPackage === b));
+  // Sort all packages by the minimum sortOrder of their accounts
+  const sortedPackageKeys = packageKeys.sort((a, b) => {
+    const [masterA, pkgA] = a.split('|');
+    const [masterB, pkgB] = b.split('|');
+    const orderA = getMinOrder(expenseAccounts.filter(acc => acc.masterPackage === masterA && acc.package === pkgA));
+    const orderB = getMinOrder(expenseAccounts.filter(acc => acc.masterPackage === masterB && acc.package === pkgB));
     return orderA - orderB || a.localeCompare(b);
   });
 
-  sortedMasters.forEach(masterName => {
-    const masterAccs = expenseAccounts.filter(a => a.masterPackage === masterName);
-    const masterCode = masterAccs[0]?.masterPackageCode || '';
+  sortedPackageKeys.forEach(key => {
+    const [masterName, pkgName] = key.split('|');
+    const pkgAccs = expenseAccounts.filter(a => a.masterPackage === masterName && a.package === pkgName);
+    const pkgCode = pkgAccs[0]?.packageCode || '';
     
-    // Header for Master Package
-    rows.push(generateRow(`m-${masterName}`, masterCode, 'Costs', masterName, 0, 0, 0, 0, true, false, 1));
+    // Check for special drill-down cases
+    const isAdminTI = masterName === 'DESPESAS ADMINISTRATIVAS' && pkgAccs.some(acc => acc.name.toLowerCase().includes('processamento de dados') || acc.name.toLowerCase().includes('ti'));
+    const isSalesMkt = masterName === 'DESPESAS COM VENDAS E MARKETING' && pkgAccs.some(acc => acc.name.toUpperCase().includes('MARKETING') || acc.name.toUpperCase().includes('PROPAGANDA'));
 
-    // Get unique Packages within this Master
-    const packageNames = Array.from(new Set(masterAccs.map(a => a.package))).filter(Boolean) as string[];
-    const sortedPackages = packageNames.sort((a, b) => {
-      const orderA = getMinOrder(masterAccs.filter(acc => acc.package === a));
-      const orderB = getMinOrder(masterAccs.filter(acc => acc.package === b));
-      return orderA - orderB || a.localeCompare(b);
-    });
+    let pkgBudget = 0; let pkgReal = 0; let pkgPrevia = 0; let pkgLY = 0;
 
-    sortedPackages.forEach(pkgName => {
-      const pkgAccs = masterAccs.filter(a => a.package === pkgName);
-      const pkgCode = pkgAccs[0]?.packageCode || '';
-      
-      const isAdminTI = masterName === 'DESPESAS ADMINISTRATIVAS' && pkgAccs.some(acc => acc.name.toLowerCase().includes('processamento de dados') || acc.name.toLowerCase().includes('ti'));
-      const isSalesMkt = masterName === 'DESPESAS COM VENDAS E MARKETING' && pkgAccs.some(acc => acc.name.toUpperCase().includes('MARKETING') || acc.name.toUpperCase().includes('PROPAGANDA'));
+    if (!isAdminTI && !isSalesMkt) {
+       // STANDARD PACKAGE - Aggregate values directly
+       pkgAccs.forEach(acc => {
+          pkgBudget += getImportedValue(acc.name, selectedYear, 'Budget');
+          pkgReal += getImportedValue(acc.name, selectedYear, 'Real');
+          pkgPrevia += getImportedValue(acc.name, selectedYear, 'Previa');
+          pkgLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
+       });
+       // Level 1 because we removed the Master header
+       rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', pkgName, pkgBudget, pkgReal, pkgLY, pkgPrevia, true, false, 1));
+    } else {
+       // SPECIAL PACKAGE - push the package row as 0 (for child drill-down)
+       rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', pkgName, 0, 0, 0, 0, true, false, 1));
+       
+       // Sort child accounts by their sortOrder
+       const sortedPkgAccs = [...pkgAccs].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+       
+       sortedPkgAccs.forEach(acc => {
+           const accIsAdminTI = isAdminTI && (acc.name.toLowerCase().includes('processamento de dados') || acc.name.toLowerCase().includes('ti'));
+           const accIsSalesMkt = isSalesMkt && (acc.name.toUpperCase().includes('MARKETING') || acc.name.toUpperCase().includes('PROPAGANDA')) && !acc.name.includes('(');
+           
+           if (accIsAdminTI) {
+                const subAreas = ['Martech', 'Marketing', 'Outras áreas'];
+                subAreas.forEach(sub => {
+                  const accName = `Processamento de dados e TI (${sub})`;
+                  const crFilter = sub === 'Martech' ? 'Martech' : sub === 'Marketing' ? 'Marketing' : undefined;
 
-      let pkgBudget = 0; let pkgReal = 0; let pkgPrevia = 0; let pkgLY = 0;
+                  const aBudget = getImportedValue(acc.name, selectedYear, 'Budget', crFilter) || (getImportedValue(acc.name, selectedYear, 'Budget') / 3);
+                  const aReal = getImportedValue(acc.name, selectedYear, 'Real', crFilter) || (getImportedValue(acc.name, selectedYear, 'Real') / 3);
+                  const aPrevia = getImportedValue(acc.name, selectedYear, 'Previa', crFilter) || (getImportedValue(acc.name, selectedYear, 'Previa') / 3);
+                  const aLY = getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real', crFilter) || (getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real') / 3);
 
-      if (!isAdminTI && !isSalesMkt) {
-         // STANDARD PACKAGE - Aggregate values directly, don't push child accounts
-         pkgAccs.forEach(acc => {
-            pkgBudget += getImportedValue(acc.name, selectedYear, 'Budget');
-            pkgReal += getImportedValue(acc.name, selectedYear, 'Real');
-            pkgPrevia += getImportedValue(acc.name, selectedYear, 'Previa');
-            pkgLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
-         });
-         rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', pkgName, pkgBudget, pkgReal, pkgLY, pkgPrevia, true, false, 2));
-      } else {
-         // SPECIAL PACKAGE - push the package row as 0 (it will be summed up correctly by children)
-         rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', pkgName, 0, 0, 0, 0, true, false, 2));
-         
-         // Push child lines manually for these specific cases
-         pkgAccs.forEach(acc => {
-             const accIsAdminTI = isAdminTI && (acc.name.toLowerCase().includes('processamento de dados') || acc.name.toLowerCase().includes('ti'));
-             const accIsSalesMkt = isSalesMkt && (acc.name.toUpperCase().includes('MARKETING') || acc.name.toUpperCase().includes('PROPAGANDA')) && !acc.name.includes('(');
-             
-             if (accIsAdminTI) {
-                  const subAreas = ['Martech', 'Marketing', 'Outras áreas'];
-                  subAreas.forEach(sub => {
-                    const accName = `Processamento de dados e TI (${sub})`;
-                    const crFilter = sub === 'Martech' ? 'Martech' : sub === 'Marketing' ? 'Marketing' : undefined;
+                  rows.push(generateRow(`${acc.id}-${sub}`, acc.code, 'Costs', accName, aBudget, aReal, aLY, aPrevia, false, false, 2));
+                });
+            } else if (accIsSalesMkt) {
+                const subAreas = ['Marketing', 'Martech', 'Outras áreas'];
+                subAreas.forEach(sub => {
+                  const accName = `${acc.name} (${sub})`;
+                  const crFilter = sub === 'Martech' ? 'Martech' : sub === 'Marketing' ? 'Marketing' : undefined;
 
-                    const aBudget = getImportedValue(acc.name, selectedYear, 'Budget', crFilter) || (getImportedValue(acc.name, selectedYear, 'Budget') / 3);
-                    const aReal = getImportedValue(acc.name, selectedYear, 'Real', crFilter) || (getImportedValue(acc.name, selectedYear, 'Real') / 3);
-                    const aPrevia = getImportedValue(acc.name, selectedYear, 'Previa', crFilter) || (getImportedValue(acc.name, selectedYear, 'Previa') / 3);
-                    const aLY = getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real', crFilter) || (getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real') / 3);
+                  const aBudget = getImportedValue(acc.name, selectedYear, 'Budget', crFilter) || (getImportedValue(acc.name, selectedYear, 'Budget') / 3);
+                  const aReal = getImportedValue(acc.name, selectedYear, 'Real', crFilter) || (getImportedValue(acc.name, selectedYear, 'Real') / 3);
+                  const aPrevia = getImportedValue(acc.name, selectedYear, 'Previa', crFilter) || (getImportedValue(acc.name, selectedYear, 'Previa') / 3);
+                  const aLY = getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real', crFilter) || (getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real') / 3);
 
-                    rows.push(generateRow(`${acc.id}-${sub}`, acc.code, 'Costs', accName, aBudget, aReal, aLY, aPrevia, false, false, 3));
-                  });
-              } else if (accIsSalesMkt) {
-                  const subAreas = ['Marketing', 'Martech', 'Outras áreas'];
-                  subAreas.forEach(sub => {
-                    const accName = `${acc.name} (${sub})`;
-                    const crFilter = sub === 'Martech' ? 'Martech' : sub === 'Marketing' ? 'Marketing' : undefined;
-
-                    const aBudget = getImportedValue(acc.name, selectedYear, 'Budget', crFilter) || (getImportedValue(acc.name, selectedYear, 'Budget') / 3);
-                    const aReal = getImportedValue(acc.name, selectedYear, 'Real', crFilter) || (getImportedValue(acc.name, selectedYear, 'Real') / 3);
-                    const aPrevia = getImportedValue(acc.name, selectedYear, 'Previa', crFilter) || (getImportedValue(acc.name, selectedYear, 'Previa') / 3);
-                    const aLY = getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real', crFilter) || (getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real') / 3);
-
-                    rows.push(generateRow(`${acc.id}-${sub}`, acc.code, 'Costs', accName, aBudget, aReal, aLY, aPrevia, false, false, 3));
-                  });
-              } else {
-                  // Some other account mapped inside a package that happens to also contain TI/MKT?
-                  const aBudget = getImportedValue(acc.name, selectedYear, 'Budget');
-                  const aReal = getImportedValue(acc.name, selectedYear, 'Real');
-                  const aPrevia = getImportedValue(acc.name, selectedYear, 'Previa');
-                  const aLY = getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
-                  rows.push(generateRow(acc.id, acc.code, 'Costs', acc.name, aBudget, aReal, aLY, aPrevia, false, false, 3));
-              }
-         });
-      }
-    });
+                  rows.push(generateRow(`${acc.id}-${sub}`, acc.code, 'Costs', accName, aBudget, aReal, aLY, aPrevia, false, false, 2));
+                });
+            } else {
+                const aBudget = getImportedValue(acc.name, selectedYear, 'Budget');
+                const aReal = getImportedValue(acc.name, selectedYear, 'Real');
+                const aPrevia = getImportedValue(acc.name, selectedYear, 'Previa');
+                const aLY = getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
+                rows.push(generateRow(acc.id, acc.code, 'Costs', acc.name, aBudget, aReal, aLY, aPrevia, false, false, 2));
+            }
+       });
+    }
   });
 
   // 4. RESULTS
