@@ -323,14 +323,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             if (!row.isHeader) {
                 // Se o botão "Mostrar Contas" estiver ativado, mostra todas as contas
                 if (showDetails) return true;
-
-                // Se oculto, força a exibição apenas das quebras específicas de TI e MKT
-                const isSpecialSplit =
-                    row.label.includes('(Martech)') ||
-                    row.label.includes('(Marketing)') ||
-                    row.label.includes('(Outras áreas)');
-
-                if (isSpecialSplit) return true;
             }
 
             return false;
