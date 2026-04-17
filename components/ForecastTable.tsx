@@ -1219,59 +1219,75 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
         runFormulas(field);
     });
 
-    // --- COSTS CALCULATIONS (Aggregating Package Totals) ---
+    // --- VARIABLE CALCULATIONS FOR INDIVIDUAL ACCOUNTS ---
     const updatedRows = Array.from(rowMap.values());
-    packages.forEach(pkg => {
-        const pkgRow = rowMap.get(pkg.id);
-        if (pkgRow) {
-            const pkgAccountIds = accounts.filter(a => a.packageId === pkg.id).map(a => a.id);
-            const children = updatedRows.filter(r => pkgAccountIds.includes(r.id));
-
-            let sumReal = 0;
-            let sumBudget = 0;
-            let sumLY = 0;
-            let sumPrevia = 0;
-
-            children.forEach(child => {
-                // Forecast (Real) - Variable Logic
-                if (child.forecastConfig.method === 'Variable') {
-                    child.real = calculateRowValue(child.forecastConfig, updatedRows, 'forecast');
-                }
-
-                // Previa - Variable Logic
-                if (child.previaConfig?.method === 'Variable') {
-                    child.previa = calculateRowValue(child.previaConfig, updatedRows, 'previa');
-                }
-
-                sumReal += child.real;
-                sumBudget += child.budget;
-                sumLY += child.lastYear;
-                sumPrevia += child.previa || 0;
-            });
-
-            pkgRow.real = sumReal;
-            pkgRow.budget = sumBudget;
-            pkgRow.lastYear = sumLY;
-            pkgRow.previa = sumPrevia;
+    updatedRows.forEach(row => {
+        if (row.forecastConfig.method === 'Variable') {
+            row.real = calculateRowValue(row.forecastConfig, updatedRows, 'forecast');
+        }
+        if (row.previaConfig?.method === 'Variable') {
+            row.previa = calculateRowValue(row.previaConfig, updatedRows, 'previa');
         }
     });
 
-    const pkgIds = packages.map(p => p.id);
+    // --- COSTS HIERARCHICAL AGGREGATION ---
+    // 1. Sum Accounts (Level 3) into Packages (Level 2)
+    const pkgRows = updatedRows.filter(r => r.category === 'Costs' && r.id.startsWith('p-'));
+    pkgRows.forEach(pkgRow => {
+        // pkgRow.id is "p-${masterName}-${pkgName}"
+        const parts = pkgRow.id.split('-');
+        const masterName = parts[1];
+        const pkgName = pkgRow.label;
+
+        // Find children accounts. Account IDs might have suffixes (e.g. accId-Martech)
+        const children = updatedRows.filter(r => {
+            if (r.category !== 'Costs' || r.indentLevel !== 3) return false;
+            const originalAccId = r.id.split('-')[0];
+            const acc = accounts.find(a => a.id === originalAccId);
+            return acc?.package === pkgName && acc?.masterPackage === masterName;
+        });
+
+        pkgRow.real = children.reduce((sum, c) => sum + c.real, 0);
+        pkgRow.budget = children.reduce((sum, c) => sum + c.budget, 0);
+        pkgRow.lastYear = children.reduce((sum, c) => sum + c.lastYear, 0);
+        pkgRow.previa = children.reduce((sum, c) => sum + (c.previa || 0), 0);
+    });
+
+    // 2. Sum Packages (Level 2) into Master Packages (Level 1)
+    const masterRows = updatedRows.filter(r => r.category === 'Costs' && r.id.startsWith('m-'));
+    masterRows.forEach(mRow => {
+        const masterName = mRow.label;
+        const children = updatedRows.filter(r => r.category === 'Costs' && r.id.startsWith(`p-${masterName}-`));
+        
+        mRow.real = children.reduce((sum, c) => sum + c.real, 0);
+        mRow.budget = children.reduce((sum, c) => sum + c.budget, 0);
+        mRow.lastYear = children.reduce((sum, c) => sum + c.lastYear, 0);
+        mRow.previa = children.reduce((sum, c) => sum + (c.previa || 0), 0);
+    });
+
+    // 3. Sum Master Packages (Level 1) into CUSTOS E DESPESAS OPERACIONAIS (Level 0)
+    const cstHead = rowMap.get('CST-HEAD');
+    if (cstHead) {
+        cstHead.real = masterRows.reduce((sum, m) => sum + m.real, 0);
+        cstHead.budget = masterRows.reduce((sum, m) => sum + m.budget, 0);
+        cstHead.lastYear = masterRows.reduce((sum, m) => sum + m.lastYear, 0);
+        cstHead.previa = masterRows.reduce((sum, m) => sum + (m.previa || 0), 0);
+    }
+
+    // --- REVENUE & RESULTS CALCULATIONS ---
     ['real', 'budget', 'lastYear', 'previa'].forEach(f => {
         const field = f as 'real' | 'budget' | 'lastYear' | 'previa';
-        sumAndSet('CST-HEAD', pkgIds.map(id => ({ id })), field);
         
-        // Results after costs
         const revTotal = rowMap.get('REV-TOTAL')?.[field] || 0;
         const revIss = rowMap.get('REV-ISS')?.[field] || 0;
         const revImp = rowMap.get('REV-IMP')?.[field] || 0;
-        const cstHead = rowMap.get('CST-HEAD')?.[field] || 0;
+        const cstHeadVal = rowMap.get('CST-HEAD')?.[field] || 0;
 
         const resOpSemImp = rowMap.get('RES-OP-SEM-IMP');
-        if (resOpSemImp) resOpSemImp[field] = revTotal - revIss - cstHead;
+        if (resOpSemImp) resOpSemImp[field] = revTotal - revIss - cstHeadVal;
 
         const resOpComImp = rowMap.get('RES-OP-COM-IMP');
-        if (resOpComImp) resOpComImp[field] = revTotal - revIss - revImp - cstHead;
+        if (resOpComImp) resOpComImp[field] = revTotal - revIss - revImp - cstHeadVal;
     });
 
     // --- DELTAS CALCULATIONS ---
