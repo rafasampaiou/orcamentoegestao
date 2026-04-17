@@ -780,6 +780,7 @@ export const getForecastData = (
       pkgAccs.forEach(acc => {
         // Apply the same TI breakdown logic as Dynamic view if this is the default TI account
         const isAdminTI = masterName === 'DESPESAS ADMINISTRATIVAS' && (acc.name.toLowerCase().includes('processamento de dados') || acc.name.toLowerCase().includes('ti'));
+        const isSalesMkt = masterName === 'DESPESAS COM VENDAS E MARKETING';
         
         if (isAdminTI) {
           const subAreas = ['Martech', 'Marketing', 'Outras áreas'];
@@ -795,6 +796,26 @@ export const getForecastData = (
             rows.push(generateRow(`${acc.id}-${sub}`, acc.code, 'Costs', accName, accBudget, accReal, accLY, accPrevia, false, false, 3));
           });
           return;
+        }
+
+        if (isSalesMkt) {
+            // Check if this account should be split or handled specifically
+            const isMktTarget = acc.name.toUpperCase().includes('MARKETING') || acc.name.toUpperCase().includes('PROPAGANDA');
+            if (isMktTarget && !acc.name.includes('(')) {
+                const subAreas = ['Marketing', 'Martech', 'Outras áreas']; // the requested order
+                subAreas.forEach(sub => {
+                    const accName = `${acc.name} (${sub})`;
+                    const crFilter = sub === 'Martech' ? 'Martech' : sub === 'Marketing' ? 'Marketing' : undefined;
+
+                    const accBudget = getImportedValue(acc.name, selectedYear, 'Budget', crFilter) || (getImportedValue(acc.name, selectedYear, 'Budget') / 3);
+                    const accReal = getImportedValue(acc.name, selectedYear, 'Real', crFilter) || (getImportedValue(acc.name, selectedYear, 'Real') / 3);
+                    const accPrevia = getImportedValue(acc.name, selectedYear, 'Previa', crFilter) || (getImportedValue(acc.name, selectedYear, 'Previa') / 3);
+                    const accLY = getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real', crFilter) || (getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real') / 3);
+
+                    rows.push(generateRow(`${acc.id}-${sub}`, acc.code, 'Costs', accName, accBudget, accReal, accLY, accPrevia, false, false, 3));
+                });
+                return;
+            }
         }
 
         const accBudget = getImportedValue(acc.name, selectedYear, 'Budget');

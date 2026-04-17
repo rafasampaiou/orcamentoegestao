@@ -168,11 +168,16 @@ const GMDView: React.FC<GMDViewProps> = ({
         const totalForecast = linkedAccountsData.reduce((s, a) => s + (a.forecast || 0), 0);
         const totalPrevia = linkedAccountsData.reduce((s, a) => s + (a.previa || 0), 0);
 
-        // Determine effective display name (e.g. "Despesas Administrativas - Martech")
+        // Determine effective display name and group key
+        let groupKey = pkgName;
         let displayName = pkgName;
+        let isTIGroup = false;
+
         if (config.subArea) {
             if (pkgName === 'DESPESAS ADMINISTRATIVAS') {
+                groupKey = 'Processamento de dados e TI'; // Extract from generic adm expenses
                 displayName = `Processamento de dados e TI (${config.subArea})`;
+                isTIGroup = true;
             } else if (pkgName === 'DESPESAS COM VENDAS E MARKETING') {
                 displayName = `${config.subArea}`;
             } else {
@@ -195,11 +200,11 @@ const GMDView: React.FC<GMDViewProps> = ({
             deltaPct: totalPrevia === 0 ? 0 : ((totalForecast - totalPrevia) / totalPrevia) * 100
         };
 
-        // We want to group by master package to show them together
-        if (!groupedData.has(pkgName)) {
-            groupedData.set(pkgName, {
+        // Group by the groupKey (which separates TI from Adm)
+        if (!groupedData.has(groupKey)) {
+            groupedData.set(groupKey, {
                 isMaster: true,
-                name: pkgName,
+                name: groupKey,
                 totalMeta: 0,
                 totalForecast: 0,
                 totalPrevia: 0,
@@ -207,24 +212,23 @@ const GMDView: React.FC<GMDViewProps> = ({
             });
         }
         
-        const group = groupedData.get(pkgName);
+        const group = groupedData.get(groupKey);
         group.totalMeta += totalMeta;
         group.totalForecast += totalForecast;
         group.totalPrevia += totalPrevia;
         group.children.push(row);
     });
 
-    // Flatten for rendering, but marks which rows are headers/sub-headers
+    // Flatten for rendering
     const flattened: any[] = [];
     groupedData.forEach(group => {
         // Calculate group deltas
         group.deltaVal = group.totalForecast - group.totalPrevia;
         group.deltaPct = group.totalPrevia === 0 ? 0 : (group.deltaVal / group.totalPrevia) * 100;
 
-        // If only one child and no subArea, we can simplify? 
-        // No, user wants specifically hierarchical for these packages.
-        
-        const needsHierarchy = group.name === 'DESPESAS ADMINISTRATIVAS' || group.name === 'DESPESAS COM VENDAS E MARKETING';
+        const needsHierarchy = group.name === 'DESPESAS ADMINISTRATIVAS' || 
+                               group.name === 'DESPESAS COM VENDAS E MARKETING' ||
+                               group.name === 'Processamento de dados e TI';
         
         if (needsHierarchy) {
             flattened.push({
@@ -232,7 +236,6 @@ const GMDView: React.FC<GMDViewProps> = ({
                 id: `master-${group.name}`,
                 isMasterHeader: true,
                 packageName: group.name,
-                // Managers should probably be hidden for master if they vary, but user specified breakdown
             });
             group.children.forEach((child: any) => {
                 flattened.push({
