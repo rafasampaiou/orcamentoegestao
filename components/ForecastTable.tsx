@@ -312,16 +312,26 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     // Filter data based on view mode
     const visibleData = useMemo(() => {
         return data.filter(row => {
-            // 1. Always keep Level 0 (Sections), Indicators and Spacers
-            if (row.category === 'Spacer') return true;
-            if ((row.indentLevel || 0) === 0) return true;
-            if (row.category === 'Indicators') return true;
+            // 1. Sempre manter Spacers e Indicadores
+            if (row.category === 'Spacer' || row.category === 'Indicators') return true;
 
-            // 2. Always show Level 1 (Packages/Groups)
-            if (row.indentLevel === 1) return true;
+            // 2. Sempre mostrar agrupadores (Mestres e Pacotes)
+            // A propriedade isHeader é true para todas as linhas totalizadoras do mock
+            if (row.isHeader) return true;
 
-            // 3. Toggle Level 2 (Accounts) based on showDetails
-            if (showDetails) return true;
+            // 3. Controlar visibilidade das Contas (Linhas de detalhe)
+            if (!row.isHeader) {
+                // Se o botão "Mostrar Contas" estiver ativado, mostra todas as contas
+                if (showDetails) return true;
+
+                // Se oculto, força a exibição apenas das quebras específicas de TI e MKT
+                const isSpecialSplit =
+                    row.label.includes('(Martech)') ||
+                    row.label.includes('(Marketing)') ||
+                    row.label.includes('(Outras áreas)');
+
+                if (isSpecialSplit) return true;
+            }
 
             return false;
         });
@@ -931,7 +941,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 }
 
                                 // --- LEVEL 2: PACKAGES ---
-                                if (isSubGroupHeader || (!showDetails && (row.indentLevel === 2 || row.indentLevel === 1))) {
+                                if (isSubGroupHeader) {
                                     return (
                                         <tr key={row.id} className="bg-gray-50 text-gray-600 font-semibold border-b border-gray-200 hover:bg-gray-100 transition-colors">
 
