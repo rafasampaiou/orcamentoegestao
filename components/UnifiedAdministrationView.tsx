@@ -1758,7 +1758,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     try {
       if (accImportMode === 'replace') {
         // TRUE DELETE in bulk to avoid slow loops
-        await (supabaseService as any).truncateAccounts();
+        await supabaseService.truncateAccounts();
         setAccounts(uniqueNewAccounts);
         await supabaseService.upsertAccounts(uniqueNewAccounts);
       } else {

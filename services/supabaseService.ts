@@ -65,10 +65,14 @@ export const supabaseService = {
       updated_at: new Date().toISOString()
     }));
 
-    const { error } = await supabase
-      .from('accounts')
-      .upsert(records, { onConflict: 'id' });
-    if (error) throw error;
+    const batchSize = 500;
+    for (let i = 0; i < records.length; i += batchSize) {
+      const batch = records.slice(i, i + batchSize);
+      const { error } = await supabase
+        .from('accounts')
+        .upsert(batch, { onConflict: 'id' });
+      if (error) throw error;
+    }
   },
 
   async deleteAccount(id: string): Promise<void> {
@@ -128,10 +132,14 @@ export const supabaseService = {
       updated_at: new Date().toISOString()
     }));
 
-    const { error } = await supabase
-      .from('cost_centers')
-      .upsert(records, { onConflict: 'id' });
-    if (error) throw error;
+    const batchSize = 500;
+    for (let i = 0; i < records.length; i += batchSize) {
+      const batch = records.slice(i, i + batchSize);
+      const { error } = await supabase
+        .from('cost_centers')
+        .upsert(batch, { onConflict: 'id' });
+      if (error) throw error;
+    }
   },
 
   async deleteCostCenter(id: string): Promise<void> {
