@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { getForecastData, getDynamicForecastData } from '../services/mockData';
 import { Download, ListFilter, LayoutList, Settings2, ChevronUp, Activity, TrendingUp, Lock, LockOpen, CheckCircle2, X } from 'lucide-react';
 import { ExpenseDriver, ImportedRow, Account, CostPackage, Hotel, ForecastRow, ForecastConfig, ForecastOperator, ColumnVisibility, UserRole } from '../types';
@@ -98,6 +98,29 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     const [resizingColumn, setResizingColumn] = useState<string | null>(null);
     const [startX, setStartX] = useState(0);
     const [startWidth, setStartWidth] = useState(0);
+    const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+    const handleKeyDown = (e: React.KeyboardEvent, rowId: string, field: 'real' | 'previa') => {
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            const direction = e.shiftKey ? -1 : 1;
+            const currentIndex = visibleData.findIndex(r => r.id === rowId);
+            let nextIndex = currentIndex + direction;
+
+            while (nextIndex >= 0 && nextIndex < visibleData.length) {
+                const nextRow = visibleData[nextIndex];
+                const nextInputId = `input-${field}-${nextRow.id}`;
+                const nextInput = inputRefs.current[nextInputId];
+                
+                if (nextInput) {
+                    nextInput.focus();
+                    nextInput.select();
+                    break;
+                }
+                nextIndex += direction;
+            }
+        }
+    };
 
     const handleResizeStart = (e: React.MouseEvent, columnId: string) => {
         e.preventDefault();
@@ -706,10 +729,12 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             if (row.forecastConfig.method === 'Fixed' || isEditableCost) {
                                                 realCellContent = (
                                                     <input
+                                                        ref={el => { inputRefs.current[`input-real-${row.id}`] = el; }}
                                                         type="number"
                                                         className={inputClass}
                                                         value={row.real === 0 ? '' : row.real}
                                                         onChange={(e) => handleManualValueChange(row.id, 'real', parseFloat(e.target.value))}
+                                                        onKeyDown={(e) => handleKeyDown(e, row.id, 'real')}
                                                         onPaste={(e) => handlePaste(e, row.id, 'real')}
                                                         step="0.01"
                                                     />
@@ -726,10 +751,12 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             if ((row.previaConfig?.method || 'Fixed') === 'Fixed' || isEditableCost) {
                                                 previaCellContent = (
                                                     <input
+                                                        ref={el => { inputRefs.current[`input-previa-${row.id}`] = el; }}
                                                         type="number"
                                                         className={inputClass}
                                                         value={row.previa === 0 ? '' : row.previa}
                                                         onChange={(e) => handleManualValueChange(row.id, 'previa', parseFloat(e.target.value))}
+                                                        onKeyDown={(e) => handleKeyDown(e, row.id, 'previa')}
                                                         onPaste={(e) => handlePaste(e, row.id, 'previa')}
                                                         step="0.01"
                                                     />
@@ -749,6 +776,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         if ((isInputIndicator || isManualRow) && !isMonthClosed) {
                                             realCellContent = (
                                                 <input
+                                                    ref={el => { inputRefs.current[`input-real-${row.id}`] = el; }}
                                                     type="number"
                                                     className={inputClass}
                                                     value={row.real === 0 ? '' : row.real}
@@ -760,6 +788,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                                             handleConfigChange(row.id, { method: 'Fixed', manualValue: val });
                                                         }
                                                     }}
+                                                    onKeyDown={(e) => handleKeyDown(e, row.id, 'real')}
                                                     onPaste={(e) => handlePaste(e, row.id, 'real')}
                                                     step="0.01"
                                                 />
@@ -767,6 +796,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
                                             previaCellContent = (
                                                 <input
+                                                    ref={el => { inputRefs.current[`input-previa-${row.id}`] = el; }}
                                                     type="number"
                                                     className={inputClass}
                                                     value={row.previa === 0 ? '' : row.previa}
@@ -788,6 +818,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                                             });
                                                         }
                                                     }}
+                                                    onKeyDown={(e) => handleKeyDown(e, row.id, 'previa')}
                                                     onPaste={(e) => handlePaste(e, row.id, 'previa')}
                                                     step="0.01"
                                                 />
