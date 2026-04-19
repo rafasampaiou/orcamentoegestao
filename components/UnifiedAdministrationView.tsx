@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useRef } from 'react';
 import { getForecastData } from '../services/mockData';
-import { Plus, Trash2, X, Save, Briefcase, Pencil, Calendar, PieChart, Lock, LockOpen, Settings as SettingsIcon, Users, Search, Upload, Settings, Eye, FileText, Layout, Info, ChevronUp, GripVertical } from 'lucide-react';
+import { Plus, Trash2, X, Save, Briefcase, Pencil, Calendar, PieChart, Lock, LockOpen, Settings as SettingsIcon, Users, Search, Upload, Settings, Eye, FileText, Layout, Info, ChevronUp, GripVertical, Database } from 'lucide-react';
 import { User, UserRole, CostCenter, ImportedRow, Hotel, Account, BudgetVersion, LaborParameters, ScheduleItem, ImportedCostCenter, CostPackage, GMDConfiguration, ViewState, DreSection } from '../types';
 import TimelineView from './TimelineView';
 import { supabaseService } from '../services/supabaseService';
@@ -2585,21 +2585,87 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   };
 
   const renderTauáBudget = () => {
+    const selectedBudgetVersion = budgetVersions.find(v => v.id === activeBudgetVersionId);
+    const hasSelectedVersion = !!activeBudgetVersionId && !!selectedBudgetVersion;
+
     return (
       <div className="space-y-6">
+        {/* Selected Version Banner */}
+        {activeBudgetTab !== 'versions' && (
+          <div className={`p-4 rounded-xl border flex items-center justify-between ${
+            hasSelectedVersion
+              ? 'bg-indigo-50 border-indigo-200'
+              : 'bg-amber-50 border-amber-200'
+          }`}>
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                hasSelectedVersion ? 'bg-indigo-600 text-white' : 'bg-amber-400 text-white'
+              }`}>
+                <Database size={20} />
+              </div>
+              <div>
+                {hasSelectedVersion ? (
+                  <>
+                    <p className="text-xs font-bold text-indigo-500 uppercase tracking-wider">Versão Selecionada</p>
+                    <p className="text-lg font-black text-indigo-900">{selectedBudgetVersion.name} <span className="text-sm font-normal text-indigo-500">({selectedBudgetVersion.year})</span></p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs font-bold text-amber-600 uppercase tracking-wider">Nenhuma versão selecionada</p>
+                    <p className="text-sm font-medium text-amber-800">Vá em <strong>Versões</strong> para selecionar a versão que deseja configurar.</p>
+                  </>
+                )}
+              </div>
+            </div>
+            {hasSelectedVersion && (
+              <button
+                onClick={() => setActiveBudgetTab('versions')}
+                className="px-3 py-1.5 bg-white border border-indigo-200 text-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-100 transition-all"
+              >
+                Trocar Versão
+              </button>
+            )}
+          </div>
+        )}
+
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm min-h-[400px]">
           {activeBudgetTab === 'versions' && (
-            <TimelineView
-              title="Planejamentos (Orçamento)"
-              versions={budgetVersions}
-              activeVersionId={activeBudgetVersionId}
-              onSelectVersion={setActiveBudgetVersionId}
-              onToggleLock={(id) => handleToggleVersionLock(id, true)}
-              onDelete={(id) => handleDeleteVersion(id, true)}
-              onCreateVersion={handleCreateBudgetVersion}
-            />
+            <div className="space-y-6">
+              <TimelineView
+                title="Planejamentos (Orçamento)"
+                versions={budgetVersions}
+                activeVersionId={activeBudgetVersionId}
+                onSelectVersion={setActiveBudgetVersionId}
+                onToggleLock={(id) => handleToggleVersionLock(id, true)}
+                onDelete={(id) => handleDeleteVersion(id, true)}
+                onCreateVersion={handleCreateBudgetVersion}
+              />
+              {activeBudgetVersionId && selectedBudgetVersion && (
+                <div className="mt-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-black text-emerald-900">Versão ativa: {selectedBudgetVersion.name} ({selectedBudgetVersion.year})</p>
+                      <p className="text-xs text-emerald-600">As abas de configuração e importação agora irão operar sobre esta versão.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
           {activeBudgetTab === 'expense_characteristics' && (
+            !hasSelectedVersion ? (
+              <div className="text-center py-20 space-y-4">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
+                  <Lock className="text-gray-400" size={28} />
+                </div>
+                <h3 className="text-xl font-bold text-gray-400">Selecione uma versão primeiro</h3>
+                <p className="text-gray-400 text-sm max-w-sm mx-auto">Acesse a aba <strong>Versões</strong> e selecione ou crie a versão do orçamento que deseja configurar.</p>
+                <button onClick={() => setActiveBudgetTab('versions')} className="text-indigo-600 font-bold text-sm hover:underline">Ir para Versões →</button>
+              </div>
+            ) : (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <h4 className="font-bold text-gray-700">Característica da Despesa (Fixo vs Variável)</h4>
@@ -2643,15 +2709,29 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 </table>
               </div>
             </div>
+            )
           )}
           {activeBudgetTab === 'import' && (
+            !hasSelectedVersion ? (
+              <div className="text-center py-20 space-y-4">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
+                  <Lock className="text-gray-400" size={28} />
+                </div>
+                <h3 className="text-xl font-bold text-gray-400">Selecione uma versão primeiro</h3>
+                <p className="text-gray-400 text-sm max-w-sm mx-auto">Acesse a aba <strong>Versões</strong> e selecione a versão do orçamento onde deseja importar a meta.</p>
+                <button onClick={() => setActiveBudgetTab('versions')} className="text-indigo-600 font-bold text-sm hover:underline">Ir para Versões →</button>
+              </div>
+            ) : (
             <div className="space-y-6">
               {budgetImportStep === 'input' && (
                 <>
                   <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 p-5 rounded-xl text-sm text-amber-900">
                     <p className="font-bold text-base mb-2 flex items-center gap-2">
                       <Upload size={18} className="text-amber-600" />
-                      Importação do Orçamento 2026
+                      Importação da Meta
+                    </p>
+                    <p className="mb-1 text-xs">
+                      Os dados serão importados na versão: <strong className="text-indigo-700">{selectedBudgetVersion?.name} ({selectedBudgetVersion?.year})</strong>
                     </p>
                     <p className="mb-3">Cole os dados do Excel com as <strong>13 colunas</strong> abaixo (separadas por TAB):</p>
                     <div className="bg-white/70 p-3 rounded-lg border border-amber-100 font-mono text-[10px] leading-relaxed grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
@@ -2670,7 +2750,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                       <div><span className="text-amber-600 font-bold">13.</span> Conta Contábil <span className="text-gray-400">(ex: 4.01.01.01.006)</span></div>
                     </div>
                     <p className="mt-3 text-xs text-amber-700 italic">
-                      💡 Os dados importados serão salvos como <strong>Meta</strong> e ficarão disponíveis automaticamente no Tauá Real ao criar uma versão de 2026.
+                      💡 Os dados importados serão salvos como <strong>Meta</strong> na versão selecionada e ficarão disponíveis automaticamente no Tauá Real.
                     </p>
                   </div>
                   <textarea
@@ -2707,9 +2787,18 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 return (
                   <div className="space-y-6">
                     <div className="flex items-center justify-between">
-                      <h4 className="text-lg font-bold text-slate-800">Resumo — Orçamento 2026</h4>
+                      <h4 className="text-lg font-bold text-slate-800">Resumo — Importação da Meta</h4>
                       <div className="flex gap-2">
                         <button onClick={() => { setBudgetImportStep('input'); setBudgetParsedData([]); }} className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-bold text-gray-600 hover:bg-gray-50">Cancelar</button>
+                      </div>
+                    </div>
+
+                    {/* Show target version */}
+                    <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-200 flex items-center gap-3">
+                      <Database size={20} className="text-indigo-600" />
+                      <div>
+                        <p className="text-xs font-bold text-indigo-500 uppercase">Versão de Destino</p>
+                        <p className="text-base font-black text-indigo-900">{selectedBudgetVersion?.name} ({selectedBudgetVersion?.year})</p>
                       </div>
                     </div>
 
@@ -2728,19 +2817,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                           {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(budgetValid.reduce((s, r) => s + (parseFloat(r.valor) || 0), 0))}
                         </div>
                       </div>
-                    </div>
-
-                    {/* Target version picker */}
-                    <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
-                      <label className="block text-sm font-bold text-orange-800 mb-2">Versão Budget de Destino</label>
-                      <select
-                        id="budget2026-version-select"
-                        defaultValue={activeBudgetVersionId}
-                        className="w-full border border-orange-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none"
-                      >
-                        <option value="">Selecione uma versão...</option>
-                        {budgetVersions.map(v => <option key={v.id} value={v.id}>{v.name} ({v.year})</option>)}
-                      </select>
                     </div>
 
                     {budgetErrors.length > 0 && (
@@ -2804,8 +2880,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
                     <button
                       onClick={() => {
-                        const sel = (document.getElementById('budget2026-version-select') as HTMLSelectElement)?.value || activeBudgetVersionId;
-                        handleFinalBudget2026Import(sel);
+                        handleFinalBudget2026Import(activeBudgetVersionId);
                       }}
                       disabled={budgetImportSaving || budgetValid.length === 0}
                       className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
@@ -2813,7 +2888,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                       {budgetImportSaving ? (
                         <><span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> Salvando...</>
                       ) : (
-                        <><Save size={16} /> Confirmar e Salvar no Supabase</>
+                        <><Save size={16} /> Confirmar e Salvar na Versão "{selectedBudgetVersion?.name}"</>
                       )}
                     </button>
                   </div>
@@ -2825,10 +2900,10 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                   <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto">
                     <svg className="w-10 h-10 text-emerald-600" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                   </div>
-                  <h3 className="text-2xl font-bold text-gray-900">Orçamento 2026 Importado!</h3>
+                  <h3 className="text-2xl font-bold text-gray-900">Meta Importada com Sucesso!</h3>
                   <p className="text-gray-500 max-w-md mx-auto">
                     {budgetImportSavedCount !== null
-                      ? <><strong>{budgetImportSavedCount}</strong> registros foram salvos com sucesso no Supabase e estão disponíveis como <strong>Meta</strong> no Tauá Real.</>
+                      ? <><strong>{budgetImportSavedCount}</strong> registros foram salvos com sucesso na versão <strong>{selectedBudgetVersion?.name}</strong> e estão disponíveis como <strong>Meta</strong> no Tauá Real.</>
                       : 'Dados importados com sucesso.'}
                   </p>
                   <div className="flex gap-3 justify-center">
@@ -2842,11 +2917,23 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 </div>
               )}
             </div>
+            )
           )}
           {activeBudgetTab === 'labor' && (
+            !hasSelectedVersion ? (
+              <div className="text-center py-20 space-y-4">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
+                  <Lock className="text-gray-400" size={28} />
+                </div>
+                <h3 className="text-xl font-bold text-gray-400">Selecione uma versão primeiro</h3>
+                <p className="text-gray-400 text-sm max-w-sm mx-auto">Acesse a aba <strong>Versões</strong> e selecione a versão do orçamento que deseja configurar.</p>
+                <button onClick={() => setActiveBudgetTab('versions')} className="text-indigo-600 font-bold text-sm hover:underline">Ir para Versões →</button>
+              </div>
+            ) : (
             <div className="space-y-8">
               {renderLaborParametersForm(activeBudgetVersionId)}
             </div>
+            )
           )}
         </div>
       </div>
@@ -3769,10 +3856,10 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     admin_real_schedule: { title: 'Cronograma', subtitle: 'Defina o cronograma de elaboração do forecast.', breadcrumb: 'Administração › Tauá Real › Cronograma' },
     admin_real_dre: { title: 'Parâmetros DRE', subtitle: 'Edite a estrutura e ordem da DRE do Forecast.', breadcrumb: 'Administração › Tauá Real › Parâmetros DRE' },
     // Admin > Tauá Budget
-    admin_budget_versions: { title: 'Versões de Orçamento', subtitle: 'Crie e gerencie as versões do orçamento.', breadcrumb: 'Administração › Tauá Budget › Versões' },
+    admin_budget_versions: { title: 'Versões de Orçamento', subtitle: 'Selecione a versão do orçamento que deseja configurar. É necessário escolher uma versão antes de editar configurações ou importar dados.', breadcrumb: 'Administração › Tauá Budget › Versões' },
     admin_budget_usali: { title: 'USALI / Config', subtitle: 'Configure a estrutura USALI e características.', breadcrumb: 'Administração › Tauá Budget › USALI' },
     admin_budget_labor: { title: 'Mão de Obra', subtitle: 'Parâmetros de encargos e projeções de pessoal.', breadcrumb: 'Administração › Tauá Budget › Mão de Obra' },
-    admin_budget_import: { title: 'Importação Budget', subtitle: 'Importe dados orçamentários em lote.', breadcrumb: 'Administração › Tauá Budget › Importação' },
+    admin_budget_import: { title: 'Importação da Meta', subtitle: 'Importe os dados da meta na versão selecionada.', breadcrumb: 'Administração › Tauá Budget › Importação da Meta' },
     // Admin > Tauá Geral
     admin_geral_accounts: { title: 'Plano de Contas', subtitle: 'Cadastro e ordenação de Pacotes Master, Pacotes e Contas.', breadcrumb: 'Administração › Tauá Geral › Plano de Contas' },
     admin_geral_hotels: { title: 'Hotéis e Unidades', subtitle: 'Cadastro de unidades hoteleiras.', breadcrumb: 'Administração › Tauá Geral › Hotéis' },

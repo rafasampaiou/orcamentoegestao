@@ -238,7 +238,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     <NavItem depth={2} label="Versões"            icon={Database} active={currentView === 'admin_budget_versions'} onClick={() => go('admin_budget_versions')} />
                     <NavItem depth={2} label="USALI / Config"     icon={Layers}   active={currentView === 'admin_budget_usali'}    onClick={() => go('admin_budget_usali')} />
                     <NavItem depth={2} label="Mão de Obra"        icon={Users2}   active={currentView === 'admin_budget_labor'}    onClick={() => go('admin_budget_labor')} />
-                    <NavItem depth={2} label="Importação"         icon={Upload}   active={currentView === 'admin_budget_import'}   onClick={() => go('admin_budget_import')} />
+                    <NavItem depth={2} label="Importação da Meta"  icon={Upload}   active={currentView === 'admin_budget_import'}   onClick={() => go('admin_budget_import')} />
                   </div>
                 )}
 
