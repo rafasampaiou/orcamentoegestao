@@ -182,15 +182,17 @@ const TimelineView: React.FC<TimelineViewProps> = ({
                           width: `${width}px` 
                         }}
                       >
-                        <div className="absolute -top-3 -right-2 bg-white rounded-full p-1.5 shadow-md border hover:scale-110 transition-transform cursor-pointer z-20" onClick={(e) => { e.stopPropagation(); onSelectVersion(isActive ? '' : version.id); }}>
+                        <div className="absolute -top-3 left-4 bg-white rounded-full p-1.5 shadow-md border hover:scale-110 transition-transform z-20">
                           <button 
-                            className={`transition-all ${isActive ? 'opacity-100 animate-spin-slow text-emerald-500' : 'opacity-60 hover:opacity-100 text-gray-500'}`}
+                            type="button"
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onSelectVersion(isActive ? '' : version.id); }}
+                            className={`flex items-center justify-center transition-all ${isActive ? 'opacity-100 animate-spin-slow text-emerald-500' : 'opacity-60 hover:opacity-100 text-gray-500'}`}
                             title={isActive ? 'Desmarcar configuração' : 'Selecionar para configuração'}
                           >
                             <Settings size={18} />
                           </button>
                         </div>
-                        <div className="flex justify-between items-start">
+                        <div className="flex justify-between items-start mt-1">
                           <div>
                             <div className="font-bold text-sm leading-tight">{version.year}</div>
                             <div className="text-xs opacity-90">{version.name}</div>
