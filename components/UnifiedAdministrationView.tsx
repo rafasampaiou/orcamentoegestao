@@ -1942,6 +1942,30 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   };
 
   // ─── Budget 2026 Import (13-column format) ─────────────────────────────────
+  const handleBudgetCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const buffer = event.target?.result as ArrayBuffer;
+
+      // Try UTF-8 first
+      const utf8Decoder = new TextDecoder('utf-8');
+      let text = utf8Decoder.decode(buffer);
+
+      // Basic check for encoding issues (broken characters or ?)
+      if (text.includes('\uFFFD') || (text.includes('?') && !file.name.endsWith('.txt'))) {
+        const latinDecoder = new TextDecoder('iso-8859-1');
+        text = latinDecoder.decode(buffer);
+      }
+
+      setBudgetImportText(text);
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = '';
+  };
+
   const processBudget2026Import = () => {
     if (!budgetImportText.trim()) return;
     setBudgetImportSavedCount(null);
@@ -2559,8 +2583,16 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                         ))}
                       </select>
                     </div>
-                    <textarea className="w-full h-64 p-4 border border-gray-300 rounded-lg font-mono text-xs" placeholder="Cole os dados do Excel aqui..." value={importText} onChange={(e) => setImportText(e.target.value)} />
-                    <button onClick={processFinancialImport} className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold">Processar Dados</button>
+                    <textarea className="w-full h-64 p-4 border border-gray-300 rounded-lg font-mono text-xs focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" placeholder="Cole os dados do Excel ou arquivo CSV aqui..." value={importText} onChange={(e) => setImportText(e.target.value)} />
+                    <div className="flex items-center gap-4">
+                      <button onClick={processFinancialImport} disabled={!importText.trim()} className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-2">
+                        <FileText size={16} /> Processar Dados
+                      </button>
+                      <label className="bg-white border border-indigo-200 text-indigo-600 px-6 py-2.5 rounded-lg font-bold cursor-pointer hover:bg-indigo-50 flex items-center gap-2 transition-all">
+                        <Upload size={16} /> Ou selecionar arquivo CSV
+                        <input type="file" accept=".csv,.txt" className="hidden" onChange={handleAccCsvUpload} />
+                      </label>
+                    </div>
                   </>
                 ) : (
                   <ImportPreview summaryRows={summaryRows} errorRows={errorRows} onCancel={() => setImportStep('input')} onConfirm={handleFinalImport} importMode={importMode} setImportMode={setImportMode} realVersions={realVersions} budgetVersions={budgetVersions} />
@@ -2818,13 +2850,19 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                     value={budgetImportText}
                     onChange={(e) => setBudgetImportText(e.target.value)}
                   />
-                  <button
-                    onClick={processBudget2026Import}
-                    disabled={!budgetImportText.trim()}
-                    className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-2"
-                  >
-                    <FileText size={16} /> Processar Dados
-                  </button>
+                  <div className="flex items-center gap-4">
+                    <button
+                      onClick={processBudget2026Import}
+                      disabled={!budgetImportText.trim()}
+                      className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+                    >
+                      <FileText size={16} /> Processar Dados
+                    </button>
+                    <label className="bg-white border border-indigo-200 text-indigo-600 px-6 py-2.5 rounded-lg font-bold cursor-pointer hover:bg-indigo-50 flex items-center gap-2 transition-all">
+                      <Upload size={16} /> Ou selecionar arquivo CSV
+                      <input type="file" accept=".csv,.txt" className="hidden" onChange={handleBudgetCsvUpload} />
+                    </label>
+                  </div>
                 </>
               )}
 
