@@ -176,28 +176,28 @@ const TimelineView: React.FC<TimelineViewProps> = ({
                     return (
                       <div 
                         key={version.id}
-                        className={`absolute top-0 h-14 rounded shadow-sm p-2.5 transition-all flex flex-col justify-center ${colorClass} text-white hover:opacity-90 ${isActive ? 'ring-2 ring-offset-2 ring-[#38b2ac]' : ''}`}
+                        className={`absolute top-0 h-14 rounded shadow-sm p-2 transition-all flex flex-col justify-start ${colorClass} text-white hover:opacity-90 ${isActive ? 'ring-2 ring-offset-2 ring-[#38b2ac]' : ''}`}
                         style={{ 
                           left: `${leftOffset}px`, 
                           width: `${width}px` 
                         }}
                       >
-                        <div className="absolute -top-3 left-4 bg-white rounded-full p-1.5 shadow-md border hover:scale-110 transition-transform z-20">
+                        <div className="absolute bottom-1 right-1 z-20">
                           <button 
                             type="button"
                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); onSelectVersion(isActive ? '' : version.id); }}
-                            className={`flex items-center justify-center transition-all ${isActive ? 'opacity-100 animate-spin-slow text-emerald-500' : 'opacity-60 hover:opacity-100 text-gray-500'}`}
+                            className={`flex items-center justify-center bg-white rounded-md p-1 shadow-sm transition-all hover:scale-110 ${isActive ? 'opacity-100 animate-spin-slow text-emerald-500 ring-1 ring-emerald-500' : 'opacity-70 hover:opacity-100 text-gray-600'}`}
                             title={isActive ? 'Desmarcar configuração' : 'Selecionar para configuração'}
                           >
-                            <Settings size={18} />
+                            <Settings size={14} />
                           </button>
                         </div>
-                        <div className="flex justify-between items-start mt-1">
+                        <div className="flex justify-between items-start">
                           <div>
-                            <div className="font-bold text-sm leading-tight">{version.year}</div>
-                            <div className="text-xs opacity-90">{version.name}</div>
+                            <div className="font-bold text-sm leading-tight max-w-[150px] truncate">{version.year}</div>
+                            <div className="text-[10px] opacity-90 max-w-[150px] truncate leading-tight mt-0.5">{version.name}</div>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5 opacity-80">
                             {onSetMain && (
                               <button 
                                 onClick={(e) => { e.stopPropagation(); onSetMain(version.id); }}

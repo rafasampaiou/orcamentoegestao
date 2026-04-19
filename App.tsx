@@ -191,6 +191,14 @@ const App: React.FC = () => {
     const selectedHotelObj = hotels.find(h => h.name === selectedHotel);
     const hotelCode = selectedHotelObj?.code || selectedHotel;
 
+    const currentActiveVersion = budgetVersions.find(v => v.id === activeBudgetVersionId);
+    const isCurrentValid = currentActiveVersion && (currentActiveVersion.hotelId === hotelCode || currentActiveVersion.hotelId === selectedHotel || !currentActiveVersion.hotelId);
+
+    // If the currently selected version is valid for the current hotel, don't force an override.
+    if (isCurrentValid && activeBudgetVersionId !== '') {
+      return;
+    }
+
     // Matching logic:
     // 1. Version matches hotel and is main
     // 2. Version matches hotel
