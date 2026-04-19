@@ -285,6 +285,17 @@ export interface ImportedRow {
     diretoria?: string; // Diretoria
 }
 
+export interface ImportHistory {
+  id: string;
+  hotel: string;
+  tipo: string;
+  ano: string;
+  meses: string;
+  versionId: string;
+  createdAt: string;
+  userId?: string;
+}
+
 export interface ImportedCostCenter {
     id: string;
     hierarchicalCode: string;

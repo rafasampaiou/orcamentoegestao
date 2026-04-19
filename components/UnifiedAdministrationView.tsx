@@ -410,13 +410,65 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const [isSavingRegistry, setIsSavingRegistry] = useState(false);
 
   // Import Sub-tabs
-  const [activeImportTab, setActiveImportTab] = useState<'financial' | 'revenue' | 'occupancy' | 'costCenters' | 'accounts'>('financial');
+  const [activeImportTab, setActiveImportTab] = useState<'financial' | 'revenue' | 'occupancy' | 'costCenters' | 'accounts' | 'history'>('financial');
+  const [importHistory, setImportHistory] = useState<any[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   // Logs & Permissions state
   const [activeDreName, setActiveDreName] = useState<'Forecast' | 'Budget'>('Forecast');
   const [isSavingDre, setIsSavingDre] = useState(false);
   const [pickingFor, setPickingFor] = useState<{ sectionId: string, packageId: string } | null>(null);
   const [accSearchTerm, setAccSearchTerm] = useState('');
+
+  const fetchImportHistory = async () => {
+    setIsLoadingHistory(true);
+    try {
+      const data = await supabaseService.getImportHistory();
+      setImportHistory(data);
+    } catch (e) {
+      console.error("Erro ao carregar histórico", e);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  const recordImportHistory = async (rows: ImportedRow[]) => {
+    const groups = new Map<string, Set<string>>();
+    // Key: hotel|tipo|ano|versionId
+    rows.forEach(r => {
+      const tipoNormalized = r.tipo?.toLowerCase().includes('receita') ? 'Receita' : 'Despesa';
+      const key = `${r.hotel}|${tipoNormalized}|${r.ano}|${r.versionId || ''}`;
+      if (!groups.has(key)) groups.set(key, new Set());
+      groups.get(key)!.add(r.mes);
+    });
+
+    const entries = Array.from(groups.entries()).map(([key, months]) => {
+      const [hotel, tipo, ano, versionId] = key.split('|');
+      const sortedMonths = Array.from(months)
+        .map(Number)
+        .sort((a, b) => a - b);
+      
+      const monthNames = sortedMonths.map(m => {
+        return new Date(2024, m - 1).toLocaleString('pt-BR', { month: 'short' });
+      }).join(', ');
+
+      return {
+        hotel,
+        tipo,
+        ano,
+        meses: monthNames,
+        version_id: versionId || null,
+        user_id: null 
+      };
+    });
+
+    try {
+      await supabaseService.saveImportHistory(entries);
+      fetchImportHistory();
+    } catch (e) {
+      console.error("Falha ao salvar histórico de importação", e);
+    }
+  };
 
   const [userLogs, setUserLogs] = useState([
     { id: '1', userId: 'u1', userName: 'Carlos Silva', userUnit: 'Tauá Resort Caeté', action: 'Atualizou Forecast DRE', timestamp: new Date(Date.now() - 3600000).toISOString() },
@@ -1939,6 +1991,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     setImportText('');
     setParsedData([]);
     setImportMode('append');
+
+    // Record History
+    recordImportHistory(finalData);
   };
 
   // ─── Budget 2026 Import (13-column format) ─────────────────────────────────
@@ -2115,6 +2170,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       await supabaseService.saveFinancialData(rowsWithVersion);
       setBudgetImportSavedCount(rowsWithVersion.length);
       setBudgetImportStep('done');
+      
+      // Record History
+      recordImportHistory(rowsWithVersion);
     } catch (err: any) {
       console.error('Erro ao salvar orçamento no Supabase:', err);
       alert(`Dados importados localmente, mas erro ao salvar no banco:\n${err?.message || JSON.stringify(err)}`);
@@ -3679,9 +3737,80 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 >
                   Contas Contábeis
                 </button>
+
+                <button
+                  onClick={() => {
+                    setActiveImportTab('history');
+                    fetchImportHistory();
+                  }}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 ${activeImportTab === 'history' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500'
+                    }`}
+                >
+                  Histórico de Importação
+                </button>
               </div>
 
-              {activeImportTab !== 'accounts' ? (
+              {activeImportTab === 'history' && (
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h4 className="font-bold text-gray-700">Log de Importações Recentes</h4>
+                    <button onClick={fetchImportHistory} className="text-indigo-600 hover:text-indigo-800 flex items-center gap-1 text-xs font-bold">
+                      <Layout size={14} /> Atualizar
+                    </button>
+                  </div>
+                  
+                  {isLoadingHistory ? (
+                    <div className="py-12 text-center text-gray-400 italic">Carregando histórico...</div>
+                  ) : (
+                    <div className="overflow-hidden border border-gray-200 rounded-xl shadow-sm">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Data/Hora</th>
+                            <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Hotel</th>
+                            <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Tipo</th>
+                            <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Ano</th>
+                            <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Meses</th>
+                            <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Versão</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200 text-xs">
+                          {importHistory.map(log => {
+                            const version = [...realVersions, ...budgetVersions].find(v => v.id === log.version_id);
+                            return (
+                              <tr key={log.id} className="hover:bg-gray-50 transition-colors">
+                                <td className="px-4 py-3 whitespace-nowrap text-gray-500">
+                                  {new Date(log.created_at).toLocaleString('pt-BR')}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap font-bold text-gray-700">{log.hotel}</td>
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                                    log.tipo === 'Receita' ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'
+                                  }`}>
+                                    {log.tipo}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-gray-600">{log.ano}</td>
+                                <td className="px-4 py-3 text-gray-500 max-w-[200px] truncate" title={log.meses}>{log.meses}</td>
+                                <td className="px-4 py-3 whitespace-nowrap text-indigo-600 font-medium">
+                                  {version?.name || log.version_id || '-'}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                          {importHistory.length === 0 && (
+                            <tr>
+                              <td colSpan={6} className="px-4 py-12 text-center text-gray-400 italic">Nenhum histórico encontrado.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeImportTab === 'costCenters' && (
                 <div className="space-y-4">
                   {ccImportStep === 'input' ? (
                     <div className="space-y-4">
@@ -3771,7 +3900,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                     </div>
                   )}
                 </div>
-              ) : (
+              )}
+
+              {activeImportTab === 'accounts' && (
                 <div className="space-y-4">
                   {accImportStep === 'input' ? (
                     <div className="space-y-4">

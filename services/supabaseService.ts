@@ -614,5 +614,28 @@ export const supabaseService = {
         .insert(records.slice(i, i + batchSize));
       if (insertError) throw insertError;
     }
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // IMPORT HISTORY
+  // ═══════════════════════════════════════════════════════════════════════════
+  async getImportHistory(): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('import_history')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async saveImportHistory(entries: Omit<any, 'id' | 'created_at'>[]): Promise<void> {
+    if (entries.length === 0) return;
+    
+    // entries should be { hotel, tipo, ano, meses, version_id, user_id }
+    const { error } = await supabase
+      .from('import_history')
+      .insert(entries);
+    
+    if (error) throw error;
   }
 };
