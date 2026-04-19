@@ -399,6 +399,46 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     // Custom Input Class to remove spinners and dashed lines
     const inputClass = "w-full text-right bg-transparent border border-transparent hover:bg-gray-50 focus:bg-white focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 rounded px-1 text-indigo-900 font-semibold outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
 
+    const FormattedInput = ({ inputRef, value, onChange, onKeyDown, onPaste, formatType, className }: any) => {
+        const [isFocused, setIsFocused] = useState(false);
+        const [localValue, setLocalValue] = useState("");
+
+        useEffect(() => {
+            if (!isFocused) {
+                setLocalValue(value === 0 ? '' : value.toString().replace('.', ','));
+            }
+        }, [value, isFocused]);
+
+        const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+            const valStr = e.target.value;
+            if (/^[0-9.,-]*$/.test(valStr)) {
+                setLocalValue(valStr);
+                const cleanStr = valStr.replace(/\./g, '').replace(',', '.');
+                const num = parseFloat(cleanStr);
+                if (!isNaN(num) || valStr === '' || valStr === '-') {
+                    onChange(isNaN(num) ? 0 : num);
+                }
+            }
+        };
+
+        return (
+            <input
+                ref={inputRef}
+                type="text"
+                className={className}
+                value={isFocused ? (localValue === '0' && value === 0 ? '' : localValue) : (value === 0 ? '' : formatValue(value, formatType))}
+                onFocus={() => {
+                    setIsFocused(true);
+                    setLocalValue(value === 0 ? '' : value.toString().replace('.', ','));
+                }}
+                onBlur={() => setIsFocused(false)}
+                onChange={handleChange}
+                onKeyDown={onKeyDown}
+                onPaste={onPaste}
+            />
+        );
+    };
+
     return (
         <div className="flex flex-col h-full w-full">
             <div className="bg-white rounded-xl shadow-lg border border-gray-200 flex flex-col h-full overflow-hidden font-sans w-full">
@@ -744,15 +784,14 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             // FORECAST (REAL) EDITING
                                             if (row.forecastConfig.method === 'Fixed' || isEditableCost || isEditableSpecial) {
                                                 realCellContent = (
-                                                    <input
-                                                        ref={el => { inputRefs.current[`input-real-${row.id}`] = el; }}
-                                                        type="number"
+                                                    <FormattedInput
+                                                        inputRef={(el: any) => { inputRefs.current[`input-real-${row.id}`] = el; }}
                                                         className={inputClass}
-                                                        value={row.real === 0 ? '' : row.real}
-                                                        onChange={(e) => handleManualValueChange(row.id, 'real', parseFloat(e.target.value))}
-                                                        onKeyDown={(e) => handleKeyDown(e, row.id, 'real')}
-                                                        onPaste={(e) => handlePaste(e, row.id, 'real')}
-                                                        step="0.01"
+                                                        value={row.real}
+                                                        formatType={formatType}
+                                                        onChange={(val: number) => handleManualValueChange(row.id, 'real', val)}
+                                                        onKeyDown={(e: any) => handleKeyDown(e, row.id, 'real')}
+                                                        onPaste={(e: any) => handlePaste(e, row.id, 'real')}
                                                     />
                                                 );
                                             } else {
@@ -766,15 +805,14 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             // PREVIA EDITING
                                             if ((row.previaConfig?.method || 'Fixed') === 'Fixed' || isEditableCost || isEditableSpecial) {
                                                 previaCellContent = (
-                                                    <input
-                                                        ref={el => { inputRefs.current[`input-previa-${row.id}`] = el; }}
-                                                        type="number"
+                                                    <FormattedInput
+                                                        inputRef={(el: any) => { inputRefs.current[`input-previa-${row.id}`] = el; }}
                                                         className={inputClass}
-                                                        value={row.previa === 0 ? '' : row.previa}
-                                                        onChange={(e) => handleManualValueChange(row.id, 'previa', parseFloat(e.target.value))}
-                                                        onKeyDown={(e) => handleKeyDown(e, row.id, 'previa')}
-                                                        onPaste={(e) => handlePaste(e, row.id, 'previa')}
-                                                        step="0.01"
+                                                        value={row.previa}
+                                                        formatType={formatType}
+                                                        onChange={(val: number) => handleManualValueChange(row.id, 'previa', val)}
+                                                        onKeyDown={(e: any) => handleKeyDown(e, row.id, 'previa')}
+                                                        onPaste={(e: any) => handlePaste(e, row.id, 'previa')}
                                                     />
                                                 );
                                             } else {
@@ -791,33 +829,30 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
                                         if ((isInputIndicator || isManualRow) && !isMonthClosed) {
                                             realCellContent = (
-                                                <input
-                                                    ref={el => { inputRefs.current[`input-real-${row.id}`] = el; }}
-                                                    type="number"
+                                                <FormattedInput
+                                                    inputRef={(el: any) => { inputRefs.current[`input-real-${row.id}`] = el; }}
                                                     className={inputClass}
-                                                    value={row.real === 0 ? '' : row.real}
-                                                    onChange={(e) => {
-                                                        const val = parseFloat(e.target.value) || 0;
+                                                    value={row.real}
+                                                    formatType={formatType}
+                                                    onChange={(val: number) => {
                                                         if (isManualRow) {
                                                             handleManualValueChange(row.id, 'real', val);
                                                         } else {
                                                             handleConfigChange(row.id, { method: 'Fixed', manualValue: val });
                                                         }
                                                     }}
-                                                    onKeyDown={(e) => handleKeyDown(e, row.id, 'real')}
-                                                    onPaste={(e) => handlePaste(e, row.id, 'real')}
-                                                    step="0.01"
+                                                    onKeyDown={(e: any) => handleKeyDown(e, row.id, 'real')}
+                                                    onPaste={(e: any) => handlePaste(e, row.id, 'real')}
                                                 />
                                             );
 
                                             previaCellContent = (
-                                                <input
-                                                    ref={el => { inputRefs.current[`input-previa-${row.id}`] = el; }}
-                                                    type="number"
+                                                <FormattedInput
+                                                    inputRef={(el: any) => { inputRefs.current[`input-previa-${row.id}`] = el; }}
                                                     className={inputClass}
-                                                    value={row.previa === 0 ? '' : row.previa}
-                                                    onChange={(e) => {
-                                                        const val = parseFloat(e.target.value) || 0;
+                                                    value={row.previa}
+                                                    formatType={formatType}
+                                                    onChange={(val: number) => {
                                                         handleManualValueChange(row.id, 'previa', val);
                                                         // Sync Forecast with Prévia for indicators
                                                         if (isInputIndicator) {
@@ -834,9 +869,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                                             });
                                                         }
                                                     }}
-                                                    onKeyDown={(e) => handleKeyDown(e, row.id, 'previa')}
-                                                    onPaste={(e) => handlePaste(e, row.id, 'previa')}
-                                                    step="0.01"
+                                                    onKeyDown={(e: any) => handleKeyDown(e, row.id, 'previa')}
+                                                    onPaste={(e: any) => handlePaste(e, row.id, 'previa')}
                                                 />
                                             );
                                         } else if ((isInputIndicator || isManualRow) && isMonthClosed) {

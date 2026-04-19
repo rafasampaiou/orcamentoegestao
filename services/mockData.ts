@@ -521,12 +521,14 @@ export const getForecastData = (
           else if (scen === 'previa' || scen === 'prévia' || scen === 'flash') normScenario = 'PREVIA';
           else return; 
           
-          // Filter by versionId if applicable
+          // Filter by versionId if applicable (ONLY FOR CURRENT YEAR)
+          const isCurrentYear = (rYear === selectedYear);
+          
           if (normScenario === 'REAL') {
-              if (activeRealVersionId && row.versionId && row.versionId !== activeRealVersionId) return;
+              if (isCurrentYear && activeRealVersionId && row.versionId && row.versionId !== activeRealVersionId) return;
           } else if (normScenario === 'BUDGET') {
               // Be more permissive for budget data: if no versionId, allow it based on year/hotel
-              if (row.versionId) {
+              if (row.versionId && isCurrentYear) {
                 const matchesBudget = activeBudgetVersionId && row.versionId === activeBudgetVersionId;
                 const matchesReal = activeRealVersionId && row.versionId === activeRealVersionId;
                 if (!matchesBudget && !matchesReal) return;
@@ -889,10 +891,11 @@ export const getDynamicForecastData = (
           else if (scen === 'budget' || scen === 'meta' || scen === 'orcamento' || scen === 'orçamento') normScenario = 'BUDGET';
           else if (scen === 'previa' || scen === 'prévia' || scen === 'flash') normScenario = 'PREVIA';
           else return; 
+          const isCurrentYear = (rYear === selectedYear);
           if (normScenario === 'REAL') {
-              if (activeRealVersionId && row.versionId && row.versionId !== activeRealVersionId) return;
+              if (isCurrentYear && activeRealVersionId && row.versionId && row.versionId !== activeRealVersionId) return;
           } else if (normScenario === 'BUDGET') {
-              if (row.versionId) {
+              if (row.versionId && isCurrentYear) {
                 const matchesBudget = activeBudgetVersionId && row.versionId === activeBudgetVersionId;
                 const matchesReal = activeRealVersionId && row.versionId === activeRealVersionId;
                 if (!matchesBudget && !matchesReal) return;
