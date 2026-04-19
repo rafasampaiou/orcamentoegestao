@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { BudgetVersion } from '../types';
-import { Star, Lock, LockOpen, Trash2, Copy, Plus, AlertTriangle } from 'lucide-react';
+import { Star, Lock, LockOpen, Trash2, Copy, Plus, AlertTriangle, Settings } from 'lucide-react';
 
 interface TimelineViewProps {
   title: string;
@@ -176,13 +176,20 @@ const TimelineView: React.FC<TimelineViewProps> = ({
                     return (
                       <div 
                         key={version.id}
-                        onClick={() => onSelectVersion(version.id)}
-                        className={`absolute top-0 h-14 rounded shadow-sm p-2.5 cursor-pointer transition-all flex flex-col justify-center ${colorClass} text-white hover:opacity-90 ${isActive ? 'ring-2 ring-offset-2 ring-[#38b2ac]' : ''}`}
+                        className={`absolute top-0 h-14 rounded shadow-sm p-2.5 transition-all flex flex-col justify-center ${colorClass} text-white hover:opacity-90 ${isActive ? 'ring-2 ring-offset-2 ring-[#38b2ac]' : ''}`}
                         style={{ 
                           left: `${leftOffset}px`, 
                           width: `${width}px` 
                         }}
                       >
+                        <div className="absolute -top-3 -right-2 bg-white rounded-full p-1.5 shadow-md border hover:scale-110 transition-transform cursor-pointer z-20" onClick={(e) => { e.stopPropagation(); onSelectVersion(isActive ? '' : version.id); }}>
+                          <button 
+                            className={`transition-all ${isActive ? 'opacity-100 animate-spin-slow text-emerald-500' : 'opacity-60 hover:opacity-100 text-gray-500'}`}
+                            title={isActive ? 'Desmarcar configuração' : 'Selecionar para configuração'}
+                          >
+                            <Settings size={18} />
+                          </button>
+                        </div>
                         <div className="flex justify-between items-start">
                           <div>
                             <div className="font-bold text-sm leading-tight">{version.year}</div>
@@ -226,6 +233,31 @@ const TimelineView: React.FC<TimelineViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Configuration version status banner */}
+      {(() => {
+        const activeVersion = versions.find(v => v.id === activeVersionId);
+        return activeVersion ? (
+          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-3">
+            <div className="w-9 h-9 bg-emerald-600 rounded-lg flex items-center justify-center shrink-0">
+              <Settings size={18} className="text-white" />
+            </div>
+            <div>
+              <p className="text-sm font-black text-emerald-900">Versão selecionada para configuração: <span className="text-emerald-700 border-b border-emerald-300 pb-0.5">{activeVersion.name} ({activeVersion.year})</span></p>
+              <p className="text-xs text-emerald-600 mt-0.5">As abas de configuração e importação agora irão operar sobre esta versão.</p>
+            </div>
+          </div>
+        ) : (
+          <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3">
+            <div className="w-9 h-9 bg-amber-400 rounded-lg flex items-center justify-center shrink-0">
+              <Settings size={18} className="text-white" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-amber-900">Selecione a versão que deseja configurar clicando na engrenagem</p>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Action Modal */}
       {modalOpen && selectedDate && (

@@ -2438,8 +2438,48 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   };
 
   const renderTauáReal = () => {
+    const selectedRealVersion = realVersions.find(v => v.id === activeRealVersionId);
+    const hasSelectedRealVersion = !!activeRealVersionId && !!selectedRealVersion;
+
     return (
       <div className="space-y-6">
+        {/* Selected Version Banner */}
+        {activeRealTab !== 'versions' && (
+          <div className={`p-4 rounded-xl border flex items-center justify-between ${
+            hasSelectedRealVersion
+              ? 'bg-indigo-50 border-indigo-200'
+              : 'bg-amber-50 border-amber-200'
+          }`}>
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                hasSelectedRealVersion ? 'bg-indigo-600 text-white' : 'bg-amber-400 text-white'
+              }`}>
+                <Database size={20} />
+              </div>
+              <div>
+                {hasSelectedRealVersion ? (
+                  <>
+                    <p className="text-sm font-black text-indigo-900">Versão selecionada para configuração: <span className="text-indigo-600">{selectedRealVersion.name} ({selectedRealVersion.year})</span></p>
+                    <p className="text-xs text-indigo-700 mt-0.5">As abas de configuração e importação agora irão operar sobre esta versão.</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-bold text-amber-900">Selecione a versão que deseja configurar clicando na engrenagem</p>
+                  </>
+                )}
+              </div>
+            </div>
+            {hasSelectedRealVersion && (
+              <button
+                onClick={() => setActiveRealTab('versions')}
+                className="px-3 py-1.5 bg-white border border-indigo-200 text-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-100 transition-all"
+              >
+                Trocar Versão
+              </button>
+            )}
+          </div>
+        )}
+
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm min-h-[400px]">
           {activeRealTab === 'versions' && (
             <TimelineView
@@ -2453,6 +2493,16 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
             />
           )}
           {activeRealTab === 'closure' && (
+            !hasSelectedRealVersion ? (
+              <div className="text-center py-20 space-y-4">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
+                  <Lock className="text-gray-400" size={28} />
+                </div>
+                <h3 className="text-xl font-bold text-gray-400">Selecione uma versão primeiro</h3>
+                <p className="text-gray-400 text-sm max-w-sm mx-auto">Acesse a aba <strong>Versões</strong> e clique na engrenagem da versão que deseja configurar.</p>
+                <button onClick={() => setActiveRealTab('versions')} className="text-indigo-600 font-bold text-sm hover:underline">Ir para Versões →</button>
+              </div>
+            ) : (
             <div className="space-y-6">
               <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
                 <Lock className="text-indigo-600" size={20} />
@@ -2473,8 +2523,19 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 })}
               </div>
             </div>
+            )
           )}
           {activeRealTab === 'import' && (
+            !hasSelectedRealVersion ? (
+              <div className="text-center py-20 space-y-4">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
+                  <Lock className="text-gray-400" size={28} />
+                </div>
+                <h3 className="text-xl font-bold text-gray-400">Selecione uma versão primeiro</h3>
+                <p className="text-gray-400 text-sm max-w-sm mx-auto">Acesse a aba <strong>Versões</strong> e clique na engrenagem da versão que deseja configurar.</p>
+                <button onClick={() => setActiveRealTab('versions')} className="text-indigo-600 font-bold text-sm hover:underline">Ir para Versões →</button>
+              </div>
+            ) : (
             <div className="space-y-6">
               <div className="space-y-4">
                 {importStep === 'input' ? (
@@ -2506,11 +2567,23 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 )}
               </div>
             </div>
+            )
           )}
           {activeRealTab === 'labor' && (
+            !hasSelectedRealVersion ? (
+              <div className="text-center py-20 space-y-4">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
+                  <Lock className="text-gray-400" size={28} />
+                </div>
+                <h3 className="text-xl font-bold text-gray-400">Selecione uma versão primeiro</h3>
+                <p className="text-gray-400 text-sm max-w-sm mx-auto">Acesse a aba <strong>Versões</strong> e clique na engrenagem da versão que deseja configurar.</p>
+                <button onClick={() => setActiveRealTab('versions')} className="text-indigo-600 font-bold text-sm hover:underline">Ir para Versões →</button>
+              </div>
+            ) : (
             <div className="space-y-8">
               {renderLaborParametersForm(activeRealVersionId)}
             </div>
+            )
           )}
           {activeRealTab === 'schedule' && (
             <div className="space-y-6">
@@ -2606,13 +2679,12 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               <div>
                 {hasSelectedVersion ? (
                   <>
-                    <p className="text-xs font-bold text-indigo-500 uppercase tracking-wider">Versão Selecionada</p>
-                    <p className="text-lg font-black text-indigo-900">{selectedBudgetVersion.name} <span className="text-sm font-normal text-indigo-500">({selectedBudgetVersion.year})</span></p>
+                    <p className="text-sm font-black text-indigo-900">Versão selecionada para configuração: <span className="text-indigo-600">{selectedBudgetVersion.name} ({selectedBudgetVersion.year})</span></p>
+                    <p className="text-xs text-indigo-700 mt-0.5">As abas de configuração e importação agora irão operar sobre esta versão.</p>
                   </>
                 ) : (
                   <>
-                    <p className="text-xs font-bold text-amber-600 uppercase tracking-wider">Nenhuma versão selecionada</p>
-                    <p className="text-sm font-medium text-amber-800">Vá em <strong>Versões</strong> para selecionar a versão que deseja configurar.</p>
+                    <p className="text-sm font-bold text-amber-900">Selecione a versão que deseja configurar clicando na engrenagem</p>
                   </>
                 )}
               </div>
@@ -2640,19 +2712,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 onDelete={(id) => handleDeleteVersion(id, true)}
                 onCreateVersion={handleCreateBudgetVersion}
               />
-              {activeBudgetVersionId && selectedBudgetVersion && (
-                <div className="mt-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
-                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                    </div>
-                    <div>
-                      <p className="text-sm font-black text-emerald-900">Versão ativa: {selectedBudgetVersion.name} ({selectedBudgetVersion.year})</p>
-                      <p className="text-xs text-emerald-600">As abas de configuração e importação agora irão operar sobre esta versão.</p>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           )}
           {activeBudgetTab === 'expense_characteristics' && (
@@ -3850,13 +3909,13 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
   const viewTitles: Record<string, { title: string; subtitle: string; breadcrumb: string }> = {
     // Admin > Tauá Real
-    admin_real_versions: { title: 'Versões de Realizado', subtitle: 'Crie e gerencie as versões do Forecast (Real).', breadcrumb: 'Administração › Tauá Real › Versões' },
+    admin_real_versions: { title: 'Versões de Realizado', subtitle: 'Selecione a versão do realizado que deseja configurar clicando na engrenagem. É necessário escolher uma versão antes de editar configurações ou importar dados.', breadcrumb: 'Administração › Tauá Real › Versões' },
     admin_real_closure: { title: 'Fechamento', subtitle: 'Configure o fechamento mensal do Realizado.', breadcrumb: 'Administração › Tauá Real › Fechamento' },
     admin_real_import: { title: 'Importação de Dados', subtitle: 'Importe dados financeiros reais em lote.', breadcrumb: 'Administração › Tauá Real › Importação' },
     admin_real_schedule: { title: 'Cronograma', subtitle: 'Defina o cronograma de elaboração do forecast.', breadcrumb: 'Administração › Tauá Real › Cronograma' },
     admin_real_dre: { title: 'Parâmetros DRE', subtitle: 'Edite a estrutura e ordem da DRE do Forecast.', breadcrumb: 'Administração › Tauá Real › Parâmetros DRE' },
     // Admin > Tauá Budget
-    admin_budget_versions: { title: 'Versões de Orçamento', subtitle: 'Selecione a versão do orçamento que deseja configurar. É necessário escolher uma versão antes de editar configurações ou importar dados.', breadcrumb: 'Administração › Tauá Budget › Versões' },
+    admin_budget_versions: { title: 'Versões de Orçamento', subtitle: 'Selecione a versão do orçamento que deseja configurar clicando na engrenagem. É necessário escolher uma versão antes de editar configurações ou importar dados.', breadcrumb: 'Administração › Tauá Budget › Versões' },
     admin_budget_usali: { title: 'USALI / Config', subtitle: 'Configure a estrutura USALI e características.', breadcrumb: 'Administração › Tauá Budget › USALI' },
     admin_budget_labor: { title: 'Mão de Obra', subtitle: 'Parâmetros de encargos e projeções de pessoal.', breadcrumb: 'Administração › Tauá Budget › Mão de Obra' },
     admin_budget_import: { title: 'Importação da Meta', subtitle: 'Importe os dados da meta na versão selecionada.', breadcrumb: 'Administração › Tauá Budget › Importação da Meta' },
