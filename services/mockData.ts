@@ -692,8 +692,9 @@ export const getForecastData = (
       const namesToTry = item.importNames || [item.label];
       namesToTry.forEach(name => {
           valBudget += getImportedValue(name, selectedYear, 'Budget', crFilter);
-          valReal += getImportedValue(name, selectedYear, 'Real', crFilter);
           valPrevia += getImportedValue(name, selectedYear, 'Previa', crFilter);
+          valPrevia += getImportedValue(name, selectedYear, 'Real', crFilter); // Actuals go to Previa
+          valReal += 0; // Forecast column starts empty
           valLY += getImportedValue(name, (selectedYear || 0) - 1, 'Real', crFilter);
       });
       
@@ -710,23 +711,23 @@ export const getForecastData = (
 
   revExtraItems.forEach(item => {
       const valBudget = getImportedValue(item.label, selectedYear, 'Budget');
-      const valReal = getImportedValue(item.label, selectedYear, 'Real');
-      const valPrevia = getImportedValue(item.label, selectedYear, 'Previa');
+      const valPrevia = getImportedValue(item.label, selectedYear, 'Previa') + getImportedValue(item.label, selectedYear, 'Real');
+      const valReal = 0; // Empty Forecast
       const valLY = getImportedValue(item.label, (selectedYear || 0) - 1, 'Real');
       rows.push(generateRow(item.id, item.code, 'Revenue', item.label, valBudget, valReal, valLY, valPrevia, false, false, 2));
   });
   
   // 1.03 Cancelamento de Time Share
   const valBudgetTS = getImportedValue('Cancelamento de Time Share', selectedYear, 'Budget');
-  const valRealTS = getImportedValue('Cancelamento de Time Share', selectedYear, 'Real');
-  const valPreviaTS = getImportedValue('Cancelamento de Time Share', selectedYear, 'Previa');
+  const valPreviaTS = getImportedValue('Cancelamento de Time Share', selectedYear, 'Previa') + getImportedValue('Cancelamento de Time Share', selectedYear, 'Real');
+  const valRealTS = 0;
   const valLYTS = getImportedValue('Cancelamento de Time Share', (selectedYear || 0) - 1, 'Real');
   rows.push(generateRow('REV-TIME', '1.03', 'Revenue', 'Cancelamento de Time Share', valBudgetTS, valRealTS, valLYTS, valPreviaTS, false, false, 1));
 
   // 1.04 Receita de ISS
   const valBudgetISS = getImportedValue('Receita de ISS', selectedYear, 'Budget');
-  const valRealISS = getImportedValue('Receita de ISS', selectedYear, 'Real');
-  const valPreviaISS = getImportedValue('Receita de ISS', selectedYear, 'Previa');
+  const valPreviaISS = getImportedValue('Receita de ISS', selectedYear, 'Previa') + getImportedValue('Receita de ISS', selectedYear, 'Real');
+  const valRealISS = 0;
   const valLYISS = getImportedValue('Receita de ISS', (selectedYear || 0) - 1, 'Real');
   rows.push(generateRow('REV-ISS', '1.04', 'Revenue', 'Receita de ISS', valBudgetISS, valRealISS, valLYISS, valPreviaISS, false, false, 1));
 
@@ -734,8 +735,8 @@ export const getForecastData = (
 
   // 1.05 Impostos (Azul conforme Receita Líquida, recuo zero)
   const valBudgetImp = getImportedValue('Impostos', selectedYear, 'Budget');
-  const valRealImp = getImportedValue('Impostos', selectedYear, 'Real');
-  const valPreviaImp = getImportedValue('Impostos', selectedYear, 'Previa');
+  const valPreviaImp = getImportedValue('Impostos', selectedYear, 'Previa') + getImportedValue('Impostos', selectedYear, 'Real');
+  const valRealImp = 0;
   const valLYImp = getImportedValue('Impostos', (selectedYear || 0) - 1, 'Real');
   rows.push(generateRow('REV-IMP', '1.05', 'Revenue', 'Impostos', valBudgetImp, valRealImp, valLYImp, valPreviaImp, false, false, 0));
 
@@ -781,8 +782,8 @@ export const getForecastData = (
        // STANDARD PACKAGE - Aggregate values directly
        pkgAccs.forEach(acc => {
           pkgBudget += getImportedValue(acc.name, selectedYear, 'Budget');
-          pkgReal += getImportedValue(acc.name, selectedYear, 'Real');
-          pkgPrevia += getImportedValue(acc.name, selectedYear, 'Previa');
+          pkgPrevia += getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real');
+          pkgReal += 0;
           pkgLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
        });
        rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', pkgName, pkgBudget, pkgReal, pkgLY, pkgPrevia, true, false, 1));
@@ -800,8 +801,8 @@ export const getForecastData = (
 
            pkgAccs.forEach(acc => {
                subBudget += getImportedValue(acc.name, selectedYear, 'Budget', crFilter);
-               subReal += getImportedValue(acc.name, selectedYear, 'Real', crFilter);
-               subPrevia += getImportedValue(acc.name, selectedYear, 'Previa', crFilter);
+               subPrevia += getImportedValue(acc.name, selectedYear, 'Previa', crFilter) + getImportedValue(acc.name, selectedYear, 'Real', crFilter);
+               subReal += 0;
                subLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real', crFilter);
            });
 
@@ -970,8 +971,8 @@ export const getDynamicForecastData = (
       }
 
       const valBudget = getImportedValue(pkg.name, selectedYear, 'Budget');
-      const valReal = getImportedValue(pkg.name, selectedYear, 'Real');
-      const valPrevia = getImportedValue(pkg.name, selectedYear, 'Previa');
+      const valPrevia = getImportedValue(pkg.name, selectedYear, 'Previa') + getImportedValue(pkg.name, selectedYear, 'Real'); // Actuals to Previa
+      const valReal = 0; // Empty Forecast
       const valLY = getImportedValue(pkg.name, (selectedYear || 0) - 1, 'Real');
 
       rows.push(generateRow(
@@ -1003,8 +1004,8 @@ export const getDynamicForecastData = (
                 const crFilter = sub === 'Martech' ? 'Martech' : sub === 'Marketing' ? 'Marketing' : undefined;
 
                 const accBudget = getImportedValue(acc.name, selectedYear, 'Budget', crFilter) || (getImportedValue(acc.name, selectedYear, 'Budget') / 3);
-                const accReal = getImportedValue(acc.name, selectedYear, 'Real', crFilter) || (getImportedValue(acc.name, selectedYear, 'Real') / 3);
-                const accPrevia = getImportedValue(acc.name, selectedYear, 'Previa', crFilter) || (getImportedValue(acc.name, selectedYear, 'Previa') / 3);
+                const accPrevia = (getImportedValue(acc.name, selectedYear, 'Previa', crFilter) + getImportedValue(acc.name, selectedYear, 'Real', crFilter)) || (getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real')) / 3;
+                const accReal = 0;
                 const accLY = getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real', crFilter) || (getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real') / 3);
 
                 rows.push(generateRow(
@@ -1031,8 +1032,8 @@ export const getDynamicForecastData = (
                     const crFilter = sub === 'Martech' ? 'Martech' : sub === 'Marketing' ? 'Marketing' : undefined;
 
                     const accBudget = getImportedValue(acc.name, selectedYear, 'Budget', crFilter) || (getImportedValue(acc.name, selectedYear, 'Budget') / 3);
-                    const accReal = getImportedValue(acc.name, selectedYear, 'Real', crFilter) || (getImportedValue(acc.name, selectedYear, 'Real') / 3);
-                    const accPrevia = getImportedValue(acc.name, selectedYear, 'Previa', crFilter) || (getImportedValue(acc.name, selectedYear, 'Previa') / 3);
+                    const accPrevia = (getImportedValue(acc.name, selectedYear, 'Previa', crFilter) + getImportedValue(acc.name, selectedYear, 'Real', crFilter)) || (getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real')) / 3;
+                    const accReal = 0;
                     const accLY = getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real', crFilter) || (getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real') / 3);
 
                     rows.push(generateRow(`${acc.id}-${sub}`, acc.code, 'Account', accName, accBudget, accReal, accLY, accPrevia, false, false, 2));
@@ -1042,8 +1043,8 @@ export const getDynamicForecastData = (
         }
 
         const accBudget = getImportedValue(acc.name, selectedYear, 'Budget');
-        const accReal = getImportedValue(acc.name, selectedYear, 'Real');
-        const accPrevia = getImportedValue(acc.name, selectedYear, 'Previa');
+        const accPrevia = getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real');
+        const accReal = 0;
         const accLY = getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
 
         rows.push(generateRow(

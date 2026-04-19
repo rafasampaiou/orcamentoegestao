@@ -597,7 +597,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         style={{ width: columnWidths.previa }}
                                         className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 border-l border-sky-200 group relative"
                                     >
-                                        PRÉVIA
+                                        {isMonthClosed ? 'REAL' : 'PRÉVIA'}
                                         <div
                                             onMouseDown={(e) => handleResizeStart(e, 'previa')}
                                             className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
@@ -639,7 +639,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         style={{ width: columnWidths.deltaPreviaBudget }}
                                         className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 whitespace-pre-line leading-tight group relative"
                                     >
-                                        Δ<br />PRÉVIA - META
+                                        Δ<br />{isMonthClosed ? 'REAL' : 'PRÉVIA'} - META
                                         <div
                                             onMouseDown={(e) => handleResizeStart(e, 'deltaPreviaBudget')}
                                             className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
@@ -653,7 +653,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         style={{ width: columnWidths.deltaPreviaBudgetPct }}
                                         className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 border-r border-sky-200 whitespace-pre-line leading-tight group relative"
                                     >
-                                        Δ %<br />PRÉVIA - META
+                                        Δ %<br />{isMonthClosed ? 'REAL' : 'PRÉVIA'} - META
                                         <div
                                             onMouseDown={(e) => handleResizeStart(e, 'deltaPreviaBudgetPct')}
                                             className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
@@ -681,7 +681,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         style={{ width: columnWidths.deltaLY }}
                                         className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 whitespace-pre-line leading-tight group relative"
                                     >
-                                        Δ<br />PRÉVIA - 2025
+                                        Δ<br />{isMonthClosed ? 'REAL' : 'PRÉVIA'} - 2025
                                         <div
                                             onMouseDown={(e) => handleResizeStart(e, 'deltaLY')}
                                             className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
@@ -695,7 +695,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         style={{ width: columnWidths.deltaLYPct }}
                                         className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 whitespace-pre-line leading-tight group relative"
                                     >
-                                        Δ %<br />PRÉVIA - 2025
+                                        Δ %<br />{isMonthClosed ? 'REAL' : 'PRÉVIA'} - 2025
                                         <div
                                             onMouseDown={(e) => handleResizeStart(e, 'deltaLYPct')}
                                             className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
