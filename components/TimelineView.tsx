@@ -11,7 +11,6 @@ interface TimelineViewProps {
   onCreateVersion: (year: number, month: number, name: string) => void;
   onReplicateVersion?: (year: number, month: number) => void;
   onSetMain?: (id: string) => void;
-  onSetMain?: (id: string) => void;
   onDelete?: (id: string) => void;
   showCreateOption?: boolean;
   showSettingsIcon?: boolean;
@@ -179,7 +178,12 @@ const TimelineView: React.FC<TimelineViewProps> = ({
                     return (
                       <div 
                         key={version.id}
-                        className={`absolute top-0 h-14 rounded shadow-sm p-2 transition-all flex flex-col justify-start ${colorClass} text-white hover:opacity-90 ${isActive ? 'ring-2 ring-offset-2 ring-[#38b2ac]' : ''}`}
+                        onClick={!showSettingsIcon ? (e) => { 
+                          e.preventDefault(); 
+                          e.stopPropagation();
+                          onSelectVersion(version.id); 
+                        } : undefined}
+                        className={`absolute top-0 h-14 rounded shadow-sm p-2 transition-all flex flex-col justify-start ${colorClass} text-white ${isActive ? 'ring-2 ring-offset-2 ring-[#38b2ac]' : ''} ${!showSettingsIcon ? 'cursor-pointer hover:scale-[1.02] hover:shadow-md' : 'hover:opacity-95'}`}
                         style={{ 
                           left: `${leftOffset}px`, 
                           width: `${width}px` 
@@ -189,16 +193,20 @@ const TimelineView: React.FC<TimelineViewProps> = ({
                           <div className="absolute bottom-1 right-1 z-20">
                             <button 
                               type="button"
-                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onSelectVersion(isActive ? '' : version.id); }}
-                              className={`flex items-center justify-center bg-white rounded-md p-1 shadow-sm transition-all hover:scale-110 ${isActive ? 'opacity-100 animate-spin-slow text-emerald-500 ring-1 ring-emerald-500' : 'opacity-70 hover:opacity-100 text-gray-600'}`}
+                              onClick={(e) => { 
+                                e.preventDefault(); 
+                                e.stopPropagation(); 
+                                onSelectVersion(isActive ? '' : version.id); 
+                              }}
+                              className={`flex items-center justify-center bg-white rounded-md p-1 shadow-md transition-all hover:scale-110 active:scale-95 ${isActive ? 'opacity-100 animate-spin-slow text-emerald-500 ring-2 ring-emerald-500' : 'opacity-80 hover:opacity-100 text-gray-700 hover:text-gray-900 border border-gray-100'}`}
                               title={isActive ? 'Desmarcar configuração' : 'Selecionar para configuração'}
                             >
-                              <Settings size={14} />
+                              <Settings size={14} strokeWidth={2.5} />
                             </button>
                           </div>
                         )}
                         <div className="flex justify-between items-start">
-                          <div>
+                          <div className={!showSettingsIcon ? 'pointer-events-none' : ''}>
                             <div className="font-bold text-sm leading-tight max-w-[150px] truncate">{version.year}</div>
                             <div className="text-[10px] opacity-90 max-w-[150px] truncate leading-tight mt-0.5">{version.name}</div>
                           </div>

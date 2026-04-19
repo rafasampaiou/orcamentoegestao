@@ -2572,6 +2572,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               onToggleLock={(id) => handleToggleVersionLock(id, false)}
               onDelete={(id) => handleDeleteVersion(id, false)}
               onCreateVersion={handleCreateRealVersion}
+              showSettingsIcon={true}
             />
           )}
           {activeRealTab === 'closure' && (
@@ -2801,6 +2802,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 onToggleLock={(id) => handleToggleVersionLock(id, true)}
                 onDelete={(id) => handleDeleteVersion(id, true)}
                 onCreateVersion={handleCreateBudgetVersion}
+                showSettingsIcon={true}
               />
             </div>
           )}
