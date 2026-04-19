@@ -787,30 +787,49 @@ export const getForecastData = (
           pkgLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
        });
        rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', pkgName, pkgBudget, pkgReal, pkgLY, pkgPrevia, true, false, 1));
-    } else {
-       // SPECIAL PACKAGE - DRILL DOWN (ADMIN TI or SALES & MKT)
-       // Initial row with sum 0 (will be updated by children or kept 0 if header-only)
-       const displayPkgName = isAdminTI ? 'Despesas administrativas' : 'Despesas de vendas e marketing';
-       rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', displayPkgName, 0, 0, 0, 0, true, false, 1));
+    } else if (isAdminTI) {
+       // --- DESPESAS ADMINISTRATIVAS SPECIAL DRILL DOWN ---
+       rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', 'Despesas administrativas', 0, 0, 0, 0, true, false, 1));
+
+       let genBudget = 0; let genReal = 0; let genPrevia = 0; let genLY = 0;
+       const tiAccountKeyword = 'processamento';
        
+       pkgAccs.forEach(acc => {
+           if (acc.name.toLowerCase().includes(tiAccountKeyword)) return;
+           genBudget += getImportedValue(acc.name, selectedYear, 'Budget');
+           genPrevia += getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real');
+           genReal += 0;
+           genLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
+       });
+       rows.push(generateRow(`p-drill-${masterName}-${pkgName}-gerais`, pkgCode, 'Costs', 'Despesas administrativas gerais', genBudget, genReal, genLY, genPrevia, false, false, 2));
+
        const subAreas = ['Martech', 'Marketing', 'Outras áreas'];
+       const tiAcc = pkgAccs.find(acc => acc.name.toLowerCase().includes(tiAccountKeyword));
        
+       if (tiAcc) {
+           subAreas.forEach(sub => {
+               const crFilter = sub === 'Martech' ? 'martech' : sub === 'Marketing' ? 'marketing' : 'OTHER_EXCEPT_MKT_MAR';
+               const subBudget = getImportedValue(tiAcc.name, selectedYear, 'Budget', crFilter);
+               const subPrevia = getImportedValue(tiAcc.name, selectedYear, 'Previa', crFilter) + getImportedValue(tiAcc.name, selectedYear, 'Real', crFilter);
+               const subReal = 0;
+               const subLY = getImportedValue(tiAcc.name, (selectedYear || 0) - 1, 'Real', crFilter);
+               rows.push(generateRow(`p-drill-${masterName}-${pkgName}-${sub}`, pkgCode, 'Costs', `Processamentos de dados e TI (${sub})`, subBudget, subReal, subLY, subPrevia, false, false, 2));
+           });
+       }
+    } else if (isSalesMkt) {
+       // --- DESPESAS DE VENDAS E MARKETING SPECIAL DRILL DOWN ---
+       rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', 'Despesas de vendas e marketing', 0, 0, 0, 0, true, false, 1));
+       const subAreas = ['Martech', 'Marketing', 'Outras áreas'];
        subAreas.forEach(sub => {
            let subBudget = 0; let subReal = 0; let subPrevia = 0; let subLY = 0;
            const crFilter = sub === 'Martech' ? 'martech' : sub === 'Marketing' ? 'marketing' : 'OTHER_EXCEPT_MKT_MAR';
-
            pkgAccs.forEach(acc => {
                subBudget += getImportedValue(acc.name, selectedYear, 'Budget', crFilter);
                subPrevia += getImportedValue(acc.name, selectedYear, 'Previa', crFilter) + getImportedValue(acc.name, selectedYear, 'Real', crFilter);
                subReal += 0;
                subLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real', crFilter);
            });
-
-           const subLabel = isAdminTI 
-              ? `Processamentos de dados e TI (${sub})` 
-              : `Despesas de Vendas e Marketing (${sub})`;
-
-           rows.push(generateRow(`p-drill-${masterName}-${pkgName}-${sub}`, pkgCode, 'Costs', subLabel, subBudget, subReal, subLY, subPrevia, false, false, 2));
+           rows.push(generateRow(`p-drill-${masterName}-${pkgName}-${sub}`, pkgCode, 'Costs', `Despesas de Vendas e Marketing (${sub})`, subBudget, subReal, subLY, subPrevia, false, false, 2));
        });
     }
   });
@@ -989,59 +1008,57 @@ export const getDynamicForecastData = (
       // 3. Optional: Accounts within package
       const pkgAccs = currentAccounts.filter(a => a.package === pkg.name || a.packageId === pkg.id);
       
+      const isAdminPkg = pkg.name.toUpperCase() === 'DESPESAS ADMINISTRATIVAS';
+      const isSalesMktPkg = pkg.name.toUpperCase() === 'DESPESAS COM VENDAS E MARKETING';
+
+      if (isAdminPkg) {
+          // --- SPECIAL CASE: ADMINISTRATIVAS ---
+          // 1. Despesas administrativas gerais (All except TI)
+          let genBudget = 0; let genReal = 0; let genPrevia = 0; let genLY = 0;
+          const tiAccountKeyword = 'processamento';
+          
+          pkgAccs.forEach(acc => {
+              if (acc.name.toLowerCase().includes(tiAccountKeyword)) return;
+              genBudget += getImportedValue(acc.name, selectedYear, 'Budget');
+              genPrevia += getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real');
+              genReal += 0;
+              genLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
+          });
+          rows.push(generateRow(`p-drill-${pkg.id}-gerais`, '', 'Account', 'Despesas administrativas gerais', genBudget, genReal, genLY, genPrevia, false, false, 2));
+
+          // 2. TI Breakdown
+          const tiAcc = pkgAccs.find(acc => acc.name.toLowerCase().includes(tiAccountKeyword));
+          if (tiAcc) {
+              const subAreas = ['Martech', 'Marketing', 'Outras áreas'];
+              subAreas.forEach(sub => {
+                  const subLabel = `Processamentos de dados e TI (${sub})`;
+                  const crFilter = sub === 'Martech' ? 'Martech' : sub === 'Marketing' ? 'Marketing' : undefined;
+                  const accBudget = getImportedValue(tiAcc.name, selectedYear, 'Budget', crFilter) || (getImportedValue(tiAcc.name, selectedYear, 'Budget') / 3);
+                  const accPrevia = (getImportedValue(tiAcc.name, selectedYear, 'Previa', crFilter) + getImportedValue(tiAcc.name, selectedYear, 'Real', crFilter)) || (getImportedValue(tiAcc.name, selectedYear, 'Previa') + getImportedValue(tiAcc.name, selectedYear, 'Real')) / 3;
+                  rows.push(generateRow(`p-drill-${tiAcc.id}-${sub}`, tiAcc.code, 'Account', subLabel, accBudget, 0, getImportedValue(tiAcc.name, (selectedYear || 0) - 1, 'Real', crFilter), accPrevia, false, false, 2));
+              });
+          }
+          return; // Skip normal accounts
+      }
+
+      if (isSalesMktPkg) {
+          // --- SPECIAL CASE: SALES & MKT ---
+          const subAreas = ['Martech', 'Marketing', 'Outras áreas'];
+          subAreas.forEach(sub => {
+              const subLabel = `Despesas de Vendas e Marketing (${sub})`;
+              const crFilter = sub === 'Martech' ? 'Martech' : sub === 'Marketing' ? 'Marketing' : undefined;
+              let sBudget = 0; let sPrevia = 0; let sLY = 0;
+              pkgAccs.forEach(acc => {
+                  sBudget += getImportedValue(acc.name, selectedYear, 'Budget', crFilter) || (getImportedValue(acc.name, selectedYear, 'Budget') / 3);
+                  sPrevia += (getImportedValue(acc.name, selectedYear, 'Previa', crFilter) + getImportedValue(acc.name, selectedYear, 'Real', crFilter)) || (getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real')) / 3;
+                  sLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real', crFilter) || (getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real') / 3);
+              });
+              rows.push(generateRow(`p-drill-${pkg.id}-${sub}`, '', 'Account', subLabel, sBudget, 0, sLY, sPrevia, false, false, 2));
+          });
+          return; // Skip normal accounts
+      }
+
       pkgAccs.forEach(acc => {
-        // --- CUSTOM LOGIC FOR TI/MARKETING BREAKDOWN ---
-        const isAdminTI = pkg.name === 'DESPESAS ADMINISTRATIVAS' && (acc.name.toLowerCase().includes('processamento de dados') || acc.name.toLowerCase().includes('ti'));
-        const isSalesMkt = pkg.name === 'DESPESAS COM VENDAS E MARKETING';
-
-        if (isAdminTI) {
-            // Split TI into Martech, Marketing, Outras áreas
-            const subAreas = ['Martech', 'Marketing', 'Outras áreas'];
-            subAreas.forEach(sub => {
-                // For demo/mock purposes, we filter by CR or just split if no data
-                // In a real scenario, we'd check if the CR belongs to Martech/Marketing/Others
-                const subLabel = `Processamentos de dados e TI (${sub})`;
-                const crFilter = sub === 'Martech' ? 'Martech' : sub === 'Marketing' ? 'Marketing' : undefined;
-
-                const accBudget = getImportedValue(acc.name, selectedYear, 'Budget', crFilter) || (getImportedValue(acc.name, selectedYear, 'Budget') / 3);
-                const accPrevia = (getImportedValue(acc.name, selectedYear, 'Previa', crFilter) + getImportedValue(acc.name, selectedYear, 'Real', crFilter)) || (getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real')) / 3;
-                const accReal = 0;
-                const accLY = getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real', crFilter) || (getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real') / 3);
-
-                rows.push(generateRow(
-                  `p-drill-${acc.id}-${sub}`, // Added p-drill prefix
-                  acc.code, 
-                  'Account', 
-                  subLabel, 
-                  accBudget, accReal, accLY, accPrevia, 
-                  false, 
-                  false, 
-                  2
-                ));
-            });
-            return; // Skip original TI row
-        }
-
-        if (isSalesMkt) {
-            // Check if this account should be split or handled specifically
-            const isMktTarget = acc.name.toUpperCase().includes('MARKETING') || acc.name.toUpperCase().includes('PROPAGANDA');
-            if (isMktTarget && !acc.name.includes('(')) {
-                const subAreas = ['Martech', 'Marketing', 'Outras áreas'];
-                subAreas.forEach(sub => {
-                    const subLabel = `Despesas de Vendas e Marketing (${sub})`;
-                    const crFilter = sub === 'Martech' ? 'Martech' : sub === 'Marketing' ? 'Marketing' : undefined;
-
-                    const accBudget = getImportedValue(acc.name, selectedYear, 'Budget', crFilter) || (getImportedValue(acc.name, selectedYear, 'Budget') / 3);
-                    const accPrevia = (getImportedValue(acc.name, selectedYear, 'Previa', crFilter) + getImportedValue(acc.name, selectedYear, 'Real', crFilter)) || (getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real')) / 3;
-                    const accReal = 0;
-                    const accLY = getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real', crFilter) || (getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real') / 3);
-
-                    rows.push(generateRow(`p-drill-${acc.id}-${sub}`, acc.code, 'Account', subLabel, accBudget, accReal, accLY, accPrevia, false, false, 2));
-                });
-                return;
-            }
-        }
-
         const accBudget = getImportedValue(acc.name, selectedYear, 'Budget');
         const accPrevia = getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real');
         const accReal = 0;
