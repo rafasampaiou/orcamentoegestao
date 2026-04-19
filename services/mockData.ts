@@ -772,51 +772,47 @@ export const getForecastData = (
     const pkgAccs = expenseAccounts.filter(a => a.masterPackage === masterName && a.package === pkgName);
     const pkgCode = pkgAccs[0]?.packageCode || '';
     
-    // Initial Package Header row - we'll calculate its totals by summing its accounts/sub-areas
-    let pkgBudget = 0; let pkgPrevia = 0; let pkgLY = 0;
+    // Check for special drill-down cases
+    const isAdminTI = masterName === 'DESPESAS ADMINISTRATIVAS' && pkgName === 'Despesas Administrativas';
+    const isSalesMkt = masterName === 'DESPESAS COM VENDAS E MARKETING' && pkgName === 'Despesas com Vendas e Marketing';
 
-    // Accounts for this package
-    const packageRows: ForecastRow[] = [];
+    let pkgBudget = 0; let pkgReal = 0; let pkgPrevia = 0; let pkgLY = 0;
 
-    pkgAccs.forEach(acc => {
-        const isAdminTI = masterName === 'DESPESAS ADMINISTRATIVAS' && (acc.name.toLowerCase().includes('processamento de dados') || acc.name.toLowerCase().includes('ti'));
-        const isSalesMkt = masterName === 'DESPESAS COM VENDAS E MARKETING' && (acc.name.toLowerCase().includes('vendas e marketing') || acc.name.toLowerCase().includes('marketing'));
+    if (!isAdminTI && !isSalesMkt) {
+       // STANDARD PACKAGE - Aggregate values directly
+       pkgAccs.forEach(acc => {
+          pkgBudget += getImportedValue(acc.name, selectedYear, 'Budget');
+          pkgPrevia += getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real');
+          pkgReal += 0;
+          pkgLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
+       });
+       rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', pkgName, pkgBudget, pkgReal, pkgLY, pkgPrevia, true, false, 1));
+    } else {
+       // SPECIAL PACKAGE - DRILL DOWN (ADMIN TI or SALES & MKT)
+       // Initial row with sum 0 (will be updated by children or kept 0 if header-only)
+       const displayPkgName = isAdminTI ? 'Despesas administrativas' : 'Despesas de vendas e marketing';
+       rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', displayPkgName, 0, 0, 0, 0, true, false, 1));
+       
+       const subAreas = ['Martech', 'Marketing', 'Outras áreas'];
+       
+       subAreas.forEach(sub => {
+           let subBudget = 0; let subReal = 0; let subPrevia = 0; let subLY = 0;
+           const crFilter = sub === 'Martech' ? 'martech' : sub === 'Marketing' ? 'marketing' : 'OTHER_EXCEPT_MKT_MAR';
 
-        if (isAdminTI || isSalesMkt) {
-            // Split into sub-areas
-            const subAreas = ['Martech', 'Marketing', 'Outras áreas'];
-            subAreas.forEach(sub => {
-                const crFilter = sub === 'Martech' ? 'martech' : sub === 'Marketing' ? 'marketing' : 'OTHER_EXCEPT_MKT_MAR';
-                
-                const subBudget = getImportedValue(acc.name, selectedYear, 'Budget', crFilter);
-                const subPrevia = getImportedValue(acc.name, selectedYear, 'Previa', crFilter) + getImportedValue(acc.name, selectedYear, 'Real', crFilter);
-                const subLY = getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real', crFilter);
+           pkgAccs.forEach(acc => {
+               subBudget += getImportedValue(acc.name, selectedYear, 'Budget', crFilter);
+               subPrevia += getImportedValue(acc.name, selectedYear, 'Previa', crFilter) + getImportedValue(acc.name, selectedYear, 'Real', crFilter);
+               subReal += 0;
+               subLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real', crFilter);
+           });
 
-                const subLabel = `${acc.name} (${sub})`;
-                packageRows.push(generateRow(`p-drill-${acc.id}-${sub}`, acc.code, 'Costs', subLabel, subBudget, 0, subLY, subPrevia, false, false, 2));
-                
-                pkgBudget += subBudget;
-                pkgPrevia += subPrevia;
-                pkgLY += subLY;
-            });
-        } else {
-            // Standard account
-            const accBudget = getImportedValue(acc.name, selectedYear, 'Budget');
-            const accPrevia = getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real');
-            const accLY = getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
+           const subLabel = isAdminTI 
+              ? `Processamentos de dados e TI (${sub})` 
+              : `Despesas de Vendas e Marketing (${sub})`;
 
-            packageRows.push(generateRow(acc.id, acc.code, 'Costs', acc.name, accBudget, 0, accLY, accPrevia, false, false, 2));
-            
-            pkgBudget += accBudget;
-            pkgPrevia += accPrevia;
-            pkgLY += accLY;
-        }
-    });
-
-    // Add the package header with calculated totals
-    rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', pkgName, pkgBudget, 0, pkgLY, pkgPrevia, true, false, 1));
-    // Add the accounts
-    rows.push(...packageRows);
+           rows.push(generateRow(`p-drill-${masterName}-${pkgName}-${sub}`, pkgCode, 'Costs', subLabel, subBudget, subReal, subLY, subPrevia, false, false, 2));
+       });
+    }
   });
 
   // 4. RESULTS
@@ -1004,19 +1000,19 @@ export const getDynamicForecastData = (
             subAreas.forEach(sub => {
                 // For demo/mock purposes, we filter by CR or just split if no data
                 // In a real scenario, we'd check if the CR belongs to Martech/Marketing/Others
-                const accName = `${acc.name} (${sub})`;
-                const crFilter = sub === 'Martech' ? 'martech' : sub === 'Marketing' ? 'marketing' : 'OTHER_EXCEPT_MKT_MAR';
+                const subLabel = `Processamentos de dados e TI (${sub})`;
+                const crFilter = sub === 'Martech' ? 'Martech' : sub === 'Marketing' ? 'Marketing' : undefined;
 
-                const accBudget = getImportedValue(acc.name, selectedYear, 'Budget', crFilter);
-                const accPrevia = getImportedValue(acc.name, selectedYear, 'Previa', crFilter) + getImportedValue(acc.name, selectedYear, 'Real', crFilter);
+                const accBudget = getImportedValue(acc.name, selectedYear, 'Budget', crFilter) || (getImportedValue(acc.name, selectedYear, 'Budget') / 3);
+                const accPrevia = (getImportedValue(acc.name, selectedYear, 'Previa', crFilter) + getImportedValue(acc.name, selectedYear, 'Real', crFilter)) || (getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real')) / 3;
                 const accReal = 0;
-                const accLY = getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real', crFilter);
+                const accLY = getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real', crFilter) || (getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real') / 3);
 
                 rows.push(generateRow(
-                  `${acc.id}-${sub}`, 
+                  `p-drill-${acc.id}-${sub}`, // Added p-drill prefix
                   acc.code, 
                   'Account', 
-                  accName, 
+                  subLabel, 
                   accBudget, accReal, accLY, accPrevia, 
                   false, 
                   false, 
@@ -1032,15 +1028,15 @@ export const getDynamicForecastData = (
             if (isMktTarget && !acc.name.includes('(')) {
                 const subAreas = ['Martech', 'Marketing', 'Outras áreas'];
                 subAreas.forEach(sub => {
-                    const accName = `${acc.name} (${sub})`;
-                    const crFilter = sub === 'Martech' ? 'martech' : sub === 'Marketing' ? 'marketing' : 'OTHER_EXCEPT_MKT_MAR';
+                    const subLabel = `Despesas de Vendas e Marketing (${sub})`;
+                    const crFilter = sub === 'Martech' ? 'Martech' : sub === 'Marketing' ? 'Marketing' : undefined;
 
-                    const accBudget = getImportedValue(acc.name, selectedYear, 'Budget', crFilter);
-                    const accPrevia = getImportedValue(acc.name, selectedYear, 'Previa', crFilter) + getImportedValue(acc.name, selectedYear, 'Real', crFilter);
+                    const accBudget = getImportedValue(acc.name, selectedYear, 'Budget', crFilter) || (getImportedValue(acc.name, selectedYear, 'Budget') / 3);
+                    const accPrevia = (getImportedValue(acc.name, selectedYear, 'Previa', crFilter) + getImportedValue(acc.name, selectedYear, 'Real', crFilter)) || (getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real')) / 3;
                     const accReal = 0;
-                    const accLY = getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real', crFilter);
+                    const accLY = getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real', crFilter) || (getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real') / 3);
 
-                    rows.push(generateRow(`${acc.id}-${sub}`, acc.code, 'Account', accName, accBudget, accReal, accLY, accPrevia, false, false, 2));
+                    rows.push(generateRow(`p-drill-${acc.id}-${sub}`, acc.code, 'Account', subLabel, accBudget, accReal, accLY, accPrevia, false, false, 2));
                 });
                 return;
             }

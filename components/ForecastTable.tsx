@@ -65,7 +65,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         }));
         return recalculateTotals(initializedData, packages, accounts);
     });
-    const [showDetails, setShowDetails] = useState(true);
+    const [showDetails, setShowDetails] = useState(false);
     const [calculationBase, setCalculationBase] = useState<'forecast' | 'previa'>('forecast');
     const [kpiBasis, setKpiBasis] = useState<'with_tax' | 'no_tax'>('with_tax');
 
@@ -359,6 +359,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
             // 3. Controlar visibilidade das Contas (Linhas de detalhe)
             if (!row.isHeader) {
+                // EXCEÇÃO: Mostrar sempre as linhas de drill-down de TI/Marketing
+                if (row.id.includes('p-drill-')) return true;
+
                 // Se o botão "Mostrar Contas" estiver ativado, mostra todas as contas
                 if (showDetails) return true;
             }
@@ -667,7 +670,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         style={{ width: columnWidths.lastYear }}
                                         className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 group relative"
                                     >
-                                        2025 (LY)
+                                        Last Year
                                         <div
                                             onMouseDown={(e) => handleResizeStart(e, 'lastYear')}
                                             className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
@@ -681,7 +684,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         style={{ width: columnWidths.deltaLY }}
                                         className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 whitespace-pre-line leading-tight group relative"
                                     >
-                                        Δ<br />{isMonthClosed ? 'REAL' : 'PRÉVIA'} - 2025
+                                        Δ<br />{isMonthClosed ? 'REAL' : 'PRÉVIA'} - LY
                                         <div
                                             onMouseDown={(e) => handleResizeStart(e, 'deltaLY')}
                                             className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
@@ -695,7 +698,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         style={{ width: columnWidths.deltaLYPct }}
                                         className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 whitespace-pre-line leading-tight group relative"
                                     >
-                                        Δ %<br />{isMonthClosed ? 'REAL' : 'PRÉVIA'} - 2025
+                                        Δ %<br />{isMonthClosed ? 'REAL' : 'PRÉVIA'} - LY
                                         <div
                                             onMouseDown={(e) => handleResizeStart(e, 'deltaLYPct')}
                                             className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
