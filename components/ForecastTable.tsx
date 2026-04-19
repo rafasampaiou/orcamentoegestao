@@ -112,7 +112,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 const nextRow = visibleData[nextIndex];
                 const nextInputId = `input-${field}-${nextRow.id}`;
                 const nextInput = inputRefs.current[nextInputId];
-                
+
                 if (nextInput) {
                     nextInput.focus();
                     nextInput.select();
@@ -167,7 +167,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     // and we only update state when the derived data actually changes from props.
     const derivedData = useMemo(() => {
         const forecastStructure = dreConfigs?.['Forecast'] || [];
-        
+
         let newData: ForecastRow[];
         if (forecastStructure.length > 0) {
             newData = getDynamicForecastData(forecastStructure, selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData);
@@ -248,12 +248,12 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         setData(prevData => {
             const newData = prevData.map(row => {
                 if (row.id !== rowId) return row;
-                
+
                 // Sync Forecast with Prévia for Occupancy Indicators
                 if (field === 'previa' && (row.id === 'IND-1' || row.id === 'IND-2')) {
                     return { ...row, previa: value, real: value, isManualPreviaOverride: true, isManualOverride: true };
                 }
-                
+
                 if (field === 'real') {
                     return { ...row, real: value, isManualOverride: true };
                 } else if (field === 'previa') {
@@ -734,14 +734,15 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     const isManualRow = ['IND-MO-2', 'IND-MO-3'].includes(row.id);
 
                                     const isEditableCost = row.category === 'Costs';
-                                    if (!isIndicator && (!isHeaderOrTotal || isEditableCost)) {
+                                    const isEditableSpecial = isSpecialEditableRow(row.id);
+                                    if (!isIndicator && (!isHeaderOrTotal || isEditableCost || isEditableSpecial)) {
                                         if (isMonthClosed) {
                                             // CLOSED MONTH: Read Only Standard
                                             realCellContent = <span className="text-gray-800 font-medium">{formatValue(row.real, formatType)}</span>;
                                             previaCellContent = <span className="text-gray-800 font-medium">{formatValue(row.previa, formatType)}</span>;
                                         } else {
                                             // FORECAST (REAL) EDITING
-                                            if (row.forecastConfig.method === 'Fixed' || isEditableCost) {
+                                            if (row.forecastConfig.method === 'Fixed' || isEditableCost || isEditableSpecial) {
                                                 realCellContent = (
                                                     <input
                                                         ref={el => { inputRefs.current[`input-real-${row.id}`] = el; }}
@@ -763,7 +764,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             }
 
                                             // PREVIA EDITING
-                                            if ((row.previaConfig?.method || 'Fixed') === 'Fixed' || isEditableCost) {
+                                            if ((row.previaConfig?.method || 'Fixed') === 'Fixed' || isEditableCost || isEditableSpecial) {
                                                 previaCellContent = (
                                                     <input
                                                         ref={el => { inputRefs.current[`input-previa-${row.id}`] = el; }}
@@ -857,7 +858,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         <>
                                             {/* PRÉVIA */}
                                             {columnVisibility.previa && (
-                                                <td 
+                                                <td
                                                     style={textStyle}
                                                     className={`px-2 py-1 text-right border-r border-gray-100 tabular-nums ${previaBg} truncate`}
                                                 >
@@ -867,7 +868,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
                                             {/* FORECAST */}
                                             {columnVisibility.real && (
-                                                <td 
+                                                <td
                                                     style={textStyle}
                                                     className={`px-2 py-1 text-right border-l border-gray-200 tabular-nums ${effectiveText} ${effectiveBg} truncate`}
                                                 >
@@ -877,7 +878,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
                                             {/* META */}
                                             {columnVisibility.budget && (
-                                                <td 
+                                                <td
                                                     style={textStyle}
                                                     className={`px-2 py-1 text-right border-r border-gray-100 tabular-nums ${isBlueHighlight ? 'text-sky-900' : 'text-slate-500'} truncate`}
                                                 >
@@ -901,7 +902,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
                                             {/* LAST YEAR */}
                                             {columnVisibility.lastYear && (
-                                                <td 
+                                                <td
                                                     style={textStyle}
                                                     className={`px-2 py-1 text-right tabular-nums border-r border-gray-100 bg-orange-50/20 text-slate-500 truncate`}
                                                 >
@@ -1015,9 +1016,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                         ${row.id === 'REV-IMP' ? 'bg-sky-100 border-y-2 border-sky-300 font-bold text-sky-950 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.5)]' : ''}
                     `}
                                     >
-                                        <td 
+                                        <td
                                             style={rowTextStyle}
-                                            className={`px-2 py-1 border-r border-gray-100 align-middle sticky left-0 z-20 bg-white group-hover:bg-indigo-50/30 ${isTotal ? 'bg-indigo-50' : ''}`}
+                                            className={`px-2 py-1 border-r border-gray-100 align-middle sticky left-0 z-20 ${row.id === 'REV-IMP' ? 'bg-sky-100' : 'bg-white'} group-hover:bg-indigo-50/30 ${isTotal ? 'bg-indigo-50' : ''}`}
                                         >
                                             <div style={{ paddingLeft: `${(row.indentLevel || 0) * 16 + 12}px` }} className={`truncate text-xs ${isTotal ? 'uppercase tracking-wide' : ''}`}>
                                                 {displayLabel}
@@ -1273,7 +1274,7 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
         const occ = rowMap.get('IND-2')?.[field] || 0;
         const revApt = rowMap.get('REV-APT')?.[field] || 0;
         const revExtra = rowMap.get('REV-EXTRA')?.[field] || 0;
-        
+
         const dm = rowMap.get('IND-4');
         if (dm) dm[field] = occ > 0 ? revApt / occ : 0;
 
@@ -1343,7 +1344,7 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
     // --- REVENUE & RESULTS CALCULATIONS ---
     ['real', 'budget', 'lastYear', 'previa'].forEach(f => {
         const field = f as 'real' | 'budget' | 'lastYear' | 'previa';
-        
+
         const revTotal = rowMap.get('REV-TOTAL')?.[field] || 0;
         const revIss = rowMap.get('REV-ISS')?.[field] || 0;
         const revImp = rowMap.get('REV-IMP')?.[field] || 0;

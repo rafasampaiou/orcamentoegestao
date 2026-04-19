@@ -698,8 +698,6 @@ export const getForecastData = (
       rows.push(generateRow(item.id, item.code, 'Revenue', item.label, valBudget, valReal, valLY, valPrevia, false, false, 2));
   });
 
-  rows.push(generateRow('SPACER-APT-EXTRA', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
-
   // 1.02 Receitas Extras
   rows.push(generateRow('REV-EXTRA', '1.02', 'Revenue', 'Receitas Extras', 0, 0, 0, 0, true, false, 1));
   
