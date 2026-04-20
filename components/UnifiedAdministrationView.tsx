@@ -393,6 +393,10 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   }, [currentView]);
 
   // Sub-tabs for Tauá Real
+  React.useEffect(() => {
+    fetchImportHistory();
+  }, []);
+
   const [activeRealTab, setActiveRealTab] = useState<'versions' | 'closure' | 'import' | 'labor' | 'schedule' | 'dre_params'>('versions');
   const [realFilterYear, setRealFilterYear] = useState<number>(new Date().getFullYear());
 
@@ -433,32 +437,48 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   };
 
   const recordImportHistory = async (rows: ImportedRow[]) => {
-    const groups = new Map<string, Set<string>>();
-    // Key: hotel|tipo|ano|versionId
+    const groups = new Map<string, { months: Set<string>, total: number, versionId: string | null }>();
+    
     rows.forEach(r => {
       const tipoNormalized = r.tipo?.toLowerCase().includes('receita') ? 'Receita' : 'Despesa';
-      const key = `${r.hotel}|${tipoNormalized}|${r.ano}|${r.versionId || ''}`;
-      if (!groups.has(key)) groups.set(key, new Set());
-      groups.get(key)!.add(r.mes);
+      // Safety: ensure r.ano is a string before splitting/keying
+      const yearStr = String(r.ano || new Date().getFullYear());
+      const key = `${r.hotel}|${tipoNormalized}|${yearStr}|${r.versionId || ''}`;
+      
+      if (!groups.has(key)) {
+        groups.set(key, { months: new Set(), total: 0, versionId: r.versionId || null });
+      }
+      
+      const group = groups.get(key)!;
+      group.months.add(String(r.mes));
+      
+      // Clean and parse value
+      const valStr = (r.valor || '0').toString().replace(/\./g, '').replace(',', '.');
+      const valParsed = parseFloat(valStr) || 0;
+      group.total += valParsed;
     });
 
-    const entries = Array.from(groups.entries()).map(([key, months]) => {
-      const [hotel, tipo, ano, versionId] = key.split('|');
-      const sortedMonths = Array.from(months)
+    const entries = Array.from(groups.entries()).map(([key, data]) => {
+      const [hotel, tipo, ano] = key.split('|');
+      const sortedMonths = Array.from(data.months)
         .map(Number)
+        .filter(m => !isNaN(m))
         .sort((a, b) => a - b);
       
       const monthNames = sortedMonths.map(m => {
-        return new Date(2024, m - 1).toLocaleString('pt-BR', { month: 'short' });
+        try {
+          return new Date(2024, m - 1).toLocaleString('pt-BR', { month: 'short' });
+        } catch(e) { return m; }
       }).join(', ');
 
       return {
         hotel,
         tipo,
-        ano,
+        ano: parseInt(ano) || new Date().getFullYear(), // This fixed the "NaN" error
         meses: monthNames,
-        version_id: versionId || null,
-        user_id: null 
+        version_id: data.versionId,
+        user_id: null,
+        valor_total: Math.abs(data.total)
       };
     });
 
@@ -469,6 +489,74 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       console.error("Falha ao salvar histórico de importação", e);
     }
   };
+
+  const renderImportHistoryTable = () => (
+    <div className="mt-8 pt-8 border-t border-gray-100">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+          <Database className="text-indigo-600" size={20} />
+          Histórico de Importações Recentes
+        </h3>
+        <button 
+          onClick={fetchImportHistory} 
+          className="text-indigo-600 hover:text-indigo-800 flex items-center gap-1 text-sm font-bold bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors border border-indigo-100"
+        >
+          <Layout size={14} /> Atualizar Histórico
+        </button>
+      </div>
+      
+      {isLoadingHistory ? (
+        <div className="py-12 text-center text-gray-400 italic bg-gray-50/50 rounded-xl border border-dashed border-gray-200">
+          Carregando histórico...
+        </div>
+      ) : (
+        <div className="overflow-hidden border border-gray-200 rounded-xl shadow-sm bg-white">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Data/Hora</th>
+                  <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Hotel</th>
+                  <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Tipo/Cenário</th>
+                  <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider text-center">Ano</th>
+                  <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Meses</th>
+                  <th className="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase tracking-wider">Valor Total</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200 text-xs">
+                {importHistory.length > 0 ? (
+                  importHistory.map(log => (
+                    <tr key={log.id} className="hover:bg-indigo-50/30 transition-colors">
+                      <td className="px-4 py-3 whitespace-nowrap text-gray-500">
+                        {new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(log.created_at))}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap font-bold text-gray-700">{log.hotel}</td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                          log.tipo === 'Receita' ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'
+                        }`}>
+                          {log.tipo}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-center text-gray-600 font-medium">{log.ano}</td>
+                      <td className="px-4 py-3 text-gray-500 max-w-[150px] truncate" title={log.meses}>{log.meses}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-right font-mono font-bold text-indigo-900">
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(log.valor_total || 0)}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-12 text-center text-gray-400 italic text-sm">Nenhum registro de importação encontrado.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 
   const [userLogs, setUserLogs] = useState([
     { id: '1', userId: 'u1', userName: 'Carlos Silva', userUnit: 'Tauá Resort Caeté', action: 'Atualizou Forecast DRE', timestamp: new Date(Date.now() - 3600000).toISOString() },
@@ -2054,6 +2142,75 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     }
   };
 
+  const renderImportHistory = () => (
+    <div className="mt-8 pt-8 border-t border-gray-100">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+          <Database className="text-indigo-600" size={20} />
+          Histórico de Importações
+        </h3>
+        <button onClick={fetchImportHistory} className="text-indigo-600 hover:text-indigo-800 flex items-center gap-1 text-sm font-bold bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors">
+          <Layout size={14} /> Atualizar Histórico
+        </button>
+      </div>
+      
+      {isLoadingHistory ? (
+        <div className="py-12 text-center text-gray-400 italic">Carregando histórico...</div>
+      ) : (
+        <div className="overflow-hidden border border-gray-200 rounded-xl shadow-sm bg-white">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Data/Hora</th>
+                <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Hotel</th>
+                <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Cenário</th>
+                <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase text-center">Ano</th>
+                <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Meses</th>
+                <th className="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase">Valor Total</th>
+                <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Versão</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200 text-xs">
+              {importHistory.map(log => {
+                const version = [...realVersions, ...budgetVersions].find(v => v.id === log.version_id);
+                return (
+                  <tr key={log.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 whitespace-nowrap text-gray-500">
+                      {new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(log.created_at))}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap font-bold text-gray-700">{log.hotel}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                        log.tipo === 'Receita' ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'
+                      }`}>
+                        {log.tipo}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-center text-gray-600 font-medium">{log.ano}</td>
+                    <td className="px-4 py-3 text-gray-500 max-w-[150px] truncate" title={log.meses}>{log.meses}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-right font-mono font-bold text-indigo-900 bg-indigo-50/30">
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(log.valor_total || 0)}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-gray-600 text-[10px] bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200 truncate inline-block max-w-[120px]">
+                        {version?.name || log.version_id || '-'}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+              {importHistory.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-12 text-center text-gray-400 italic text-sm">Nenhum registro de importação encontrado.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+
   // ─── Budget 2026 Import (13-column format) ─────────────────────────────────
   const handleBudgetCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -2715,6 +2872,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                   <ImportPreview summaryRows={summaryRows} errorRows={errorRows} onCancel={() => setImportStep('input')} onConfirm={handleFinalImport} importMode={importMode} setImportMode={setImportMode} realVersions={realVersions} budgetVersions={budgetVersions} />
                 )}
               </div>
+
+              {/* Persistant History below import frame */}
+              {renderImportHistoryTable()}
             </div>
             )
           )}
@@ -3121,16 +3281,11 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                       ? <><strong>{budgetImportSavedCount}</strong> registros foram salvos com sucesso na versão <strong>{selectedBudgetVersion?.name}</strong> e estão disponíveis como <strong>Meta</strong> no Tauá Real.</>
                       : 'Dados importados com sucesso.'}
                   </p>
-                  <div className="flex gap-3 justify-center">
-                    <button
-                      onClick={() => { setBudgetImportStep('input'); setBudgetImportText(''); setBudgetParsedData([]); setBudgetImportSavedCount(null); }}
-                      className="px-6 py-2.5 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700"
-                    >
-                      Nova Importação
-                    </button>
-                  </div>
                 </div>
               )}
+
+              {/* Persistant History below import frame */}
+              {renderImportHistoryTable()}
             </div>
             )
           )}
@@ -3810,65 +3965,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 </button>
               </div>
 
-              {activeImportTab === 'history' && (
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h4 className="font-bold text-gray-700">Log de Importações Recentes</h4>
-                    <button onClick={fetchImportHistory} className="text-indigo-600 hover:text-indigo-800 flex items-center gap-1 text-xs font-bold">
-                      <Layout size={14} /> Atualizar
-                    </button>
-                  </div>
-                  
-                  {isLoadingHistory ? (
-                    <div className="py-12 text-center text-gray-400 italic">Carregando histórico...</div>
-                  ) : (
-                    <div className="overflow-hidden border border-gray-200 rounded-xl shadow-sm">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Data/Hora</th>
-                            <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Hotel</th>
-                            <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Tipo</th>
-                            <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Ano</th>
-                            <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Meses</th>
-                            <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Versão</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200 text-xs">
-                          {importHistory.map(log => {
-                            const version = [...realVersions, ...budgetVersions].find(v => v.id === log.version_id);
-                            return (
-                              <tr key={log.id} className="hover:bg-gray-50 transition-colors">
-                                <td className="px-4 py-3 whitespace-nowrap text-gray-500">
-                                  {new Date(log.created_at).toLocaleString('pt-BR')}
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap font-bold text-gray-700">{log.hotel}</td>
-                                <td className="px-4 py-3 whitespace-nowrap">
-                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                                    log.tipo === 'Receita' ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'
-                                  }`}>
-                                    {log.tipo}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-gray-600">{log.ano}</td>
-                                <td className="px-4 py-3 text-gray-500 max-w-[200px] truncate" title={log.meses}>{log.meses}</td>
-                                <td className="px-4 py-3 whitespace-nowrap text-indigo-600 font-medium">
-                                  {version?.name || log.version_id || '-'}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                          {importHistory.length === 0 && (
-                            <tr>
-                              <td colSpan={6} className="px-4 py-12 text-center text-gray-400 italic">Nenhum histórico encontrado.</td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              )}
 
               {activeImportTab === 'costCenters' && (
                 <div className="space-y-4">
@@ -4127,6 +4223,15 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                       </div>
                     </div>
                   )}
+
+                  {/* Persistent History below Account Import frame */}
+                  {renderImportHistoryTable()}
+                </div>
+              )}
+
+              {activeImportTab === 'history' && (
+                <div className="space-y-4">
+                  {renderImportHistoryTable()}
                 </div>
               )}
             </div>

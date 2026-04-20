@@ -1027,15 +1027,27 @@ export const getDynamicForecastData = (
           rows.push(generateRow(`p-drill-${pkg.id}-gerais`, '', 'Account', 'Despesas administrativas gerais', genBudget, genReal, genLY, genPrevia, false, false, 2));
 
           // 2. TI Breakdown
-          const tiAcc = pkgAccs.find(acc => acc.name.toLowerCase().includes(tiAccountKeyword));
-          if (tiAcc) {
+          const tiAccounts = pkgAccs.filter(acc => acc.name.toLowerCase().includes(tiAccountKeyword));
+          if (tiAccounts.length > 0) {
               const subAreas = ['Martech', 'Marketing', 'Outras áreas'];
               subAreas.forEach(sub => {
                   const subLabel = `Processamentos de dados e TI (${sub})`;
                   const crFilter = sub === 'Martech' ? 'Martech' : sub === 'Marketing' ? 'Marketing' : undefined;
-                  const accBudget = getImportedValue(tiAcc.name, selectedYear, 'Budget', crFilter) || (getImportedValue(tiAcc.name, selectedYear, 'Budget') / 3);
-                  const accPrevia = (getImportedValue(tiAcc.name, selectedYear, 'Previa', crFilter) + getImportedValue(tiAcc.name, selectedYear, 'Real', crFilter)) || (getImportedValue(tiAcc.name, selectedYear, 'Previa') + getImportedValue(tiAcc.name, selectedYear, 'Real')) / 3;
-                  rows.push(generateRow(`p-drill-${tiAcc.id}-${sub}`, tiAcc.code, 'Account', subLabel, accBudget, 0, getImportedValue(tiAcc.name, (selectedYear || 0) - 1, 'Real', crFilter), accPrevia, false, false, 2));
+                  
+                  let accBudget = 0; let accPrevia = 0; let accLY = 0;
+                  
+                  tiAccounts.forEach(tiAcc => {
+                    const b = getImportedValue(tiAcc.name, selectedYear, 'Budget', crFilter);
+                    const p = getImportedValue(tiAcc.name, selectedYear, 'Previa', crFilter);
+                    const r = getImportedValue(tiAcc.name, selectedYear, 'Real', crFilter);
+                    const ly = getImportedValue(tiAcc.name, (selectedYear || 0) - 1, 'Real', crFilter);
+
+                    accBudget += b || (getImportedValue(tiAcc.name, selectedYear, 'Budget') / 3);
+                    accPrevia += (p + r) || (getImportedValue(tiAcc.name, selectedYear, 'Previa') + getImportedValue(tiAcc.name, selectedYear, 'Real')) / 3;
+                    accLY += ly || (getImportedValue(tiAcc.name, (selectedYear || 0) - 1, 'Real') / 3);
+                  });
+
+                  rows.push(generateRow(`p-drill-${pkg.id}-${sub}`, '', 'Account', subLabel, accBudget, 0, accLY, accPrevia, false, false, 2));
               });
           }
           return; // Skip normal accounts
@@ -1043,16 +1055,29 @@ export const getDynamicForecastData = (
 
       if (isSalesMktPkg) {
           // --- SPECIAL CASE: SALES & MKT ---
+          const mktAccountKeyword = 'vendas';
+          const mktAccounts = pkgAccs.filter(acc => acc.name.toLowerCase().includes(mktAccountKeyword));
+          
           const subAreas = ['Martech', 'Marketing', 'Outras áreas'];
           subAreas.forEach(sub => {
               const subLabel = `Despesas de Vendas e Marketing (${sub})`;
               const crFilter = sub === 'Martech' ? 'Martech' : sub === 'Marketing' ? 'Marketing' : undefined;
+              
               let sBudget = 0; let sPrevia = 0; let sLY = 0;
-              pkgAccs.forEach(acc => {
-                  sBudget += getImportedValue(acc.name, selectedYear, 'Budget', crFilter) || (getImportedValue(acc.name, selectedYear, 'Budget') / 3);
-                  sPrevia += (getImportedValue(acc.name, selectedYear, 'Previa', crFilter) + getImportedValue(acc.name, selectedYear, 'Real', crFilter)) || (getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real')) / 3;
-                  sLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real', crFilter) || (getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real') / 3);
-              });
+              
+              if (mktAccounts.length > 0) {
+                mktAccounts.forEach(mktAcc => {
+                  const b = getImportedValue(mktAcc.name, selectedYear, 'Budget', crFilter);
+                  const p = getImportedValue(mktAcc.name, selectedYear, 'Previa', crFilter);
+                  const r = getImportedValue(mktAcc.name, selectedYear, 'Real', crFilter);
+                  const ly = getImportedValue(mktAcc.name, (selectedYear || 0) - 1, 'Real', crFilter);
+
+                  sBudget += b || (getImportedValue(mktAcc.name, selectedYear, 'Budget') / 3);
+                  sPrevia += (p + r) || (getImportedValue(mktAcc.name, selectedYear, 'Previa') + getImportedValue(mktAcc.name, selectedYear, 'Real')) / 3;
+                  sLY += ly || (getImportedValue(mktAcc.name, (selectedYear || 0) - 1, 'Real') / 3);
+                });
+              }
+
               rows.push(generateRow(`p-drill-${pkg.id}-${sub}`, '', 'Account', subLabel, sBudget, 0, sLY, sPrevia, false, false, 2));
           });
           return; // Skip normal accounts
