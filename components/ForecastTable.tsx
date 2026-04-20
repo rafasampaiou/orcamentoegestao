@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { getForecastData, getDynamicForecastData } from '../services/mockData';
 import { Download, ListFilter, LayoutList, Settings2, ChevronUp, Activity, TrendingUp, Lock, LockOpen, CheckCircle2, X } from 'lucide-react';
@@ -34,6 +33,79 @@ interface ForecastTableProps {
     dreConfigs?: Record<string, import('../types').DreSection[]>;
 }
 
+// --- UTILITÁRIOS MOVIDOS PARA FORA PARA EVITAR RE-RENDERIZAÇÕES DESNECESSÁRIAS ---
+
+const formatValue = (val: number | undefined, format: 'currency' | 'percent' | 'integer' | 'decimal' = 'currency') => {
+    if (val === undefined || val === null) return '-';
+    if (isNaN(val)) return '0';
+
+    if (format === 'percent') {
+        return `${val.toFixed(2)}%`;
+    }
+    if (format === 'integer') {
+        return new Intl.NumberFormat('pt-BR', { style: 'decimal', maximumFractionDigits: 0 }).format(val);
+    }
+    if (format === 'decimal') {
+        return new Intl.NumberFormat('pt-BR', { style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val);
+    }
+    // Currency default: No decimals
+    return new Intl.NumberFormat('pt-BR', { style: 'decimal', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val);
+};
+
+const formatPercentDiff = (val: number | undefined) => {
+    if (val === undefined) return '-';
+    if (val > 999) return '>999%';
+    if (val < -999) return '<-999%';
+    if (isNaN(val)) return '-';
+    return `${val > 0 ? '+' : ''}${val.toFixed(1)}%`;
+};
+
+const blueRowIds = ['REV-TOTAL', 'REV-NET', 'CST-HEAD', 'RES-OP', 'RES-PCT', 'REV-IMP', 'RES-OP-SEM-IMP', 'RES-OP-COM-IMP'];
+
+const inputClass = "w-full text-right bg-transparent border border-transparent hover:bg-gray-50 focus:bg-white focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 rounded px-1 text-indigo-900 font-semibold outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
+
+const FormattedInput = ({ inputRef, value, onChange, onKeyDown, onPaste, formatType, className }: any) => {
+    const [isFocused, setIsFocused] = useState(false);
+    const [localValue, setLocalValue] = useState("");
+
+    useEffect(() => {
+        if (!isFocused) {
+            setLocalValue(value === 0 ? '' : value.toString().replace('.', ','));
+        }
+    }, [value, isFocused]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const valStr = e.target.value;
+        if (/^[0-9.,-]*$/.test(valStr)) {
+            setLocalValue(valStr);
+            const cleanStr = valStr.replace(/\./g, '').replace(',', '.');
+            const num = parseFloat(cleanStr);
+            if (!isNaN(num) || valStr === '' || valStr === '-') {
+                onChange(isNaN(num) ? 0 : num);
+            }
+        }
+    };
+
+    return (
+        <input
+            ref={inputRef}
+            type="text"
+            className={className}
+            value={isFocused ? (localValue === '0' && value === 0 ? '' : localValue) : (value === 0 ? '' : formatValue(value, formatType))}
+            onFocus={() => {
+                setIsFocused(true);
+                setLocalValue(value === 0 ? '' : value.toString().replace('.', ','));
+            }}
+            onBlur={() => setIsFocused(false)}
+            onChange={handleChange}
+            onKeyDown={onKeyDown}
+            onPaste={onPaste}
+        />
+    );
+};
+
+// --- COMPONENTE PRINCIPAL ---
+
 const ForecastTable: React.FC<ForecastTableProps> = ({
     selectedMonth,
     selectedYear,
@@ -54,17 +126,17 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     currentUser,
     dreConfigs
 }) => {
-    // Initialize state passing selectedHotel and dynamic structures
     const [data, setData] = useState<ForecastRow[]>(() => {
         const forecastStructure = dreConfigs?.['Forecast'] || [];
         const initialData = getDynamicForecastData(forecastStructure, selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData);
-        // Initialize previaConfig if missing
+
         const initializedData = initialData.map(row => ({
             ...row,
             previaConfig: row.previaConfig || { method: 'Fixed', manualValue: row.previa }
         }));
         return recalculateTotals(initializedData, packages, accounts);
     });
+
     const [showDetails, setShowDetails] = useState(false);
     const [calculationBase, setCalculationBase] = useState<'forecast' | 'previa'>('forecast');
     const [kpiBasis, setKpiBasis] = useState<'with_tax' | 'no_tax'>('with_tax');
@@ -81,9 +153,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         deltaLY: true,
         deltaLYPct: true,
     });
+
     const [showColumnSettings, setShowColumnSettings] = useState(false);
 
-    // Column Resizing State
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
         description: 300,
         previa: 120,
@@ -155,16 +227,10 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         };
     }, [resizingColumn, startX, startWidth]);
 
-    // State to track which parameter rows are expanded (showing full controls) vs minimized
     const [expandedConfigRows, setExpandedConfigRows] = useState<Set<string>>(new Set());
-
-    // Validation Modal State
     const [showValidationModal, setShowValidationModal] = useState(false);
     const [justifications, setJustifications] = useState<Record<string, string>>({});
 
-    // Effect: When dependencies change, regenerate the Forecast rows using current state props
-    // We use useMemo to avoid the linter warning about setState in effect, 
-    // and we only update state when the derived data actually changes from props.
     const derivedData = useMemo(() => {
         const forecastStructure = dreConfigs?.['Forecast'] || [];
 
@@ -190,11 +256,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         return ['REV-APT-LAZER', 'REV-APT-EVENTOS', 'REV-EXTRA-LAZER', 'REV-EXTRA-EVENTOS', 'REV-TIME', 'REV-ISS', 'REV-IMP'].includes(id);
     };
 
-
-
-
-    // --- STATE HANDLERS ---
-
     const toggleConfigRow = (id: string) => {
         setExpandedConfigRows(prev => {
             const next = new Set(prev);
@@ -212,23 +273,19 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 const currentConfig = calculationBase === 'forecast' ? row.forecastConfig : (row.previaConfig || { method: 'Fixed' });
                 const newConfig = { ...currentConfig, ...updates };
 
-                // Reset manual value if switching to Variable (optional, but keeps clean)
                 let newValue = calculationBase === 'forecast' ? row.real : row.previa;
 
                 if (updates.method === 'Fixed') {
-                    // Ensure manualValue is set to current value if not present
                     newConfig.manualValue = updates.manualValue !== undefined ? updates.manualValue : newValue;
                     newValue = newConfig.manualValue || 0;
                 }
 
-                // We update the config
                 const updatedRow = {
                     ...row,
                     [calculationBase === 'forecast' ? 'forecastConfig' : 'previaConfig']: newConfig
                 };
 
                 if (updates.method === 'Variable' || (currentConfig.method === 'Variable' && !updates.method)) {
-                    // We immediately calculate the new value based on this config
                     const calculated = calculateRowValue(newConfig, prevData, calculationBase);
                     if (calculationBase === 'forecast') updatedRow.real = calculated;
                     else updatedRow.previa = calculated;
@@ -249,7 +306,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             const newData = prevData.map(row => {
                 if (row.id !== rowId) return row;
 
-                // Sync Forecast with Prévia for Occupancy Indicators
                 if (field === 'previa' && (row.id === 'IND-1' || row.id === 'IND-2')) {
                     return { ...row, previa: value, real: value, isManualPreviaOverride: true, isManualOverride: true };
                 }
@@ -270,12 +326,18 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         if (!pasteData) return;
 
         const lines = pasteData.split(/\r?\n/).filter(line => line.trim() !== '');
-        if (lines.length <= 1) return; // Let default behavior handle single value paste
+        if (lines.length <= 1) return;
 
         e.preventDefault();
 
         setData(prevData => {
-            const newData = [...prevData];
+            // CLONE PROFUNDO DA LISTA PARA NÃO MUTAR O ESTADO
+            const newData = prevData.map(r => ({
+                ...r,
+                forecastConfig: { ...r.forecastConfig },
+                previaConfig: r.previaConfig ? { ...r.previaConfig } : undefined
+            }));
+
             const startIndex = newData.findIndex(r => r.id === startRowId);
             if (startIndex === -1) return prevData;
 
@@ -344,103 +406,19 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         });
     };
 
-    // Function moved to end of file to avoid hoisting issues
-
-
-    // Filter data based on view mode
     const visibleData = useMemo(() => {
         return data.filter(row => {
-            // 1. Sempre manter Spacers e Indicadores
             if (row.category === 'Spacer' || row.category === 'Indicators') return true;
-
-            // 2. Sempre mostrar agrupadores (Mestres e Pacotes)
-            // A propriedade isHeader é true para todas as linhas totalizadoras do mock
             if (row.isHeader) return true;
-
-            // 3. Controlar visibilidade das Contas (Linhas de detalhe)
             if (!row.isHeader) {
-                // EXCEÇÃO: Mostrar sempre as linhas de drill-down de TI/Marketing
                 if (row.id.includes('p-drill-')) return true;
-
-                // Se o botão "Mostrar Contas" estiver ativado, mostra todas as contas
                 if (showDetails) return true;
             }
-
             return false;
         });
     }, [data, showDetails]);
 
-    const formatValue = (val: number | undefined, format: 'currency' | 'percent' | 'integer' | 'decimal' = 'currency') => {
-        if (val === undefined || val === null) return '-';
-        if (isNaN(val)) return '0';
-
-        if (format === 'percent') {
-            return `${val.toFixed(2)}%`;
-        }
-        if (format === 'integer') {
-            return new Intl.NumberFormat('pt-BR', { style: 'decimal', maximumFractionDigits: 0 }).format(val);
-        }
-        if (format === 'decimal') {
-            return new Intl.NumberFormat('pt-BR', { style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val);
-        }
-        // Currency default: No decimals
-        return new Intl.NumberFormat('pt-BR', { style: 'decimal', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val);
-    };
-
-    const formatPercentDiff = (val: number | undefined) => {
-        if (val === undefined) return '-';
-        if (val > 999) return '>999%';
-        if (val < -999) return '<-999%';
-        if (isNaN(val)) return '-';
-        return `${val > 0 ? '+' : ''}${val.toFixed(1)}%`;
-    };
-
-    const blueRowIds = ['REV-TOTAL', 'REV-NET', 'CST-HEAD', 'RES-OP', 'RES-PCT', 'REV-IMP', 'RES-OP-SEM-IMP', 'RES-OP-COM-IMP'];
-
     const monthName = new Date(selectedYear || 2024, (selectedMonth || 1) - 1).toLocaleString('pt-BR', { month: 'long' });
-
-    // Custom Input Class to remove spinners and dashed lines
-    const inputClass = "w-full text-right bg-transparent border border-transparent hover:bg-gray-50 focus:bg-white focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 rounded px-1 text-indigo-900 font-semibold outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
-
-    const FormattedInput = ({ inputRef, value, onChange, onKeyDown, onPaste, formatType, className }: any) => {
-        const [isFocused, setIsFocused] = useState(false);
-        const [localValue, setLocalValue] = useState("");
-
-        useEffect(() => {
-            if (!isFocused) {
-                setLocalValue(value === 0 ? '' : value.toString().replace('.', ','));
-            }
-        }, [value, isFocused]);
-
-        const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-            const valStr = e.target.value;
-            if (/^[0-9.,-]*$/.test(valStr)) {
-                setLocalValue(valStr);
-                const cleanStr = valStr.replace(/\./g, '').replace(',', '.');
-                const num = parseFloat(cleanStr);
-                if (!isNaN(num) || valStr === '' || valStr === '-') {
-                    onChange(isNaN(num) ? 0 : num);
-                }
-            }
-        };
-
-        return (
-            <input
-                ref={inputRef}
-                type="text"
-                className={className}
-                value={isFocused ? (localValue === '0' && value === 0 ? '' : localValue) : (value === 0 ? '' : formatValue(value, formatType))}
-                onFocus={() => {
-                    setIsFocused(true);
-                    setLocalValue(value === 0 ? '' : value.toString().replace('.', ','));
-                }}
-                onBlur={() => setIsFocused(false)}
-                onChange={handleChange}
-                onKeyDown={onKeyDown}
-                onPaste={onPaste}
-            />
-        );
-    };
 
     return (
         <div className="flex flex-col h-full w-full">
@@ -470,7 +448,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                     </div>
 
                     <div className="flex items-center gap-4">
-                        {/* KPI BASIS SELECTOR */}
                         <div className="flex items-center bg-gray-100 rounded-lg p-1 border border-gray-200">
                             <button
                                 onClick={() => setKpiBasis('with_tax')}
@@ -543,7 +520,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 </div>
 
                 <div className="overflow-auto flex-1 bg-white relative">
-                    {/* COLUMN SETTINGS PANEL */}
                     {showColumnSettings && (
                         <div className="absolute right-4 top-4 z-50 bg-white border border-gray-200 shadow-xl rounded-xl p-4 w-64 animate-in fade-in slide-in-from-top-2">
                             <div className="flex justify-between items-center mb-3">
@@ -580,9 +556,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                     <table className="text-base text-left border-collapse table-fixed w-max">
                         <thead className="bg-sky-100 sticky top-0 z-30 shadow-sm font-bold text-sky-900 uppercase tracking-tight text-sm">
                             <tr>
-
-
-                                {/* Description - Flexible Width */}
                                 <th
                                     style={{ width: columnWidths.description }}
                                     className="px-2 py-3 border-b border-sky-200 bg-sky-100 text-sky-900 truncate group relative z-40 sticky left-0 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]"
@@ -594,7 +567,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     />
                                 </th>
 
-                                {/* PRÉVIA */}
                                 {columnVisibility.previa && (
                                     <th
                                         style={{ width: columnWidths.previa }}
@@ -608,7 +580,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     </th>
                                 )}
 
-                                {/* FORECAST */}
                                 {columnVisibility.real && (
                                     <th
                                         style={{ width: columnWidths.real }}
@@ -622,7 +593,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     </th>
                                 )}
 
-                                {/* META */}
                                 {columnVisibility.budget && (
                                     <th
                                         style={{ width: columnWidths.budget }}
@@ -636,7 +606,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     </th>
                                 )}
 
-                                {/* Δ Prévia - Meta R$ */}
                                 {columnVisibility.deltaPreviaBudget && (
                                     <th
                                         style={{ width: columnWidths.deltaPreviaBudget }}
@@ -650,7 +619,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     </th>
                                 )}
 
-                                {/* Δ Prévia - Meta % */}
                                 {columnVisibility.deltaPreviaBudgetPct && (
                                     <th
                                         style={{ width: columnWidths.deltaPreviaBudgetPct }}
@@ -664,7 +632,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     </th>
                                 )}
 
-                                {/* LAST YEAR */}
                                 {columnVisibility.lastYear && (
                                     <th
                                         style={{ width: columnWidths.lastYear }}
@@ -678,7 +645,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     </th>
                                 )}
 
-                                {/* Δ PRÉVIA X LY R$ */}
                                 {columnVisibility.deltaLY && (
                                     <th
                                         style={{ width: columnWidths.deltaLY }}
@@ -692,7 +658,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     </th>
                                 )}
 
-                                {/* Δ PRÉVIA X LY % */}
                                 {columnVisibility.deltaLYPct && (
                                     <th
                                         style={{ width: columnWidths.deltaLYPct }}
@@ -709,7 +674,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                             {visibleData.map((row, idx) => {
-                                // --- SPECIAL RENDER FOR TRANSFORMATION / REACTIVITY CARDS ---
                                 if (row.id === 'KPI-TRANS-BUDGET' || row.id === 'KPI-TRANS-LY') {
                                     const isTransformation = row.label.includes('Transformação');
                                     return (
@@ -736,7 +700,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     );
                                 }
 
-                                // --- SPACER LOGIC ---
                                 if (row.category === 'Spacer') {
                                     return (
                                         <tr key={row.id} className="bg-gray-100/50">
@@ -746,19 +709,14 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 }
 
                                 const isIndicator = row.category === 'Indicators';
-                                const isSectionHeader = row.isHeader && row.indentLevel === 0; // Level 0 (Receitas, Custos)
-                                const isGroupHeader = row.isHeader && row.indentLevel === 1;   // Level 1 (Pacotes)
-                                const isSubGroupHeader = row.isHeader && row.indentLevel === 2; // Level 2 (Sub-pacotes - Raro agora)
+                                const isSectionHeader = row.isHeader && row.indentLevel === 0;
+                                const isGroupHeader = row.isHeader && row.indentLevel === 1;
+                                const isSubGroupHeader = row.isHeader && row.indentLevel === 2;
                                 const isTotal = row.isTotal;
                                 const isBlueHighlight = blueRowIds.includes(row.id);
-
-                                // Identify Special Revenue Rows for Styling
-                                // REMOVED REV-TIME from this list to allow manual editing
                                 const isSpecialRevenue = ['REV-HOSP', 'REV-EXTRA', 'REV-ISS', 'REV-APT'].includes(row.id);
-
                                 const formatType = row.rowConfig?.format || 'currency';
 
-                                // --- COMMON FINANCIAL CELLS RENDERER ---
                                 const renderFinancialCells = (isHeaderOrTotal = false, customBg = "") => {
                                     const effectiveBg = row.bgColor || (isBlueHighlight ? 'bg-sky-100 border-sky-200' : (customBg || 'bg-blue-50/20 border-r border-blue-50'));
                                     const effectiveText = row.textColor || (isBlueHighlight ? 'text-sky-900' : (isHeaderOrTotal ? 'text-black' : 'text-slate-800'));
@@ -769,22 +727,18 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         fontStyle: row.isItalic ? 'italic' : 'normal'
                                     };
 
-                                    // FORECAST (REAL) CELL LOGIC
                                     let realCellContent: React.ReactNode = formatValue(row.real, formatType);
                                     let previaCellContent: React.ReactNode = formatValue(row.previa, formatType);
 
-                                    // Identify Manual Edit Rows (CLT / Extra Quantity)
                                     const isManualRow = ['IND-MO-2', 'IND-MO-3'].includes(row.id);
-
                                     const isEditableCost = row.category === 'Costs';
                                     const isEditableSpecial = isSpecialEditableRow(row.id);
+
                                     if (!isIndicator && (!isHeaderOrTotal || isEditableCost || isEditableSpecial)) {
                                         if (isMonthClosed) {
-                                            // CLOSED MONTH: Read Only Standard
                                             realCellContent = <span className="text-gray-800 font-medium">{formatValue(row.real, formatType)}</span>;
                                             previaCellContent = <span className="text-gray-800 font-medium">{formatValue(row.previa, formatType)}</span>;
                                         } else {
-                                            // FORECAST (REAL) EDITING
                                             if (row.forecastConfig.method === 'Fixed' || isEditableCost || isEditableSpecial) {
                                                 realCellContent = (
                                                     <FormattedInput
@@ -805,7 +759,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                                 );
                                             }
 
-                                            // PREVIA EDITING
                                             if ((row.previaConfig?.method || 'Fixed') === 'Fixed' || isEditableCost || isEditableSpecial) {
                                                 previaCellContent = (
                                                     <FormattedInput
@@ -827,7 +780,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             }
                                         }
                                     } else if (isIndicator) {
-                                        // Special handling for Indicators that should be inputs (Fixed)
                                         const isInputIndicator = ['IND-1', 'IND-2', 'IND-ADULTOS', 'IND-CHD', 'IND-LZ-2', 'IND-LZ-4', 'IND-LZ-5', 'IND-EV-2', 'IND-EV-4', 'IND-EV-5'].includes(row.id);
 
                                         if ((isInputIndicator || isManualRow) && !isMonthClosed) {
@@ -857,7 +809,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                                     formatType={formatType}
                                                     onChange={(val: number) => {
                                                         handleManualValueChange(row.id, 'previa', val);
-                                                        // Sync Forecast with Prévia for indicators
                                                         if (isInputIndicator) {
                                                             setData(prevData => {
                                                                 const newData = prevData.map(r => {
@@ -882,7 +833,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         }
                                     }
 
-                                    // Calculate Previa vs Last Year %
                                     const previaLYVal = (row.previa || 0) - (row.lastYear || 0);
                                     const previaLYPct = row.lastYear && row.lastYear !== 0
                                         ? (previaLYVal / row.lastYear) * 100
@@ -893,68 +843,48 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
                                     return (
                                         <>
-                                            {/* PRÉVIA */}
                                             {columnVisibility.previa && (
-                                                <td
-                                                    style={textStyle}
-                                                    className={`px-2 py-1 text-right border-r border-gray-100 tabular-nums ${previaBg} truncate`}
-                                                >
+                                                <td style={textStyle} className={`px-2 py-1 text-right border-r border-gray-100 tabular-nums ${previaBg} truncate`}>
                                                     {previaCellContent}
                                                 </td>
                                             )}
 
-                                            {/* FORECAST */}
                                             {columnVisibility.real && (
-                                                <td
-                                                    style={textStyle}
-                                                    className={`px-2 py-1 text-right border-l border-gray-200 tabular-nums ${effectiveText} ${effectiveBg} truncate`}
-                                                >
+                                                <td style={textStyle} className={`px-2 py-1 text-right border-l border-gray-200 tabular-nums ${effectiveText} ${effectiveBg} truncate`}>
                                                     {realCellContent}
                                                 </td>
                                             )}
 
-                                            {/* META */}
                                             {columnVisibility.budget && (
-                                                <td
-                                                    style={textStyle}
-                                                    className={`px-2 py-1 text-right border-r border-gray-100 tabular-nums ${isBlueHighlight ? 'text-sky-900' : 'text-slate-500'} truncate`}
-                                                >
+                                                <td style={textStyle} className={`px-2 py-1 text-right border-r border-gray-100 tabular-nums ${isBlueHighlight ? 'text-sky-900' : 'text-slate-500'} truncate`}>
                                                     {formatValue(row.budget, formatType)}
                                                 </td>
                                             )}
 
-                                            {/* Δ Prévia - Meta R$ */}
                                             {columnVisibility.deltaPreviaBudget && (
                                                 <td className={`px-2 py-1 text-right border-r border-gray-100 tabular-nums font-medium ${row.deltaPreviaBudgetVal && row.deltaPreviaBudgetVal < 0 ? 'text-rose-600' : 'text-emerald-600'} truncate`}>
                                                     {formatValue(row.deltaPreviaBudgetVal || 0, isIndicator && formatType !== 'percent' ? formatType : 'currency')}
                                                 </td>
                                             )}
 
-                                            {/* Δ Prévia - Meta % */}
                                             {columnVisibility.deltaPreviaBudgetPct && (
                                                 <td className={`px-2 py-1 text-right border-r border-gray-200 tabular-nums ${row.deltaPreviaBudgetPct && row.deltaPreviaBudgetPct < 0 ? 'text-rose-600' : 'text-emerald-600'} truncate`}>
                                                     {formatPercentDiff(row.deltaPreviaBudgetPct)}
                                                 </td>
                                             )}
 
-                                            {/* LAST YEAR */}
                                             {columnVisibility.lastYear && (
-                                                <td
-                                                    style={textStyle}
-                                                    className={`px-2 py-1 text-right tabular-nums border-r border-gray-100 bg-orange-50/20 text-slate-500 truncate`}
-                                                >
+                                                <td style={textStyle} className={`px-2 py-1 text-right tabular-nums border-r border-gray-100 bg-orange-50/20 text-slate-500 truncate`}>
                                                     {formatValue(row.lastYear, formatType)}
                                                 </td>
                                             )}
 
-                                            {/* PRÉVIA X LY R$ */}
                                             {columnVisibility.deltaLY && (
                                                 <td className={`px-2 py-1 text-right border-r border-gray-100 tabular-nums font-medium ${previaLYValColor} truncate`}>
                                                     {formatValue(previaLYVal, isIndicator && formatType !== 'percent' ? formatType : 'currency')}
                                                 </td>
                                             )}
 
-                                            {/* PRÉVIA X LY % */}
                                             {columnVisibility.deltaLYPct && (
                                                 <td className={`px-2 py-1 text-right tabular-nums ${previaLYColor} ${isBlueHighlight ? 'bg-sky-100' : 'bg-orange-50/10'} truncate`}>
                                                     {formatPercentDiff(previaLYPct)}
@@ -964,11 +894,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     );
                                 };
 
-                                // --- INDICATOR DATA ROWS (MODIFIED FOR GROUPING) ---
                                 if (isIndicator) {
                                     return (
                                         <tr key={row.id} className="border-b border-gray-100 hover:bg-sky-50/30 transition-colors h-8">
-
                                             <td className="px-2 py-1 border-r border-gray-100 align-middle sticky left-0 z-20 bg-white">
                                                 <div className="truncate text-xs font-bold text-slate-700 pl-4">
                                                     {row.label}
@@ -979,34 +907,27 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     )
                                 }
 
-                                // --- STANDARD DRE HEADERS ---
                                 if (isSectionHeader) {
                                     const rowClass = isBlueHighlight
                                         ? "bg-sky-100 hover:bg-sky-200 transition-colors border-y border-sky-200"
                                         : "bg-slate-100 hover:bg-slate-200 transition-colors border-y border-slate-200";
-
                                     const stickyClass = isBlueHighlight ? "bg-sky-100 border-r border-sky-300" : "bg-slate-100 border-r border-slate-300";
                                     const textClass = isBlueHighlight ? "text-sky-900" : "text-slate-800";
 
                                     return (
                                         <tr key={row.id} className={rowClass}>
-
                                             <td className={`px-2 py-3 text-sm font-bold ${textClass} uppercase tracking-wide flex items-center truncate sticky left-0 z-20 ${stickyClass}`}>
                                                 {!isBlueHighlight && <div className="w-1 h-4 bg-indigo-500 mr-2 rounded-full"></div>}
                                                 {row.label}
                                             </td>
-
                                             {renderFinancialCells(true)}
                                         </tr>
                                     );
                                 }
 
-                                // --- LEVEL 1: MASTER PACKAGES OR SPECIAL REVENUE ROWS ---
-                                // Applying unified Gray Style to Group Headers AND Special Revenue Rows (REV-HOSP, REV-EXTRA, etc.)
                                 if (isGroupHeader || isSpecialRevenue) {
                                     return (
                                         <tr key={row.id} className="bg-gray-50 text-gray-800 font-bold border-b border-gray-200 hover:bg-gray-100 transition-colors">
-
                                             <td className="px-2 py-2 text-sm uppercase align-middle border-r border-gray-200 sticky left-0 z-20 bg-gray-50">
                                                 <div style={{ paddingLeft: `${(row.indentLevel || 0) * 16}px` }} className="truncate">
                                                     {row.label}
@@ -1017,11 +938,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     );
                                 }
 
-                                // --- LEVEL 2: PACKAGES ---
                                 if (isSubGroupHeader) {
                                     return (
                                         <tr key={row.id} className="bg-gray-50 text-gray-600 font-semibold border-b border-gray-200 hover:bg-gray-100 transition-colors">
-
                                             <td className="px-2 py-2 text-sm uppercase pl-8 truncate sticky left-0 z-20 bg-gray-50 border-r border-gray-200">
                                                 {row.label}
                                             </td>
@@ -1030,8 +949,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     );
                                 }
 
-                                // --- STANDARD DATA ROW ---
-                                // Format Label if it looks like an unformatted account code (e.g. 64104 -> 64.104)
                                 let displayLabel = row.label;
                                 if (displayLabel && /^\d{5}$/.test(displayLabel.trim())) {
                                     displayLabel = displayLabel.trim().replace(/^(\d{2})(\d{3})$/, '$1.$2');
@@ -1047,11 +964,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     <tr
                                         key={row.id}
                                         style={{ backgroundColor: row.bgColor || undefined }}
-                                        className={`
-                        transition-colors text-slate-700 hover:bg-indigo-50/30
-                        ${isTotal ? 'bg-indigo-50 font-bold border-y-2 border-gray-300 text-indigo-900' : 'border-b border-gray-50'}
-                        ${row.id === 'REV-IMP' ? 'bg-sky-100 border-y-2 border-sky-300 font-bold text-sky-950 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.5)]' : ''}
-                    `}
+                                        className={`transition-colors text-slate-700 hover:bg-indigo-50/30 ${isTotal ? 'bg-indigo-50 font-bold border-y-2 border-gray-300 text-indigo-900' : 'border-b border-gray-50'} ${row.id === 'REV-IMP' ? 'bg-sky-100 border-y-2 border-sky-300 font-bold text-sky-950 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.5)]' : ''}`}
                                     >
                                         <td
                                             style={rowTextStyle}
@@ -1061,7 +974,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                                 {displayLabel}
                                             </div>
                                         </td>
-
                                         {renderFinancialCells(false)}
                                     </tr>
                                 );
@@ -1071,7 +983,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 </div>
             </div>
 
-            {/* VALIDATION MODAL */}
             {showValidationModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95">
@@ -1161,11 +1072,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         return;
                                     }
 
-                                    // Gather rows to save
                                     const rowsToSave: { accountName: string; costCenter?: string; value: number; scenario: 'Real' | 'Previa' }[] = [];
                                     data.forEach(row => {
                                         if (row.category === 'Costs' || row.category === 'Indicators' || row.category === 'Revenue') {
-                                            // Using an 'override_' prefix combined with row ID to uniquely identify this row's manual edit
                                             rowsToSave.push({ accountName: `override_${row.id}`, value: row.real, scenario: 'Real' });
                                             if (row.previa !== undefined) {
                                                 rowsToSave.push({ accountName: `override_${row.id}`, value: row.previa, scenario: 'Previa' });
@@ -1223,20 +1132,18 @@ export default ForecastTable;
 function getDriverValue(driver: ExpenseDriver | undefined, allRows: ForecastRow[], base: 'forecast' | 'previa' = 'forecast'): number {
     if (!driver) return 0;
 
-    // Logic to find the driver value from the "Indicators" or "Revenue" rows
     let targetRowId = '';
 
     switch (driver) {
-        case 'UH Ocupada': targetRowId = 'IND-2'; break; // UH Ocupada
-        case 'PAX': targetRowId = 'IND-5'; break; // PAX
-        case 'Emocionadores': targetRowId = 'IND-7'; break; // Emocionadores (Mocked)
-        case 'Extras': targetRowId = 'IND-8'; break; // Extras (Mocked)
-        case 'Receita': targetRowId = 'REV-TOTAL'; break; // Total Revenue (New ID)
+        case 'UH Ocupada': targetRowId = 'IND-2'; break;
+        case 'PAX': targetRowId = 'IND-5'; break;
+        case 'Emocionadores': targetRowId = 'IND-7'; break;
+        case 'Extras': targetRowId = 'IND-8'; break;
+        case 'Receita': targetRowId = 'REV-TOTAL'; break;
         default: return 0;
     }
 
     const row = allRows.find(r => r.id === targetRowId);
-    // Use the appropriate base value of the driver for calculation
     return row ? (base === 'forecast' ? row.real : row.previa) : 0;
 }
 
@@ -1246,35 +1153,27 @@ function calculateRowValue(config: ForecastConfig, allRows: ForecastRow[], base:
     if (config.method === 'Fixed') {
         return config.manualValue || 0;
     } else {
-        // Variable Calculation
         const driverValue = getDriverValue(config.driver, allRows, base);
         const factor = config.factor || 0;
 
         if (config.operator === 'divide' && factor !== 0) {
             return driverValue / factor;
         } else {
-            // Default multiply
             return driverValue * factor;
         }
     }
 }
 
 function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], accounts: Account[]) {
-    // 1. CLONE PROFUNDO (Shallow Copy de cada objeto)
-    // Isso impede que as atribuições mutem o estado anterior do React
-    const clonedRows = rows.map(r => ({ 
-        ...r, 
-        // Clonar também os configs para garantir segurança térmica total
+    const clonedRows = rows.map(r => ({
+        ...r,
         forecastConfig: { ...r.forecastConfig },
-        previaConfig: r.previaConfig ? { ...r.previaConfig } : undefined 
+        previaConfig: r.previaConfig ? { ...r.previaConfig } : undefined
     }));
 
-    // 2. Use as linhas clonadas para os mapas
     const rowMap = new Map(clonedRows.map(r => [r.id, r]));
     const nameMap = new Map(clonedRows.map(r => [r.label.trim(), r]));
 
-    // 3. RESET CALCULATED VALUES: Prevent "Self-Reference" or "Cumulative" multiplication bug
-    // Every recalculation should start from 0 for values derived from formulas
     clonedRows.forEach(r => {
         if (r.isCalculated) {
             r.real = 0;
@@ -1291,7 +1190,7 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
             if (row) total += row[fieldToSet] || 0;
         });
         const target = rowMap.get(targetId);
-        if (target) target[fieldToSet] = total; // Agora mutar aqui é seguro, pois é um clone!
+        if (target) target[fieldToSet] = total;
     };
 
     const runFormulas = (field: 'real' | 'budget' | 'lastYear' | 'previa') => {
@@ -1364,20 +1263,15 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
     // 1. Sum Accounts (Level 2) into Packages (Level 1)
     const pkgRows = updatedRows.filter(r => r.category === 'Costs' && r.id.startsWith('p-'));
     pkgRows.forEach(pkgRow => {
-        // pkgRow.id is "p-${masterName}-${pkgName}"
         const parts = pkgRow.id.split('-');
         const masterName = parts[1];
         const pkgName = pkgRow.label;
 
-        // Find children accounts. Account IDs might have suffixes (e.g. accId-Martech)
         const children = updatedRows.filter(r => {
             if (r.category !== 'Costs' || r.indentLevel !== 2) return false;
-            
-            // Inclusion of special drill-down rows (p-drill-master-pkg-sub)
+
             if (r.id.startsWith('p-drill-')) {
-                // Pattern matches: p-drill-${masterName}-${pkgName}-...
                 const matchesMaster = r.id.includes(`-${masterName}-`);
-                // For pkgName, we check both the label and the possible ID part (parts[2])
                 const matchesPkg = (parts[2] && r.id.includes(`-${parts[2]}-`)) || r.id.includes(`-${pkgName}-`);
                 if (matchesMaster && matchesPkg) return true;
             }
@@ -1385,7 +1279,7 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
             const originalAccId = r.id.split('-')[0];
             const acc = accounts.find(a => a.id === originalAccId);
             return (acc?.package === pkgName && acc?.masterPackage === masterName) ||
-                   (parts[2] && acc?.package === parts[2] && acc?.masterPackage === masterName);
+                (parts[2] && acc?.package === parts[2] && acc?.masterPackage === masterName);
         });
 
         if (children.length > 0) {
@@ -1401,7 +1295,6 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
     });
 
     // 2. Sum Packages (Level 1) directly into CUSTOS E DESPESAS OPERACIONAIS (Level 0)
-    // We skip Master Packages (Level 1) as they are no longer in the list
     const cstHead = rowMap.get('CST-HEAD');
     if (cstHead) {
         cstHead.real = pkgRows.reduce((sum, p) => sum + p.real, 0);
