@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useRef } from 'react';
 import { getForecastData } from '../services/mockData';
-import { Plus, Trash2, X, Save, Briefcase, Pencil, Calendar, PieChart, Lock, LockOpen, Settings as SettingsIcon, Users, Search, Upload, Settings, Eye, FileText, Layout, Info, ChevronUp, GripVertical, Database } from 'lucide-react';
+import { Plus, Trash2, X, Save, Briefcase, Pencil, Calendar, PieChart, Lock, LockOpen, Settings as SettingsIcon, Users, Search, Upload, Settings, Eye, FileText, Layout, Info, ChevronUp, GripVertical, Database, BedDouble, DollarSign } from 'lucide-react';
 import { User, UserRole, CostCenter, ImportedRow, Hotel, Account, BudgetVersion, LaborParameters, ScheduleItem, ImportedCostCenter, CostPackage, GMDConfiguration, ViewState, DreSection } from '../types';
 import TimelineView from './TimelineView';
 import { supabaseService } from '../services/supabaseService';
@@ -40,6 +40,48 @@ interface ImportedAccount {
   msg: string;
   originalLine: number;
 }
+
+// --- CONSTANTS FOR STRUCTURED IMPORTS ---
+const DRE_FORECAST_ROWS = [
+  "Custo de alimentos",
+  "Custo de bebidas",
+  "Custo de produtos diversos",
+  "Custos de outras receitas",
+  "Despesas com conservacao e limpeza",
+  "Despesas com manutencao",
+  "Despesas com servicos publicos",
+  "Despesas operacionais",
+  "Beneficios aos colaboradores",
+  "Despesas com pessoal",
+  "Encargos sociais",
+  "Serviços de terceiros",
+  "Servicos de terceiros temporarios",
+  "Serviço de terceiros recorrente",
+  "Serviços contratados de prestadores PJ - MEI",
+  "Despesas administrativas",
+  "Despesas administrativas gerais",
+  "Processamentos de dados e TI (Tech)",
+  "Processamentos de dados e TI (Martech)",
+  "Processamentos de dados e TI (Outras áreas)",
+  "Provisoes gerais",
+  "Despesas com vendas e marketing",
+  "Despesas de Vendas e Marketing (Marketing)",
+  "Despesas de Vendas e Marketing (Martech)",
+  "Despesas de Vendas e Marketing (Outras áreas)",
+  "Despesas financeiras e bancarias",
+  "Outros impostos",
+  "Arrendamento"
+];
+
+const REVENUE_IMPORT_COLUMNS = [
+  "Empresa", "Mês", "tipo_cr", "Grupo_CR", "CR_Hierarquico", "PDVs", 
+  "ClasseGerencial", "Valor", "Rateio", "Estorno", "Antecipado", 
+  "Total Mês", "Total_Antecipado", "Orcado_Mes", "Conta_Contabil"
+];
+
+const DETAILED_EXPENSE_COLUMNS = [
+  "Empresa", "Mês", "Cod_CR", "CR_Nome", "Conta_Contabil", "Conta_Nome", "Valor", "Ano", "Pacote_DRE"
+];
 
 // --- IMPORT PREVIEW COMPONENT ---
 interface ImportPreviewProps {
@@ -204,23 +246,13 @@ const ImportPreview: React.FC<ImportPreviewProps> = ({ summaryRows, errorRows, o
 };
 
 // --- SPREADSHEET COMPONENT ---
-/*
-const extraRevRows = ["Receita de Lazer", "Receita de Eventos"];
-const taxRows = ["Impostos"];
-const occRows = [
-    "Lazer - UH Disponível", "Lazer - UH Ocupada", "Lazer - PAX", "Receita de Hospedagem - Lazer",
-    "Eventos - UH Disponível", "Eventos - UH Ocupada", "Eventos - PAX", "Receita de Hospedagem - Eventos"
-];
-
 interface SpreadsheetTableProps {
     rows: string[]; // List of row labels (Indicators)
     data: Record<string, Record<number, string>>; // rowLabel -> monthIndex (1-12) -> value
     onCellChange: (rowLabel: string, month: number, value: string) => void;
     onPaste?: (startRowLabel: string, startMonth: number, pastedData: string[][]) => void;
 }
-*/
 
-/*
 const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({ rows, data, onCellChange, onPaste }) => {
     const months = [1,2,3,4,5,6,7,8,9,10,11,12];
 
@@ -233,29 +265,31 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({ rows, data, onCellC
     };
     
     return (
-        <div className="overflow-x-auto border border-gray-200 rounded-lg shadow-sm">
+        <div className="overflow-x-auto border border-gray-200 rounded-xl shadow-sm bg-white">
             <table className="min-w-full divide-y divide-gray-200 text-xs">
                 <thead className="bg-gray-50">
                     <tr>
-                        <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10 border-r border-gray-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Indicador</th>
+                        <th className="px-4 py-3 text-left font-black text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-20 border-r border-gray-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                          Item / Indicador
+                        </th>
                         {months.map(m => (
-                            <th key={m} className="px-2 py-2 text-center font-medium text-gray-500 w-24 border-l border-gray-200">
-                                {new Date(2024, m-1).toLocaleString('pt-BR', { month: 'short' }).toUpperCase()}
+                            <th key={m} className="px-2 py-3 text-center font-black text-gray-500 w-28 border-l border-gray-200 uppercase tracking-widest bg-gray-50/50">
+                                {new Date(2024, m-1).toLocaleString('pt-BR', { month: 'short' })}
                             </th>
                         ))}
                     </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                     {rows.map((rowLabel, idx) => (
-                        <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}>
-                            <td className="px-3 py-1 font-medium text-gray-700 sticky left-0 bg-white z-10 border-r border-gray-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] truncate max-w-[200px]" title={rowLabel}>
+                        <tr key={idx} className="hover:bg-indigo-50/30 transition-colors">
+                            <td className="px-4 py-2 font-bold text-gray-700 sticky left-0 bg-white z-10 border-r border-gray-200 truncate max-w-[240px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]" title={rowLabel}>
                                 {rowLabel}
                             </td>
                             {months.map(m => (
-                                <td key={m} className="p-0 border-l border-gray-100">
+                                <td key={m} className="p-0 border-l border-gray-100 group">
                                     <input 
                                         type="text" 
-                                        className="w-full h-full px-2 py-1.5 text-right focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-transparent"
+                                        className="w-full h-full px-3 py-2.5 text-right font-mono text-indigo-900 font-bold focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-transparent group-hover:bg-white transition-all transition-duration-200"
                                         placeholder="-"
                                         value={data[rowLabel]?.[m] || ''}
                                         onChange={(e) => onCellChange(rowLabel, m, e.target.value)}
@@ -270,7 +304,6 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({ rows, data, onCellC
         </div>
     );
 };
-*/
 
 type ModalType = 'user' | 'hotel' | 'costCenter' | 'package' | 'account' | 'gmd' | null;
 
@@ -658,6 +691,18 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const [importStep, setImportStep] = useState<'input' | 'preview'>('input');
   const [importMode, setImportMode] = useState<'append' | 'replace'>('append');
   const [importYear, setImportYear] = useState<number>(new Date().getFullYear());
+
+  // New Structured Import State
+  const [importCategory, setImportCategory] = useState<'financial' | 'occupancy' | 'revenue' | 'taxes' | 'expenses'>('financial');
+  const [expenseImportMode, setExpenseImportMode] = useState<'forecast' | 'detailed'>('forecast');
+  const [importHotelId, setImportHotelId] = useState<string>('');
+  const [importTargetYear, setImportTargetYear] = useState<number>(new Date().getFullYear());
+  
+  // Table-based import data (rowLabel -> monthIndex 1-12 -> string value)
+  const [dreForecastData, setDreForecastData] = useState<Record<string, Record<number, string>>>({});
+  const [taxesImportData, setTaxesImportData] = useState<Record<string, Record<number, string>>>({});
+  const [occupancyImportData, setOccupancyImportData] = useState<Record<string, Record<number, string>>>({});
+  const [occTargetVersionId, setOccTargetVersionId] = useState<string>('');
 
   // Budget 2026 Import State (separate from Real import)
   const [budgetImportText, setBudgetImportText] = useState('');
@@ -2398,6 +2443,290 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     }
   };
 
+  const handleClearExpensesForecast = () => {
+    if (confirm('Tem certeza que deseja limpar todos os valores digitados na tabela?')) {
+      setDreForecastData({});
+    }
+  };
+
+  const handleSaveExpensesForecast = async () => {
+    if (!importHotelId) return alert('Selecione um hotel');
+    const selectedVersion = realVersions.find(v => v.id === activeRealVersionId);
+    if (!selectedVersion) return alert('Selecione uma versão');
+
+    const hotelObj = hotels.find(h => h.id === importHotelId);
+    const hotelName = hotelObj?.name || '';
+    
+    const rowsToSave: ImportedRow[] = [];
+    
+    // Mapping for virtual/drill-down rows to base account + CR
+    const specialMapping: Record<string, { account: string, cr?: string }> = {
+      "Processamentos de dados e TI (Tech)": { account: "Processamentos de dados e TI", cr: "martech" },
+      "Processamentos de dados e TI (Martech)": { account: "Processamentos de dados e TI", cr: "marketing" },
+      "Processamentos de dados e TI (Outras áreas)": { account: "Processamentos de dados e TI", cr: "" },
+
+      "Despesas de Vendas e Marketing (Marketing)": { account: "Despesas de Vendas e Marketing", cr: "marketing" },
+      "Despesas de Vendas e Marketing (Martech)": { account: "Despesas de Vendas e Marketing", cr: "martech" },
+      "Despesas de Vendas e Marketing (Outras áreas)": { account: "Despesas de Vendas e Marketing", cr: "" },
+    };
+
+    Object.entries(dreForecastData).forEach(([rowLabel, months]) => {
+      Object.entries(months).forEach(([month, value]) => {
+        if (value === undefined || value === '') return;
+        
+        const cleanVal = value.toString().replace(/\./g, '').replace(',', '.').trim();
+        const numVal = parseFloat(cleanVal);
+        if (isNaN(numVal)) return;
+
+        const mapping = specialMapping[rowLabel];
+        const finalAccount = mapping ? mapping.account : rowLabel;
+        const finalCR = mapping ? mapping.cr : "";
+
+        rowsToSave.push({
+          ano: String(importTargetYear),
+          mes: month,
+          hotel: hotelName,
+          tipo: 'Despesa',
+          cenario: 'REAL',
+          conta: finalAccount,
+          cr: finalCR,
+          valor: String(numVal),
+          status: 'valid',
+          versionId: activeRealVersionId
+        });
+      });
+    });
+
+    if (rowsToSave.length === 0) return alert('Preencha ao menos um valor na tabela.');
+
+    setIsSavingDre(true);
+    try {
+      await supabaseService.saveFinancialData(rowsToSave);
+      alert('Dados de despesas salvos com sucesso!');
+      recordImportHistory(rowsToSave);
+    } catch (e: any) {
+      console.error("Save error:", e);
+      alert('Erro ao persistir dados: ' + (e.message || 'Erro desconhecido'));
+    } finally {
+      setIsSavingDre(false);
+    }
+  };
+
+  const handleClearTaxes = () => {
+    if (confirm('Tem certeza que deseja limpar a tabela de impostos?')) {
+      setTaxesImportData({});
+    }
+  };
+
+  const handleSaveTaxes = async () => {
+    const rowsToSave: ImportedRow[] = [];
+    
+    Object.entries(taxesImportData).forEach(([hotelName, months]) => {
+      Object.entries(months).forEach(([month, value]) => {
+        if (value === undefined || value === '') return;
+        
+        const cleanVal = value.toString().replace(/\./g, '').replace(',', '.').trim();
+        const numVal = parseFloat(cleanVal);
+        if (isNaN(numVal)) return;
+
+        rowsToSave.push({
+          ano: String(importYear),
+          mes: month,
+          hotel: hotelName,
+          tipo: 'Imposto',
+          cenario: 'REAL',
+          conta: 'Impostos',
+          cr: "", // Fix lint
+          valor: String(numVal),
+          status: 'valid'
+        });
+      });
+    });
+
+    if (rowsToSave.length === 0) return alert('Nenhum valor preenchido.');
+
+    setIsSavingDre(true);
+    try {
+      await supabaseService.saveFinancialData(rowsToSave);
+      alert('Impostos salvos com sucesso!');
+      recordImportHistory(rowsToSave);
+    } catch (e: any) {
+      alert('Erro ao salvar impostos: ' + e.message);
+    } finally {
+      setIsSavingDre(false);
+    }
+  };
+
+  const handleClearOccupancy = () => {
+    if (confirm('Tem certeza que deseja limpar a tabela de ocupação?')) {
+      setOccupancyImportData({});
+    }
+  };
+
+  const handleSaveOccupancy = async () => {
+    if (!occTargetVersionId) return alert('Selecione a versão de destino.');
+    
+    // 1. Prepare occupancy data object
+    // Format required by budget_versions: Record<string, number[]>
+    const metrics = ["UH Disponíveis", "UH Ocupadas", "PAX", "Adultos", "Crianças", "Receita Hospedagem"];
+    const occupancy_data: Record<string, number[]> = {};
+    
+    metrics.forEach(metric => {
+      const monthValues = Array(12).fill(0);
+      for (let m = 1; m <= 12; m++) {
+        const valStr = occupancyImportData[metric]?.[m] || '0';
+        const val = parseFloat(valStr.toString().replace(/\./g, '').replace(',', '.')) || 0;
+        monthValues[m - 1] = val;
+      }
+      occupancy_data[metric] = monthValues;
+    });
+
+    // 2. Resolve version object
+    const targetVersion = budgetVersions.find(v => v.id === occTargetVersionId) 
+                       || realVersions.find(v => v.id === occTargetVersionId);
+    
+    if (!targetVersion) return alert('Versão não encontrada.');
+
+    setIsSavingDre(true);
+    try {
+      const updatedVersion = { ...targetVersion, occupancyData: occupancy_data };
+      await supabaseService.upsertBudgetVersion(updatedVersion);
+      
+      // Update local state
+      if (budgetVersions.some(v => v.id === occTargetVersionId)) {
+        setBudgetVersions(prev => prev.map(v => v.id === occTargetVersionId ? updatedVersion : v));
+      } else {
+        setRealVersions(prev => prev.map(v => v.id === occTargetVersionId ? updatedVersion : v));
+      }
+
+      alert('Dados de ocupação salvos com sucesso!');
+      
+      // History record (artificial row for display)
+      const histRows: ImportedRow[] = [{
+        ano: String(targetVersion.year),
+        mes: "1-12",
+        hotel: targetVersion.hotelId || "Múltiplas",
+        tipo: "Ocupação",
+        cenario: "REAL",
+        conta: "Métricas de Ocupação",
+        cr: "",
+        valor: "0",
+        status: "valid",
+        versionId: targetVersion.id
+      }];
+      recordImportHistory(histRows);
+
+    } catch (e: any) {
+      alert('Erro ao salvar ocupação: ' + e.message);
+    } finally {
+      setIsSavingDre(false);
+    }
+  };
+
+  const handleProcessRevenueSimplifiedImport = async () => {
+    if (!importText.trim()) return alert('Cole os dados no campo de texto.');
+    
+    const rows = importText.split('\n');
+    const firstRowCols = rows[0].split('\t');
+    const hasHeader = firstRowCols[0] === 'Empresa' || isNaN(Number(firstRowCols[1]));
+    const startIdx = hasHeader ? 1 : 0;
+    
+    const rowsToSave: ImportedRow[] = [];
+    
+    for (let i = startIdx; i < rows.length; i++) {
+      const line = rows[i].trim();
+      if (!line) continue;
+      const cols = line.split('\t');
+      if (cols.length < 8) continue; // Basic validation
+      
+      const [empresa, mes, tipo_cr, grupo_cr, cr_hier, pdv_nome, classe, valorStr] = cols;
+      
+      const cleanValStr = (valorStr || "0").replace(/\./g, '').replace(',', '.').trim();
+      const finalVal = parseFloat(cleanValStr) || 0;
+
+      rowsToSave.push({
+        ano: String(importYear),
+        mes: mes.trim(),
+        hotel: pdv_nome || empresa,
+        tipo: 'Receita',
+        cenario: 'REAL',
+        conta: (classe || 'Receitas').trim(),
+        cr: pdv_nome?.trim() || "",
+        valor: String(finalVal),
+        status: 'valid'
+      });
+    }
+
+    if (rowsToSave.length === 0) return alert('Nenhum dado válido encontrado.');
+
+    setIsSavingDre(true);
+    try {
+      await supabaseService.saveFinancialData(rowsToSave);
+      alert(`${rowsToSave.length} registros de receita salvos com sucesso!`);
+      recordImportHistory(rowsToSave);
+      setImportText('');
+    } catch (e: any) {
+      alert('Erro ao salvar receitas: ' + e.message);
+    } finally {
+      setIsSavingDre(false);
+    }
+  };
+
+  const handleProcessDetailedExpenses = async () => {
+    if (!importText.trim()) return alert('Cole os dados no campo de texto.');
+    
+    const rows = importText.split('\n');
+    const firstRowCols = rows[0].split('\t');
+    const hasHeader = firstRowCols[0] === 'Empresa' || isNaN(Number(firstRowCols[1]));
+    const startIdx = hasHeader ? 1 : 0;
+    
+    const rowsToSave: ImportedRow[] = [];
+    const selectedVersion = realVersions.find(v => v.id === activeRealVersionId);
+    if (!selectedVersion) return alert('Selecione uma versão de Realizado primeiro.');
+
+    for (let i = startIdx; i < rows.length; i++) {
+        const line = rows[i].trim();
+        if (!line) continue;
+        const cols = line.split('\t');
+        if (cols.length < 7) continue; 
+
+        // Empresa	Mês	Cod_CR	CR_Nome	Conta_Contabil	Conta_Nome	Valor	Ano	Pacote_DRE
+        const [empresa, mes, codCr, crNome, contaContabil, contaNome, valorStr, anoStr, pacoteDre] = cols;
+        
+        const finalAno = anoStr || String(importYear);
+        const cleanValStr = valorStr.replace(/\./g, '').replace(',', '.').trim();
+        const finalVal = parseFloat(cleanValStr) || 0;
+
+        rowsToSave.push({
+            ano: finalAno.trim(),
+            mes: mes.trim(),
+            hotel: empresa.trim(),
+            tipo: 'Despesa',
+            cenario: 'REAL',
+            conta: contaNome?.trim() || 'Despesa Indireta',
+            cr: crNome?.trim() || "",
+            valor: String(finalVal),
+            status: 'valid',
+            versionId: activeRealVersionId,
+            pacote: pacoteDre?.trim() || ""
+        });
+    }
+
+    if (rowsToSave.length === 0) return alert('Nenhum dado válido encontrado.');
+
+    setIsSavingDre(true);
+    try {
+        await supabaseService.saveFinancialData(rowsToSave);
+        alert(`${rowsToSave.length} registros de despesa detalhada salvos com sucesso!`);
+        recordImportHistory(rowsToSave);
+        setImportText('');
+    } catch (e: any) {
+        alert('Erro ao salvar despesas: ' + e.message);
+    } finally {
+        setIsSavingDre(false);
+    }
+  };
+
   /*
   const processRevenueImport = () => {
     if (!revImportText.trim()) return;
@@ -2835,46 +3164,311 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               </div>
             ) : (
             <div className="space-y-6">
-              <div className="space-y-4">
-                {importStep === 'input' ? (
-                  <>
-                    <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl text-sm text-amber-800 mb-4">
-                      <p className="font-bold mb-1">Instruções para Importação Financeira:</p>
-                      <p>Cole os dados do Excel com as seguintes colunas (separadas por TAB):</p>
-                      <code className="block mt-2 bg-white/50 p-2 rounded border border-amber-100 font-mono text-[10px]">
-                        Ano | Escopo ou Fora | Mês | Classe Gerencial Nome | Centro de Resultado Nome | Valor Ajustado | Filial | Departamento | Pacote | Pacote Master | Diretoria
-                      </code>
-                    </div>
-                    <div className="flex items-center gap-4 mb-4">
-                      <label className="text-sm font-bold text-gray-700">Ano da Importação:</label>
-                      <select
-                        value={importYear}
-                        onChange={(e) => setImportYear(parseInt(e.target.value))}
-                        className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                      >
-                        {[2023, 2024, 2025, 2026, 2027].map(y => (
-                          <option key={y} value={y}>{y}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <textarea className="w-full h-64 p-4 border border-gray-300 rounded-lg font-mono text-xs focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" placeholder="Cole os dados do Excel ou arquivo CSV aqui..." value={importText} onChange={(e) => setImportText(e.target.value)} />
-                    <div className="flex items-center gap-4">
-                      <button onClick={processFinancialImport} disabled={!importText.trim()} className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-2">
-                        <FileText size={16} /> Processar Dados
-                      </button>
-                      <label className="bg-white border border-indigo-200 text-indigo-600 px-6 py-2.5 rounded-lg font-bold cursor-pointer hover:bg-indigo-50 flex items-center gap-2 transition-all">
-                        <Upload size={16} /> Ou selecionar arquivo CSV
-                        <input type="file" accept=".csv,.txt" className="hidden" onChange={handleAccCsvUpload} />
-                      </label>
-                    </div>
-                  </>
-                ) : (
-                  <ImportPreview summaryRows={summaryRows} errorRows={errorRows} onCancel={() => setImportStep('input')} onConfirm={handleFinalImport} importMode={importMode} setImportMode={setImportMode} realVersions={realVersions} budgetVersions={budgetVersions} />
-                )}
+              {/* Category Sub-Tabs */}
+              <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl w-fit">
+                {[
+                  { id: 'occupancy', label: '1. Ocupação', icon: BedDouble },
+                  { id: 'revenue', label: '2. Receitas', icon: DollarSign },
+                  { id: 'taxes', label: '3. Impostos', icon: PieChart },
+                  { id: 'expenses', label: '4. Despesas', icon: Briefcase }
+                ].map(cat => (
+                  <button
+                    key={cat.id}
+                    onClick={() => setImportCategory(cat.id as any)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-black transition-all ${
+                      importCategory === cat.id 
+                        ? 'bg-white text-indigo-600 shadow-sm' 
+                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'
+                    }`}
+                  >
+                    <cat.icon size={14} />
+                    {cat.label}
+                  </button>
+                ))}
               </div>
 
-              {/* Persistant History below import frame */}
-              {renderImportHistoryTable()}
+              {/* 1. Occupancy Import */}
+              {importCategory === 'occupancy' && (
+                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <div className="flex items-center font-bold text-gray-900 gap-2 mb-2">
+                    <BedDouble className="text-indigo-600" size={20} />
+                    Importação da Ocupação
+                  </div>
+                  <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl text-sm text-blue-800">
+                    <p>Preencha os indicadores de ocupação abaixo ou cole do Excel.</p>
+                  </div>
+                  <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                    <label className="text-sm font-bold text-gray-700">Integrar na Versão:</label>
+                    <select 
+                      value={occTargetVersionId}
+                      onChange={e => setOccTargetVersionId(e.target.value)}
+                      className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[200px]"
+                    >
+                      <option value="">Selecione a versão...</option>
+                      {realVersions.map(v => <option key={v.id} value={v.id}>{v.name} ({v.year})</option>)}
+                    </select>
+                    <button 
+                      onClick={handleSaveOccupancy}
+                      disabled={isSavingDre || !occTargetVersionId}
+                      className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all flex items-center gap-2 disabled:opacity-50"
+                    >
+                      {isSavingDre ? 'Salvando...' : <><Save size={16} /> Salvar Ocupação</>}
+                    </button>
+                    <button 
+                      onClick={handleClearOccupancy}
+                      className="bg-white border border-gray-300 text-red-600 px-4 py-2 rounded-lg font-bold text-sm hover:bg-red-50 transition-all flex items-center gap-2"
+                    >
+                      <Trash2 size={16} /> Limpar
+                    </button>
+                  </div>
+                  <SpreadsheetTable 
+                    rows={["UH Disponíveis", "UH Ocupadas", "PAX", "Adultos", "Crianças", "Receita Hospedagem"]}
+                    data={occupancyImportData}
+                    onCellChange={(row, month, val) => setOccupancyImportData(prev => ({ ...prev, [row]: { ...(prev[row] || {}), [month]: val }}))}
+                    onPaste={(row, month, pasted) => {
+                      const newData = { ...occupancyImportData };
+                      const rows = ["UH Disponíveis", "UH Ocupadas", "PAX", "Adultos", "Crianças", "Receita Hospedagem"];
+                      const startIdx = rows.indexOf(row);
+                      pasted.forEach((pRow, rOffset) => {
+                        const targetRow = rows[startIdx + rOffset];
+                        if (targetRow) {
+                          if (!newData[targetRow]) newData[targetRow] = {};
+                          pRow.forEach((val, cOffset) => {
+                            const targetCol = month + cOffset;
+                            if (targetCol <= 12) newData[targetRow][targetCol] = val;
+                          });
+                        }
+                      });
+                      setOccupancyImportData(newData);
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* 2. Revenue Import */}
+              {importCategory === 'revenue' && (
+                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <div className="flex items-center font-bold text-gray-900 gap-2 mb-2">
+                    <DollarSign className="text-emerald-600" size={20} />
+                    Importação das Receitas
+                  </div>
+                  <div className="bg-amber-50 border border-amber-100 p-4 rounded-xl text-xs text-amber-800">
+                    <p className="font-bold mb-1">Colunas esperadas (TAB ou CSV):</p>
+                    <code className="block bg-white/50 p-2 rounded border border-amber-200 mt-1 overflow-x-auto whitespace-nowrap">
+                      {REVENUE_IMPORT_COLUMNS.join(" | ")}
+                    </code>
+                  </div>
+                  <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                    <label className="text-sm font-bold text-gray-700">Ano Alvo:</label>
+                    <select value={importYear} onChange={e => setImportYear(Number(e.target.value))} className="border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                      {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
+                    </select>
+                  </div>
+                  <textarea 
+                    className="w-full h-64 p-4 border border-gray-300 rounded-lg font-mono text-[10px] focus:ring-2 focus:ring-emerald-500 outline-none" 
+                    placeholder="Cole os dados das receitas aqui..." 
+                    value={importText} 
+                    onChange={e => setImportText(e.target.value)} 
+                  />
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={handleProcessRevenueSimplifiedImport}
+                      disabled={isSavingDre || !importText.trim()}
+                      className="bg-emerald-600 text-white px-6 py-2.5 rounded-lg font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-100 flex items-center gap-2 disabled:opacity-50"
+                    >
+                      {isSavingDre ? 'Processando...' : <><FileText size={16} /> Processar e Salvar Receitas</>}
+                    </button>
+                    <button 
+                      onClick={() => setImportText('')}
+                      className="bg-white border border-gray-300 text-gray-500 px-4 py-2.5 rounded-lg font-bold hover:bg-gray-50 transition-all"
+                    >
+                      Limpar Texto
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* 3. Taxes Import */}
+              {importCategory === 'taxes' && (
+                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <div className="flex items-center font-bold text-gray-900 gap-2 mb-2">
+                    <PieChart className="text-blue-600" size={20} />
+                    Importação dos Impostos (Global)
+                  </div>
+                  <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl text-sm text-blue-800">
+                    <p>Cole do Excel os valores de impostos por hotel e mês. Estes valores serão aplicados globalmente.</p>
+                  </div>
+                  <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                    <label className="text-sm font-bold text-gray-700">Ano:</label>
+                    <select value={importYear} onChange={e => setImportYear(Number(e.target.value))} className="border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                      {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
+                    </select>
+                    <button 
+                      onClick={handleSaveTaxes}
+                      disabled={isSavingDre}
+                      className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 flex items-center gap-2 disabled:opacity-50"
+                    >
+                      {isSavingDre ? 'Salvando...' : <><Save size={16} /> Salvar Impostos</>}
+                    </button>
+                    <button 
+                      onClick={handleClearTaxes}
+                      className="bg-white border border-gray-300 text-red-600 px-4 py-2 rounded-lg font-bold text-sm hover:bg-red-50 transition-all flex items-center gap-2"
+                    >
+                      <Trash2 size={16} /> Limpar
+                    </button>
+                  </div>
+                  <SpreadsheetTable 
+                    rows={hotels.map(h => h.name)}
+                    data={taxesImportData}
+                    onCellChange={(row, month, val) => setTaxesImportData(prev => ({ ...prev, [row]: { ...(prev[row] || {}), [month]: val }}))}
+                    onPaste={(row, month, pasted) => {
+                      const newData = { ...taxesImportData };
+                      const rowLabels = hotels.map(h => h.name);
+                      const startIdx = rowLabels.indexOf(row);
+                      pasted.forEach((pRow, rOffset) => {
+                        const targetRow = rowLabels[startIdx + rOffset];
+                        if (targetRow) {
+                          if (!newData[targetRow]) newData[targetRow] = {};
+                          pRow.forEach((val, cOffset) => {
+                            const targetCol = month + cOffset;
+                            if (targetCol <= 12) newData[targetRow][targetCol] = val;
+                          });
+                        }
+                      });
+                      setTaxesImportData(newData);
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* 4. Expenses Import */}
+              {importCategory === 'expenses' && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center font-bold text-gray-900 gap-2">
+                      <Briefcase className="text-indigo-600" size={20} />
+                      Importação das Despesas
+                    </div>
+                    <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
+                      <button 
+                        onClick={() => setExpenseImportMode('forecast')}
+                        className={`px-3 py-1.5 rounded-md text-[10px] font-black tracking-wider uppercase transition-all ${
+                          expenseImportMode === 'forecast' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                      >
+                        DRE Forecast
+                      </button>
+                      <button 
+                        onClick={() => setExpenseImportMode('detailed')}
+                        className={`px-3 py-1.5 rounded-md text-[10px] font-black tracking-wider uppercase transition-all ${
+                          expenseImportMode === 'detailed' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                      >
+                        Orç. Geral (Detalhado)
+                      </button>
+                    </div>
+                  </div>
+
+                  {expenseImportMode === 'forecast' ? (
+                    <div className="space-y-4">
+                      <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl text-sm text-indigo-800">
+                        <p>Importação simplificada para o **DRE Forecast**. Escolha o hotel e cole os valores mensais por pacote.</p>
+                      </div>
+                      <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Hotel</label>
+                          <select 
+                            value={importHotelId}
+                            onChange={e => setImportHotelId(e.target.value)}
+                            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[200px]"
+                          >
+                            <option value="">Selecione...</option>
+                            {hotels.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+                          </select>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Ano</label>
+                          <select 
+                            value={importTargetYear}
+                            onChange={e => setImportTargetYear(Number(e.target.value))}
+                            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                          >
+                            {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+                          </select>
+                        </div>
+                        <div className="flex-1" />
+                        <button 
+                          onClick={handleSaveExpensesForecast}
+                          disabled={isSavingDre || !importHotelId}
+                          className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all flex items-center gap-2 self-end disabled:opacity-50"
+                        >
+                          {isSavingDre ? 'Salvando...' : <><Save size={16} /> Salvar Despesas Forecast</>}
+                        </button>
+                        <button 
+                          onClick={handleClearExpensesForecast}
+                          className="bg-white border border-gray-300 text-red-600 px-4 py-2 rounded-lg font-bold text-sm hover:bg-red-50 transition-all flex items-center gap-2 self-end"
+                        >
+                          <Trash2 size={16} /> Limpar
+                        </button>
+                      </div>
+                      <SpreadsheetTable 
+                        rows={DRE_FORECAST_ROWS}
+                        data={dreForecastData}
+                        onCellChange={(row, month, val) => setDreForecastData(prev => ({ ...prev, [row]: { ...(prev[row] || {}), [month]: val }}))}
+                        onPaste={(row, month, pasted) => {
+                          const newData = { ...dreForecastData };
+                          const startIdx = DRE_FORECAST_ROWS.indexOf(row);
+                          pasted.forEach((pRow, rOffset) => {
+                            const targetRow = DRE_FORECAST_ROWS[startIdx + rOffset];
+                            if (targetRow) {
+                              if (!newData[targetRow]) newData[targetRow] = {};
+                              pRow.forEach((val, cOffset) => {
+                                const targetCol = month + cOffset;
+                                if (targetCol <= 12) newData[targetRow][targetCol] = val;
+                              });
+                            }
+                          });
+                          setDreForecastData(newData);
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="bg-amber-50 border border-amber-100 p-4 rounded-xl text-xs text-amber-800">
+                        <p className="font-bold mb-1">Importação Detalhada (USALI):</p>
+                        <p>Cole os dados do Excel com as colunas seguintes:</p>
+                        <code className="block bg-white/50 p-2 rounded border border-amber-200 mt-1">
+                          {DETAILED_EXPENSE_COLUMNS.join(" | ")}
+                        </code>
+                      </div>
+                      <textarea 
+                        className="w-full h-64 p-4 border border-gray-300 rounded-lg font-mono text-[10px] focus:ring-2 focus:ring-indigo-500 outline-none mt-4" 
+                        placeholder="Cole os dados detalhados aqui..." 
+                        value={importText} 
+                        onChange={e => setImportText(e.target.value)} 
+                      />
+                      <div className="flex gap-3 mt-4">
+                        <button 
+                          onClick={handleProcessDetailedExpenses}
+                          disabled={isSavingDre || !importText.trim()}
+                          className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 flex items-center gap-2 disabled:opacity-50 transition-all font-bold text-sm"
+                        >
+                          {isSavingDre ? <><Settings className="animate-spin" size={16} /> Processando...</> : <><FileText size={16} /> Processar e Salvar Despesas Detalhadas</>}
+                        </button>
+                        <button 
+                          onClick={() => setImportText('')}
+                          className="bg-white border border-gray-300 text-gray-500 px-4 py-2.5 rounded-lg font-bold hover:bg-gray-50 transition-all text-sm"
+                        >
+                          Limpar Texto
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* History below (optional, maybe only in expenses/revenue) */}
+              {(importCategory === 'expenses' || importCategory === 'revenue') && renderImportHistoryTable()}
             </div>
             )
           )}
