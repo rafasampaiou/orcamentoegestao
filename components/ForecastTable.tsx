@@ -1260,8 +1260,18 @@ function calculateRowValue(config: ForecastConfig, allRows: ForecastRow[], base:
 }
 
 function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], accounts: Account[]) {
-    const rowMap = new Map(rows.map(r => [r.id, r]));
-    const nameMap = new Map(rows.map(r => [r.label.trim(), r])); // For formula lookups by name
+    // 1. CLONE PROFUNDO (Shallow Copy de cada objeto)
+    // Isso impede que as atribuições mutem o estado anterior do React
+    const clonedRows = rows.map(r => ({ 
+        ...r, 
+        // Clonar também os configs para garantir segurança térmica total
+        forecastConfig: { ...r.forecastConfig },
+        previaConfig: r.previaConfig ? { ...r.previaConfig } : undefined 
+    }));
+
+    // 2. Use as linhas clonadas para os mapas
+    const rowMap = new Map(clonedRows.map(r => [r.id, r]));
+    const nameMap = new Map(clonedRows.map(r => [r.label.trim(), r]));
 
     const sumAndSet = (targetId: string, sources: { id: string }[], fieldToSet: 'real' | 'budget' | 'lastYear' | 'previa') => {
         let total = 0;
@@ -1270,7 +1280,7 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
             if (row) total += row[fieldToSet] || 0;
         });
         const target = rowMap.get(targetId);
-        if (target) target[fieldToSet] = total;
+        if (target) target[fieldToSet] = total; // Agora mutar aqui é seguro, pois é um clone!
     };
 
     const runFormulas = (field: 'real' | 'budget' | 'lastYear' | 'previa') => {
@@ -1278,7 +1288,7 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
             getValue: (name: string) => nameMap.get(name.trim())?.[field] || 0
         };
 
-        rows.forEach(row => {
+        clonedRows.forEach(row => {
             if (row.isCalculated && row.formula) {
                 row[field] = evaluateFormula(row.formula, context);
             }

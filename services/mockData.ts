@@ -1036,7 +1036,7 @@ export const getDynamicForecastData = (
               genReal += 0;
               genLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
           });
-          rows.push(generateRow(`p-drill-${pkg.id}-gerais`, '', 'Account', 'Despesas administrativas gerais', genBudget, genReal, genLY, genPrevia, false, false, 2));
+          rows.push(generateRow(`p-drill-${pkg.id}-gerais`, '', 'Account', 'Despesas administrativas gerais', genBudget, genReal, genLY, genPrevia, false, false, 2, undefined, { method: 'Fixed' }));
 
           // 2. TI Breakdown
           const tiAccounts = pkgAccs.filter(acc => acc.name.toLowerCase().includes(tiAccountKeyword));
@@ -1062,7 +1062,7 @@ export const getDynamicForecastData = (
                     accLY += ly || (getImportedValue(tiAcc.name, (selectedYear || 0) - 1, 'Real') / 3);
                   });
 
-                  rows.push(generateRow(`p-drill-${pkg.id}-${sub.label}`, '', 'Account', subLabel, accBudget, 0, accLY, accPrevia, false, false, 2));
+                  rows.push(generateRow(`p-drill-${pkg.id}-${sub.label}`, '', 'Account', subLabel, accBudget, 0, accLY, accPrevia, false, false, 2, undefined, { method: 'Fixed' }));
               });
           }
           return; // Skip normal accounts
@@ -1096,7 +1096,7 @@ export const getDynamicForecastData = (
                 });
               }
 
-              rows.push(generateRow(`p-drill-${pkg.id}-${sub.label}`, '', 'Account', subLabel, sBudget, 0, sLY, sPrevia, false, false, 2));
+              rows.push(generateRow(`p-drill-${pkg.id}-${sub.label}`, '', 'Account', subLabel, sBudget, 0, sLY, sPrevia, false, false, 2, undefined, { method: 'Fixed' }));
           });
           return; // Skip normal accounts
       }
@@ -1115,7 +1115,9 @@ export const getDynamicForecastData = (
           accBudget, accReal, accLY, accPrevia, 
           false, 
           false, 
-          2
+          2,
+          undefined,
+          { method: 'Fixed' }
         ));
       });
     });
