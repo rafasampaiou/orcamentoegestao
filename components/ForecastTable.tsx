@@ -1273,6 +1273,17 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
     const rowMap = new Map(clonedRows.map(r => [r.id, r]));
     const nameMap = new Map(clonedRows.map(r => [r.label.trim(), r]));
 
+    // 3. RESET CALCULATED VALUES: Prevent "Self-Reference" or "Cumulative" multiplication bug
+    // Every recalculation should start from 0 for values derived from formulas
+    clonedRows.forEach(r => {
+        if (r.isCalculated) {
+            r.real = 0;
+            if (r.previaConfig?.method !== 'Fixed') {
+                r.previa = 0;
+            }
+        }
+    });
+
     const sumAndSet = (targetId: string, sources: { id: string }[], fieldToSet: 'real' | 'budget' | 'lastYear' | 'previa') => {
         let total = 0;
         sources.forEach(src => {

@@ -801,22 +801,32 @@ export const getForecastData = (
            genReal += 0;
            genLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
        });
-       rows.push(generateRow(`p-drill-${masterName}-${pkgName}-gerais`, pkgCode, 'Costs', 'Despesas administrativas gerais', genBudget, genReal, genLY, genPrevia, false, false, 2));
+       rows.push(generateRow(`p-drill-${masterName}-${pkgName}-gerais`, pkgCode, 'Costs', 'Despesas administrativas gerais', genBudget, genReal, genLY, genPrevia, false, false, 2, undefined, { method: 'Fixed' }));
 
        const subAreas = [
            { label: 'Tech', cr: 'martech' },
            { label: 'Martech', cr: 'marketing' },
            { label: 'Outras áreas', cr: 'OTHER_EXCEPT_MKT_MAR' }
        ];
-       const tiAcc = pkgAccs.find(acc => acc.name.toLowerCase().includes(tiAccountKeyword));
-       
-       if (tiAcc) {
+       const tiAccs = pkgAccs.filter(acc => acc.name.toLowerCase().includes(tiAccountKeyword));
+       if (tiAccs.length > 0) {
            subAreas.forEach(sub => {
-               const subBudget = getImportedValue(tiAcc.name, selectedYear, 'Budget', sub.cr);
-               const subPrevia = getImportedValue(tiAcc.name, selectedYear, 'Previa', sub.cr) + getImportedValue(tiAcc.name, selectedYear, 'Real', sub.cr);
-               const subReal = 0;
-               const subLY = getImportedValue(tiAcc.name, (selectedYear || 0) - 1, 'Real', sub.cr);
-               rows.push(generateRow(`p-drill-${masterName}-${pkgName}-${sub.label}`, pkgCode, 'Costs', `Processamentos de dados e TI (${sub.label})`, subBudget, subReal, subLY, subPrevia, false, false, 2));
+               let subBudget = 0; let subPrevia = 0; let subReal = 0; let subLY = 0;
+               tiAccs.forEach(tiAcc => {
+                   let sB = getImportedValue(tiAcc.name, selectedYear, 'Budget', sub.cr);
+                   let sP = getImportedValue(tiAcc.name, selectedYear, 'Previa', sub.cr) + getImportedValue(tiAcc.name, selectedYear, 'Real', sub.cr);
+                   let sLY = getImportedValue(tiAcc.name, (selectedYear || 0) - 1, 'Real', sub.cr);
+                   
+                   // Fallback for "Tech" if "martech" CR is empty - try "ti"
+                   if (sub.label === 'Tech' && sB === 0 && sP === 0) {
+                       sB = getImportedValue(tiAcc.name, selectedYear, 'Budget', 'ti');
+                       sP = getImportedValue(tiAcc.name, selectedYear, 'Previa', 'ti') + getImportedValue(tiAcc.name, selectedYear, 'Real', 'ti');
+                       sLY = getImportedValue(tiAcc.name, (selectedYear || 0) - 1, 'Real', 'ti');
+                   }
+                   
+                   subBudget += sB; subPrevia += sP; subLY += sLY;
+               });
+               rows.push(generateRow(`p-drill-${masterName}-${pkgName}-${sub.label}`, pkgCode, 'Costs', `Processamentos de dados e TI (${sub.label})`, subBudget, subReal, subLY, subPrevia, false, false, 2, undefined, { method: 'Fixed' }));
            });
        }
     } else if (isSalesMkt) {
@@ -835,7 +845,7 @@ export const getForecastData = (
                subReal += 0;
                subLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real', sub.cr);
            });
-           rows.push(generateRow(`p-drill-${masterName}-${pkgName}-${sub.label}`, pkgCode, 'Costs', `Despesas de Vendas e Marketing (${sub.label})`, subBudget, subReal, subLY, subPrevia, false, false, 2));
+           rows.push(generateRow(`p-drill-${masterName}-${pkgName}-${sub.label}`, pkgCode, 'Costs', `Despesas de Vendas e Marketing (${sub.label})`, subBudget, subReal, subLY, subPrevia, false, false, 2, undefined, { method: 'Fixed' }));
        });
     }
   });
@@ -1048,18 +1058,25 @@ export const getDynamicForecastData = (
               ];
               subAreas.forEach(sub => {
                   const subLabel = `Processamentos de dados e TI (${sub.label})`;
-                  
                   let accBudget = 0; let accPrevia = 0; let accLY = 0;
                   
                   tiAccounts.forEach(tiAcc => {
-                    const b = getImportedValue(tiAcc.name, selectedYear, 'Budget', sub.cr);
-                    const p = getImportedValue(tiAcc.name, selectedYear, 'Previa', sub.cr);
-                    const r = getImportedValue(tiAcc.name, selectedYear, 'Real', sub.cr);
-                    const ly = getImportedValue(tiAcc.name, (selectedYear || 0) - 1, 'Real', sub.cr);
+                      let b = getImportedValue(tiAcc.name, selectedYear, 'Budget', sub.cr);
+                      let p = getImportedValue(tiAcc.name, selectedYear, 'Previa', sub.cr);
+                      let r = getImportedValue(tiAcc.name, selectedYear, 'Real', sub.cr);
+                      let ly = getImportedValue(tiAcc.name, (selectedYear || 0) - 1, 'Real', sub.cr);
 
-                    accBudget += b || (getImportedValue(tiAcc.name, selectedYear, 'Budget') / 3);
-                    accPrevia += (p + r) || (getImportedValue(tiAcc.name, selectedYear, 'Previa') + getImportedValue(tiAcc.name, selectedYear, 'Real')) / 3;
-                    accLY += ly || (getImportedValue(tiAcc.name, (selectedYear || 0) - 1, 'Real') / 3);
+                      // Fallback for Tech -> try 'ti' CR
+                      if (sub.label === 'Tech' && b === 0 && (p + r) === 0) {
+                          b = getImportedValue(tiAcc.name, selectedYear, 'Budget', 'ti');
+                          p = getImportedValue(tiAcc.name, selectedYear, 'Previa', 'ti');
+                          r = getImportedValue(tiAcc.name, selectedYear, 'Real', 'ti');
+                          ly = getImportedValue(tiAcc.name, (selectedYear || 0) - 1, 'Real', 'ti');
+                      }
+
+                      accBudget += b;
+                      accPrevia += (p + r);
+                      accLY += ly;
                   });
 
                   rows.push(generateRow(`p-drill-${pkg.id}-${sub.label}`, '', 'Account', subLabel, accBudget, 0, accLY, accPrevia, false, false, 2, undefined, { method: 'Fixed' }));
