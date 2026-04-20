@@ -1351,9 +1351,20 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
         // Find children accounts. Account IDs might have suffixes (e.g. accId-Martech)
         const children = updatedRows.filter(r => {
             if (r.category !== 'Costs' || r.indentLevel !== 2) return false;
+            
+            // Inclusion of special drill-down rows (p-drill-master-pkg-sub)
+            if (r.id.startsWith('p-drill-')) {
+                // Pattern matches: p-drill-${masterName}-${pkgName}-...
+                const matchesMaster = r.id.includes(`-${masterName}-`);
+                // For pkgName, we check both the label and the possible ID part (parts[2])
+                const matchesPkg = (parts[2] && r.id.includes(`-${parts[2]}-`)) || r.id.includes(`-${pkgName}-`);
+                if (matchesMaster && matchesPkg) return true;
+            }
+
             const originalAccId = r.id.split('-')[0];
             const acc = accounts.find(a => a.id === originalAccId);
-            return acc?.package === pkgName && acc?.masterPackage === masterName;
+            return (acc?.package === pkgName && acc?.masterPackage === masterName) ||
+                   (parts[2] && acc?.package === parts[2] && acc?.masterPackage === masterName);
         });
 
         if (children.length > 0) {
