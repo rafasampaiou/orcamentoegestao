@@ -593,6 +593,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const accFileInputRef = useRef<HTMLInputElement>(null);
 
   // Account View Customization
+  const [isImportingFinancial, setIsImportingFinancial] = useState(false);
   const [collapsedMasterPackages, setCollapsedMasterPackages] = useState<Set<string>>(new Set());
   const [collapsedPackages, setCollapsedPackages] = useState<Set<string>>(new Set());
   const [accountViewLevel, setAccountViewLevel] = useState<'master' | 'package' | 'account'>('account');
@@ -1968,7 +1969,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     setImportStep('preview');
   };
 
-  const handleFinalImport = (targetRealVersionId: string, targetBudgetVersionId: string) => {
+  const handleFinalImport = async (targetRealVersionId: string, targetBudgetVersionId: string) => {
     const dataToImport = parsedData;
 
     // Map version IDs to the rows based on cenario
@@ -1980,20 +1981,63 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       };
     });
 
-    if (onImportData) {
-      onImportData(finalData, importMode);
+    if (finalData.length === 0) {
+      alert("Nenhum registro válido para importar.");
+      return;
     }
 
-    const count = finalData.length;
-    alert(`Importação concluída! ${count} registros processados.`);
+    setIsImportingFinancial(true);
+    try {
+      if (importMode === 'replace') {
+        // SMART REPLACE: Delete existing data for the same contexts (Hotel+Year+Month+Scenario+Version)
+        const contexts = new Set<string>();
+        finalData.forEach(row => {
+          const key = `${row.hotel}|${row.ano}|${row.mes}|${row.cenario}|${row.versionId || ''}`;
+          contexts.add(key);
+        });
 
-    setImportStep('input');
-    setImportText('');
-    setParsedData([]);
-    setImportMode('append');
+        for (const context of contexts) {
+          const [hotel, ano, mes, cenario, versionId] = context.split('|');
+          let query = (supabaseTemp as any)
+            .from('financial_data')
+            .delete()
+            .eq('hotel', hotel)
+            .eq('year', parseInt(ano))
+            .eq('month', parseInt(mes))
+            .eq('scenario', cenario);
+          
+          if (versionId) {
+            query = query.eq('version_id', versionId);
+          } else {
+            query = query.is('version_id', null);
+          }
+          
+          const { error } = await query;
+          if (error) throw error;
+        }
+      }
 
-    // Record History
-    recordImportHistory(finalData);
+      await supabaseService.saveFinancialData(finalData);
+
+      if (onImportData) {
+        onImportData(finalData, importMode);
+      }
+
+      alert(`Importação concluída! ${finalData.length} registros processados e salvos no banco.`);
+
+      setImportStep('input');
+      setImportText('');
+      setParsedData([]);
+      setImportMode('append');
+
+      // Record History
+      recordImportHistory(finalData);
+    } catch (err: any) {
+      console.error("Erro ao salvar importação no Supabase:", err);
+      alert(`Erro ao salvar no banco de dados: ${err.message || 'Verifique sua conexão.'}`);
+    } finally {
+      setIsImportingFinancial(false);
+    }
   };
 
   // ─── Budget 2026 Import (13-column format) ─────────────────────────────────
