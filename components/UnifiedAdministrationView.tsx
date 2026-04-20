@@ -1945,8 +1945,13 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         msgParts.push(`Setor/CR '${crName}' não encontrado (Hotel: ${hotel})`);
       }
 
+      let finalAno = (ano_col || "").trim();
+      if (!finalAno || isNaN(Number(finalAno))) {
+        finalAno = importYear.toString();
+      }
+
       parsed.push({
-        ano: ano_col || importYear.toString(),
+        ano: finalAno,
         cenario: cenario,
         tipo: tipo,
         hotel: hotel || '',
@@ -1998,12 +2003,21 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
         for (const context of contexts) {
           const [hotel, ano, mes, cenario, versionId] = context.split('|');
+          const yearNum = parseInt(ano);
+          const monthNum = parseInt(mes);
+
+          // Safety check to avoid "NaN" error in Postgres
+          if (isNaN(yearNum) || isNaN(monthNum)) {
+            console.error(`Pulo da limpeza automática devido a dados inválidos: Ano=${ano}, Mês=${mes}`);
+            continue;
+          }
+
           let query = (supabaseTemp as any)
             .from('financial_data')
             .delete()
             .eq('hotel', hotel)
-            .eq('year', parseInt(ano))
-            .eq('month', parseInt(mes))
+            .eq('year', yearNum)
+            .eq('month', monthNum)
             .eq('scenario', cenario);
           
           if (versionId) {
