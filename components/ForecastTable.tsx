@@ -1261,25 +1261,34 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
 
     // --- COSTS HIERARCHICAL AGGREGATION ---
     // 1. Sum Accounts (Level 2) into Packages (Level 1)
-    const pkgRows = updatedRows.filter(r => r.category === 'Costs' && r.id.startsWith('p-'));
+    // Use semantic properties: isHeader + indentLevel instead of ID prefixes
+    const pkgRows = updatedRows.filter(r =>
+        (r.category === 'Costs' || r.category === 'Package') &&
+        r.isHeader &&
+        r.indentLevel === 1 &&
+        !r.id.startsWith('p-drill-')
+    );
     pkgRows.forEach(pkgRow => {
-        const parts = pkgRow.id.split('-');
-        const masterName = parts[1];
+        const pkgId = pkgRow.id;
         const pkgName = pkgRow.label;
 
+        // Find children: accounts AND drill-down sub-rows at indentLevel 2
         const children = updatedRows.filter(r => {
-            if (r.category !== 'Costs' || r.indentLevel !== 2) return false;
+            if (r.indentLevel !== 2) return false;
+            if (r.category !== 'Costs' && r.category !== 'Account') return false;
 
+            // Match drill-down rows: their ID contains the parent package ID
             if (r.id.startsWith('p-drill-')) {
-                const matchesMaster = r.id.includes(`-${masterName}-`);
-                const matchesPkg = (parts[2] && r.id.includes(`-${parts[2]}-`)) || r.id.includes(`-${pkgName}-`);
-                if (matchesMaster && matchesPkg) return true;
+                // Dynamic: p-drill-{pkgId}-{sub} → contains pkgId
+                // Static: p-drill-{masterName}-{pkgName}-{sub} → contains pkgName
+                return r.id.includes(pkgId) || r.id.includes(`-${pkgName}-`);
             }
 
+            // Match regular account rows via the accounts registry
             const originalAccId = r.id.split('-')[0];
             const acc = accounts.find(a => a.id === originalAccId);
-            return (acc?.package === pkgName && acc?.masterPackage === masterName) ||
-                (parts[2] && acc?.package === parts[2] && acc?.masterPackage === masterName);
+            if (!acc) return false;
+            return acc.package === pkgName || acc.packageId === pkgId;
         });
 
         if (children.length > 0) {

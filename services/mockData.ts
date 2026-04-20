@@ -583,7 +583,10 @@ export const getForecastData = (
 
     hotelsToTry.forEach(h => {
         const baseKey = `${targetYear}|${selectedMonth}|${h.trim().toUpperCase()}|${targetScenario}|${targetName}`;
-        if (targetCR) {
+        if (crFilter === 'OTHER_EXCEPT_MKT_MAR') {
+            // Special: use base key (no CR suffix) so we can do Total - Martech - Marketing
+            keysToCheck.add(baseKey);
+        } else if (targetCR) {
             keysToCheck.add(`${baseKey}|${targetCR}`);
         } else {
             keysToCheck.add(baseKey);
@@ -593,19 +596,16 @@ export const getForecastData = (
     let total = 0;
     keysToCheck.forEach(key => {
         if (crFilter === 'OTHER_EXCEPT_MKT_MAR') {
-             // Logic: Total - Martech - Marketing
+             // Logic: Total (base key) - Martech - Marketing
              const totalVal = dataIndex.get(key) || 0;
              const martechVal = dataIndex.get(`${key}|martech`) || 0;
              const mktVal = dataIndex.get(`${key}|marketing`) || 0;
              total += (totalVal - martechVal - mktVal);
         } else if (dataIndex.has(key)) {
             total += dataIndex.get(key) || 0;
-        } else if (key.includes('|') && key.split('|').length > 5) {
-            // Fallback: If with CR failed, try without CR
-            const parts = key.split('|');
-            const fallbackKey = parts.slice(0, 5).join('|');
-            total += dataIndex.get(fallbackKey) || 0;
         }
+        // REMOVED: CR fallback that was returning full account total
+        // when no CR-specific data existed, inflating sub-area values
     });
 
     return total;
@@ -1107,9 +1107,9 @@ export const getDynamicForecastData = (
                   const r = getImportedValue(mktAcc.name, selectedYear, 'Real', sub.cr);
                   const ly = getImportedValue(mktAcc.name, (selectedYear || 0) - 1, 'Real', sub.cr);
 
-                  sBudget += b || (getImportedValue(mktAcc.name, selectedYear, 'Budget') / 3);
-                  sPrevia += (p + r) || (getImportedValue(mktAcc.name, selectedYear, 'Previa') + getImportedValue(mktAcc.name, selectedYear, 'Real')) / 3;
-                  sLY += ly || (getImportedValue(mktAcc.name, (selectedYear || 0) - 1, 'Real') / 3);
+                  sBudget += b;
+                  sPrevia += (p + r);
+                  sLY += ly;
                 });
               }
 
