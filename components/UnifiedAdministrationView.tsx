@@ -3290,13 +3290,36 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               {/* 1. Occupancy Import */}
               {importCategory === 'occupancy' && (
                 <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                  <div className="flex items-center font-bold text-gray-900 gap-2 mb-2">
-                    <BedDouble className="text-indigo-600" size={20} />
-                    Importação da Ocupação
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center font-bold text-gray-900 gap-2">
+                      <BedDouble className="text-indigo-600" size={20} />
+                      Importação da Ocupação
+                    </div>
+                    {/* Sub-Tabs: Ocupação UH vs Lazer e Eventos */}
+                    <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
+                      {[
+                        { id: 'uh', label: 'Ocupação UH' },
+                        { id: 'leisure', label: 'Lazer e Eventos' }
+                      ].map(tab => (
+                        <button
+                          key={tab.id}
+                          onClick={() => setOccupancySubTab(tab.id as any)}
+                          className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${
+                            occupancySubTab === tab.id 
+                              ? 'bg-white text-indigo-600 shadow-sm' 
+                              : 'text-gray-500 hover:text-gray-700'
+                          }`}
+                        >
+                          {tab.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl text-sm text-blue-800">
-                    <p>Preencha os indicadores de ocupação abaixo ou cole do Excel.</p>
+
+                  <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl text-xs text-blue-800">
+                    <p>Preencha os indicadores de {occupancySubTab === 'uh' ? 'ocupação UH' : 'lazer e eventos'} abaixo ou cole do Excel.</p>
                   </div>
+
                   <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
                     <label className="text-sm font-bold text-gray-700">Integrar na Versão:</label>
                     <select 
@@ -3307,41 +3330,89 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                       <option value="">Selecione a versão...</option>
                       {realVersions.map(v => <option key={v.id} value={v.id}>{v.name} ({v.year})</option>)}
                     </select>
-                    <button 
-                      onClick={handleSaveOccupancy}
-                      disabled={isSavingDre || !occTargetVersionId}
-                      className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all flex items-center gap-2 disabled:opacity-50"
-                    >
-                      {isSavingDre ? 'Salvando...' : <><Save size={16} /> Salvar Ocupação</>}
-                    </button>
-                    <button 
-                      onClick={handleClearOccupancy}
-                      className="bg-white border border-gray-300 text-red-600 px-4 py-2 rounded-lg font-bold text-sm hover:bg-red-50 transition-all flex items-center gap-2"
-                    >
-                      <Trash2 size={16} /> Limpar
-                    </button>
+
+                    <div className="flex-1" />
+
+                    {occupancySubTab === 'uh' ? (
+                      <>
+                        <button 
+                          onClick={handleSaveOccupancy}
+                          disabled={isSavingDre || !occTargetVersionId}
+                          className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all flex items-center gap-2 disabled:opacity-50"
+                        >
+                          {isSavingDre ? 'Salvando...' : <><Save size={16} /> Salvar Ocupação UH</>}
+                        </button>
+                        <button 
+                          onClick={handleClearOccupancy}
+                          className="bg-white border border-gray-300 text-red-600 px-4 py-2 rounded-lg font-bold text-sm hover:bg-red-50 transition-all flex items-center gap-2"
+                        >
+                          <Trash2 size={16} /> Limpar
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button 
+                          onClick={handleSaveLeisureEvents}
+                          disabled={isSavingDre || !occTargetVersionId}
+                          className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all flex items-center gap-2 disabled:opacity-50"
+                        >
+                          {isSavingDre ? 'Salvando...' : <><Save size={16} /> Salvar Lazer e Eventos</>}
+                        </button>
+                        <button 
+                          onClick={handleClearLeisureEvents}
+                          className="bg-white border border-gray-300 text-red-600 px-4 py-2 rounded-lg font-bold text-sm hover:bg-red-50 transition-all flex items-center gap-2"
+                        >
+                          <Trash2 size={16} /> Limpar
+                        </button>
+                      </>
+                    )}
                   </div>
-                  <SpreadsheetTable 
-                    rows={["UH Disponíveis", "UH Ocupadas", "PAX", "Adultos", "Crianças", "Receita Hospedagem"]}
-                    data={occupancyImportData}
-                    onCellChange={(row, month, val) => setOccupancyImportData(prev => ({ ...prev, [row]: { ...(prev[row] || {}), [month]: val }}))}
-                    onPaste={(row, month, pasted) => {
-                      const newData = { ...occupancyImportData };
-                      const rows = ["UH Disponíveis", "UH Ocupadas", "PAX", "Adultos", "Crianças", "Receita Hospedagem"];
-                      const startIdx = rows.indexOf(row);
-                      pasted.forEach((pRow, rOffset) => {
-                        const targetRow = rows[startIdx + rOffset];
-                        if (targetRow) {
-                          if (!newData[targetRow]) newData[targetRow] = {};
-                          pRow.forEach((val, cOffset) => {
-                            const targetCol = month + cOffset;
-                            if (targetCol <= 12) newData[targetRow][targetCol] = val;
-                          });
-                        }
-                      });
-                      setOccupancyImportData(newData);
-                    }}
-                  />
+
+                  {occupancySubTab === 'uh' ? (
+                    <SpreadsheetTable 
+                      rows={["UH Disponíveis", "UH Ocupadas", "PAX", "Adultos", "Crianças", "Receita Hospedagem"]}
+                      data={occupancyImportData}
+                      onCellChange={(row, month, val) => setOccupancyImportData(prev => ({ ...prev, [row]: { ...(prev[row] || {}), [month]: val }}))}
+                      onPaste={(row, month, pasted) => {
+                        const newData = { ...occupancyImportData };
+                        const rows = ["UH Disponíveis", "UH Ocupadas", "PAX", "Adultos", "Crianças", "Receita Hospedagem"];
+                        const startIdx = rows.indexOf(row);
+                        pasted.forEach((pRow, rOffset) => {
+                          const targetRow = rows[startIdx + rOffset];
+                          if (targetRow) {
+                            if (!newData[targetRow]) newData[targetRow] = {};
+                            pRow.forEach((val, cOffset) => {
+                              const targetCol = month + cOffset;
+                              if (targetCol <= 12) newData[targetRow][targetCol] = val;
+                            });
+                          }
+                        });
+                        setOccupancyImportData(newData);
+                      }}
+                    />
+                  ) : (
+                    <SpreadsheetTable 
+                      rows={["UH Lazer", "UH Eventos", "PAX Lazer", "PAX Eventos", "Receita Lazer", "Receita Eventos"]}
+                      data={leisureEventImportData}
+                      onCellChange={(row, month, val) => setLeisureEventImportData(prev => ({ ...prev, [row]: { ...(prev[row] || {}), [month]: val }}))}
+                      onPaste={(row, month, pasted) => {
+                        const newData = { ...leisureEventImportData };
+                        const rows = ["UH Lazer", "UH Eventos", "PAX Lazer", "PAX Eventos", "Receita Lazer", "Receita Eventos"];
+                        const startIdx = rows.indexOf(row);
+                        pasted.forEach((pRow, rOffset) => {
+                          const targetRow = rows[startIdx + rOffset];
+                          if (targetRow) {
+                            if (!newData[targetRow]) newData[targetRow] = {};
+                            pRow.forEach((val, cOffset) => {
+                              const targetCol = month + cOffset;
+                              if (targetCol <= 12) newData[targetRow][targetCol] = val;
+                            });
+                          }
+                        });
+                        setLeisureEventImportData(newData);
+                      }}
+                    />
+                  )}
                 </div>
               )}
 
