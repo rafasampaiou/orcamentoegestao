@@ -283,6 +283,7 @@ const geralRows: BudgetRow[] = [
     { id: 'geral_trevpar', label: 'TREVPAR', isCalculated: true, format: 'currency' },
     { id: 'geral_rev_fap', label: 'Receita COM rateios', isCalculated: true, format: 'currency' },
     { id: 'geral_rev_hosp', label: 'Receita SEM rateios', isCalculated: true, format: 'currency' },
+    { id: 'geral_extra_rev', label: 'Receitas Extras', isCalculated: true, format: 'currency' },
 ];
 
 const lazerRows: BudgetRow[] = [
@@ -303,6 +304,7 @@ const lazerRows: BudgetRow[] = [
     { id: 'lazer_revpar', label: 'REVPAR', isCalculated: true, format: 'currency' },
     { id: 'lazer_rev_fap', label: 'Receita COM rateios', isInput: true, format: 'currency' },
     { id: 'lazer_rev_hosp', label: 'Receita SEM rateios', isCalculated: true, format: 'currency' },
+    { id: 'lazer_extra_rev', label: 'Receitas Extras', isInput: true, isManualReal: true, format: 'currency' },
 ];
 
 const eventRows: BudgetRow[] = [
@@ -323,6 +325,7 @@ const eventRows: BudgetRow[] = [
     { id: 'event_revpar', label: 'REVPAR', isCalculated: true, format: 'currency' },
     { id: 'event_rev_fap', label: 'Receita COM rateios', isInput: true, format: 'currency' },
     { id: 'event_rev_hosp', label: 'Receita SEM rateios', isCalculated: true, format: 'currency' },
+    { id: 'event_extra_rev', label: 'Receitas Extras', isInput: true, isManualReal: true, format: 'currency' },
 ];
 
 // --- Main Component ---
@@ -418,6 +421,7 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
 
             const evPax = evAd + evChd;
             const evRevFap = evDmFap * evSold;
+            const evExtra = get(`event_extra_rev_${s}`);
 
             set(`event_pax_${s}`, evPax);
             set(`event_occ_pct_${s}`, evAvail > 0 ? (evSold / evAvail) * 100 : 0);
@@ -426,6 +430,9 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             set(`event_coef_chd_${s}`, evSold > 0 ? evChd / evSold : 0);
             set(`event_rev_fap_${s}`, evRevFap);
             set(`event_revpar_${s}`, evAvail > 0 ? evRevFap / evAvail : 0);
+
+            const lzExtra = get(`lazer_extra_rev_${s}`);
+            const gExtra = lzExtra + evExtra;
 
             const gSold = lzSold + evSold;
             const gAd = lzAd + evAd;
@@ -445,6 +452,7 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             set(`geral_rev_fap_${s}`, gRevFap);
             set(`geral_dm_fap_${s}`, gSold > 0 ? gRevFap / gSold : 0);
             set(`geral_revpar_${s}`, gAvail > 0 ? gRevFap / gAvail : 0);
+            set(`geral_extra_rev_${s}`, gExtra);
         });
 
         return newData;
@@ -592,6 +600,10 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
 
             set('geral_rev_fap', i, gRevFap);
             set('geral_rev_hosp', i, gRevHosp);
+
+            const lzExtra = get('lazer_extra_rev', i);
+            const evExtra = get('event_extra_rev', i);
+            set('geral_extra_rev', i, lzExtra + evExtra);
         });
 
         return newData;
@@ -808,17 +820,10 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
                     <div>
                         <div className="flex items-center gap-3">
                             <h2 className="text-2xl font-bold text-gray-900">Ocupação (Real)</h2>
-                            {!isBudget && setActiveProjectionType && (
-                                <select
-                                    className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 p-1.5 font-bold"
-                                    value={activeProjectionType}
-                                    onChange={(e) => setActiveProjectionType(e.target.value as import('../types').ProjectionType)}
-                                >
-                                    <option value="Reunião de Ritmo">Reunião de Ritmo</option>
-                                    <option value="FCA N1">FCA N1</option>
-                                    <option value="FCA N2">FCA N2</option>
-                                    <option value="Fechamento oficial">Fechamento oficial</option>
-                                </select>
+                            {!isBudget && (
+                                <span className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-sm rounded-lg py-1 px-3 font-bold">
+                                    Fechamento oficial
+                                </span>
                             )}
                         </div>
                         <p className="text-gray-500 mt-1">Análise detalhada de ocupação por segmento para {selectedMonth}/{selectedYear}.</p>
