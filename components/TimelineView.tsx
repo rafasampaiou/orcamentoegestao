@@ -119,9 +119,11 @@ const TimelineView: React.FC<TimelineViewProps> = ({
           </svg>
           {title}
         </h3>
-        <button onClick={handleNewPlanClick} className="bg-[#38b2ac] hover:bg-[#319795] text-white px-4 py-2 rounded text-xs font-bold flex items-center gap-2 transition-colors uppercase tracking-wider shadow-sm">
-          Novo Planejamento
-        </button>
+        {showCreateOption && (
+          <button onClick={handleNewPlanClick} className="bg-[#38b2ac] hover:bg-[#319795] text-white px-4 py-2 rounded text-xs font-bold flex items-center gap-2 transition-colors uppercase tracking-wider shadow-sm">
+            Novo Planejamento
+          </button>
+        )}
       </div>
 
       <div className="border border-gray-200 bg-white shadow-sm overflow-x-auto">
