@@ -80,7 +80,7 @@ const REVENUE_IMPORT_COLUMNS = [
 ];
 
 const DETAILED_EXPENSE_COLUMNS = [
-  "Empresa", "Mês", "Cod_CR", "CR_Nome", "Conta_Contabil", "Conta_Nome", "Valor", "Ano", "Pacote_DRE"
+  "Ano", "Escopo ou Fora", "Mês", "Classe Gerencial Nome", "Centro de Resultado Nome", "Valor Ajustado", "Filial", "Departamento", "Pacote", "Pacote Master", "Diretoria"
 ];
 
 // --- IMPORT PREVIEW COMPONENT ---
@@ -473,8 +473,12 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     const groups = new Map<string, { months: Set<string>, total: number, versionId: string | null }>();
     
     rows.forEach(r => {
-      const tipoNormalized = r.tipo?.toLowerCase().includes('receita') ? 'Receita' : 'Despesa';
-      // Safety: ensure r.ano is a string before splitting/keying
+      let tipoNormalized = 'Despesa';
+      if (r.tipo?.toLowerCase().includes('receita')) tipoNormalized = 'Receita';
+      else if (r.tipo?.toLowerCase().includes('imposto')) tipoNormalized = 'Imposto';
+      else if (r.tipo?.toLowerCase().includes('ocupação')) tipoNormalized = 'Ocupação';
+      else if (r.tipo?.toLowerCase().includes('meta')) tipoNormalized = 'Meta';
+      
       const yearStr = String(r.ano || new Date().getFullYear());
       const key = `${r.hotel}|${tipoNormalized}|${yearStr}|${r.versionId || ''}`;
       
@@ -485,7 +489,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       const group = groups.get(key)!;
       group.months.add(String(r.mes));
       
-      // Clean and parse value
       const valStr = (r.valor || '0').toString().replace(/\./g, '').replace(',', '.');
       const valParsed = parseFloat(valStr) || 0;
       group.total += valParsed;
@@ -507,8 +510,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       return {
         hotel,
         tipo,
-        ano: parseInt(ano) || new Date().getFullYear(), // This fixed the "NaN" error
-        meses: monthNames,
+        ano: ano,
+        meses: monthNames || "1-12",
         version_id: data.versionId,
         user_id: null,
         valor_total: Math.abs(data.total)
@@ -516,10 +519,23 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     });
 
     try {
-      await supabaseService.saveImportHistory(entries);
+      const saved = await supabaseService.saveImportHistory(entries);
       fetchImportHistory();
+      return saved[0]?.id; // Return the first ID for linking
     } catch (e) {
       console.error("Falha ao salvar histórico de importação", e);
+      return null;
+    }
+  };
+
+  const handleDeleteImportHistory = async (id: string) => {
+    if (!confirm('Tem certeza que deseja excluir esta importação? Todos os dados vinculados serão removidos do banco de dados.')) return;
+    try {
+      await supabaseService.deleteImport(id);
+      setImportHistory(prev => prev.filter(h => h.id !== id));
+      alert('Importação excluída com sucesso.');
+    } catch (e: any) {
+      alert('Erro ao excluir importação: ' + e.message);
     }
   };
 
@@ -554,6 +570,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                   <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider text-center">Ano</th>
                   <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Meses</th>
                   <th className="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase tracking-wider">Valor Total</th>
+                  <th className="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase tracking-wider">Ações</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200 text-xs">
@@ -573,8 +590,17 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-center text-gray-600 font-medium">{log.ano}</td>
                       <td className="px-4 py-3 text-gray-500 max-w-[150px] truncate" title={log.meses}>{log.meses}</td>
-                      <td className="px-4 py-3 whitespace-nowrap text-right font-mono font-bold text-indigo-900">
+                      <td className="px-4 py-3 whitespace-nowrap text-right font-mono font-bold text-indigo-900 bg-indigo-50/30">
                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(log.valor_total || 0)}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-right">
+                        <button 
+                          onClick={() => handleDeleteImportHistory(log.id)}
+                          className="text-red-400 hover:text-red-600 p-1 hover:bg-red-50 rounded transition-colors"
+                          title="Excluir esta importação"
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       </td>
                     </tr>
                   ))
@@ -702,7 +728,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const [dreForecastData, setDreForecastData] = useState<Record<string, Record<number, string>>>({});
   const [taxesImportData, setTaxesImportData] = useState<Record<string, Record<number, string>>>({});
   const [occupancyImportData, setOccupancyImportData] = useState<Record<string, Record<number, string>>>({});
+  const [leisureEventImportData, setLeisureEventImportData] = useState<Record<string, Record<number, string>>>({});
   const [occTargetVersionId, setOccTargetVersionId] = useState<string>('');
+  const [occupancySubTab, setOccupancySubTab] = useState<'uh' | 'leisure'>('uh');
 
   // Budget 2026 Import State (separate from Real import)
   const [budgetImportText, setBudgetImportText] = useState('');
@@ -2164,7 +2192,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         }
       }
 
-      await supabaseService.saveFinancialData(finalData);
+      // Record History
+      const importId = await recordImportHistory(finalData);
+      await supabaseService.saveFinancialData(finalData, importId);
 
       if (onImportData) {
         onImportData(finalData, importMode);
@@ -2176,9 +2206,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       setImportText('');
       setParsedData([]);
       setImportMode('append');
-
-      // Record History
-      recordImportHistory(finalData);
+      
+      fetchImportHistory(); // Refresh history
     } catch (err: any) {
       console.error("Erro ao salvar importação no Supabase:", err);
       alert(`Erro ao salvar no banco de dados: ${err.message || 'Verifique sua conexão.'}`);
@@ -2425,14 +2454,12 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     // 2) Persiste no Supabase
     setBudgetImportSaving(true);
     try {
+      const importId = await recordImportHistory(rowsWithVersion);
       // Remove registros anteriores desta versão para evitar duplicados
-      await supabaseService.deleteFinancialDataByVersion(targetBudgetVersionId);
-      await supabaseService.saveFinancialData(rowsWithVersion);
+      // await supabaseService.deleteFinancialDataByVersion(targetBudgetVersionId); // Removed as we use delete history now
+      await supabaseService.saveFinancialData(rowsWithVersion, importId);
       setBudgetImportSavedCount(rowsWithVersion.length);
       setBudgetImportStep('done');
-      
-      // Record History
-      recordImportHistory(rowsWithVersion);
     } catch (err: any) {
       console.error('Erro ao salvar orçamento no Supabase:', err);
       alert(`Dados importados localmente, mas erro ao salvar no banco:\n${err?.message || JSON.stringify(err)}`);
@@ -2501,9 +2528,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
     setIsSavingDre(true);
     try {
-      await supabaseService.saveFinancialData(rowsToSave);
+      const importId = await recordImportHistory(rowsToSave);
+      await supabaseService.saveFinancialData(rowsToSave, importId);
       alert('Dados de despesas salvos com sucesso!');
-      recordImportHistory(rowsToSave);
     } catch (e: any) {
       console.error("Save error:", e);
       alert('Erro ao persistir dados: ' + (e.message || 'Erro desconhecido'));
@@ -2547,9 +2574,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
     setIsSavingDre(true);
     try {
-      await supabaseService.saveFinancialData(rowsToSave);
+      const importId = await recordImportHistory(rowsToSave);
+      await supabaseService.saveFinancialData(rowsToSave, importId);
       alert('Impostos salvos com sucesso!');
-      recordImportHistory(rowsToSave);
     } catch (e: any) {
       alert('Erro ao salvar impostos: ' + e.message);
     } finally {
@@ -2606,7 +2633,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         ano: String(targetVersion.year),
         mes: "1-12",
         hotel: targetVersion.hotelId || "Múltiplas",
-        tipo: "Ocupação",
+        tipo: "Ocupação UH",
         cenario: "REAL",
         conta: "Métricas de Ocupação",
         cr: "",
@@ -2614,10 +2641,77 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         status: "valid",
         versionId: targetVersion.id
       }];
-      recordImportHistory(histRows);
+      const importId = await recordImportHistory(histRows);
+      fetchImportHistory(); // Refresh history
 
     } catch (e: any) {
       alert('Erro ao salvar ocupação: ' + e.message);
+    } finally {
+      setIsSavingDre(false);
+    }
+  };
+
+  const handleClearLeisureEvents = () => {
+    if (confirm('Tem certeza que deseja limpar a tabela de Lazer e Eventos?')) {
+      setLeisureEventImportData({});
+    }
+  };
+
+  const handleSaveLeisureEvents = async () => {
+    if (!occTargetVersionId) return alert('Selecione a versão de destino.');
+    
+    const metrics = ["UH Lazer", "UH Eventos", "PAX Lazer", "PAX Eventos", "Receita Lazer", "Receita Eventos"];
+    const occupancy_data: Record<string, number[]> = {};
+    
+    metrics.forEach(metric => {
+      const monthValues = Array(12).fill(0);
+      for (let m = 1; m <= 12; m++) {
+        const valStr = leisureEventImportData[metric]?.[m] || '0';
+        const val = parseFloat(valStr.toString().replace(/\./g, '').replace(',', '.')) || 0;
+        monthValues[m - 1] = val;
+      }
+      occupancy_data[metric] = monthValues;
+    });
+
+    const targetVersion = budgetVersions.find(v => v.id === occTargetVersionId) 
+                       || realVersions.find(v => v.id === occTargetVersionId);
+    
+    if (!targetVersion) return alert('Versão não encontrada.');
+
+    setIsSavingDre(true);
+    try {
+      // Merge with existing occupancy data if any
+      const existingOcc = targetVersion.occupancyData || {};
+      const updatedOccupancy = { ...existingOcc, ...occupancy_data };
+      const updatedVersion = { ...targetVersion, occupancyData: updatedOccupancy };
+      
+      await supabaseService.upsertBudgetVersion(updatedVersion);
+      
+      if (budgetVersions.some(v => v.id === occTargetVersionId)) {
+        setBudgetVersions(prev => prev.map(v => v.id === occTargetVersionId ? updatedVersion : v));
+      } else {
+        setRealVersions(prev => prev.map(v => v.id === occTargetVersionId ? updatedVersion : v));
+      }
+
+      alert('Dados de Lazer e Eventos salvos com sucesso!');
+      
+      const histRows: ImportedRow[] = [{
+        ano: String(targetVersion.year),
+        mes: "1-12",
+        hotel: targetVersion.hotelId || "Múltiplas",
+        tipo: "Lazer e Eventos",
+        cenario: "REAL",
+        conta: "Métricas de Lazer e Eventos",
+        cr: "",
+        valor: "0",
+        status: "valid",
+        versionId: targetVersion.id
+      }];
+      const importId = await recordImportHistory(histRows);
+      fetchImportHistory(); // Refresh history
+
+    } catch (e: any) {
+      alert('Erro ao salvar lazer/eventos: ' + e.message);
     } finally {
       setIsSavingDre(false);
     }
@@ -2661,9 +2755,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
     setIsSavingDre(true);
     try {
-      await supabaseService.saveFinancialData(rowsToSave);
+      const importId = await recordImportHistory(rowsToSave);
+      await supabaseService.saveFinancialData(rowsToSave, importId);
       alert(`${rowsToSave.length} registros de receita salvos com sucesso!`);
-      recordImportHistory(rowsToSave);
       setImportText('');
     } catch (e: any) {
       alert('Erro ao salvar receitas: ' + e.message);
@@ -2677,38 +2771,43 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     
     const rows = importText.split('\n');
     const firstRowCols = rows[0].split('\t');
-    const hasHeader = firstRowCols[0] === 'Empresa' || isNaN(Number(firstRowCols[1]));
+    const hasHeader = firstRowCols[0].toLowerCase().includes('ano') || isNaN(Number(firstRowCols[2]));
     const startIdx = hasHeader ? 1 : 0;
     
     const rowsToSave: ImportedRow[] = [];
-    const selectedVersion = realVersions.find(v => v.id === activeRealVersionId);
-    if (!selectedVersion) return alert('Selecione uma versão de Realizado primeiro.');
+    if (!activeRealVersionId) return alert('Selecione uma versão de Realizado primeiro.');
+
+    const hotelObj = hotels.find(h => h.id === importHotelId);
+    const empresaDefault = hotelObj?.name || 'Múltiplos';
 
     for (let i = startIdx; i < rows.length; i++) {
         const line = rows[i].trim();
         if (!line) continue;
         const cols = line.split('\t');
-        if (cols.length < 7) continue; 
+        if (cols.length < 11) continue; 
 
-        // Empresa	Mês	Cod_CR	CR_Nome	Conta_Contabil	Conta_Nome	Valor	Ano	Pacote_DRE
-        const [empresa, mes, codCr, crNome, contaContabil, contaNome, valorStr, anoStr, pacoteDre] = cols;
+        // Columns: Ano, Escopo ou Fora, Mês, Classe Gerencial Nome, Centro de Resultado Nome, Valor Ajustado, Filial, Departamento, Pacote, Pacote Master, Diretoria
+        const [ano, escopo, mes, classe, cr, valorStr, filial, departamento, pacote, pacoteMaster, diretoria] = cols;
         
-        const finalAno = anoStr || String(importYear);
-        const cleanValStr = valorStr.replace(/\./g, '').replace(',', '.').trim();
+        const cleanValStr = (valorStr || "0").replace(/\./g, '').replace(',', '.').trim();
         const finalVal = parseFloat(cleanValStr) || 0;
 
         rowsToSave.push({
-            ano: finalAno.trim(),
-            mes: mes.trim(),
-            hotel: empresa.trim(),
+            ano: ano?.trim() || String(importYear),
+            mes: mes?.trim() || "1",
+            hotel: filial?.trim() || empresaDefault,
             tipo: 'Despesa',
             cenario: 'REAL',
-            conta: contaNome?.trim() || 'Despesa Indireta',
-            cr: crNome?.trim() || "",
+            conta: classe?.trim() || 'Despesa',
+            cr: cr?.trim() || "",
             valor: String(finalVal),
             status: 'valid',
             versionId: activeRealVersionId,
-            pacote: pacoteDre?.trim() || ""
+            pacote: pacote?.trim() || "",
+            pacoteMaster: pacoteMaster?.trim() || "",
+            departamento: departamento?.trim() || "",
+            diretoria: diretoria?.trim() || "",
+            escopo: escopo?.trim() || ""
         });
     }
 
@@ -2716,10 +2815,11 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
     setIsSavingDre(true);
     try {
-        await supabaseService.saveFinancialData(rowsToSave);
+        const importId = await recordImportHistory(rowsToSave);
+        await supabaseService.saveFinancialData(rowsToSave, importId);
         alert(`${rowsToSave.length} registros de despesa detalhada salvos com sucesso!`);
-        recordImportHistory(rowsToSave);
         setImportText('');
+        fetchImportHistory(); // Refresh history
     } catch (e: any) {
         alert('Erro ao salvar despesas: ' + e.message);
     } finally {

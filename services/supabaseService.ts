@@ -419,7 +419,7 @@ export const supabaseService = {
   // ═══════════════════════════════════════════════════════════════════════════
   // FINANCIAL DATA (Dados Financeiros Reais e de Orçamento)
   // ═══════════════════════════════════════════════════════════════════════════
-  async saveFinancialData(rows: ImportedRow[]): Promise<void> {
+  async saveFinancialData(rows: ImportedRow[], importId?: string): Promise<void> {
     if (rows.length === 0) return;
     const records = rows.map(r => ({
       version_id:    r.versionId || null,
@@ -438,6 +438,7 @@ export const supabaseService = {
       master_package: r.pacoteMaster || null,
       cr:            r.cr || null,
       conta_contabil: (r as any).contaContabil || null,
+      import_id:     importId || null,
     }));
 
     // Save in batches of 500 to avoid payload limits
@@ -628,13 +629,26 @@ export const supabaseService = {
     return data || [];
   },
 
-  async saveImportHistory(entries: Omit<any, 'id' | 'created_at'>[]): Promise<void> {
-    if (entries.length === 0) return;
+  async saveImportHistory(entries: Omit<any, 'id' | 'created_at'>[]): Promise<any[]> {
+    if (entries.length === 0) return [];
     
     // entries should be { hotel, tipo, ano, meses, version_id, user_id }
+    const { data, error } = await supabase
+      .from('import_history')
+      .insert(entries)
+      .select();
+    
+    if (error) throw error;
+    return data || [];
+  },
+
+  async deleteImport(id: string): Promise<void> {
+    // Due to ON DELETE CASCADE on import_id, deleting the history entry 
+    // will automatically delete matching financial_data rows.
     const { error } = await supabase
       .from('import_history')
-      .insert(entries);
+      .delete()
+      .eq('id', id);
     
     if (error) throw error;
   }
