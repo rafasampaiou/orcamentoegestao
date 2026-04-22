@@ -2885,53 +2885,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   };
   */
 
-  const handleCreateBudgetVersion = async (year?: number, month?: number) => {
-    const name = prompt('Nome da nova versão (ex: 2026 Oficial):');
-    if (name) {
-      const newVersion: BudgetVersion = {
-        id: `v-${Date.now()}`,
-        name,
-        year: year || new Date().getFullYear(),
-        month: month || 1,
-        createdAt: new Date().toISOString(),
-        isLocked: false,
-        isMain: budgetVersions.length === 0
-      };
-
-      try {
-        await supabaseService.upsertBudgetVersion(newVersion);
-        setBudgetVersions(prev => [...prev, newVersion]);
-        setActiveBudgetVersionId(newVersion.id);
-      } catch (err) {
-        console.error('Failed to save version:', err);
-        alert('Erro ao salvar versão no banco.');
-      }
-    }
-  };
-
-  const handleCreateRealVersion = async (year?: number, month?: number) => {
-    const name = prompt('Nome da nova versão de Realizado (ex: 2026 Real):');
-    if (name) {
-      const newVersion: BudgetVersion = {
-        id: `r-${Date.now()}`,
-        name,
-        year: year || new Date().getFullYear(),
-        month: month || 1,
-        createdAt: new Date().toISOString(),
-        isLocked: false,
-        isMain: realVersions.length === 0
-      };
-
-      try {
-        await supabaseService.upsertBudgetVersion(newVersion);
-        setRealVersions(prev => [...prev, newVersion]);
-        setActiveRealVersionId(newVersion.id);
-      } catch (err) {
-        console.error('Failed to save version:', err);
-        alert('Erro ao salvar versão no banco.');
-      }
-    }
-  };
+  /* 
+  Handlers removed as version creation is now centralized in the Budget home view.
+  */
 
   const handleToggleVersionLock = async (id: string, isBudget: boolean) => {
     const list = isBudget ? budgetVersions : realVersions;
@@ -3174,7 +3130,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               onSelectVersion={setActiveRealVersionId}
               onToggleLock={(id) => handleToggleVersionLock(id, false)}
               onDelete={(id) => handleDeleteVersion(id, false)}
-              onCreateVersion={handleCreateRealVersion}
+              onCreateVersion={(y, m, n, h) => {}} 
+              showCreateOption={false}
               showSettingsIcon={true}
             />
           )}
@@ -3829,7 +3786,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 onSelectVersion={setActiveBudgetVersionId}
                 onToggleLock={(id) => handleToggleVersionLock(id, true)}
                 onDelete={(id) => handleDeleteVersion(id, true)}
-                onCreateVersion={handleCreateBudgetVersion}
+                onCreateVersion={(y, m, n, h) => {}}
+                showCreateOption={false}
                 showSettingsIcon={true}
               />
             </div>

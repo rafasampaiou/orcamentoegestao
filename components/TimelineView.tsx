@@ -8,12 +8,13 @@ interface TimelineViewProps {
   activeVersionId: string;
   onSelectVersion: (id: string) => void;
   onToggleLock: (id: string) => void;
-  onCreateVersion: (year: number, month: number, name: string) => void;
+  onCreateVersion: (year: number, month: number, name: string, hotelId: string) => void;
   onReplicateVersion?: (year: number, month: number) => void;
   onSetMain?: (id: string) => void;
   onDelete?: (id: string) => void;
   showCreateOption?: boolean;
   showSettingsIcon?: boolean;
+  hotels?: { id: string, name: string, code: string }[];
 }
 
 const TimelineView: React.FC<TimelineViewProps> = ({
@@ -27,7 +28,8 @@ const TimelineView: React.FC<TimelineViewProps> = ({
   onSetMain,
   onDelete,
   showCreateOption = true,
-  showSettingsIcon = false
+  showSettingsIcon = false,
+  hotels = []
 }) => {
   const [modalOpen, setModalOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -35,6 +37,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({
   const [selectedDate, setSelectedDate] = useState<{year: number, month: number} | null>(null);
   const [newVersionName, setNewVersionName] = useState('');
   const [newVersionYear, setNewVersionYear] = useState(new Date().getFullYear());
+  const [selectedHotelId, setSelectedHotelId] = useState('');
 
   const handleMonthClick = (year: number, month: number) => {
     setSelectedDate({ year, month });
@@ -71,9 +74,12 @@ const TimelineView: React.FC<TimelineViewProps> = ({
 
   const handleCreateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (newVersionName.trim() && selectedDate) {
-      onCreateVersion(newVersionYear, selectedDate.month, newVersionName.trim());
+    if (newVersionName.trim() && selectedDate && selectedHotelId) {
+      onCreateVersion(newVersionYear, selectedDate.month, newVersionName.trim(), selectedHotelId);
       setCreateModalOpen(false);
+      setSelectedHotelId('');
+    } else if (!selectedHotelId) {
+      alert('Por favor, selecione uma empresa/hotel.');
     }
   };
   // Determine the range of years to display
@@ -362,6 +368,20 @@ const TimelineView: React.FC<TimelineViewProps> = ({
                   className="w-full border border-gray-300 rounded-md p-2 focus:ring-[#38b2ac] focus:border-[#38b2ac]" 
                   required 
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Empresa (Hotel)</label>
+                <select 
+                  value={selectedHotelId} 
+                  onChange={e => setSelectedHotelId(e.target.value)} 
+                  className="w-full border border-gray-300 rounded-md p-2 focus:ring-[#38b2ac] focus:border-[#38b2ac]" 
+                  required
+                >
+                  <option value="">Selecione um hotel...</option>
+                  {hotels.map(h => (
+                    <option key={h.id} value={h.code}>{h.name}</option>
+                  ))}
+                </select>
               </div>
               <div className="flex justify-end gap-3 pt-4">
                 <button type="button" onClick={() => setCreateModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">

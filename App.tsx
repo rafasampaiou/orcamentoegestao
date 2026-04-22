@@ -676,14 +676,14 @@ const App: React.FC = () => {
               setCurrentView(isAdm ? 'dre_budget' : 'occupancy_budget');
             }}
             onToggleLock={(id) => setBudgetVersions(prev => prev.map(bv => bv.id === id ? { ...bv, isLocked: !bv.isLocked } : bv))}
-            onCreateVersion={async (year, month, name) => {
-              const selectedHotelObj = hotels.find(h => h.name === selectedHotel || h.code === selectedHotel);
-              const hotelId = selectedHotelObj?.code || selectedHotelObj?.id || selectedHotel;
+            onCreateVersion={async (year, month, name, hotelId) => {
+              const newVersionId = `v-${Date.now()}`;
+              const realVersionId = `r-${Date.now()}`;
 
-              const newVersion: BudgetVersion = {
-                id: `v-${Date.now()}`,
+              const newBudgetVersion: BudgetVersion = {
+                id: newVersionId,
                 name,
-                year: year,
+                year,
                 month: month || 1,
                 createdAt: new Date().toISOString(),
                 isLocked: false,
@@ -692,20 +692,43 @@ const App: React.FC = () => {
                 occupancyData: {}
               };
 
-              // Save to Supabase right away
+              const newRealVersion: BudgetVersion = {
+                id: realVersionId,
+                name,
+                year,
+                month: month || 1,
+                createdAt: new Date().toISOString(),
+                isLocked: false,
+                isMain: realVersions.length === 0,
+                hotelId: hotelId
+              };
+
+              // Save both to Supabase
               try {
-                await supabaseService.upsertBudgetVersion(newVersion);
+                await Promise.all([
+                  supabaseService.upsertBudgetVersion(newBudgetVersion),
+                  supabaseService.upsertBudgetVersion(newRealVersion)
+                ]);
+                toast.success('Versões criadas com sucesso!');
               } catch (e) {
-                console.error('Failed to create version in Supabase', e);
+                console.error('Failed to create versions in Supabase', e);
+                toast.error('Erro ao salvar no banco.');
               }
 
-              setBudgetVersions(prev => [...prev, newVersion]);
-              setActiveBudgetVersionId(newVersion.id);
-              setBudgetOccupancyDataMap(prev => ({ ...prev, [newVersion.id]: {} }));
+              setBudgetVersions(prev => [...prev, newBudgetVersion]);
+              setRealVersions(prev => [...prev, newRealVersion]);
+              setActiveBudgetVersionId(newVersionId);
+              setBudgetOccupancyDataMap(prev => ({ ...prev, [newVersionId]: {} }));
 
-              const isAdm = selectedHotelObj?.code === 'ADM' || selectedHotel === 'Administradora';
+              const isAdm = hotelId === 'ADM' || hotelId === 'Administradora';
+              
+              // Switch to the created hotel's view so the user sees the new version
+              const hObj = hotels.find(h => h.id === hotelId || h.code === hotelId);
+              if (hObj) setSelectedHotel(hObj.name);
+
               setCurrentView(isAdm ? 'dre_budget' : 'occupancy_budget');
             }}
+            hotels={hotels}
             onReplicateVersion={(year, month) => {
               setReplicateTarget({ year, month });
               setReplicateMode('BUDGET');
