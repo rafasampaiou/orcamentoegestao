@@ -492,7 +492,7 @@ const App: React.FC = () => {
         <div className="p-8 max-w-7xl mx-auto w-full">
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Tauá Real</h1>
-            <p className="text-gray-500">Selecione uma versão de realizado para trabalhar ou crie uma nova.</p>
+            <p className="text-gray-500">Selecione uma versão de realizado para trabalhar.</p>
           </div>
           <TimelineView
             title="Planejamentos (Realizado)"
