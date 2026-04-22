@@ -264,68 +264,72 @@ const BudgetOccupancyTable: React.FC<{
 // --- Row Definitions (Moved outside for performance) ---
 const geralRows: BudgetRow[] = [
     { id: 'days_month', label: 'Dias do mês', isInput: true, format: 'integer' },
-    { id: 'geral_capacity', label: 'Aptos Hotel', isInput: true, format: 'integer' },
-    { id: 'geral_avail', label: 'APTOS DISPONIVEIS', isCalculated: true, format: 'integer' },
-    { id: 'geral_sold', label: 'APTO VENDIDOS', isCalculated: true, forceWhite: true, format: 'integer' },
-    { id: 'geral_occ_pct', label: '% DE OCUPAÇÃO', isCalculated: true, format: 'percent' },
-    { id: 'geral_pax', label: 'N° DE HOSPEDES', isCalculated: true, forceWhite: true, format: 'integer' },
+    { id: 'geral_capacity', label: 'Quartos', isInput: true, format: 'integer' },
+    { id: 'geral_avail', label: 'Aptos disponíveis', isCalculated: true, format: 'integer' },
+    { id: 'geral_sold', label: 'Aptos vendidos', isCalculated: true, forceWhite: true, format: 'integer' },
+    { id: 'geral_occ_pct', label: '% de ocupação', isCalculated: true, format: 'percent' },
+    { id: 'geral_pax', label: 'N° de hóspedes', isCalculated: true, forceWhite: true, format: 'integer' },
     { id: 'geral_coef_total', label: 'Coef. Occ Geral', isCalculated: true, format: 'decimal' },
-    { id: 'geral_adults', label: 'ADULTOS', isCalculated: true, forceWhite: true, format: 'integer' },
+    { id: 'geral_adults', label: 'Adultos', isCalculated: true, forceWhite: true, format: 'integer' },
     { id: 'geral_coef_ad', label: 'Coef. Occ Adultos', isCalculated: true, format: 'decimal' },
     { id: 'geral_chd', label: 'CHD', isCalculated: true, forceWhite: true, format: 'integer' },
     { id: 'geral_coef_chd', label: 'Coef. Occ CHD', isCalculated: true, format: 'decimal' },
-    { id: 'geral_rate_ad', label: 'Valor FAP Adulto', isCalculated: true, forceWhite: true, format: 'currency' },
-    { id: 'geral_rate_chd', label: 'Valor FAP Criança', isCalculated: true, forceWhite: true, format: 'currency' },
-    { id: 'geral_dm_fap', label: 'DM LÍQ COM FAP', isCalculated: true, format: 'currency' },
-    { id: 'geral_dm_hosp', label: 'DM LÍQ HOSPEDAGEM', isCalculated: true, format: 'currency' },
+    { id: 'geral_rate_ad', label: 'Valor FAP Adulto', isInput: true, format: 'currency' },
+    { id: 'geral_rate_chd', label: 'Valor FAP Criança', isInput: true, format: 'currency' },
+    { id: 'geral_rev_fap', label: 'Receita COM rateios', isCalculated: true, format: 'currency' },
+    { id: 'geral_rev_hosp', label: 'Receita SEM rateios', isCalculated: true, format: 'currency' },
+    { id: 'geral_extra_rev', label: 'Receitas Extras', isInput: true, format: 'currency' },
+    { id: 'geral_dm_fap', label: 'DM bruta (sem iss)', isCalculated: true, format: 'currency' },
+    { id: 'geral_dm_hosp', label: 'DM líquida (sem iss)', isCalculated: true, format: 'currency' },
     { id: 'geral_revpar', label: 'REVPAR', isCalculated: true, format: 'currency' },
     { id: 'geral_trevpor', label: 'TREVPOR', isCalculated: true, format: 'currency' },
     { id: 'geral_trevpar', label: 'TREVPAR', isCalculated: true, format: 'currency' },
-    { id: 'geral_rev_fap', label: 'Receita COM rateios', isCalculated: true, format: 'currency' },
-    { id: 'geral_rev_hosp', label: 'Receita SEM rateios', isCalculated: true, format: 'currency' },
-    { id: 'geral_extra_rev', label: 'Receitas Extras', isCalculated: true, format: 'currency' },
 ];
 
 const lazerRows: BudgetRow[] = [
-    { id: 'lazer_capacity', label: 'Aptos Hotel', isInput: true, format: 'integer' },
-    { id: 'lazer_avail', label: 'APTOS DISPONIVEIS', isCalculated: true, format: 'integer' },
-    { id: 'lazer_sold', label: 'APTO VENDIDOS', isInput: true, isManualReal: true, format: 'integer' },
-    { id: 'lazer_occ_pct', label: '% DE OCUPAÇÃO', isCalculated: true, format: 'percent' },
-    { id: 'lazer_pax', label: 'N° DE HOSPEDES', isCalculated: true, format: 'integer' },
+    { id: 'lazer_capacity', label: 'Quartos', isInput: true, format: 'integer' },
+    { id: 'lazer_avail', label: 'Aptos disponíveis', isCalculated: true, format: 'integer' },
+    { id: 'lazer_sold', label: 'Aptos vendidos', isInput: true, isManualReal: true, format: 'integer' },
+    { id: 'lazer_occ_pct', label: '% de ocupação', isCalculated: true, format: 'percent' },
+    { id: 'lazer_pax', label: 'N° de hóspedes', isCalculated: true, format: 'integer' },
     { id: 'lazer_coef_total', label: 'Coef. Occ Geral', isCalculated: true, format: 'decimal' },
-    { id: 'lazer_adults', label: 'ADULTOS', isInput: true, isManualReal: true, format: 'integer' },
+    { id: 'lazer_adults', label: 'Adultos', isInput: true, isManualReal: true, format: 'integer' },
     { id: 'lazer_coef_ad', label: 'Coef. Occ Adultos', isCalculated: true, format: 'decimal' },
     { id: 'lazer_chd', label: 'CHD', isInput: true, isManualReal: true, format: 'integer' },
     { id: 'lazer_coef_chd', label: 'Coef. Occ CHD', isCalculated: true, format: 'decimal' },
     { id: 'lazer_rate_ad', label: 'Valor FAP Adulto', isInput: true, format: 'currency' },
     { id: 'lazer_rate_chd', label: 'Valor FAP Criança', isInput: true, format: 'currency' },
-    { id: 'lazer_dm_fap', label: 'DM LÍQ COM FAP', isCalculated: true, isManualReal: true, format: 'currency' },
-    { id: 'lazer_dm_hosp', label: 'DM LÍQ HOSPEDAGEM', isCalculated: true, format: 'currency' },
-    { id: 'lazer_revpar', label: 'REVPAR', isCalculated: true, format: 'currency' },
     { id: 'lazer_rev_fap', label: 'Receita COM rateios', isInput: true, format: 'currency' },
     { id: 'lazer_rev_hosp', label: 'Receita SEM rateios', isCalculated: true, format: 'currency' },
     { id: 'lazer_extra_rev', label: 'Receitas Extras', isInput: true, isManualReal: true, format: 'currency' },
+    { id: 'lazer_dm_fap', label: 'DM bruta (sem iss)', isCalculated: true, format: 'currency' },
+    { id: 'lazer_dm_hosp', label: 'DM líquida (sem iss)', isCalculated: true, format: 'currency' },
+    { id: 'lazer_revpar', label: 'REVPAR', isCalculated: true, format: 'currency' },
+    { id: 'lazer_trevpor', label: 'TREVPOR', isCalculated: true, format: 'currency' },
+    { id: 'lazer_trevpar', label: 'TREVPAR', isCalculated: true, format: 'currency' },
 ];
 
 const eventRows: BudgetRow[] = [
-    { id: 'event_capacity', label: 'Aptos Hotel', isInput: true, format: 'integer' },
-    { id: 'event_avail', label: 'APTOS DISPONIVEIS', isCalculated: true, format: 'integer' },
-    { id: 'event_sold', label: 'APTO VENDIDOS', isInput: true, isManualReal: true, format: 'integer' },
-    { id: 'event_occ_pct', label: '% DE OCUPAÇÃO', isCalculated: true, format: 'percent' },
-    { id: 'event_pax', label: 'N° DE HOSPEDES', isCalculated: true, format: 'integer' },
+    { id: 'event_capacity', label: 'Quartos', isInput: true, format: 'integer' },
+    { id: 'event_avail', label: 'Aptos disponíveis', isCalculated: true, format: 'integer' },
+    { id: 'event_sold', label: 'Aptos vendidos', isInput: true, isManualReal: true, format: 'integer' },
+    { id: 'event_occ_pct', label: '% de ocupação', isCalculated: true, format: 'percent' },
+    { id: 'event_pax', label: 'N° de hóspedes', isCalculated: true, format: 'integer' },
     { id: 'event_coef_total', label: 'Coef. Occ Geral', isCalculated: true, format: 'decimal' },
-    { id: 'event_adults', label: 'ADULTOS', isInput: true, isManualReal: true, format: 'integer' },
+    { id: 'event_adults', label: 'Adultos', isInput: true, isManualReal: true, format: 'integer' },
     { id: 'event_coef_ad', label: 'Coef. Occ Adultos', isCalculated: true, format: 'decimal' },
     { id: 'event_chd', label: 'CHD', isInput: true, isManualReal: true, format: 'integer' },
     { id: 'event_coef_chd', label: 'Coef. Occ CHD', isCalculated: true, format: 'decimal' },
     { id: 'event_rate_ad', label: 'Valor FAP Adulto', isInput: true, format: 'currency' },
     { id: 'event_rate_chd', label: 'Valor FAP Criança', isInput: true, format: 'currency' },
-    { id: 'event_dm_fap', label: 'DM LÍQ COM FAP', isCalculated: true, isManualReal: true, format: 'currency' },
-    { id: 'event_dm_hosp', label: 'DM LÍQ HOSPEDAGEM', isCalculated: true, format: 'currency' },
-    { id: 'event_revpar', label: 'REVPAR', isCalculated: true, format: 'currency' },
     { id: 'event_rev_fap', label: 'Receita COM rateios', isInput: true, format: 'currency' },
     { id: 'event_rev_hosp', label: 'Receita SEM rateios', isCalculated: true, format: 'currency' },
     { id: 'event_extra_rev', label: 'Receitas Extras', isInput: true, isManualReal: true, format: 'currency' },
+    { id: 'event_dm_fap', label: 'DM bruta (sem iss)', isCalculated: true, format: 'currency' },
+    { id: 'event_dm_hosp', label: 'DM líquida (sem iss)', isCalculated: true, format: 'currency' },
+    { id: 'event_revpar', label: 'REVPAR', isCalculated: true, format: 'currency' },
+    { id: 'event_trevpor', label: 'TREVPOR', isCalculated: true, format: 'currency' },
+    { id: 'event_trevpar', label: 'TREVPAR', isCalculated: true, format: 'currency' },
 ];
 
 // --- Main Component ---
@@ -589,21 +593,30 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             set('geral_chd', i, gChd);
             set('geral_coef_chd', i, gSold > 0 ? gChd / gSold : 0);
 
-            set('geral_rate_ad', i, gAd > 0 ? ((lzAd * lzRateAd) + (evAd * evRateAd)) / gAd : 0);
-            set('geral_rate_chd', i, gChd > 0 ? ((lzChd * lzRateChd) + (evChd * evRateChd)) / gChd : 0);
-
-            set('geral_dm_fap', i, gSold > 0 ? gRevFap / gSold : 0);
-            set('geral_dm_hosp', i, gSold > 0 ? gRevHosp / gSold : 0);
-            set('geral_revpar', i, gAvail > 0 ? gRevFap / gAvail : 0);
-            set('geral_trevpor', i, gSold > 0 ? gRevFap / gSold : 0);
-            set('geral_trevpar', i, gAvail > 0 ? gRevFap / gAvail : 0);
+            set('geral_rate_ad', i, get('geral_rate_ad', i)); 
+            set('geral_rate_chd', i, get('geral_rate_chd', i)); 
 
             set('geral_rev_fap', i, gRevFap);
             set('geral_rev_hosp', i, gRevHosp);
 
             const lzExtra = get('lazer_extra_rev', i);
             const evExtra = get('event_extra_rev', i);
-            set('geral_extra_rev', i, lzExtra + evExtra);
+            const gExtraInput = get('geral_extra_rev', i);
+            // If user entered something in Geral, use it, otherwise use sum
+            const gExtra = gExtraInput !== 0 ? gExtraInput : (lzExtra + evExtra);
+            set('geral_extra_rev', i, gExtra);
+
+            set('geral_dm_fap', i, gSold > 0 ? gRevFap / gSold : 0);
+            set('geral_dm_hosp', i, gSold > 0 ? gRevHosp / gSold : 0);
+            set('geral_revpar', i, gAvail > 0 ? gRevFap / gAvail : 0);
+            set('geral_trevpor', i, gSold > 0 ? (gRevFap + gExtra) / gSold : 0);
+            set('geral_trevpar', i, gAvail > 0 ? (gRevFap + gExtra) / gAvail : 0);
+
+            set('lazer_trevpor', i, lzSold > 0 ? (lzRevFap + lzExtra) / lzSold : 0);
+            set('lazer_trevpar', i, lzAvail > 0 ? (lzRevFap + lzExtra) / lzAvail : 0);
+
+            set('event_trevpor', i, evSold > 0 ? (evRevFap + evExtra) / evSold : 0);
+            set('event_trevpar', i, evAvail > 0 ? (evRevFap + evExtra) / evAvail : 0);
         });
 
         return newData;

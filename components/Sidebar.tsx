@@ -218,7 +218,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                   <div className="ml-3 border-l border-slate-800/40 pl-1 space-y-0.5 pb-1">
                     <NavItem depth={2} label="Versões"       icon={Database}        active={currentView === 'admin_real_versions'} onClick={() => go('admin_real_versions')} />
                     <NavItem depth={2} label="Fechamento"    icon={Lock}            active={currentView === 'admin_real_closure'}  onClick={() => go('admin_real_closure')} />
-                    <NavItem depth={2} label="Importação"    icon={Upload}          active={currentView === 'admin_real_import'}   onClick={() => go('admin_real_import')} />
                     <NavItem depth={2} label="Cronograma"    icon={Calendar}        active={currentView === 'admin_real_schedule'} onClick={() => go('admin_real_schedule')} />
                     <NavItem depth={2} label="Parâmetros DRE" icon={GanttChartSquare} active={currentView === 'admin_real_dre'}   onClick={() => go('admin_real_dre')} />
                   </div>
@@ -238,7 +237,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                     <NavItem depth={2} label="Versões"            icon={Database} active={currentView === 'admin_budget_versions'} onClick={() => go('admin_budget_versions')} />
                     <NavItem depth={2} label="USALI / Config"     icon={Layers}   active={currentView === 'admin_budget_usali'}    onClick={() => go('admin_budget_usali')} />
                     <NavItem depth={2} label="Mão de Obra"        icon={Users2}   active={currentView === 'admin_budget_labor'}    onClick={() => go('admin_budget_labor')} />
-                    <NavItem depth={2} label="Importação da Meta"  icon={Upload}   active={currentView === 'admin_budget_import'}   onClick={() => go('admin_budget_import')} />
                   </div>
                 )}
 

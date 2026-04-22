@@ -41,6 +41,10 @@ const TimelineView: React.FC<TimelineViewProps> = ({
 
   const handleMonthClick = (year: number, month: number) => {
     setSelectedDate({ year, month });
+    if (!showCreateOption && !onReplicateVersion) {
+      return;
+    }
+    
     if (!showCreateOption && onReplicateVersion) {
       onReplicateVersion(year, month);
       return;
@@ -160,7 +164,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({
                       title={`Nova ação em ${months[idx]} de ${year}`}
                     >
                       <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <div className="w-4 h-4 rounded-full bg-[#38b2ac] text-white flex items-center justify-center text-xs font-bold">+</div>
+                        {showCreateOption && <div className="w-4 h-4 rounded-full bg-[#38b2ac] text-white flex items-center justify-center text-xs font-bold">+</div>}
                       </div>
                     </div>
                   ))}

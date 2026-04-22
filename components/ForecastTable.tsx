@@ -430,16 +430,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 Demonstrativo de Resultados (DRE) - {monthName} {selectedYear}
                             </h2>
                             {setActiveProjectionType && activeProjectionType && (
-                                <select
-                                    className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 p-1.5 font-bold"
-                                    value={activeProjectionType}
-                                    onChange={(e) => setActiveProjectionType(e.target.value as import('../types').ProjectionType)}
-                                >
-                                    <option value="Reunião de Ritmo">Reunião de Ritmo</option>
-                                    <option value="FCA N1">FCA N1</option>
-                                    <option value="FCA N2">FCA N2</option>
-                                    <option value="Fechamento oficial">Fechamento oficial</option>
-                                </select>
+                                <div className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-sm rounded-lg px-3 py-1.5 font-black uppercase tracking-wider">
+                                    Fechamento oficial
+                                </div>
                             )}
                         </div>
                         <p className="text-xs text-gray-500 mt-1">

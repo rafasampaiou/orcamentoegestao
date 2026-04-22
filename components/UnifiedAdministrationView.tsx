@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useRef } from 'react';
 import { getForecastData } from '../services/mockData';
-import { Plus, Trash2, X, Save, Briefcase, Pencil, Calendar, PieChart, Lock, LockOpen, Settings as SettingsIcon, Users, Search, Upload, Settings, Eye, FileText, Layout, Info, ChevronUp, GripVertical, Database, BedDouble, DollarSign } from 'lucide-react';
+import { Plus, Trash2, X, Save, Briefcase, Pencil, Calendar, PieChart, Lock, LockOpen, Settings as SettingsIcon, Users, Search, Upload, Settings, Eye, FileText, Layout, Info, ChevronUp, GripVertical, Database, BedDouble, DollarSign, Target } from 'lucide-react';
 import { User, UserRole, CostCenter, ImportedRow, Hotel, Account, BudgetVersion, LaborParameters, ScheduleItem, ImportedCostCenter, CostPackage, GMDConfiguration, ViewState, DreSection } from '../types';
 import TimelineView from './TimelineView';
 import { supabaseService } from '../services/supabaseService';
@@ -387,7 +387,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     } else if (currentView === 'admin_real_closure') {
       setMainTab('real'); setActiveRealTab('closure');
     } else if (currentView === 'admin_real_import') {
-      setMainTab('real'); setActiveRealTab('import');
+      setMainTab('geral'); setActiveGeralTab('import');
     } else if (currentView === 'admin_real_schedule') {
       setMainTab('real'); setActiveRealTab('schedule');
     } else if (currentView === 'admin_real_dre') {
@@ -400,7 +400,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     } else if (currentView === 'admin_budget_labor') {
       setMainTab('budget'); setActiveBudgetTab('labor');
     } else if (currentView === 'admin_budget_import') {
-      setMainTab('budget'); setActiveBudgetTab('import');
+      setMainTab('geral'); setActiveGeralTab('import');
       // ── Admin > Tauá Geral ─────────────────────────────────────────
     } else if (currentView === 'admin_geral_accounts') {
       setMainTab('geral'); setActiveGeralTab('registries'); setActiveRegistryTab('accounts');
@@ -457,6 +457,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
   // Import Sub-tabs
   const [activeImportTab, setActiveImportTab] = useState<'financial' | 'revenue' | 'occupancy' | 'costCenters' | 'accounts' | 'history'>('financial');
+  const [importScenario, setImportScenario] = useState<'REAL' | 'BUDGET'>('REAL');
   const [importHistory, setImportHistory] = useState<any[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
@@ -2320,7 +2321,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     e.target.value = '';
   };
 
-  const processBudget2026Import = () => {
+  const handleProcessBudgetImport = () => {
     if (!budgetImportText.trim()) return;
     setBudgetImportSavedCount(null);
 
@@ -3078,6 +3079,593 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     );
   };
 
+  const renderRealImportInterface = () => {
+    return (
+      <div className="space-y-6">
+        {importCategory === 'occupancy' && (
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center font-bold text-gray-900 gap-2">
+                <BedDouble className="text-indigo-600" size={20} />
+                Importação da Ocupação
+              </div>
+              <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
+                {[
+                  { id: 'geral', label: 'Geral' },
+                  { id: 'leisure', label: 'Lazer' },
+                  { id: 'events', label: 'Eventos' }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setOccupancySubTab(tab.id as any)}
+                    className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${
+                      occupancySubTab === tab.id 
+                        ? 'bg-white text-indigo-600 shadow-sm' 
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl text-xs text-blue-800">
+              <p>Preencha os indicadores de {
+                occupancySubTab === 'geral' ? 'ocupação geral (auto-calculado)' : 
+                occupancySubTab === 'leisure' ? 'lazer' : 'eventos'
+              } abaixo ou cole do Excel.</p>
+            </div>
+
+            <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
+              <label className="text-sm font-bold text-gray-700">Integrar na Versão:</label>
+              <select 
+                value={occTargetVersionId}
+                onChange={e => setOccTargetVersionId(e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[200px]"
+              >
+                <option value="">Selecione a versão...</option>
+                {realVersions.map(v => <option key={v.id} value={v.id}>{v.name} ({v.year})</option>)}
+              </select>
+
+              <div className="flex-1" />
+
+              <button 
+                onClick={handleSaveOccupancy}
+                disabled={isSavingDre || !occTargetVersionId}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all flex items-center gap-2 disabled:opacity-50"
+              >
+                {isSavingDre ? 'Salvando...' : <><Save size={16} /> Salvar Tudo (Ocupação)</>}
+              </button>
+              <button 
+                onClick={handleClearOccupancy}
+                className="bg-white border border-gray-300 text-red-600 px-4 py-2 rounded-lg font-bold text-sm hover:bg-red-50 transition-all flex items-center gap-2"
+              >
+                <Trash2 size={16} /> Limpar
+              </button>
+            </div>
+
+            {(() => {
+              const OCC_ROWS = [
+                "Dias do mês", "Quartos", "Aptos disponíveis", "Aptos vendidos", "% de ocupação", 
+                "N° de hóspedes", "Coef. Occ Geral", "Adultos", "Coef. Occ Adultos", "CHD", 
+                "Coef. Occ CHD", "Valor FAP Adulto", "Valor FAP Criança", "Receita COM rateios", 
+                "Receita SEM rateios", "Receita Extras", "DM bruta (sem iss)", "DM líquida (sem iss)", 
+                "REVPAR", "TREVPOR", "TREVPAR"
+              ];
+
+              const parseVal = (v: any) => {
+                if (!v) return 0;
+                return parseFloat(String(v).replace(/\./g, '').replace(',', '.').replace('%', '')) || 0;
+              };
+
+              const targetYear = realVersions.find(v => v.id === occTargetVersionId)?.year || new Date().getFullYear();
+
+              const calculateTable = (data: Record<string, Record<number, string>>) => {
+                const newTable = { ...data };
+                const months = Array.from({length: 12}, (_, i) => i + 1);
+                months.forEach(m => {
+                  const days = new Date(targetYear, m, 0).getDate();
+                  if (!newTable["Dias do mês"]) newTable["Dias do mês"] = {};
+                  newTable["Dias do mês"][m] = String(days);
+
+                  const qts = parseVal(newTable["Quartos"]?.[m]);
+                  const available = days * qts;
+                  if (!newTable["Aptos disponíveis"]) newTable["Aptos disponíveis"] = {};
+                  newTable["Aptos disponíveis"][m] = available.toLocaleString('pt-BR');
+
+                  const sold = parseVal(newTable["Aptos vendidos"]?.[m]);
+                  const occ = available > 0 ? (sold / available) * 100 : 0;
+                  if (!newTable["% de ocupação"]) newTable["% de ocupação"] = {};
+                  newTable["% de ocupação"][m] = occ.toFixed(1) + "%";
+
+                  const hsp = parseVal(newTable["N° de hóspedes"]?.[m]);
+                  const coefGeral = sold > 0 ? hsp / sold : 0;
+                  if (!newTable["Coef. Occ Geral"]) newTable["Coef. Occ Geral"] = {};
+                  newTable["Coef. Occ Geral"][m] = coefGeral.toFixed(2);
+
+                  const adu = parseVal(newTable["Adultos"]?.[m]);
+                  const coefAdu = sold > 0 ? adu / sold : 0;
+                  if (!newTable["Coef. Occ Adultos"]) newTable["Coef. Occ Adultos"] = {};
+                  newTable["Coef. Occ Adultos"][m] = coefAdu.toFixed(2);
+
+                  const chd = parseVal(newTable["CHD"]?.[m]);
+                  const coefChd = sold > 0 ? chd / sold : 0;
+                  if (!newTable["Coef. Occ CHD"]) newTable["Coef. Occ CHD"] = {};
+                  newTable["Coef. Occ CHD"][m] = coefChd.toFixed(2);
+
+                  const recCom = parseVal(newTable["Receita COM rateios"]?.[m]);
+                  const fapAdu = parseVal(newTable["Valor FAP Adulto"]?.[m]);
+                  const fapChd = parseVal(newTable["Valor FAP Criança"]?.[m]);
+                  const recSem = recCom - (adu * fapAdu) - (chd * fapChd);
+                  if (!newTable["Receita SEM rateios"]) newTable["Receita SEM rateios"] = {};
+                  newTable["Receita SEM rateios"][m] = recSem.toLocaleString('pt-BR');
+
+                  const extra = parseVal(newTable["Receita Extras"]?.[m]);
+                  const dmB = sold > 0 ? recCom / sold : 0;
+                  if (!newTable["DM bruta (sem iss)"]) newTable["DM bruta (sem iss)"] = {};
+                  newTable["DM bruta (sem iss)"][m] = dmB.toLocaleString('pt-BR');
+
+                  const dmL = sold > 0 ? recSem / sold : 0;
+                  if (!newTable["DM líquida (sem iss)"]) newTable["DM líquida (sem iss)"] = {};
+                  newTable["DM líquida (sem iss)"][m] = dmL.toLocaleString('pt-BR');
+
+                  const revpar = available > 0 ? recCom / available : 0;
+                  if (!newTable["REVPAR"]) newTable["REVPAR"] = {};
+                  newTable["REVPAR"][m] = revpar.toLocaleString('pt-BR');
+
+                  const trevpor = sold > 0 ? (recCom + extra) / sold : 0;
+                  if (!newTable["TREVPOR"]) newTable["TREVPOR"] = {};
+                  newTable["TREVPOR"][m] = trevpor.toLocaleString('pt-BR');
+
+                  const trevpar = available > 0 ? (recCom + extra) / available : 0;
+                  if (!newTable["TREVPAR"]) newTable["TREVPAR"] = {};
+                  newTable["TREVPAR"][m] = trevpar.toLocaleString('pt-BR');
+                });
+                return newTable;
+              };
+
+              const aggregateGeral = () => {
+                const geral = { ...occupancyImportData };
+                const rowsToSum = ["Aptos vendidos", "N° de hóspedes", "Adultos", "CHD", "Receita COM rateios", "Receita Extras"];
+                const months = Array.from({length: 12}, (_, i) => i + 1);
+                months.forEach(m => {
+                  rowsToSum.forEach(row => {
+                    const val = parseVal(leisureImportData[row]?.[m]) + parseVal(eventsImportData[row]?.[m]);
+                    if (!geral[row]) geral[row] = {};
+                    geral[row][m] = val.toLocaleString('pt-BR');
+                  });
+                });
+                return calculateTable(geral);
+              };
+
+              const currentData = occupancySubTab === 'geral' ? aggregateGeral() : 
+                                 occupancySubTab === 'leisure' ? calculateTable(leisureImportData) :
+                                 calculateTable(eventsImportData);
+
+              const setData = occupancySubTab === 'geral' ? setOccupancyImportData :
+                              occupancySubTab === 'leisure' ? setLeisureImportData :
+                              setEventsImportData;
+
+              return (
+                <SpreadsheetTable 
+                  rows={OCC_ROWS}
+                  data={currentData}
+                  onCellChange={(row, month, val) => {
+                    setData(prev => ({ ...prev, [row]: { ...(prev[row] || {}), [month]: val }}));
+                  }}
+                  readOnlyRows={["Dias do mês", "Aptos disponíveis", "% de ocupação", "Coef. Occ Geral", "Coef. Occ Adultos", "Coef. Occ CHD", "Receita SEM rateios", "DM bruta (sem iss)", "DM líquida (sem iss)", "REVPAR", "TREVPOR", "TREVPAR"]}
+                  onPaste={(row, mIdx, pasted) => {
+                    const newData = { ...currentData };
+                    const startIdx = OCC_ROWS.indexOf(row);
+                    pasted.forEach((pRow, rOffset) => {
+                      const targetRow = OCC_ROWS[startIdx + rOffset];
+                      if (targetRow) {
+                        if (!newData[targetRow]) newData[targetRow] = {};
+                        pRow.forEach((val, cOffset) => {
+                          const targetCol = mIdx + cOffset;
+                          if (targetCol <= 12) newData[targetRow][targetCol] = val;
+                        });
+                      }
+                    });
+                    setData(newData);
+                  }}
+                />
+              );
+            })()}
+          </div>
+        )}
+
+        {importCategory === 'revenue' && (
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="flex items-center font-bold text-gray-900 gap-2 mb-2">
+              <DollarSign className="text-emerald-600" size={20} />
+              Importação das Receitas
+            </div>
+            <div className="bg-amber-50 border border-amber-100 p-4 rounded-xl text-xs text-amber-800">
+              <p className="font-bold mb-1">Colunas esperadas (TAB ou CSV):</p>
+              <code className="block bg-white/50 p-2 rounded border border-amber-200 mt-1 overflow-x-auto whitespace-nowrap">
+                {REVENUE_IMPORT_COLUMNS.join(" | ")}
+              </code>
+            </div>
+            <textarea 
+              className="w-full h-64 p-4 border border-gray-300 rounded-lg font-mono text-[10px] focus:ring-2 focus:ring-emerald-500 outline-none" 
+              placeholder="Cole os dados das receitas aqui..." 
+              value={importText} 
+              onChange={e => setImportText(e.target.value)} 
+            />
+            <div className="flex gap-3">
+              <button 
+                onClick={handleProcessRevenueSimplifiedImport}
+                disabled={isSavingDre || !importText.trim() || !activeRealVersionId}
+                className="bg-emerald-600 text-white px-6 py-2.5 rounded-lg font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-100 flex items-center gap-2 disabled:opacity-50"
+              >
+                {isSavingDre ? 'Processando...' : <><FileText size={16} /> Processar e Salvar Receitas</>}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {importCategory === 'taxes' && (
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="flex items-center font-bold text-gray-900 gap-2 mb-2">
+              <PieChart className="text-blue-600" size={20} />
+              Importação dos Impostos (Global)
+            </div>
+            <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl text-sm text-blue-800">
+              <p>Cole do Excel os valores de impostos por hotel e mês. Estes valores serão aplicados globalmente.</p>
+            </div>
+            <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
+              <button 
+                onClick={handleSaveTaxes}
+                disabled={isSavingDre}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 flex items-center gap-2 disabled:opacity-50"
+              >
+                {isSavingDre ? 'Salvando...' : <><Save size={16} /> Salvar Impostos</>}
+              </button>
+            </div>
+            <SpreadsheetTable 
+              rows={hotels.map(h => h.name)}
+              data={taxesImportData}
+              onCellChange={(row, month, val) => setTaxesImportData(prev => ({ ...prev, [row]: { ...(prev[row] || {}), [month]: val }}))}
+              onPaste={(row, month, pasted) => {
+                const newData = { ...taxesImportData };
+                const rowLabels = hotels.map(h => h.name);
+                const startIdx = rowLabels.indexOf(row);
+                pasted.forEach((pRow, rOffset) => {
+                  const targetRow = rowLabels[startIdx + rOffset];
+                  if (targetRow) {
+                    if (!newData[targetRow]) newData[targetRow] = {};
+                    pRow.forEach((val, cOffset) => {
+                      const targetCol = month + cOffset;
+                      if (targetCol <= 12) newData[targetRow][targetCol] = val;
+                    });
+                  }
+                });
+                setTaxesImportData(newData);
+              }}
+            />
+          </div>
+        )}
+
+        {importCategory === 'expenses' && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center font-bold text-gray-900 gap-2">
+                <Briefcase className="text-indigo-600" size={20} />
+                Importação das Despesas
+              </div>
+              <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
+                <button 
+                  onClick={() => setExpenseImportMode('forecast')}
+                  className={`px-3 py-1.5 rounded-md text-[10px] font-black tracking-wider uppercase transition-all ${
+                    expenseImportMode === 'forecast' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  DRE Forecast
+                </button>
+                <button 
+                  onClick={() => setExpenseImportMode('detailed')}
+                  className={`px-3 py-1.5 rounded-md text-[10px] font-black tracking-wider uppercase transition-all ${
+                    expenseImportMode === 'detailed' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  Orç. Geral (Detalhado)
+                </button>
+              </div>
+            </div>
+
+            {expenseImportMode === 'detailed' ? (
+              <div className="space-y-4">
+                <div className="bg-amber-50 border border-amber-100 p-4 rounded-xl text-xs text-amber-800">
+                  <p className="font-bold mb-1">Importação Detalhada (USALI):</p>
+                  <p>Cole os dados do Excel com as colunas seguintes:</p>
+                  <code className="block bg-white/50 p-2 rounded border border-amber-200 mt-1">
+                    {DETAILED_EXPENSE_COLUMNS.join(" | ")}
+                  </code>
+                </div>
+                <textarea 
+                  className="w-full h-64 p-4 border border-gray-300 rounded-lg font-mono text-[10px] focus:ring-2 focus:ring-indigo-500 outline-none mt-4" 
+                  placeholder="Cole os dados detalhados aqui..." 
+                  value={importText} 
+                  onChange={e => setImportText(e.target.value)} 
+                />
+                <button 
+                  onClick={handleProcessDetailedExpenses}
+                  disabled={isSavingDre || !importText.trim() || !activeRealVersionId}
+                  className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 flex items-center gap-2 disabled:opacity-50 transition-all font-bold text-sm"
+                >
+                  {isSavingDre ? <><Settings className="animate-spin" size={16} /> Processando...</> : <><FileText size={16} /> Processar e Salvar Despesas</>}
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl text-sm text-indigo-800">
+                  <p>Importação simplificada para o **DRE Forecast**. Escolha o hotel e cole os valores mensais por pacote.</p>
+                </div>
+                <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Hotel</label>
+                    <select 
+                      value={importHotelId}
+                      onChange={e => setImportHotelId(e.target.value)}
+                      className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[200px]"
+                    >
+                      <option value="">Selecione...</option>
+                      {hotels.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+                    </select>
+                  </div>
+                  <button 
+                    onClick={handleSaveExpensesForecast}
+                    disabled={isSavingDre || !importHotelId || !activeRealVersionId}
+                    className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all flex items-center gap-2 self-end disabled:opacity-50"
+                  >
+                    {isSavingDre ? 'Salvando...' : <><Save size={16} /> Salvar Despesas Forecast</>}
+                  </button>
+                </div>
+                <SpreadsheetTable 
+                  rows={DRE_FORECAST_ROWS}
+                  data={dreForecastData}
+                  onCellChange={(row, month, val) => setDreForecastData(prev => ({ ...prev, [row]: { ...(prev[row] || {}), [month]: val }}))}
+                  onPaste={(row, month, pasted) => {
+                    const newData = { ...dreForecastData };
+                    const startIdx = DRE_FORECAST_ROWS.indexOf(row);
+                    pasted.forEach((pRow, rOffset) => {
+                      const targetRow = DRE_FORECAST_ROWS[startIdx + rOffset];
+                      if (targetRow) {
+                        if (!newData[targetRow]) newData[targetRow] = {};
+                        pRow.forEach((val, cOffset) => {
+                          const targetCol = month + cOffset;
+                          if (targetCol <= 12) newData[targetRow][targetCol] = val;
+                        });
+                      }
+                    });
+                    setDreForecastData(newData);
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        )}
+        {renderImportHistoryTable()}
+      </div>
+    );
+  };
+
+  const renderBudgetImportInterface = () => (
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+      <div className="flex items-center font-bold text-gray-900 gap-2 mb-2">
+        <Target className="text-orange-600" size={20} />
+        Importação da Meta Geral (Orçamento)
+      </div>
+      <div className="bg-orange-50 border border-orange-100 p-4 rounded-xl text-xs text-orange-800">
+        <p className="font-bold mb-1">Colunas esperadas (TAB ou CSV):</p>
+        <p>Esta importação substitui os valores da meta para a versão selecionada.</p>
+        <code className="block bg-white/50 p-2 rounded border border-orange-200 mt-1 overflow-x-auto whitespace-nowrap">
+          Hotel | Mês | Ano | Unidade | Pacote | Valor
+        </code>
+      </div>
+
+      <textarea 
+        className="w-full h-80 p-4 border border-gray-300 rounded-xl font-mono text-[10px] focus:ring-2 focus:ring-orange-500 outline-none shadow-inner" 
+        placeholder="Cole aqui os dados da meta (Hotel | Mês | Ano | Unidade | Pacote | Valor)..." 
+        value={importText} 
+        onChange={e => setImportText(e.target.value)} 
+      />
+
+      <div className="flex gap-3">
+        <button 
+          onClick={handleProcessBudgetImport}
+          disabled={isSavingDre || !importText.trim() || !activeBudgetVersionId}
+          className="bg-orange-600 text-white px-8 py-3 rounded-xl font-black hover:bg-orange-700 shadow-lg shadow-orange-100 flex items-center gap-2 disabled:opacity-50 transition-all uppercase tracking-widest text-xs"
+        >
+          {isSavingDre ? <><Settings className="animate-spin" size={16} /> Processando...</> : <><FileText size={16} /> Importar e Atribuir à Versão {activeBudgetVersionId ? budgetVersions.find(v => v.id === activeBudgetVersionId)?.name : ''}</>}
+        </button>
+      </div>
+
+      {renderImportHistoryTable()}
+    </div>
+  );
+
+  const renderCostCenterImport = () => (
+    <div className="space-y-4">
+      {ccImportStep === 'input' ? (
+        <div className="space-y-4">
+          <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl text-sm text-amber-800">
+            <p className="font-bold mb-1">Instruções para Importação de Setores:</p>
+            <p>Cole os dados do Excel com as seguintes colunas (separadas por TAB ou Ponto e Vírgula):</p>
+            <code className="block mt-2 bg-white/50 p-2 rounded border border-amber-100 italic">
+              Hotel | Hierárquico | Descrição | Código | Código da Empresa | Departamento | Diretoria | Tipo
+            </code>
+          </div>
+          <textarea
+            value={importText}
+            onChange={e => setImportText(e.target.value)}
+            className="w-full h-64 p-4 border border-gray-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-indigo-500 outline-none shadow-inner"
+            placeholder="Cole aqui os dados copiados do Excel..."
+          />
+          <div className="flex justify-end">
+            <button
+              onClick={processCostCenterImport}
+              disabled={!importText.trim()}
+              className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-indigo-700 disabled:opacity-50 shadow-lg shadow-indigo-100 transition-all uppercase tracking-widest text-xs"
+            >
+              Processar Importação
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="flex justify-between items-center">
+            <h4 className="font-bold text-gray-900">Prévia da Importação ({ccParsedData.length} linhas)</h4>
+            <div className="flex gap-4 items-center">
+              <div className="flex bg-gray-100 p-1 rounded-lg">
+                <button onClick={() => setCcImportMode('append')} className={`px-4 py-1.5 text-[10px] font-black uppercase rounded-md transition-all ${ccImportMode === 'append' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500'}`}>Mesclar</button>
+                <button onClick={() => setCcImportMode('replace')} className={`px-4 py-1.5 text-[10px] font-black uppercase rounded-md transition-all ${ccImportMode === 'replace' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500'}`}>Substituir Tudo</button>
+              </div>
+              <button onClick={() => setCcImportStep('input')} className="text-gray-500 hover:text-gray-700 font-bold text-sm">Voltar</button>
+            </div>
+          </div>
+
+          <div className="overflow-hidden border border-gray-200 rounded-xl bg-white shadow-sm">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Status</th>
+                  <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Hotel</th>
+                  <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Hierárquico</th>
+                  <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Descrição</th>
+                  <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Código</th>
+                  <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Tipo</th>
+                  <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Mensagem</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {ccParsedData.map((row, idx) => (
+                  <tr key={idx} className={row.status === 'error' ? 'bg-red-50' : 'hover:bg-gray-50'}>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {row.status === 'valid' ? <div className="w-2 h-2 rounded-full bg-emerald-500" /> : <div className="w-2 h-2 rounded-full bg-red-500" />}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-xs">{row.hotelName}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-xs font-mono">{row.hierarchicalCode}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-xs font-bold">{row.name}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-xs font-mono">{row.id}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-xs">{row.type}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-[10px] text-red-600 italic">{row.msg}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex justify-end gap-4">
+            <button onClick={() => setCcImportStep('input')} className="px-6 py-3 border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-gray-50 transition-all">Cancelar</button>
+            <button
+              onClick={handleFinalCostCenterImport}
+              disabled={isImportingCostCenter}
+              className={`px-8 py-3 rounded-xl font-bold text-white shadow-lg flex items-center gap-2 transition-all ${isImportingCostCenter ? 'opacity-50 cursor-not-allowed' : ''} ${ccImportMode === 'replace' ? 'bg-red-600 hover:bg-red-700 shadow-red-100' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100'}`}
+            >
+              {isImportingCostCenter ? 'Sincronizando...' : (ccImportMode === 'replace' ? 'Confirmar Substituição' : 'Confirmar Importação')}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderAccountImport = () => (
+    <div className="space-y-4">
+      {accImportStep === 'input' ? (
+        <div className="space-y-4">
+          <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl text-sm text-amber-800">
+            <p className="font-bold mb-1 text-xs uppercase tracking-widest">Instruções para Importação de Contas:</p>
+            <div className="mt-2 mb-3">
+              <input type="file" ref={accFileInputRef} onChange={handleAccCsvUpload} accept=".csv,.txt" className="hidden" />
+              <button 
+                onClick={() => accFileInputRef.current?.click()} 
+                className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-[10px] font-black uppercase shadow-sm transition-all flex items-center gap-2"
+              >
+                <Upload size={14} /> Selecionar Arquivo CSV de Contas
+              </button>
+            </div>
+            <p className="text-[10px]">Cole os dados do Excel ou carregue um CSV com as seguintes colunas:</p>
+            <code className="block mt-2 bg-white/50 p-2 rounded border border-amber-100 text-[10px] font-mono italic">
+              Tipo | Escopo ou Fora | Pacote Master | Pacote | Código | Conta Contábil
+            </code>
+          </div>
+          <textarea
+            value={importText}
+            onChange={e => setImportText(e.target.value)}
+            className="w-full h-64 p-4 border border-gray-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-indigo-500 outline-none shadow-inner bg-slate-50"
+            placeholder="Cole aqui os dados copiados do Excel..."
+          />
+          <div className="flex justify-end">
+            <button
+              onClick={processAccountImport}
+              disabled={!importText.trim()}
+              className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-indigo-700 disabled:opacity-50 shadow-lg shadow-indigo-100 transition-all uppercase tracking-widest text-xs"
+            >
+              Analisar Plano de Contas
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="flex justify-between items-center">
+            <h4 className="font-bold text-gray-900">Prévia da Importação ({accParsedData.length} contas)</h4>
+            <div className="flex gap-4 items-center">
+              <div className="flex bg-gray-100 p-1 rounded-lg">
+                <button onClick={() => setAccImportMode('append')} className={`px-4 py-1.5 text-[10px] font-black uppercase rounded-md transition-all ${accImportMode === 'append' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500'}`}>Mesclar</button>
+                <button onClick={() => setAccImportMode('replace')} className={`px-4 py-1.5 text-[10px] font-black uppercase rounded-md transition-all ${accImportMode === 'replace' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500'}`}>Substituir Tudo</button>
+              </div>
+              <button onClick={() => setAccImportStep('input')} className="text-indigo-600 hover:text-indigo-800 font-black text-xs uppercase">Reiniciar</button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto border border-gray-200 rounded-xl shadow-sm bg-white">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
+                  <th className="px-4 py-3 text-left w-12">Status</th>
+                  <th className="px-4 py-3 text-left w-20">Tipo</th>
+                  <th className="px-4 py-3 text-left">Código</th>
+                  <th className="px-4 py-3 text-left">Conta Contábil</th>
+                  <th className="px-4 py-3 text-left">Pacote Executivo</th>
+                  <th className="px-4 py-3 text-left">Pacote Master</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {accParsedData.map((row, idx) => (
+                  <tr key={idx} className={`${row.status === 'error' ? 'bg-red-50' : 'hover:bg-indigo-50/20'} transition-colors`}>
+                    <td className="px-4 py-2">
+                      <div className={`w-2.5 h-2.5 rounded-full ${row.status === 'valid' ? 'bg-emerald-500 shadow-sm' : 'bg-red-500 shadow-sm'}`} />
+                    </td>
+                    <td className="px-4 py-2 text-[10px]">{row.tipo}</td>
+                    <td className="px-4 py-2 text-[10px] font-mono text-gray-400">{row.id}</td>
+                    <td className="px-4 py-2 text-[10px] font-bold text-gray-700">{row.name}</td>
+                    <td className="px-4 py-2 text-[10px]">{row.package}</td>
+                    <td className="px-4 py-2 text-[10px]">{row.masterPackage}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex justify-end gap-4 border-t border-gray-100 pt-6">
+            <button onClick={() => setAccImportStep('input')} className="px-6 py-3 border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-gray-50 transition-all">Descartar</button>
+            <button
+              onClick={handleFinalAccountImport}
+              disabled={isImportingAccount}
+              className={`px-8 py-3 rounded-xl font-bold text-white shadow-lg transition-all ${isImportingAccount ? 'opacity-50 cursor-not-allowed' : ''} ${accImportMode === 'replace' ? 'bg-red-600 hover:bg-red-700 shadow-red-100' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100'}`}
+            >
+              {isImportingAccount ? 'Sincronizando...' : 'Finalizar Importação'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   const renderTauáReal = () => {
     const selectedRealVersion = realVersions.find(v => v.id === activeRealVersionId);
     const hasSelectedRealVersion = !!activeRealVersionId && !!selectedRealVersion;
@@ -3168,483 +3756,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
             </div>
             )
           )}
-          {activeRealTab === 'import' && (
-            !hasSelectedRealVersion ? (
-              <div className="text-center py-20 space-y-4">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
-                  <Lock className="text-gray-400" size={28} />
-                </div>
-                <h3 className="text-xl font-bold text-gray-400">Selecione uma versão primeiro</h3>
-                <p className="text-gray-400 text-sm max-w-sm mx-auto">Acesse a aba <strong>Versões</strong> e clique na engrenagem da versão que deseja configurar.</p>
-                <button onClick={() => setActiveRealTab('versions')} className="text-indigo-600 font-bold text-sm hover:underline">Ir para Versões →</button>
-              </div>
-            ) : (
-            <div className="space-y-6">
-              {/* Category Sub-Tabs */}
-              <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl w-fit">
-                {[
-                  { id: 'occupancy', label: '1. Ocupação', icon: BedDouble },
-                  { id: 'revenue', label: '2. Receitas', icon: DollarSign },
-                  { id: 'taxes', label: '3. Impostos', icon: PieChart },
-                  { id: 'expenses', label: '4. Despesas', icon: Briefcase }
-                ].map(cat => (
-                  <button
-                    key={cat.id}
-                    onClick={() => setImportCategory(cat.id as any)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-black transition-all ${
-                      importCategory === cat.id 
-                        ? 'bg-white text-indigo-600 shadow-sm' 
-                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'
-                    }`}
-                  >
-                    <cat.icon size={14} />
-                    {cat.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* 1. Occupancy Import */}
-              {importCategory === 'occupancy' && (
-                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center font-bold text-gray-900 gap-2">
-                      <BedDouble className="text-indigo-600" size={20} />
-                      Importação da Ocupação
-                    </div>
-                    {/* Sub-Tabs: Geral vs Lazer vs Eventos */}
-                    <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
-                      {[
-                        { id: 'geral', label: 'Geral' },
-                        { id: 'leisure', label: 'Lazer' },
-                        { id: 'events', label: 'Eventos' }
-                      ].map(tab => (
-                        <button
-                          key={tab.id}
-                          onClick={() => setOccupancySubTab(tab.id as any)}
-                          className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${
-                            occupancySubTab === tab.id 
-                              ? 'bg-white text-indigo-600 shadow-sm' 
-                              : 'text-gray-500 hover:text-gray-700'
-                          }`}
-                        >
-                          {tab.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl text-xs text-blue-800">
-                    <p>Preencha os indicadores de {
-                      occupancySubTab === 'geral' ? 'ocupação geral (auto-calculado)' : 
-                      occupancySubTab === 'leisure' ? 'lazer' : 'eventos'
-                    } abaixo ou cole do Excel.</p>
-                  </div>
-
-                  <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
-                    <label className="text-sm font-bold text-gray-700">Integrar na Versão:</label>
-                    <select 
-                      value={occTargetVersionId}
-                      onChange={e => setOccTargetVersionId(e.target.value)}
-                      className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[200px]"
-                    >
-                      <option value="">Selecione a versão...</option>
-                      {realVersions.map(v => <option key={v.id} value={v.id}>{v.name} ({v.year})</option>)}
-                    </select>
-
-                    <div className="flex-1" />
-
-                    <button 
-                      onClick={handleSaveOccupancy}
-                      disabled={isSavingDre || !occTargetVersionId}
-                      className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all flex items-center gap-2 disabled:opacity-50"
-                    >
-                      {isSavingDre ? 'Salvando...' : <><Save size={16} /> Salvar Tudo (Ocupação)</>}
-                    </button>
-                    <button 
-                      onClick={handleClearOccupancy}
-                      className="bg-white border border-gray-300 text-red-600 px-4 py-2 rounded-lg font-bold text-sm hover:bg-red-50 transition-all flex items-center gap-2"
-                    >
-                      <Trash2 size={16} /> Limpar
-                    </button>
-                  </div>
-
-                  {(() => {
-                    const OCC_ROWS = [
-                      "Dias do mês",
-                      "Quartos",
-                      "Aptos disponíveis",
-                      "Aptos vendidos",
-                      "% de ocupação",
-                      "N° de hóspedes",
-                      "Coef. Occ Geral",
-                      "Adultos",
-                      "Coef. Occ Adultos",
-                      "CHD",
-                      "Coef. Occ CHD",
-                      "Valor FAP Adulto",
-                      "Valor FAP Criança",
-                      "Receita COM rateios",
-                      "Receita SEM rateios",
-                      "Receita Extras",
-                      "DM bruta (sem iss)",
-                      "DM líquida (sem iss)",
-                      "REVPAR",
-                      "TREVPOR",
-                      "TREVPAR"
-                    ];
-
-                    const parseVal = (v: any) => {
-                      if (!v) return 0;
-                      return parseFloat(String(v).replace(/\./g, '').replace(',', '.').replace('%', '')) || 0;
-                    };
-
-                    const targetYear = realVersions.find(v => v.id === occTargetVersionId)?.year || new Date().getFullYear();
-
-                    // Calculate derived fields for a segment
-                    const calculateTable = (data: Record<string, Record<number, string>>) => {
-                      const newTable = { ...data };
-                      const months = Array.from({length: 12}, (_, i) => i + 1);
-                      months.forEach(m => {
-                        const days = new Date(targetYear, m, 0).getDate();
-                        if (!newTable["Dias do mês"]) newTable["Dias do mês"] = {};
-                        newTable["Dias do mês"][m] = String(days);
-
-                        const qts = parseVal(newTable["Quartos"]?.[m]);
-                        const available = days * qts;
-                        if (!newTable["Aptos disponíveis"]) newTable["Aptos disponíveis"] = {};
-                        newTable["Aptos disponíveis"][m] = available.toLocaleString('pt-BR');
-
-                        const sold = parseVal(newTable["Aptos vendidos"]?.[m]);
-                        const occ = available > 0 ? (sold / available) * 100 : 0;
-                        if (!newTable["% de ocupação"]) newTable["% de ocupação"] = {};
-                        newTable["% de ocupação"][m] = occ.toFixed(1) + "%";
-
-                        const hsp = parseVal(newTable["N° de hóspedes"]?.[m]);
-                        const coefGeral = sold > 0 ? hsp / sold : 0;
-                        if (!newTable["Coef. Occ Geral"]) newTable["Coef. Occ Geral"] = {};
-                        newTable["Coef. Occ Geral"][m] = coefGeral.toFixed(2);
-
-                        const adu = parseVal(newTable["Adultos"]?.[m]);
-                        const coefAdu = sold > 0 ? adu / sold : 0;
-                        if (!newTable["Coef. Occ Adultos"]) newTable["Coef. Occ Adultos"] = {};
-                        newTable["Coef. Occ Adultos"][m] = coefAdu.toFixed(2);
-
-                        const chd = parseVal(newTable["CHD"]?.[m]);
-                        const coefChd = sold > 0 ? chd / sold : 0;
-                        if (!newTable["Coef. Occ CHD"]) newTable["Coef. Occ CHD"] = {};
-                        newTable["Coef. Occ CHD"][m] = coefChd.toFixed(2);
-
-                        const recCom = parseVal(newTable["Receita COM rateios"]?.[m]);
-                        const fapAdu = parseVal(newTable["Valor FAP Adulto"]?.[m]);
-                        const fapChd = parseVal(newTable["Valor FAP Criança"]?.[m]);
-                        const recSem = recCom - (adu * fapAdu) - (chd * fapChd);
-                        if (!newTable["Receita SEM rateios"]) newTable["Receita SEM rateios"] = {};
-                        newTable["Receita SEM rateios"][m] = recSem.toLocaleString('pt-BR');
-
-                        const extra = parseVal(newTable["Receita Extras"]?.[m]);
-
-                        const dmB = sold > 0 ? recCom / sold : 0;
-                        if (!newTable["DM bruta (sem iss)"]) newTable["DM bruta (sem iss)"] = {};
-                        newTable["DM bruta (sem iss)"][m] = dmB.toLocaleString('pt-BR');
-
-                        const dmL = sold > 0 ? recSem / sold : 0;
-                        if (!newTable["DM líquida (sem iss)"]) newTable["DM líquida (sem iss)"] = {};
-                        newTable["DM líquida (sem iss)"][m] = dmL.toLocaleString('pt-BR');
-
-                        const revpar = available > 0 ? recCom / available : 0;
-                        if (!newTable["REVPAR"]) newTable["REVPAR"] = {};
-                        newTable["REVPAR"][m] = revpar.toLocaleString('pt-BR');
-
-                        const trevpor = sold > 0 ? (recCom + extra) / sold : 0;
-                        if (!newTable["TREVPOR"]) newTable["TREVPOR"] = {};
-                        newTable["TREVPOR"][m] = trevpor.toLocaleString('pt-BR');
-
-                        const trevpar = available > 0 ? (recCom + extra) / available : 0;
-                        if (!newTable["TREVPAR"]) newTable["TREVPAR"] = {};
-                        newTable["TREVPAR"][m] = trevpar.toLocaleString('pt-BR');
-                      });
-                      return newTable;
-                    };
-
-                    const aggregateGeral = () => {
-                      const geral = { ...occupancyImportData };
-                      const rowsToSum = ["Aptos vendidos", "N° de hóspedes", "Adultos", "CHD", "Receita COM rateios", "Receita Extras", "Valor FAP Adulto", "Valor FAP Criança"];
-                      const months = Array.from({length: 12}, (_, i) => i + 1);
-                      months.forEach(m => {
-                        rowsToSum.forEach(row => {
-                          const val = parseVal(leisureImportData[row]?.[m]) + parseVal(eventsImportData[row]?.[m]);
-                          if (!geral[row]) geral[row] = {};
-                          geral[row][m] = val.toLocaleString('pt-BR');
-                        });
-                        // Quartos should be same for all, maybe? We'll use Geral:Quartos if provided
-                      });
-                      return calculateTable(geral);
-                    };
-
-                    const currentData = occupancySubTab === 'geral' ? aggregateGeral() : 
-                                       occupancySubTab === 'leisure' ? calculateTable(leisureImportData) :
-                                       calculateTable(eventsImportData);
-
-                    const setData = occupancySubTab === 'geral' ? setOccupancyImportData :
-                                    occupancySubTab === 'leisure' ? setLeisureImportData :
-                                    setEventsImportData;
-
-                    return (
-                      <SpreadsheetTable 
-                        rows={OCC_ROWS}
-                        data={currentData}
-                        onCellChange={(row, month, val) => {
-                          setData(prev => ({ ...prev, [row]: { ...(prev[row] || {}), [month]: val }}));
-                        }}
-                        readOnlyRows={["Dias do mês", "Aptos disponíveis", "% de ocupação", "Coef. Occ Geral", "Coef. Occ Adultos", "Coef. Occ CHD", "Receita SEM rateios", "DM bruta (sem iss)", "DM líquida (sem iss)", "REVPAR", "TREVPOR", "TREVPAR"]}
-                        onPaste={(row, mIdx, pasted) => {
-                          const newData = { ...currentData };
-                          const startIdx = OCC_ROWS.indexOf(row);
-                          pasted.forEach((pRow, rOffset) => {
-                            const targetRow = OCC_ROWS[startIdx + rOffset];
-                            if (targetRow) {
-                              if (!newData[targetRow]) newData[targetRow] = {};
-                              pRow.forEach((val, cOffset) => {
-                                const targetCol = mIdx + cOffset;
-                                if (targetCol <= 12) newData[targetRow][targetCol] = val;
-                              });
-                            }
-                          });
-                          setData(newData);
-                        }}
-                      />
-                    );
-                  })()}
-                </div>
-              )}
-
-              {/* 2. Revenue Import */}
-              {importCategory === 'revenue' && (
-                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                  <div className="flex items-center font-bold text-gray-900 gap-2 mb-2">
-                    <DollarSign className="text-emerald-600" size={20} />
-                    Importação das Receitas
-                  </div>
-                  <div className="bg-amber-50 border border-amber-100 p-4 rounded-xl text-xs text-amber-800">
-                    <p className="font-bold mb-1">Colunas esperadas (TAB ou CSV):</p>
-                    <code className="block bg-white/50 p-2 rounded border border-amber-200 mt-1 overflow-x-auto whitespace-nowrap">
-                      {REVENUE_IMPORT_COLUMNS.join(" | ")}
-                    </code>
-                  </div>
-                  <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
-                    <label className="text-sm font-bold text-gray-700">Ano Alvo:</label>
-                    <select value={importYear} onChange={e => setImportYear(Number(e.target.value))} className="border border-gray-300 rounded-lg px-3 py-2 text-sm">
-                      {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
-                    </select>
-                  </div>
-                  <textarea 
-                    className="w-full h-64 p-4 border border-gray-300 rounded-lg font-mono text-[10px] focus:ring-2 focus:ring-emerald-500 outline-none" 
-                    placeholder="Cole os dados das receitas aqui..." 
-                    value={importText} 
-                    onChange={e => setImportText(e.target.value)} 
-                  />
-                  <div className="flex gap-3">
-                    <button 
-                      onClick={handleProcessRevenueSimplifiedImport}
-                      disabled={isSavingDre || !importText.trim()}
-                      className="bg-emerald-600 text-white px-6 py-2.5 rounded-lg font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-100 flex items-center gap-2 disabled:opacity-50"
-                    >
-                      {isSavingDre ? 'Processando...' : <><FileText size={16} /> Processar e Salvar Receitas</>}
-                    </button>
-                    <button 
-                      onClick={() => setImportText('')}
-                      className="bg-white border border-gray-300 text-gray-500 px-4 py-2.5 rounded-lg font-bold hover:bg-gray-50 transition-all"
-                    >
-                      Limpar Texto
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* 3. Taxes Import */}
-              {importCategory === 'taxes' && (
-                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                  <div className="flex items-center font-bold text-gray-900 gap-2 mb-2">
-                    <PieChart className="text-blue-600" size={20} />
-                    Importação dos Impostos (Global)
-                  </div>
-                  <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl text-sm text-blue-800">
-                    <p>Cole do Excel os valores de impostos por hotel e mês. Estes valores serão aplicados globalmente.</p>
-                  </div>
-                  <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
-                    <label className="text-sm font-bold text-gray-700">Ano:</label>
-                    <select value={importYear} onChange={e => setImportYear(Number(e.target.value))} className="border border-gray-300 rounded-lg px-3 py-2 text-sm">
-                      {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
-                    </select>
-                    <button 
-                      onClick={handleSaveTaxes}
-                      disabled={isSavingDre}
-                      className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 flex items-center gap-2 disabled:opacity-50"
-                    >
-                      {isSavingDre ? 'Salvando...' : <><Save size={16} /> Salvar Impostos</>}
-                    </button>
-                    <button 
-                      onClick={handleClearTaxes}
-                      className="bg-white border border-gray-300 text-red-600 px-4 py-2 rounded-lg font-bold text-sm hover:bg-red-50 transition-all flex items-center gap-2"
-                    >
-                      <Trash2 size={16} /> Limpar
-                    </button>
-                  </div>
-                  <SpreadsheetTable 
-                    rows={hotels.map(h => h.name)}
-                    data={taxesImportData}
-                    onCellChange={(row, month, val) => setTaxesImportData(prev => ({ ...prev, [row]: { ...(prev[row] || {}), [month]: val }}))}
-                    onPaste={(row, month, pasted) => {
-                      const newData = { ...taxesImportData };
-                      const rowLabels = hotels.map(h => h.name);
-                      const startIdx = rowLabels.indexOf(row);
-                      pasted.forEach((pRow, rOffset) => {
-                        const targetRow = rowLabels[startIdx + rOffset];
-                        if (targetRow) {
-                          if (!newData[targetRow]) newData[targetRow] = {};
-                          pRow.forEach((val, cOffset) => {
-                            const targetCol = month + cOffset;
-                            if (targetCol <= 12) newData[targetRow][targetCol] = val;
-                          });
-                        }
-                      });
-                      setTaxesImportData(newData);
-                    }}
-                  />
-                </div>
-              )}
-
-              {/* 4. Expenses Import */}
-              {importCategory === 'expenses' && (
-                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center font-bold text-gray-900 gap-2">
-                      <Briefcase className="text-indigo-600" size={20} />
-                      Importação das Despesas
-                    </div>
-                    <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
-                      <button 
-                        onClick={() => setExpenseImportMode('forecast')}
-                        className={`px-3 py-1.5 rounded-md text-[10px] font-black tracking-wider uppercase transition-all ${
-                          expenseImportMode === 'forecast' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                      >
-                        DRE Forecast
-                      </button>
-                      <button 
-                        onClick={() => setExpenseImportMode('detailed')}
-                        className={`px-3 py-1.5 rounded-md text-[10px] font-black tracking-wider uppercase transition-all ${
-                          expenseImportMode === 'detailed' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                      >
-                        Orç. Geral (Detalhado)
-                      </button>
-                    </div>
-                  </div>
-
-                  {expenseImportMode === 'forecast' ? (
-                    <div className="space-y-4">
-                      <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl text-sm text-indigo-800">
-                        <p>Importação simplificada para o **DRE Forecast**. Escolha o hotel e cole os valores mensais por pacote.</p>
-                      </div>
-                      <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
-                        <div className="flex flex-col gap-1">
-                          <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Hotel</label>
-                          <select 
-                            value={importHotelId}
-                            onChange={e => setImportHotelId(e.target.value)}
-                            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[200px]"
-                          >
-                            <option value="">Selecione...</option>
-                            {hotels.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
-                          </select>
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Ano</label>
-                          <select 
-                            value={importTargetYear}
-                            onChange={e => setImportTargetYear(Number(e.target.value))}
-                            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                          >
-                            {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
-                          </select>
-                        </div>
-                        <div className="flex-1" />
-                        <button 
-                          onClick={handleSaveExpensesForecast}
-                          disabled={isSavingDre || !importHotelId}
-                          className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all flex items-center gap-2 self-end disabled:opacity-50"
-                        >
-                          {isSavingDre ? 'Salvando...' : <><Save size={16} /> Salvar Despesas Forecast</>}
-                        </button>
-                        <button 
-                          onClick={handleClearExpensesForecast}
-                          className="bg-white border border-gray-300 text-red-600 px-4 py-2 rounded-lg font-bold text-sm hover:bg-red-50 transition-all flex items-center gap-2 self-end"
-                        >
-                          <Trash2 size={16} /> Limpar
-                        </button>
-                      </div>
-                      <SpreadsheetTable 
-                        rows={DRE_FORECAST_ROWS}
-                        data={dreForecastData}
-                        onCellChange={(row, month, val) => setDreForecastData(prev => ({ ...prev, [row]: { ...(prev[row] || {}), [month]: val }}))}
-                        onPaste={(row, month, pasted) => {
-                          const newData = { ...dreForecastData };
-                          const startIdx = DRE_FORECAST_ROWS.indexOf(row);
-                          pasted.forEach((pRow, rOffset) => {
-                            const targetRow = DRE_FORECAST_ROWS[startIdx + rOffset];
-                            if (targetRow) {
-                              if (!newData[targetRow]) newData[targetRow] = {};
-                              pRow.forEach((val, cOffset) => {
-                                const targetCol = month + cOffset;
-                                if (targetCol <= 12) newData[targetRow][targetCol] = val;
-                              });
-                            }
-                          });
-                          setDreForecastData(newData);
-                        }}
-                      />
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="bg-amber-50 border border-amber-100 p-4 rounded-xl text-xs text-amber-800">
-                        <p className="font-bold mb-1">Importação Detalhada (USALI):</p>
-                        <p>Cole os dados do Excel com as colunas seguintes:</p>
-                        <code className="block bg-white/50 p-2 rounded border border-amber-200 mt-1">
-                          {DETAILED_EXPENSE_COLUMNS.join(" | ")}
-                        </code>
-                      </div>
-                      <textarea 
-                        className="w-full h-64 p-4 border border-gray-300 rounded-lg font-mono text-[10px] focus:ring-2 focus:ring-indigo-500 outline-none mt-4" 
-                        placeholder="Cole os dados detalhados aqui..." 
-                        value={importText} 
-                        onChange={e => setImportText(e.target.value)} 
-                      />
-                      <div className="flex gap-3 mt-4">
-                        <button 
-                          onClick={handleProcessDetailedExpenses}
-                          disabled={isSavingDre || !importText.trim()}
-                          className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 flex items-center gap-2 disabled:opacity-50 transition-all font-bold text-sm"
-                        >
-                          {isSavingDre ? <><Settings className="animate-spin" size={16} /> Processando...</> : <><FileText size={16} /> Processar e Salvar Despesas Detalhadas</>}
-                        </button>
-                        <button 
-                          onClick={() => setImportText('')}
-                          className="bg-white border border-gray-300 text-gray-500 px-4 py-2.5 rounded-lg font-bold hover:bg-gray-50 transition-all text-sm"
-                        >
-                          Limpar Texto
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* History below (optional, maybe only in expenses/revenue) */}
-              {(importCategory === 'expenses' || importCategory === 'revenue') && renderImportHistoryTable()}
-            </div>
-            )
-          )}
           {activeRealTab === 'labor' && (
             !hasSelectedRealVersion ? (
               <div className="text-center py-20 space-y-4">
@@ -3719,7 +3830,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                         />
                       </div>
                     </div>
-                    <button onClick={() => handleDeleteScheduleStep(idx)} className="p-2 text-red-400 hover:text-red-600 transition-colors">
+                    <button onClick={() => handleDeleteScheduleStep(idx)} className="p-2 text-red-100 hover:text-red-300 transition-colors">
                       <Trash2 size={18} />
                     </button>
                   </div>
@@ -3845,215 +3956,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                   </tbody>
                 </table>
               </div>
-            </div>
-            )
-          )}
-          {activeBudgetTab === 'import' && (
-            !hasSelectedVersion ? (
-              <div className="text-center py-20 space-y-4">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
-                  <Lock className="text-gray-400" size={28} />
-                </div>
-                <h3 className="text-xl font-bold text-gray-400">Selecione uma versão primeiro</h3>
-                <p className="text-gray-400 text-sm max-w-sm mx-auto">Acesse a aba <strong>Versões</strong> e selecione a versão do orçamento onde deseja importar a meta.</p>
-                <button onClick={() => setActiveBudgetTab('versions')} className="text-indigo-600 font-bold text-sm hover:underline">Ir para Versões →</button>
-              </div>
-            ) : (
-            <div className="space-y-6">
-              {budgetImportStep === 'input' && (
-                <>
-                  <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 p-5 rounded-xl text-sm text-amber-900">
-                    <p className="font-bold text-base mb-2 flex items-center gap-2">
-                      <Upload size={18} className="text-amber-600" />
-                      Importação da Meta
-                    </p>
-                    <p className="mb-1 text-xs">
-                      Os dados serão importados na versão: <strong className="text-indigo-700">{selectedBudgetVersion?.name} ({selectedBudgetVersion?.year})</strong>
-                    </p>
-                    <p className="mb-3">Cole os dados do Excel com as <strong>13 colunas</strong> abaixo (separadas por TAB):</p>
-                    <div className="bg-white/70 p-3 rounded-lg border border-amber-100 font-mono text-[10px] leading-relaxed grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
-                      <div><span className="text-amber-600 font-bold">1.</span> Receita / Despesa <span className="text-gray-400">(Texto)</span></div>
-                      <div><span className="text-amber-600 font-bold">2.</span> Real / Meta <span className="text-gray-400">(Número)</span></div>
-                      <div><span className="text-amber-600 font-bold">3.</span> Escopo ou Fora <span className="text-gray-400">(Texto)</span></div>
-                      <div><span className="text-amber-600 font-bold">4.</span> Filial <span className="text-gray-400">(Texto)</span></div>
-                      <div><span className="text-amber-600 font-bold">5.</span> CR Certo <span className="text-gray-400">(Texto)</span></div>
-                      <div><span className="text-amber-600 font-bold">6.</span> Departamento <span className="text-gray-400">(Texto)</span></div>
-                      <div><span className="text-amber-600 font-bold">7.</span> Descrição da Conta <span className="text-gray-400">(Texto)</span></div>
-                      <div><span className="text-amber-600 font-bold">8.</span> Pacote <span className="text-gray-400">(Texto)</span></div>
-                      <div><span className="text-amber-600 font-bold">9.</span> Pacote Master <span className="text-gray-400">(Texto)</span></div>
-                      <div><span className="text-amber-600 font-bold">10.</span> Mês <span className="text-gray-400">(Número 1-12)</span></div>
-                      <div><span className="text-amber-600 font-bold">11.</span> Valor <span className="text-gray-400">(Número)</span></div>
-                      <div><span className="text-amber-600 font-bold">12.</span> CR <span className="text-gray-400">(ex: 1.1.1.004)</span></div>
-                      <div><span className="text-amber-600 font-bold">13.</span> Conta Contábil <span className="text-gray-400">(ex: 4.01.01.01.006)</span></div>
-                    </div>
-                    <p className="mt-3 text-xs text-amber-700 italic">
-                      💡 Os dados importados serão salvos como <strong>Meta</strong> na versão selecionada e ficarão disponíveis automaticamente no Tauá Real.
-                    </p>
-                  </div>
-                  <textarea
-                    className="w-full h-64 p-4 border border-gray-300 rounded-lg font-mono text-xs focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                    placeholder="Cole os dados do Excel aqui (13 colunas separadas por TAB)..."
-                    value={budgetImportText}
-                    onChange={(e) => setBudgetImportText(e.target.value)}
-                  />
-                  <div className="flex items-center gap-4">
-                    <button
-                      onClick={processBudget2026Import}
-                      disabled={!budgetImportText.trim()}
-                      className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-2"
-                    >
-                      <FileText size={16} /> Processar Dados
-                    </button>
-                    <label className="bg-white border border-indigo-200 text-indigo-600 px-6 py-2.5 rounded-lg font-bold cursor-pointer hover:bg-indigo-50 flex items-center gap-2 transition-all">
-                      <Upload size={16} /> Ou selecionar arquivo CSV
-                      <input type="file" accept=".csv,.txt" className="hidden" onChange={handleBudgetCsvUpload} />
-                    </label>
-                  </div>
-                </>
-              )}
-
-              {budgetImportStep === 'preview' && (() => {
-                const budgetErrors = budgetParsedData.filter(r => r.status === 'error');
-                const budgetValid = budgetParsedData.filter(r => r.status === 'valid');
-
-                // Summary by filial + mes
-                const summaryMap = new Map<string, { hotel: string; mes: string; tipo: string; total: number; count: number }>();
-                budgetValid.forEach(r => {
-                  const key = `${r.hotel}|${r.mes}|${r.tipo}`;
-                  if (!summaryMap.has(key)) summaryMap.set(key, { hotel: r.hotel, mes: r.mes, tipo: r.tipo, total: 0, count: 0 });
-                  const e = summaryMap.get(key)!;
-                  e.total += parseFloat(r.valor) || 0;
-                  e.count++;
-                });
-                const summaryArr = Array.from(summaryMap.values()).sort((a, b) => Number(a.mes) - Number(b.mes));
-
-                return (
-                  <div className="space-y-6">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-lg font-bold text-slate-800">Resumo — Importação da Meta</h4>
-                      <div className="flex gap-2">
-                        <button onClick={() => { setBudgetImportStep('input'); setBudgetParsedData([]); }} className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-bold text-gray-600 hover:bg-gray-50">Cancelar</button>
-                      </div>
-                    </div>
-
-                    {/* Show target version */}
-                    <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-200 flex items-center gap-3">
-                      <Database size={20} className="text-indigo-600" />
-                      <div>
-                        <p className="text-xs font-bold text-indigo-500 uppercase">Versão de Destino</p>
-                        <p className="text-base font-black text-indigo-900">{selectedBudgetVersion?.name} ({selectedBudgetVersion?.year})</p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
-                        <div className="text-emerald-600 text-xs font-bold uppercase mb-1">Registros Válidos</div>
-                        <div className="text-2xl font-bold text-emerald-700">{budgetValid.length}</div>
-                      </div>
-                      <div className="bg-red-50 p-4 rounded-xl border border-red-100">
-                        <div className="text-red-600 text-xs font-bold uppercase mb-1">Erros</div>
-                        <div className="text-2xl font-bold text-red-700">{budgetErrors.length}</div>
-                      </div>
-                      <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
-                        <div className="text-indigo-600 text-xs font-bold uppercase mb-1">Total Geral</div>
-                        <div className="text-2xl font-bold text-indigo-700">
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(budgetValid.reduce((s, r) => s + (parseFloat(r.valor) || 0), 0))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {budgetErrors.length > 0 && (
-                      <div className="bg-white border border-red-200 rounded-xl overflow-hidden">
-                        <div className="bg-red-50 px-4 py-2 border-b border-red-200">
-                          <h5 className="text-xs font-bold text-red-700 uppercase">Erros de Validação (primeiros 50)</h5>
-                        </div>
-                        <div className="max-h-48 overflow-y-auto">
-                          <table className="min-w-full divide-y divide-gray-200 text-[10px]">
-                            <thead className="bg-gray-50">
-                              <tr>
-                                <th className="px-4 py-2 text-left font-medium text-gray-500">Linha</th>
-                                <th className="px-4 py-2 text-left font-medium text-gray-500">Erro</th>
-                              </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                              {budgetErrors.slice(0, 50).map((err, idx) => (
-                                <tr key={idx}>
-                                  <td className="px-4 py-2 font-mono text-gray-400">{err.originalLine}</td>
-                                  <td className="px-4 py-2 text-red-600">{err.msg}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Summary table */}
-                    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                      <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
-                        <h5 className="text-xs font-bold text-gray-700 uppercase">Resumo por Filial / Mês</h5>
-                      </div>
-                      <div className="max-h-64 overflow-y-auto">
-                        <table className="min-w-full divide-y divide-gray-200 text-xs">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="px-4 py-2 text-left font-medium text-gray-500">Filial</th>
-                              <th className="px-4 py-2 text-left font-medium text-gray-500">Mês</th>
-                              <th className="px-4 py-2 text-left font-medium text-gray-500">Tipo</th>
-                              <th className="px-4 py-2 text-right font-medium text-gray-500">Registros</th>
-                              <th className="px-4 py-2 text-right font-medium text-gray-500">Total</th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {summaryArr.map((row, idx) => (
-                              <tr key={idx}>
-                                <td className="px-4 py-2 font-medium text-gray-900">{row.hotel}</td>
-                                <td className="px-4 py-2 text-gray-500">{row.mes}</td>
-                                <td className="px-4 py-2 text-gray-500">{row.tipo}</td>
-                                <td className="px-4 py-2 text-right text-gray-500">{row.count}</td>
-                                <td className="px-4 py-2 text-right font-bold text-indigo-600">
-                                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(row.total)}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => {
-                        handleFinalBudget2026Import(activeBudgetVersionId);
-                      }}
-                      disabled={budgetImportSaving || budgetValid.length === 0}
-                      className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                    >
-                      {budgetImportSaving ? (
-                        <><span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> Salvando...</>
-                      ) : (
-                        <><Save size={16} /> Confirmar e Salvar na Versão "{selectedBudgetVersion?.name}"</>
-                      )}
-                    </button>
-                  </div>
-                );
-              })()}
-
-              {budgetImportStep === 'done' && (
-                <div className="text-center py-16 space-y-6">
-                  <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto">
-                    <svg className="w-10 h-10 text-emerald-600" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                  </div>
-                  <h3 className="text-2xl font-bold text-gray-900">Meta Importada com Sucesso!</h3>
-                  <p className="text-gray-500 max-w-md mx-auto">
-                    {budgetImportSavedCount !== null
-                      ? <><strong>{budgetImportSavedCount}</strong> registros foram salvos com sucesso na versão <strong>{selectedBudgetVersion?.name}</strong> e estão disponíveis como <strong>Meta</strong> no Tauá Real.</>
-                      : 'Dados importados com sucesso.'}
-                  </p>
-                </div>
-              )}
-
-              {/* Persistant History below import frame */}
-              {renderImportHistoryTable()}
             </div>
             )
           )}
@@ -4704,303 +4606,82 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
           )}
           {activeGeralTab === 'import' && (
             <div className="space-y-6">
-              <div className="flex border-b border-gray-100 mb-6">
-                <button
-                  onClick={() => setActiveImportTab('costCenters')}
-                  className={`px-4 py-2 text-sm font-medium border-b-2 ${activeImportTab === 'costCenters' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500'
-                    }`}
-                >
-                  Setores (CR/PDV)
-                </button>
+              {/* Scenario Selector */}
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <span className="text-sm font-black text-gray-700 uppercase tracking-widest">Cenário para Importação:</span>
+                  <div className="flex bg-white p-1 rounded-xl shadow-sm border border-gray-200">
+                    <button
+                      onClick={() => setImportScenario('REAL')}
+                      className={`px-6 py-2 rounded-lg text-xs font-black uppercase transition-all flex items-center gap-2 ${importScenario === 'REAL' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                    >
+                      <Database size={14} /> Tauá Real (Forecast)
+                    </button>
+                    <button
+                      onClick={() => setImportScenario('BUDGET')}
+                      className={`px-6 py-2 rounded-lg text-xs font-black uppercase transition-all flex items-center gap-2 ${importScenario === 'BUDGET' ? 'bg-orange-600 text-white shadow-lg' : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                    >
+                      <Target size={14} /> Tauá Budget (Meta)
+                    </button>
+                  </div>
+                </div>
 
-                <button
-                  onClick={() => setActiveImportTab('accounts')}
-                  className={`px-4 py-2 text-sm font-medium border-b-2 ${activeImportTab === 'accounts' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500'
-                    }`}
-                >
-                  Contas Contábeis
-                </button>
-
-                <button
-                  onClick={() => {
-                    setActiveImportTab('history');
-                    fetchImportHistory();
-                  }}
-                  className={`px-4 py-2 text-sm font-medium border-b-2 ${activeImportTab === 'history' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500'
-                    }`}
-                >
-                  Histórico de Importação
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => { setActiveImportTab('costCenters'); setImportScenario('REAL'); }}
+                    className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${activeImportTab === 'costCenters' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                  >
+                    Setores
+                  </button>
+                  <button
+                    onClick={() => { setActiveImportTab('accounts'); setImportScenario('REAL'); }}
+                    className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${activeImportTab === 'accounts' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                  >
+                    Contas
+                  </button>
+                  <button
+                    onClick={() => { setActiveImportTab('history'); setImportScenario('REAL'); fetchImportHistory(); }}
+                    className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${activeImportTab === 'history' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                  >
+                    Histórico
+                  </button>
+                </div>
               </div>
 
-
-              {activeImportTab === 'costCenters' && (
-                <div className="space-y-4">
-                  {ccImportStep === 'input' ? (
-                    <div className="space-y-4">
-                      <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl text-sm text-amber-800">
-                        <p className="font-bold mb-1">Instruções para Importação de Setores:</p>
-                        <p>Cole os dados do Excel com as seguintes colunas (separadas por TAB ou Ponto e Vírgula):</p>
-                        <code className="block mt-2 bg-white/50 p-2 rounded border border-amber-100">
-                          Hotel | Hierárquico | Descrição | Código | Código da Empresa | Departamento | Diretoria | Tipo
-                        </code>
-                      </div>
-                      <textarea
-                        value={importText}
-                        onChange={e => setImportText(e.target.value)}
-                        className="w-full h-64 p-4 border border-gray-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
-                        placeholder="Cole aqui os dados copiados do Excel..."
-                      />
-                      <div className="flex justify-end">
-                        <button
-                          onClick={processCostCenterImport}
-                          disabled={!importText.trim()}
-                          className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-indigo-700 disabled:opacity-50 shadow-lg shadow-indigo-100"
-                        >
-                          Processar Importação
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-6">
-                      <div className="flex justify-between items-center">
-                        <h4 className="font-bold text-gray-900">Prévia da Importação ({ccParsedData.length} linhas)</h4>
-                        <div className="flex gap-4 items-center">
-                          <div className="flex bg-gray-100 p-1 rounded-lg">
-                            <button onClick={() => setCcImportMode('append')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${ccImportMode === 'append' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500'}`}>Mesclar</button>
-                            <button onClick={() => setCcImportMode('replace')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${ccImportMode === 'replace' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500'}`}>Substituir Tudo</button>
-                          </div>
-                          <button onClick={() => setCcImportStep('input')} className="text-gray-500 hover:text-gray-700 font-bold text-sm">Voltar</button>
-                        </div>
-                      </div>
-
-                      <div className="overflow-hidden border border-gray-200 rounded-xl">
-                        <table className="min-w-full divide-y divide-gray-200">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Status</th>
-                              <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Hotel</th>
-                              <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Hierárquico</th>
-                              <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Descrição</th>
-                              <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Código</th>
-                              <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Cód. Empresa</th>
-                              <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Tipo</th>
-                              <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Mensagem</th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {ccParsedData.map((row, idx) => (
-                              <tr key={idx} className={row.status === 'error' ? 'bg-red-50' : ''}>
-                                <td className="px-4 py-3 whitespace-nowrap">
-                                  {row.status === 'valid' ? <div className="w-2 h-2 rounded-full bg-emerald-500" /> : <div className="w-2 h-2 rounded-full bg-red-500" />}
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-xs">{row.hotelName}</td>
-                                <td className="px-4 py-3 whitespace-nowrap text-xs font-mono">{row.hierarchicalCode}</td>
-                                <td className="px-4 py-3 whitespace-nowrap text-xs font-bold">{row.name}</td>
-                                <td className="px-4 py-3 whitespace-nowrap text-xs font-mono">{row.id}</td>
-                                <td className="px-4 py-3 whitespace-nowrap text-xs">{row.companyCode}</td>
-                                <td className="px-4 py-3 whitespace-nowrap text-xs">{row.type}</td>
-                                <td className="px-4 py-3 whitespace-nowrap text-[10px] text-red-600 italic">{row.msg}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      <div className="flex justify-end gap-4">
-                        <button onClick={() => setCcImportStep('input')} className="px-6 py-3 border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-gray-50">Cancelar</button>
-                        <button
-                          onClick={handleFinalCostCenterImport}
-                          disabled={isImportingCostCenter}
-                          className={`px-8 py-3 rounded-xl font-bold text-white shadow-lg flex items-center gap-2 transition-all ${isImportingCostCenter ? 'opacity-50 cursor-not-allowed' : ''} ${ccImportMode === 'replace' ? 'bg-red-600 hover:bg-red-700 shadow-red-100' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100'}`}
-                        >
-                          {isImportingCostCenter ? (
-                            <><span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> Sincronizando...</>
-                          ) : (
-                            ccImportMode === 'replace' ? 'Confirmar Substituição' : 'Confirmar Importação'
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  )}
+              {importScenario === 'REAL' && activeImportTab !== 'costCenters' && activeImportTab !== 'accounts' && activeImportTab !== 'history' && (
+                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                  {[
+                    { id: 'occupancy', label: 'Ocupação', icon: BedDouble },
+                    { id: 'revenue', label: 'Receitas', icon: DollarSign },
+                    { id: 'taxes', label: 'Impostos', icon: PieChart },
+                    { id: 'expenses', label: 'Despesas', icon: Briefcase }
+                  ].map(cat => (
+                    <button
+                      key={cat.id}
+                      onClick={() => setImportCategory(cat.id as any)}
+                      className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase transition-all whitespace-nowrap border ${importCategory === cat.id
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-100 translate-y-[-2px]'
+                          : 'bg-white text-gray-500 border-gray-200 hover:border-indigo-300 hover:text-indigo-600 shadow-sm'
+                        }`}
+                    >
+                      <cat.icon size={16} /> {cat.label}
+                    </button>
+                  ))}
                 </div>
               )}
 
-              {activeImportTab === 'accounts' && (
-                <div className="space-y-4">
-                  {accImportStep === 'input' ? (
-                    <div className="space-y-4">
-                      <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl text-sm text-amber-800">
-                        <p className="font-bold mb-1">Instruções para Importação de Contas:</p>
-                        <div className="mt-2 mb-3">
-                          <input type="file" ref={accFileInputRef} onChange={handleAccCsvUpload} accept=".csv,.txt" className="hidden" />
-                          <button onClick={() => accFileInputRef.current?.click()} className="px-3 py-1.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-[10px] font-bold shadow-sm transition-all">
-                            Selecionar Arquivo CSV de Contas
-                          </button>
-                        </div>
-                        <p>Cole os dados do Excel com as seguintes colunas (separadas por TAB ou Ponto e Vírgula):</p>
-                        <code className="block mt-2 bg-white/50 p-2 rounded border border-amber-100 text-[10px]">
-                          Tipo | Escopo ou Fora | Pacote Master | Pacote | Código | Conta Contábil
-                        </code>
-                      </div>
-                      <textarea
-                        value={importText}
-                        onChange={e => setImportText(e.target.value)}
-                        className="w-full h-64 p-4 border border-gray-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
-                        placeholder="Cole aqui os dados copiados do Excel..."
-                      />
-                      <div className="flex justify-end">
-                        <button
-                          onClick={processAccountImport}
-                          disabled={!importText.trim()}
-                          className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-indigo-700 disabled:opacity-50 shadow-lg shadow-indigo-100"
-                        >
-                          Processar Importação
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-6">
-                      <div className="flex justify-between items-center">
-                        <h4 className="font-bold text-gray-900">Prévia da Importação ({accParsedData.length} linhas)</h4>
-                        <div className="flex gap-4 items-center">
-                          <div className="flex bg-gray-100 p-1 rounded-lg">
-                            <button onClick={() => setAccImportMode('append')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${accImportMode === 'append' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500'}`}>Mesclar</button>
-                            <button onClick={() => setAccImportMode('replace')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${accImportMode === 'replace' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500'}`}>Substituir Tudo</button>
-                          </div>
-                          <button onClick={() => setAccImportStep('input')} className="text-gray-500 hover:text-gray-700 font-bold text-sm">Voltar</button>
-                        </div>
-                      </div>
-
-                      <div className="overflow-x-auto border border-gray-200 rounded-xl shadow-sm">
-                        <table className="min-w-full divide-y divide-gray-200">
-                          <thead className="bg-gray-50 uppercase tracking-widest text-[9px] font-black text-gray-500">
-                            <tr>
-                              <th className="px-4 py-3 text-left w-12">Status</th>
-                              <th className="px-4 py-3 text-left w-20">Tipo</th>
-                              <th className="px-4 py-3 text-left w-20">Escopo</th>
-                              <th className="px-4 py-3 text-left w-24">Código</th>
-                              <th className="px-4 py-3 text-left">Conta Contábil</th>
-                              <th className="px-4 py-3 text-left">Pacote</th>
-                              <th className="px-4 py-3 text-left">Pacote Master</th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {accParsedData.map((row, idx) => (
-                              <tr key={idx} className={`${row.status === 'error' ? 'bg-red-50' : 'hover:bg-slate-50'} transition-colors`}>
-                                <td className="px-4 py-2">
-                                  {row.status === 'valid' ? (
-                                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm" title="Válido" />
-                                  ) : (
-                                    <div className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-sm" title={row.msg} />
-                                  )}
-                                </td>
-                                <td className="px-2 py-1">
-                                  <input
-                                    type="text"
-                                    value={row.tipo}
-                                    onChange={e => {
-                                      const newData = [...accParsedData];
-                                      newData[idx].tipo = e.target.value;
-                                      setAccParsedData(newData);
-                                    }}
-                                    className="w-full bg-transparent border-none focus:ring-1 focus:ring-indigo-500 rounded p-1 text-[10px]"
-                                  />
-                                </td>
-                                <td className="px-2 py-1">
-                                  <input
-                                    type="text"
-                                    value={row.escopo}
-                                    onChange={e => {
-                                      const newData = [...accParsedData];
-                                      newData[idx].escopo = e.target.value;
-                                      setAccParsedData(newData);
-                                    }}
-                                    className="w-full bg-transparent border-none focus:ring-1 focus:ring-indigo-500 rounded p-1 text-[10px]"
-                                  />
-                                </td>
-                                <td className="px-2 py-1">
-                                  <input
-                                    type="text"
-                                    value={row.id}
-                                    onChange={e => {
-                                      const newData = [...accParsedData];
-                                      newData[idx].id = e.target.value;
-                                      setAccParsedData(newData);
-                                    }}
-                                    className="w-full bg-transparent border-none focus:ring-1 focus:ring-indigo-500 rounded p-1 text-[10px] font-mono"
-                                  />
-                                </td>
-                                <td className="px-2 py-1">
-                                  <input
-                                    type="text"
-                                    value={row.name}
-                                    onChange={e => {
-                                      const newData = [...accParsedData];
-                                      newData[idx].name = e.target.value;
-                                      setAccParsedData(newData);
-                                    }}
-                                    className="w-full bg-transparent border-none focus:ring-1 focus:ring-indigo-500 rounded p-1 text-[10px] font-bold"
-                                  />
-                                </td>
-                                <td className="px-2 py-1">
-                                  <div className="flex flex-col">
-                                    <input
-                                      type="text"
-                                      value={row.package}
-                                      onChange={e => {
-                                        const newData = [...accParsedData];
-                                        newData[idx].package = e.target.value;
-                                        setAccParsedData(newData);
-                                      }}
-                                      className="w-full bg-transparent border-none focus:ring-1 focus:ring-indigo-500 rounded p-0.5 text-[10px]"
-                                    />
-                                    <span className="text-[8px] text-gray-400 pl-0.5">{row.packageCode}</span>
-                                  </div>
-                                </td>
-                                <td className="px-2 py-1">
-                                  <div className="flex flex-col">
-                                    <input
-                                      type="text"
-                                      value={row.masterPackage}
-                                      onChange={e => {
-                                        const newData = [...accParsedData];
-                                        newData[idx].masterPackage = e.target.value;
-                                        setAccParsedData(newData);
-                                      }}
-                                      className="w-full bg-transparent border-none focus:ring-1 focus:ring-indigo-500 rounded p-0.5 text-[10px]"
-                                    />
-                                    <span className="text-[8px] text-gray-400 pl-0.5">{row.masterPackageCode}</span>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      <div className="flex justify-end gap-4">
-                        <button onClick={() => setAccImportStep('input')} className="px-6 py-3 border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-gray-50">Cancelar</button>
-                        <button
-                          onClick={handleFinalAccountImport}
-                          disabled={isImportingAccount}
-                          className={`px-8 py-3 rounded-xl font-bold text-white shadow-lg transition-all ${isImportingAccount ? 'opacity-50 cursor-not-allowed' : ''} ${accImportMode === 'replace' ? 'bg-red-600 hover:bg-red-700 shadow-red-100' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100'}`}
-                        >
-                          {isImportingAccount ? 'Sincronizando...' : (accImportMode === 'replace' ? 'Confirmar Substituição' : 'Confirmar Importação')}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Persistent History below Account Import frame */}
-                  {renderImportHistoryTable()}
-                </div>
-              )}
-
-              {activeImportTab === 'history' && (
-                <div className="space-y-4">
-                  {renderImportHistoryTable()}
-                </div>
+              {/* Conditional Rendering based on Scenario and Tab */}
+              {importScenario === 'REAL' ? (
+                <>
+                  {activeImportTab === 'costCenters' && renderCostCenterImport()}
+                  {activeImportTab === 'accounts' && renderAccountImport()}
+                  {activeImportTab === 'history' && renderImportHistoryTable()}
+                  {activeImportTab !== 'costCenters' && activeImportTab !== 'accounts' && activeImportTab !== 'history' && renderRealImportInterface()}
+                </>
+              ) : (
+                renderBudgetImportInterface()
               )}
             </div>
           )}
