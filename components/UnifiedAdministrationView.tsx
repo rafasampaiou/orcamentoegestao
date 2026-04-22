@@ -251,13 +251,14 @@ interface SpreadsheetTableProps {
     data: Record<string, Record<number, string>>; // rowLabel -> monthIndex (1-12) -> value
     onCellChange: (rowLabel: string, month: number, value: string) => void;
     onPaste?: (startRowLabel: string, startMonth: number, pastedData: string[][]) => void;
+    readOnlyRows?: string[];
 }
 
-const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({ rows, data, onCellChange, onPaste }) => {
+const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({ rows, data, onCellChange, onPaste, readOnlyRows = [] }) => {
     const months = [1,2,3,4,5,6,7,8,9,10,11,12];
 
     const handlePaste = (e: React.ClipboardEvent, rowLabel: string, startMonth: number) => {
-        if (!onPaste) return;
+        if (!onPaste || readOnlyRows.includes(rowLabel)) return;
         e.preventDefault();
         const clipboardData = e.clipboardData.getData('text');
         const pastedRows = clipboardData.split(/\r\n|\n|\r/).filter(r => r.trim()).map(row => row.split('\t'));
@@ -280,25 +281,33 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({ rows, data, onCellC
                     </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                    {rows.map((rowLabel, idx) => (
-                        <tr key={idx} className="hover:bg-indigo-50/30 transition-colors">
-                            <td className="px-4 py-2 font-bold text-gray-700 sticky left-0 bg-white z-10 border-r border-gray-200 truncate max-w-[240px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]" title={rowLabel}>
-                                {rowLabel}
-                            </td>
-                            {months.map(m => (
-                                <td key={m} className="p-0 border-l border-gray-100 group">
-                                    <input 
-                                        type="text" 
-                                        className="w-full h-full px-3 py-2.5 text-right font-mono text-indigo-900 font-bold focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-transparent group-hover:bg-white transition-all transition-duration-200"
-                                        placeholder="-"
-                                        value={data[rowLabel]?.[m] || ''}
-                                        onChange={(e) => onCellChange(rowLabel, m, e.target.value)}
-                                        onPaste={(e) => handlePaste(e, rowLabel, m)}
-                                    />
+                    {rows.map((rowLabel, idx) => {
+                        const isReadOnly = readOnlyRows.includes(rowLabel);
+                        return (
+                            <tr key={idx} className={`hover:bg-indigo-50/30 transition-colors ${isReadOnly ? 'bg-slate-50/50' : ''}`}>
+                                <td className={`px-4 py-2 font-bold sticky left-0 z-10 border-r border-gray-200 truncate max-w-[240px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] ${isReadOnly ? 'bg-slate-50 text-slate-500 italic font-medium' : 'bg-white text-gray-700'}`} title={rowLabel}>
+                                    {rowLabel}
                                 </td>
-                            ))}
-                        </tr>
-                    ))}
+                                {months.map(m => (
+                                    <td key={m} className="p-0 border-l border-gray-100 group">
+                                        <input 
+                                            type="text" 
+                                            readOnly={isReadOnly}
+                                            className={`w-full h-full px-3 py-2.5 text-right font-mono transition-all transition-duration-200 focus:outline-none ${
+                                                isReadOnly 
+                                                ? 'bg-slate-100/30 text-slate-400 cursor-not-allowed select-none' 
+                                                : 'text-indigo-900 font-bold focus:ring-2 focus:ring-indigo-500 bg-transparent group-hover:bg-white'
+                                            }`}
+                                            placeholder="-"
+                                            value={data[rowLabel]?.[m] || ''}
+                                            onChange={(e) => !isReadOnly && onCellChange(rowLabel, m, e.target.value)}
+                                            onPaste={(e) => !isReadOnly && handlePaste(e, rowLabel, m)}
+                                        />
+                                    </td>
+                                ))}
+                            </tr>
+                        );
+                    })}
                 </tbody>
             </table>
         </div>
@@ -728,9 +737,10 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const [dreForecastData, setDreForecastData] = useState<Record<string, Record<number, string>>>({});
   const [taxesImportData, setTaxesImportData] = useState<Record<string, Record<number, string>>>({});
   const [occupancyImportData, setOccupancyImportData] = useState<Record<string, Record<number, string>>>({});
-  const [leisureEventImportData, setLeisureEventImportData] = useState<Record<string, Record<number, string>>>({});
+  const [leisureImportData, setLeisureImportData] = useState<Record<string, Record<number, string>>>({});
+  const [eventsImportData, setEventsImportData] = useState<Record<string, Record<number, string>>>({});
   const [occTargetVersionId, setOccTargetVersionId] = useState<string>('');
-  const [occupancySubTab, setOccupancySubTab] = useState<'uh' | 'leisure'>('uh');
+  const [occupancySubTab, setOccupancySubTab] = useState<'geral' | 'leisure' | 'events'>('geral');
 
   // Budget 2026 Import State (separate from Real import)
   const [budgetImportText, setBudgetImportText] = useState('');
@@ -2584,31 +2594,48 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     }
   };
 
+
   const handleClearOccupancy = () => {
-    if (confirm('Tem certeza que deseja limpar a tabela de ocupação?')) {
+    if (confirm('Tem certeza que deseja limpar todos os dados de ocupação (Geral, Lazer e Eventos)?')) {
       setOccupancyImportData({});
+      setLeisureImportData({});
+      setEventsImportData({});
     }
   };
 
   const handleSaveOccupancy = async () => {
     if (!occTargetVersionId) return alert('Selecione a versão de destino.');
     
-    // 1. Prepare occupancy data object
-    // Format required by budget_versions: Record<string, number[]>
-    const metrics = ["UH Disponíveis", "UH Ocupadas", "PAX", "Adultos", "Crianças", "Receita Hospedagem"];
+    // We save all 3 segments into occupancyData with prefixes
     const occupancy_data: Record<string, number[]> = {};
-    
-    metrics.forEach(metric => {
-      const monthValues = Array(12).fill(0);
-      for (let m = 1; m <= 12; m++) {
-        const valStr = occupancyImportData[metric]?.[m] || '0';
-        const val = parseFloat(valStr.toString().replace(/\./g, '').replace(',', '.')) || 0;
-        monthValues[m - 1] = val;
-      }
-      occupancy_data[metric] = monthValues;
+    const segments: Array<{label: string, data: Record<string, Record<number, string>>}> = [
+      { label: 'Geral', data: occupancyImportData },
+      { label: 'Lazer', data: leisureImportData },
+      { label: 'Eventos', data: eventsImportData }
+    ];
+
+    const metrics = [
+      "Quartos", "Aptos vendidos", "N° de hóspedes", "Adultos", "CHD", 
+      "Valor FAP Adulto", "Valor FAP Criança", "Receita COM rateios", "Receita Extras"
+    ];
+
+    segments.forEach(seg => {
+      metrics.forEach(metric => {
+        const monthValues = Array(12).fill(0);
+        for (let m = 1; m <= 12; m++) {
+          const valStr = seg.data[metric]?.[m] || '0';
+          const val = parseFloat(valStr.toString().replace(/\./g, '').replace(',', '.')) || 0;
+          monthValues[m - 1] = val;
+        }
+        occupancy_data[`${seg.label}:${metric}`] = monthValues;
+        
+        // Also save without prefix for the "Geral" segment to maintain compatibility with existing DRE logic
+        if (seg.label === 'Geral') {
+          occupancy_data[metric] = monthValues;
+        }
+      });
     });
 
-    // 2. Resolve version object
     const targetVersion = budgetVersions.find(v => v.id === occTargetVersionId) 
                        || realVersions.find(v => v.id === occTargetVersionId);
     
@@ -2619,21 +2646,19 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       const updatedVersion = { ...targetVersion, occupancyData: occupancy_data };
       await supabaseService.upsertBudgetVersion(updatedVersion);
       
-      // Update local state
       if (budgetVersions.some(v => v.id === occTargetVersionId)) {
         setBudgetVersions(prev => prev.map(v => v.id === occTargetVersionId ? updatedVersion : v));
       } else {
         setRealVersions(prev => prev.map(v => v.id === occTargetVersionId ? updatedVersion : v));
       }
 
-      alert('Dados de ocupação salvos com sucesso!');
+      alert('Dados de ocupação (Geral, Lazer e Eventos) salvos com sucesso!');
       
-      // History record (artificial row for display)
       const histRows: ImportedRow[] = [{
         ano: String(targetVersion.year),
         mes: "1-12",
         hotel: targetVersion.hotelId || "Múltiplas",
-        tipo: "Ocupação UH",
+        tipo: "Ocupação Detalhada",
         cenario: "REAL",
         conta: "Métricas de Ocupação",
         cr: "",
@@ -2641,77 +2666,11 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         status: "valid",
         versionId: targetVersion.id
       }];
-      const importId = await recordImportHistory(histRows);
-      fetchImportHistory(); // Refresh history
+      await recordImportHistory(histRows);
+      fetchImportHistory();
 
     } catch (e: any) {
       alert('Erro ao salvar ocupação: ' + e.message);
-    } finally {
-      setIsSavingDre(false);
-    }
-  };
-
-  const handleClearLeisureEvents = () => {
-    if (confirm('Tem certeza que deseja limpar a tabela de Lazer e Eventos?')) {
-      setLeisureEventImportData({});
-    }
-  };
-
-  const handleSaveLeisureEvents = async () => {
-    if (!occTargetVersionId) return alert('Selecione a versão de destino.');
-    
-    const metrics = ["UH Lazer", "UH Eventos", "PAX Lazer", "PAX Eventos", "Receita Lazer", "Receita Eventos"];
-    const occupancy_data: Record<string, number[]> = {};
-    
-    metrics.forEach(metric => {
-      const monthValues = Array(12).fill(0);
-      for (let m = 1; m <= 12; m++) {
-        const valStr = leisureEventImportData[metric]?.[m] || '0';
-        const val = parseFloat(valStr.toString().replace(/\./g, '').replace(',', '.')) || 0;
-        monthValues[m - 1] = val;
-      }
-      occupancy_data[metric] = monthValues;
-    });
-
-    const targetVersion = budgetVersions.find(v => v.id === occTargetVersionId) 
-                       || realVersions.find(v => v.id === occTargetVersionId);
-    
-    if (!targetVersion) return alert('Versão não encontrada.');
-
-    setIsSavingDre(true);
-    try {
-      // Merge with existing occupancy data if any
-      const existingOcc = targetVersion.occupancyData || {};
-      const updatedOccupancy = { ...existingOcc, ...occupancy_data };
-      const updatedVersion = { ...targetVersion, occupancyData: updatedOccupancy };
-      
-      await supabaseService.upsertBudgetVersion(updatedVersion);
-      
-      if (budgetVersions.some(v => v.id === occTargetVersionId)) {
-        setBudgetVersions(prev => prev.map(v => v.id === occTargetVersionId ? updatedVersion : v));
-      } else {
-        setRealVersions(prev => prev.map(v => v.id === occTargetVersionId ? updatedVersion : v));
-      }
-
-      alert('Dados de Lazer e Eventos salvos com sucesso!');
-      
-      const histRows: ImportedRow[] = [{
-        ano: String(targetVersion.year),
-        mes: "1-12",
-        hotel: targetVersion.hotelId || "Múltiplas",
-        tipo: "Lazer e Eventos",
-        cenario: "REAL",
-        conta: "Métricas de Lazer e Eventos",
-        cr: "",
-        valor: "0",
-        status: "valid",
-        versionId: targetVersion.id
-      }];
-      const importId = await recordImportHistory(histRows);
-      fetchImportHistory(); // Refresh history
-
-    } catch (e: any) {
-      alert('Erro ao salvar lazer/eventos: ' + e.message);
     } finally {
       setIsSavingDre(false);
     }
@@ -3295,11 +3254,12 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                       <BedDouble className="text-indigo-600" size={20} />
                       Importação da Ocupação
                     </div>
-                    {/* Sub-Tabs: Ocupação UH vs Lazer e Eventos */}
+                    {/* Sub-Tabs: Geral vs Lazer vs Eventos */}
                     <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
                       {[
-                        { id: 'uh', label: 'Ocupação UH' },
-                        { id: 'leisure', label: 'Lazer e Eventos' }
+                        { id: 'geral', label: 'Geral' },
+                        { id: 'leisure', label: 'Lazer' },
+                        { id: 'events', label: 'Eventos' }
                       ].map(tab => (
                         <button
                           key={tab.id}
@@ -3317,7 +3277,10 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                   </div>
 
                   <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl text-xs text-blue-800">
-                    <p>Preencha os indicadores de {occupancySubTab === 'uh' ? 'ocupação UH' : 'lazer e eventos'} abaixo ou cole do Excel.</p>
+                    <p>Preencha os indicadores de {
+                      occupancySubTab === 'geral' ? 'ocupação geral (auto-calculado)' : 
+                      occupancySubTab === 'leisure' ? 'lazer' : 'eventos'
+                    } abaixo ou cole do Excel.</p>
                   </div>
 
                   <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
@@ -3333,86 +3296,168 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
                     <div className="flex-1" />
 
-                    {occupancySubTab === 'uh' ? (
-                      <>
-                        <button 
-                          onClick={handleSaveOccupancy}
-                          disabled={isSavingDre || !occTargetVersionId}
-                          className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all flex items-center gap-2 disabled:opacity-50"
-                        >
-                          {isSavingDre ? 'Salvando...' : <><Save size={16} /> Salvar Ocupação UH</>}
-                        </button>
-                        <button 
-                          onClick={handleClearOccupancy}
-                          className="bg-white border border-gray-300 text-red-600 px-4 py-2 rounded-lg font-bold text-sm hover:bg-red-50 transition-all flex items-center gap-2"
-                        >
-                          <Trash2 size={16} /> Limpar
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button 
-                          onClick={handleSaveLeisureEvents}
-                          disabled={isSavingDre || !occTargetVersionId}
-                          className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all flex items-center gap-2 disabled:opacity-50"
-                        >
-                          {isSavingDre ? 'Salvando...' : <><Save size={16} /> Salvar Lazer e Eventos</>}
-                        </button>
-                        <button 
-                          onClick={handleClearLeisureEvents}
-                          className="bg-white border border-gray-300 text-red-600 px-4 py-2 rounded-lg font-bold text-sm hover:bg-red-50 transition-all flex items-center gap-2"
-                        >
-                          <Trash2 size={16} /> Limpar
-                        </button>
-                      </>
-                    )}
+                    <button 
+                      onClick={handleSaveOccupancy}
+                      disabled={isSavingDre || !occTargetVersionId}
+                      className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all flex items-center gap-2 disabled:opacity-50"
+                    >
+                      {isSavingDre ? 'Salvando...' : <><Save size={16} /> Salvar Tudo (Ocupação)</>}
+                    </button>
+                    <button 
+                      onClick={handleClearOccupancy}
+                      className="bg-white border border-gray-300 text-red-600 px-4 py-2 rounded-lg font-bold text-sm hover:bg-red-50 transition-all flex items-center gap-2"
+                    >
+                      <Trash2 size={16} /> Limpar
+                    </button>
                   </div>
 
-                  {occupancySubTab === 'uh' ? (
-                    <SpreadsheetTable 
-                      rows={["UH Disponíveis", "UH Ocupadas", "PAX", "Adultos", "Crianças", "Receita Hospedagem"]}
-                      data={occupancyImportData}
-                      onCellChange={(row, month, val) => setOccupancyImportData(prev => ({ ...prev, [row]: { ...(prev[row] || {}), [month]: val }}))}
-                      onPaste={(row, month, pasted) => {
-                        const newData = { ...occupancyImportData };
-                        const rows = ["UH Disponíveis", "UH Ocupadas", "PAX", "Adultos", "Crianças", "Receita Hospedagem"];
-                        const startIdx = rows.indexOf(row);
-                        pasted.forEach((pRow, rOffset) => {
-                          const targetRow = rows[startIdx + rOffset];
-                          if (targetRow) {
-                            if (!newData[targetRow]) newData[targetRow] = {};
-                            pRow.forEach((val, cOffset) => {
-                              const targetCol = month + cOffset;
-                              if (targetCol <= 12) newData[targetRow][targetCol] = val;
-                            });
-                          }
+                  {(() => {
+                    const OCC_ROWS = [
+                      "Dias do mês",
+                      "Quartos",
+                      "Aptos disponíveis",
+                      "Aptos vendidos",
+                      "% de ocupação",
+                      "N° de hóspedes",
+                      "Coef. Occ Geral",
+                      "Adultos",
+                      "Coef. Occ Adultos",
+                      "CHD",
+                      "Coef. Occ CHD",
+                      "Valor FAP Adulto",
+                      "Valor FAP Criança",
+                      "Receita COM rateios",
+                      "Receita SEM rateios",
+                      "Receita Extras",
+                      "DM bruta (sem iss)",
+                      "DM líquida (sem iss)",
+                      "REVPAR",
+                      "TREVPOR",
+                      "TREVPAR"
+                    ];
+
+                    const parseVal = (v: any) => {
+                      if (!v) return 0;
+                      return parseFloat(String(v).replace(/\./g, '').replace(',', '.').replace('%', '')) || 0;
+                    };
+
+                    const targetYear = realVersions.find(v => v.id === occTargetVersionId)?.year || new Date().getFullYear();
+
+                    // Calculate derived fields for a segment
+                    const calculateTable = (data: Record<string, Record<number, string>>) => {
+                      const newTable = { ...data };
+                      const months = Array.from({length: 12}, (_, i) => i + 1);
+                      months.forEach(m => {
+                        const days = new Date(targetYear, m, 0).getDate();
+                        if (!newTable["Dias do mês"]) newTable["Dias do mês"] = {};
+                        newTable["Dias do mês"][m] = String(days);
+
+                        const qts = parseVal(newTable["Quartos"]?.[m]);
+                        const available = days * qts;
+                        if (!newTable["Aptos disponíveis"]) newTable["Aptos disponíveis"] = {};
+                        newTable["Aptos disponíveis"][m] = available.toLocaleString('pt-BR');
+
+                        const sold = parseVal(newTable["Aptos vendidos"]?.[m]);
+                        const occ = available > 0 ? (sold / available) * 100 : 0;
+                        if (!newTable["% de ocupação"]) newTable["% de ocupação"] = {};
+                        newTable["% de ocupação"][m] = occ.toFixed(1) + "%";
+
+                        const hsp = parseVal(newTable["N° de hóspedes"]?.[m]);
+                        const coefGeral = sold > 0 ? hsp / sold : 0;
+                        if (!newTable["Coef. Occ Geral"]) newTable["Coef. Occ Geral"] = {};
+                        newTable["Coef. Occ Geral"][m] = coefGeral.toFixed(2);
+
+                        const adu = parseVal(newTable["Adultos"]?.[m]);
+                        const coefAdu = sold > 0 ? adu / sold : 0;
+                        if (!newTable["Coef. Occ Adultos"]) newTable["Coef. Occ Adultos"] = {};
+                        newTable["Coef. Occ Adultos"][m] = coefAdu.toFixed(2);
+
+                        const chd = parseVal(newTable["CHD"]?.[m]);
+                        const coefChd = sold > 0 ? chd / sold : 0;
+                        if (!newTable["Coef. Occ CHD"]) newTable["Coef. Occ CHD"] = {};
+                        newTable["Coef. Occ CHD"][m] = coefChd.toFixed(2);
+
+                        const recCom = parseVal(newTable["Receita COM rateios"]?.[m]);
+                        const fapAdu = parseVal(newTable["Valor FAP Adulto"]?.[m]);
+                        const fapChd = parseVal(newTable["Valor FAP Criança"]?.[m]);
+                        const recSem = recCom - (adu * fapAdu) - (chd * fapChd);
+                        if (!newTable["Receita SEM rateios"]) newTable["Receita SEM rateios"] = {};
+                        newTable["Receita SEM rateios"][m] = recSem.toLocaleString('pt-BR');
+
+                        const extra = parseVal(newTable["Receita Extras"]?.[m]);
+
+                        const dmB = sold > 0 ? recCom / sold : 0;
+                        if (!newTable["DM bruta (sem iss)"]) newTable["DM bruta (sem iss)"] = {};
+                        newTable["DM bruta (sem iss)"][m] = dmB.toLocaleString('pt-BR');
+
+                        const dmL = sold > 0 ? recSem / sold : 0;
+                        if (!newTable["DM líquida (sem iss)"]) newTable["DM líquida (sem iss)"] = {};
+                        newTable["DM líquida (sem iss)"][m] = dmL.toLocaleString('pt-BR');
+
+                        const revpar = available > 0 ? recCom / available : 0;
+                        if (!newTable["REVPAR"]) newTable["REVPAR"] = {};
+                        newTable["REVPAR"][m] = revpar.toLocaleString('pt-BR');
+
+                        const trevpor = sold > 0 ? (recCom + extra) / sold : 0;
+                        if (!newTable["TREVPOR"]) newTable["TREVPOR"] = {};
+                        newTable["TREVPOR"][m] = trevpor.toLocaleString('pt-BR');
+
+                        const trevpar = available > 0 ? (recCom + extra) / available : 0;
+                        if (!newTable["TREVPAR"]) newTable["TREVPAR"] = {};
+                        newTable["TREVPAR"][m] = trevpar.toLocaleString('pt-BR');
+                      });
+                      return newTable;
+                    };
+
+                    const aggregateGeral = () => {
+                      const geral = { ...occupancyImportData };
+                      const rowsToSum = ["Aptos vendidos", "N° de hóspedes", "Adultos", "CHD", "Receita COM rateios", "Receita Extras", "Valor FAP Adulto", "Valor FAP Criança"];
+                      const months = Array.from({length: 12}, (_, i) => i + 1);
+                      months.forEach(m => {
+                        rowsToSum.forEach(row => {
+                          const val = parseVal(leisureImportData[row]?.[m]) + parseVal(eventsImportData[row]?.[m]);
+                          if (!geral[row]) geral[row] = {};
+                          geral[row][m] = val.toLocaleString('pt-BR');
                         });
-                        setOccupancyImportData(newData);
-                      }}
-                    />
-                  ) : (
-                    <SpreadsheetTable 
-                      rows={["UH Lazer", "UH Eventos", "PAX Lazer", "PAX Eventos", "Receita Lazer", "Receita Eventos"]}
-                      data={leisureEventImportData}
-                      onCellChange={(row, month, val) => setLeisureEventImportData(prev => ({ ...prev, [row]: { ...(prev[row] || {}), [month]: val }}))}
-                      onPaste={(row, month, pasted) => {
-                        const newData = { ...leisureEventImportData };
-                        const rows = ["UH Lazer", "UH Eventos", "PAX Lazer", "PAX Eventos", "Receita Lazer", "Receita Eventos"];
-                        const startIdx = rows.indexOf(row);
-                        pasted.forEach((pRow, rOffset) => {
-                          const targetRow = rows[startIdx + rOffset];
-                          if (targetRow) {
-                            if (!newData[targetRow]) newData[targetRow] = {};
-                            pRow.forEach((val, cOffset) => {
-                              const targetCol = month + cOffset;
-                              if (targetCol <= 12) newData[targetRow][targetCol] = val;
-                            });
-                          }
-                        });
-                        setLeisureEventImportData(newData);
-                      }}
-                    />
-                  )}
+                        // Quartos should be same for all, maybe? We'll use Geral:Quartos if provided
+                      });
+                      return calculateTable(geral);
+                    };
+
+                    const currentData = occupancySubTab === 'geral' ? aggregateGeral() : 
+                                       occupancySubTab === 'leisure' ? calculateTable(leisureImportData) :
+                                       calculateTable(eventsImportData);
+
+                    const setData = occupancySubTab === 'geral' ? setOccupancyImportData :
+                                    occupancySubTab === 'leisure' ? setLeisureImportData :
+                                    setEventsImportData;
+
+                    return (
+                      <SpreadsheetTable 
+                        rows={OCC_ROWS}
+                        data={currentData}
+                        onCellChange={(row, month, val) => {
+                          setData(prev => ({ ...prev, [row]: { ...(prev[row] || {}), [month]: val }}));
+                        }}
+                        readOnlyRows={["Dias do mês", "Aptos disponíveis", "% de ocupação", "Coef. Occ Geral", "Coef. Occ Adultos", "Coef. Occ CHD", "Receita SEM rateios", "DM bruta (sem iss)", "DM líquida (sem iss)", "REVPAR", "TREVPOR", "TREVPAR"]}
+                        onPaste={(row, mIdx, pasted) => {
+                          const newData = { ...currentData };
+                          const startIdx = OCC_ROWS.indexOf(row);
+                          pasted.forEach((pRow, rOffset) => {
+                            const targetRow = OCC_ROWS[startIdx + rOffset];
+                            if (targetRow) {
+                              if (!newData[targetRow]) newData[targetRow] = {};
+                              pRow.forEach((val, cOffset) => {
+                                const targetCol = mIdx + cOffset;
+                                if (targetCol <= 12) newData[targetRow][targetCol] = val;
+                              });
+                            }
+                          });
+                          setData(newData);
+                        }}
+                      />
+                    );
+                  })()}
                 </div>
               )}
 
