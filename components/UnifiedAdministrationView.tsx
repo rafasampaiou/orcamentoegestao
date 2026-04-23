@@ -60,14 +60,14 @@ const DRE_FORECAST_ROWS = [
   "Serviços contratados de prestadores PJ - MEI",
   "Despesas administrativas",
   "Despesas administrativas gerais",
-  "Processamentos de dados e TI (Tech)",
-  "Processamentos de dados e TI (Martech)",
-  "Processamentos de dados e TI (Outras áreas)",
+  "Processamento de dados e TI (TI)",
+  "Processamento de dados e TI (Martech)",
+  "Processamento de dados e TI (Outros)",
   "Provisoes gerais",
   "Despesas com vendas e marketing",
-  "Despesas de Vendas e Marketing (Marketing)",
-  "Despesas de Vendas e Marketing (Martech)",
-  "Despesas de Vendas e Marketing (Outras áreas)",
+  "Marketing",
+  "Martech",
+  "Outros setores",
   "Despesas financeiras e bancarias",
   "Outros impostos",
   "Arrendamento"
@@ -2501,13 +2501,13 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     
     // Mapping for virtual/drill-down rows to base account + CR
     const specialMapping: Record<string, { account: string, cr?: string }> = {
-      "Processamentos de dados e TI (Tech)": { account: "Processamentos de dados e TI", cr: "martech" },
-      "Processamentos de dados e TI (Martech)": { account: "Processamentos de dados e TI", cr: "marketing" },
-      "Processamentos de dados e TI (Outras áreas)": { account: "Processamentos de dados e TI", cr: "" },
+      "Processamento de dados e TI (TI)": { account: "Processamento de dados e TI", cr: "ti" },
+      "Processamento de dados e TI (Martech)": { account: "Processamento de dados e TI", cr: "martech" },
+      "Processamento de dados e TI (Outros)": { account: "Processamento de dados e TI", cr: "" },
 
-      "Despesas de Vendas e Marketing (Marketing)": { account: "Despesas de Vendas e Marketing", cr: "marketing" },
-      "Despesas de Vendas e Marketing (Martech)": { account: "Despesas de Vendas e Marketing", cr: "martech" },
-      "Despesas de Vendas e Marketing (Outras áreas)": { account: "Despesas de Vendas e Marketing", cr: "" },
+      "Marketing": { account: "Despesas com vendas e marketing", cr: "marketing" },
+      "Martech": { account: "Despesas com vendas e marketing", cr: "martech" },
+      "Outros setores": { account: "Despesas com vendas e marketing", cr: "" },
     };
 
     Object.entries(dreForecastData).forEach(([rowLabel, months]) => {
@@ -2527,7 +2527,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
           mes: month,
           hotel: hotelName,
           tipo: 'Despesa',
-          cenario: 'REAL',
+          cenario: 'FORECAST',
           conta: finalAccount,
           cr: finalCR,
           valor: String(numVal),
