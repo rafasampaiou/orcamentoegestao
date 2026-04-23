@@ -2547,6 +2547,10 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     try {
       const importId = await recordImportHistory(rowsToSave);
       await supabaseService.saveFinancialData(rowsToSave, importId);
+      // Update local state so the Forecast view reflects the data immediately (no page refresh needed)
+      if (onImportData) {
+        onImportData(rowsToSave, 'append');
+      }
       alert('Dados de despesas salvos com sucesso!');
     } catch (e: any) {
       console.error("Save error:", e);
@@ -2555,6 +2559,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       setIsSavingDre(false);
     }
   };
+
 
   const handleClearTaxes = () => {
     if (confirm('Tem certeza que deseja limpar a tabela de impostos?')) {
