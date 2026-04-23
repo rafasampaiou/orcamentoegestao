@@ -2492,7 +2492,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const handleSaveExpensesForecast = async () => {
     if (!importHotelId) return alert('Selecione um hotel');
     const selectedVersionId = targetRealVersionId || activeRealVersionId;
-    const selectedVersion = realVersions.find(v => v.id === selectedVersionId);
+    const selectedVersion = realVersions.find(v => v.id === selectedVersionId)
+                         || budgetVersions.find(v => v.id === selectedVersionId);
     if (!selectedVersion) return alert('Selecione uma versão');
 
     const hotelObj = hotels.find(h => h.id === importHotelId);
@@ -2511,6 +2512,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       "Outros setores": { account: "Despesas com vendas e marketing", cr: "" },
     };
 
+    const targetYear = selectedVersion.year || importTargetYear;
+
     Object.entries(dreForecastData).forEach(([rowLabel, months]) => {
       Object.entries(months).forEach(([month, value]) => {
         if (value === undefined || value === '') return;
@@ -2524,7 +2527,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         const finalCR = mapping ? mapping.cr : "";
 
         rowsToSave.push({
-          ano: String(importTargetYear),
+          ano: String(targetYear),
           mes: month,
           hotel: hotelName,
           tipo: 'Despesa',
@@ -2537,6 +2540,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         });
       });
     });
+
 
     if (rowsToSave.length === 0) return alert('Preencha ao menos um valor na tabela.');
 
@@ -3484,7 +3488,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                         className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[200px]"
                     >
                         <option value="">Selecione a versão...</option>
-                        {realVersions.map(v => <option key={v.id} value={v.id}>{v.name} ({v.year})</option>)}
+                        {realVersions.length > 0 && <optgroup label="Versões de Realizado">{realVersions.map(v => <option key={v.id} value={v.id}>{v.name} ({v.year})</option>)}</optgroup>}
+                        {budgetVersions.length > 0 && <optgroup label="Versões de Orçamento">{budgetVersions.map(v => <option key={v.id} value={v.id}>{v.name} ({v.year})</option>)}</optgroup>}
                     </select>
                   </div>
                   <div className="flex-1 min-w-[24px]" />

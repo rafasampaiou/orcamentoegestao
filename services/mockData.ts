@@ -525,14 +525,12 @@ export const getForecastData = (
           // Filter by versionId if applicable (ONLY FOR CURRENT YEAR)
           const isCurrentYear = (rYear === selectedYear);
           
-          if (normScenario === 'REAL' || normScenario === 'FORECAST') {
-              if (isCurrentYear && activeRealVersionId && row.versionId && row.versionId !== activeRealVersionId) return;
-          } else if (normScenario === 'BUDGET') {
-              // Be more permissive for budget data: if no versionId, allow it based on year/hotel
-              if (row.versionId && isCurrentYear) {
-                const matchesBudget = activeBudgetVersionId && row.versionId === activeBudgetVersionId;
-                const matchesReal = activeRealVersionId && row.versionId === activeRealVersionId;
-                if (!matchesBudget && !matchesReal) return;
+          // Filter by versionId: accept data matching either Real or Budget active version
+          if (row.versionId && isCurrentYear) {
+              const matchesReal = activeRealVersionId && row.versionId === activeRealVersionId;
+              const matchesBudget = activeBudgetVersionId && row.versionId === activeBudgetVersionId;
+              if (activeRealVersionId || activeBudgetVersionId) {
+                  if (!matchesReal && !matchesBudget) return;
               }
           }
 
