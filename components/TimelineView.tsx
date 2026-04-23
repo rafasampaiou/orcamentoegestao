@@ -34,7 +34,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({
   const [modalOpen, setModalOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [deleteVersionId, setDeleteVersionId] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState<{year: number, month: number} | null>(null);
+  const [selectedDate, setSelectedDate] = useState<{ year: number, month: number } | null>(null);
   const [newVersionName, setNewVersionName] = useState('');
   const [newVersionYear, setNewVersionYear] = useState(new Date().getFullYear());
   const [selectedHotelId, setSelectedHotelId] = useState('');
@@ -44,12 +44,12 @@ const TimelineView: React.FC<TimelineViewProps> = ({
     if (!showCreateOption && !onReplicateVersion) {
       return;
     }
-    
+
     if (!showCreateOption && onReplicateVersion) {
       onReplicateVersion(year, month);
       return;
     }
-    
+
     if (onReplicateVersion) {
       setModalOpen(true);
     } else {
@@ -90,7 +90,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({
   const currentYear = new Date().getFullYear();
   const minYear = Math.min(...versions.map(v => v.year), currentYear - 1);
   const maxYear = Math.max(...versions.map(v => v.year), currentYear + 3);
-  
+
   const years = Array.from({ length: maxYear - minYear + 1 }, (_, i) => minYear + i);
   const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
@@ -157,8 +157,8 @@ const TimelineView: React.FC<TimelineViewProps> = ({
               {years.map(year => (
                 <div key={`grid-${year}`} className="flex-none w-[360px] flex border-r border-gray-200 last:border-r-0">
                   {months.map((_, idx) => (
-                    <div 
-                      key={`grid-m-${idx}`} 
+                    <div
+                      key={`grid-m-${idx}`}
                       className="flex-1 border-r border-gray-100 last:border-r-0 hover:bg-gray-50 cursor-pointer group relative"
                       onClick={() => handleMonthClick(year, idx + 1)}
                       title={`Nova ação em ${months[idx]} de ${year}`}
@@ -179,7 +179,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({
                   {years.map((year, yearIdx) => {
                     const version = versionsByYear[year]?.[rowIdx];
                     if (!version) return null;
-                    
+
                     const colorClass = colors[(yearIdx + rowIdx) % colors.length];
                     const isActive = activeVersionId === version.id;
 
@@ -188,27 +188,27 @@ const TimelineView: React.FC<TimelineViewProps> = ({
                     const width = (12 - startMonth) * 30 - 8;
 
                     return (
-                      <div 
+                      <div
                         key={version.id}
-                        onClick={!showSettingsIcon ? (e) => { 
-                          e.preventDefault(); 
+                        onClick={!showSettingsIcon ? (e) => {
+                          e.preventDefault();
                           e.stopPropagation();
-                          onSelectVersion(version.id); 
+                          onSelectVersion(version.id);
                         } : undefined}
                         className={`absolute top-0 h-14 rounded shadow-sm p-2 transition-all flex flex-col justify-start ${colorClass} text-white ${isActive ? 'ring-2 ring-offset-2 ring-[#38b2ac]' : ''} ${!showSettingsIcon ? 'cursor-pointer hover:scale-[1.02] hover:shadow-md' : 'hover:opacity-95'}`}
-                        style={{ 
-                          left: `${leftOffset}px`, 
-                          width: `${width}px` 
+                        style={{
+                          left: `${leftOffset}px`,
+                          width: `${width}px`
                         }}
                       >
                         {showSettingsIcon && (
                           <div className="absolute bottom-1 right-1 z-20">
-                            <button 
+                            <button
                               type="button"
-                              onClick={(e) => { 
-                                e.preventDefault(); 
-                                e.stopPropagation(); 
-                                onSelectVersion(isActive ? '' : version.id); 
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                onSelectVersion(isActive ? '' : version.id);
                               }}
                               className={`flex items-center justify-center bg-white rounded-md p-1 shadow-md transition-all hover:scale-110 active:scale-95 ${isActive ? 'opacity-100 animate-spin-slow text-emerald-500 ring-2 ring-emerald-500' : 'opacity-80 hover:opacity-100 text-gray-700 hover:text-gray-900 border border-gray-100'}`}
                               title={isActive ? 'Desmarcar configuração' : 'Selecionar para configuração'}
@@ -224,7 +224,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({
                           </div>
                           <div className="flex items-center gap-1.5 opacity-80">
                             {onSetMain && (
-                              <button 
+                              <button
                                 onClick={(e) => { e.stopPropagation(); onSetMain(version.id); }}
                                 className={`opacity-70 hover:opacity-100 transition-opacity ${version.isMain ? 'opacity-100' : ''}`}
                                 title={version.isMain ? "Versão Principal" : "Tornar Principal"}
@@ -233,7 +233,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({
                               </button>
                             )}
                             {!onSetMain && version.isMain && <Star size={14} className="fill-white" />}
-                            <button 
+                            <button
                               onClick={(e) => { e.stopPropagation(); onToggleLock(version.id); }}
                               className="opacity-70 hover:opacity-100 transition-opacity"
                               title={version.isLocked ? "Desbloquear" : "Bloquear"}
@@ -241,7 +241,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({
                               {version.isLocked ? <Lock size={14} /> : <LockOpen size={14} />}
                             </button>
                             {onDelete && (
-                              <button 
+                              <button
                                 onClick={(e) => { e.stopPropagation(); setDeleteVersionId(version.id); }}
                                 className="opacity-70 hover:opacity-100 hover:text-red-200 transition-colors"
                                 title="Deletar"
@@ -355,32 +355,32 @@ const TimelineView: React.FC<TimelineViewProps> = ({
             <form onSubmit={handleCreateSubmit} className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nome da Versão</label>
-                <input 
-                  type="text" 
-                  value={newVersionName} 
-                  onChange={e => setNewVersionName(e.target.value)} 
-                  className="w-full border border-gray-300 rounded-md p-2 focus:ring-[#38b2ac] focus:border-[#38b2ac]" 
-                  placeholder="Ex: 2026 Oficial" 
-                  required 
-                  autoFocus 
+                <input
+                  type="text"
+                  value={newVersionName}
+                  onChange={e => setNewVersionName(e.target.value)}
+                  className="w-full border border-gray-300 rounded-md p-2 focus:ring-[#38b2ac] focus:border-[#38b2ac]"
+                  placeholder="Ex: 2026 Oficial"
+                  required
+                  autoFocus
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Ano</label>
-                <input 
-                  type="number" 
-                  value={newVersionYear} 
-                  onChange={e => setNewVersionYear(parseInt(e.target.value) || new Date().getFullYear())} 
-                  className="w-full border border-gray-300 rounded-md p-2 focus:ring-[#38b2ac] focus:border-[#38b2ac]" 
-                  required 
+                <input
+                  type="number"
+                  value={newVersionYear}
+                  onChange={e => setNewVersionYear(parseInt(e.target.value) || new Date().getFullYear())}
+                  className="w-full border border-gray-300 rounded-md p-2 focus:ring-[#38b2ac] focus:border-[#38b2ac]"
+                  required
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Empresa (Hotel)</label>
-                <select 
-                  value={selectedHotelId} 
-                  onChange={e => setSelectedHotelId(e.target.value)} 
-                  className="w-full border border-gray-300 rounded-md p-2 focus:ring-[#38b2ac] focus:border-[#38b2ac]" 
+                <select
+                  value={selectedHotelId}
+                  onChange={e => setSelectedHotelId(e.target.value)}
+                  className="w-full border border-gray-300 rounded-md p-2 focus:ring-[#38b2ac] focus:border-[#38b2ac]"
                   required
                 >
                   <option value="">Selecione um hotel...</option>
@@ -416,11 +416,11 @@ const TimelineView: React.FC<TimelineViewProps> = ({
                 <button onClick={() => setDeleteVersionId(null)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
                   Cancelar
                 </button>
-                <button 
-                  onClick={() => { 
-                    if(onDelete) onDelete(deleteVersionId); 
-                    setDeleteVersionId(null); 
-                  }} 
+                <button
+                  onClick={() => {
+                    if (onDelete) onDelete(deleteVersionId);
+                    setDeleteVersionId(null);
+                  }}
                   className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
                 >
                   Excluir
