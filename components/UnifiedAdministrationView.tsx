@@ -2490,7 +2490,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
   const handleSaveExpensesForecast = async () => {
     if (!importHotelId) return alert('Selecione um hotel');
-    const selectedVersion = realVersions.find(v => v.id === activeRealVersionId);
+    const selectedVersionId = targetRealVersionId || activeRealVersionId;
+    const selectedVersion = realVersions.find(v => v.id === selectedVersionId);
     if (!selectedVersion) return alert('Selecione uma versão');
 
     const hotelObj = hotels.find(h => h.id === importHotelId);
@@ -2531,7 +2532,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
           cr: finalCR,
           valor: String(numVal),
           status: 'valid',
-          versionId: activeRealVersionId
+          versionId: selectedVersionId
         });
       });
     });
@@ -3462,7 +3463,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl text-sm text-indigo-800">
                   <p>Importação simplificada para o **DRE Forecast**. Escolha o hotel e cole os valores mensais por pacote.</p>
                 </div>
-                <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                <div className="flex flex-wrap items-end gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
                   <div className="flex flex-col gap-1">
                     <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Hotel</label>
                     <select 
@@ -3474,10 +3475,22 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                       {hotels.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
                     </select>
                   </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Versão de Destino</label>
+                    <select 
+                        value={targetRealVersionId || activeRealVersionId}
+                        onChange={e => setTargetRealVersionId(e.target.value)}
+                        className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[200px]"
+                    >
+                        <option value="">Selecione a versão...</option>
+                        {realVersions.map(v => <option key={v.id} value={v.id}>{v.name} ({v.year})</option>)}
+                    </select>
+                  </div>
+                  <div className="flex-1 min-w-[24px]" />
                   <button 
                     onClick={handleSaveExpensesForecast}
-                    disabled={isSavingDre || !importHotelId || !activeRealVersionId}
-                    className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all flex items-center gap-2 self-end disabled:opacity-50"
+                    disabled={isSavingDre || !importHotelId || (!targetRealVersionId && !activeRealVersionId)}
+                    className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all flex items-center gap-2 disabled:opacity-50"
                   >
                     {isSavingDre ? 'Salvando...' : <><Save size={16} /> Salvar Despesas Forecast</>}
                   </button>
