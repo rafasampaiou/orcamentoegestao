@@ -64,6 +64,7 @@ const DRE_FORECAST_ROWS = [
   "Processamento de dados e TI (Martech)",
   "Processamento de dados e TI (Outros)",
   "Provisoes gerais",
+  "Provisao de servicos de terceiros temporarios",
   "Despesas com vendas e marketing",
   "Marketing",
   "Martech",

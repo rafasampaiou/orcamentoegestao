@@ -777,10 +777,13 @@ export const getForecastData = (
     // Check for special drill-down cases
     const isAdminTI = masterName === 'DESPESAS ADMINISTRATIVAS' && pkgName === 'Despesas Administrativas';
     const isSalesMkt = masterName === 'DESPESAS COM VENDAS E MARKETING' && pkgName === 'Despesas com Vendas e Marketing';
+    const isServicosTerceiros = pkgName.toUpperCase() === 'SERVIÇOS DE TERCEIROS' || pkgName.toUpperCase() === 'SERVIÇO DE TERCEIROS';
+    const isProvisoes = pkgName.toUpperCase() === 'PROVISÕES GERAIS' || pkgName.toUpperCase() === 'PROVISOES GERAIS';
+
 
     let pkgBudget = 0; let pkgReal = 0; let pkgPrevia = 0; let pkgLY = 0;
 
-    if (!isAdminTI && !isSalesMkt) {
+    if (!isAdminTI && !isSalesMkt && !isServicosTerceiros && !isProvisoes) {
        // STANDARD PACKAGE - Aggregate values directly
        pkgAccs.forEach(acc => {
           pkgBudget += getImportedValue(acc.name, selectedYear, 'Budget');
@@ -851,7 +854,49 @@ export const getForecastData = (
            });
            rows.push(generateRow(`p-drill-${masterName}-${pkgName}-${sub.label}`, pkgCode, 'Costs', `Despesas de Vendas e Marketing (${sub.label})`, subBudget, subReal, subLY, subPrevia, false, false, 2, undefined, { method: 'Fixed' }));
        });
-    }
+    } else if (isServicosTerceiros) {
+        rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', 'Serviços de Terceiros', 0, 0, 0, 0, true, false, 1));
+        const subAreas = [
+               { label: 'Servicos de terceiros temporarios', name: 'Servicos de terceiros temporarios' },
+               { label: 'Serviço de terceiros recorrente', name: 'Serviço de terceiros recorrente' },
+               { label: 'Serviços contratados de prestadores PJ - MEI', name: 'Serviços contratados de prestadores PJ - MEI' }
+        ];
+        subAreas.forEach(sub => {
+            const b = getImportedValue(sub.name, selectedYear, 'Budget');
+            const p = getImportedValue(sub.name, selectedYear, 'Previa') + getImportedValue(sub.name, selectedYear, 'Real');
+            const f = getImportedValue(sub.name, selectedYear, 'Forecast');
+            const ly = getImportedValue(sub.name, (selectedYear || 0) - 1, 'Real');
+            rows.push(generateRow(`p-drill-${masterName}-${pkgName}-${sub.name}`, pkgCode, 'Costs', sub.label, b, f, ly, p, false, false, 2, undefined, { method: 'Fixed' }));
+        });
+     } else if (isProvisoes) {
+        rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', 'Provisões Gerais', 0, 0, 0, 0, true, false, 1));
+        const keyTemp = 'Provisao de servicos de terceiros temporarios';
+        const tB = getImportedValue(keyTemp, selectedYear, 'Budget');
+        const tP = getImportedValue(keyTemp, selectedYear, 'Previa') + getImportedValue(keyTemp, selectedYear, 'Real');
+        const tF = getImportedValue(keyTemp, selectedYear, 'Forecast');
+        const tLY = getImportedValue(keyTemp, (selectedYear || 0) - 1, 'Real');
+        
+        rows.push(generateRow(`p-drill-${masterName}-${pkgName}-temporarios`, pkgCode, 'Costs', keyTemp, tB, tF, tLY, tP, false, false, 2, undefined, { method: 'Fixed' }));
+
+        let oB = 0; let oP = 0; let oF = 0; let oLY = 0;
+        
+        oB += getImportedValue('Provisoes gerais', selectedYear, 'Budget');
+        oP += getImportedValue('Provisoes gerais', selectedYear, 'Previa') + getImportedValue('Provisoes gerais', selectedYear, 'Real');
+        oF += getImportedValue('Provisoes gerais', selectedYear, 'Forecast');
+        oLY += getImportedValue('Provisoes gerais', (selectedYear || 0) - 1, 'Real');
+
+        pkgAccs.forEach(acc => {
+            if (acc.name.toLowerCase() === keyTemp.toLowerCase()) return;
+            if (acc.name.toLowerCase() === 'provisoes gerais') return;
+            
+            oB += getImportedValue(acc.name, selectedYear, 'Budget');
+            oP += getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real');
+            oF += getImportedValue(acc.name, selectedYear, 'Forecast');
+            oLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
+        });
+
+        rows.push(generateRow(`p-drill-${masterName}-${pkgName}-outras`, pkgCode, 'Costs', 'Outras provisões', oB, oF, oLY, oP, false, false, 2, undefined, { method: 'Fixed' }));
+     }
   });
 
   // 4. RESULTS
@@ -1039,6 +1084,8 @@ export const getDynamicForecastData = (
       
       const isAdminPkg = pkg.name.toUpperCase() === 'DESPESAS ADMINISTRATIVAS';
       const isSalesMktPkg = pkg.name.toUpperCase() === 'DESPESAS COM VENDAS E MARKETING';
+      const isServicosTerceirosPkg = pkg.name.toUpperCase() === 'SERVIÇOS DE TERCEIROS' || pkg.name.toUpperCase() === 'SERVIÇO DE TERCEIROS';
+      const isProvisoesPkg = pkg.name.toUpperCase() === 'PROVISÕES GERAIS' || pkg.name.toUpperCase() === 'PROVISOES GERAIS';
 
       if (isAdminPkg) {
           // --- SPECIAL CASE: ADMINISTRATIVAS ---
@@ -1127,6 +1174,55 @@ export const getDynamicForecastData = (
 
               rows.push(generateRow(`p-drill-${pkg.id}-${sub.label}`, '', 'Account', subLabel, sBudget, sReal, sLY, sPrevia, false, false, 2, undefined, { method: 'Fixed' }));
           });
+          return; // Skip normal accounts
+      }
+
+      if (isServicosTerceirosPkg) {
+          // --- SPECIAL CASE: SERVIÇOS DE TERCEIROS ---
+          const subAreas = [
+               { label: 'Servicos de terceiros temporarios', name: 'Servicos de terceiros temporarios' },
+               { label: 'Serviço de terceiros recorrente', name: 'Serviço de terceiros recorrente' },
+               { label: 'Serviços contratados de prestadores PJ - MEI', name: 'Serviços contratados de prestadores PJ - MEI' }
+          ];
+          
+          subAreas.forEach(sub => {
+              const b = getImportedValue(sub.name, selectedYear, 'Budget');
+              const p = getImportedValue(sub.name, selectedYear, 'Previa') + getImportedValue(sub.name, selectedYear, 'Real');
+              const f = getImportedValue(sub.name, selectedYear, 'Forecast');
+              const ly = getImportedValue(sub.name, (selectedYear || 0) - 1, 'Real');
+              rows.push(generateRow(`p-drill-${pkg.id}-${sub.name}`, '', 'Account', sub.label, b, f, ly, p, false, false, 2, undefined, { method: 'Fixed' }));
+          });
+          return; // Skip normal accounts
+      }
+
+      if (isProvisoesPkg) {
+          // --- SPECIAL CASE: PROVISOES GERAIS ---
+          const keyTemp = 'Provisao de servicos de terceiros temporarios';
+          const tB = getImportedValue(keyTemp, selectedYear, 'Budget');
+          const tP = getImportedValue(keyTemp, selectedYear, 'Previa') + getImportedValue(keyTemp, selectedYear, 'Real');
+          const tF = getImportedValue(keyTemp, selectedYear, 'Forecast');
+          const tLY = getImportedValue(keyTemp, (selectedYear || 0) - 1, 'Real');
+          
+          rows.push(generateRow(`p-drill-${pkg.id}-temporarios`, '', 'Account', keyTemp, tB, tF, tLY, tP, false, false, 2, undefined, { method: 'Fixed' }));
+
+          let oB = 0; let oP = 0; let oF = 0; let oLY = 0;
+          
+          oB += getImportedValue('Provisoes gerais', selectedYear, 'Budget');
+          oP += getImportedValue('Provisoes gerais', selectedYear, 'Previa') + getImportedValue('Provisoes gerais', selectedYear, 'Real');
+          oF += getImportedValue('Provisoes gerais', selectedYear, 'Forecast');
+          oLY += getImportedValue('Provisoes gerais', (selectedYear || 0) - 1, 'Real');
+
+          pkgAccs.forEach(acc => {
+              if (acc.name.toLowerCase() === keyTemp.toLowerCase()) return;
+              if (acc.name.toLowerCase() === 'provisoes gerais') return;
+              
+              oB += getImportedValue(acc.name, selectedYear, 'Budget');
+              oP += getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real');
+              oF += getImportedValue(acc.name, selectedYear, 'Forecast');
+              oLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
+          });
+
+          rows.push(generateRow(`p-drill-${pkg.id}-outras`, '', 'Account', 'Outras provisões', oB, oF, oLY, oP, false, false, 2, undefined, { method: 'Fixed' }));
           return; // Skip normal accounts
       }
 
