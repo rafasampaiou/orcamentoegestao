@@ -977,13 +977,12 @@ export const getDynamicForecastData = (
           else if (scen === 'forecast' || scen === 'projeção') normScenario = 'FORECAST';
           else return; 
           const isCurrentYear = (rYear === selectedYear);
-          if (normScenario === 'REAL' || normScenario === 'FORECAST') {
-              if (isCurrentYear && activeRealVersionId && row.versionId && row.versionId !== activeRealVersionId) return;
-          } else if (normScenario === 'BUDGET') {
-              if (row.versionId && isCurrentYear) {
-                const matchesBudget = activeBudgetVersionId && row.versionId === activeBudgetVersionId;
-                const matchesReal = activeRealVersionId && row.versionId === activeRealVersionId;
-                if (!matchesBudget && !matchesReal) return;
+          if (row.versionId && isCurrentYear) {
+              const matchesBudget = activeBudgetVersionId && row.versionId === activeBudgetVersionId;
+              const matchesReal = activeRealVersionId && row.versionId === activeRealVersionId;
+              // If the page has active versions selected, only accept rows that match one of them
+              if (activeBudgetVersionId || activeRealVersionId) {
+                  if (!matchesBudget && !matchesReal) return;
               }
           }
           const normHotel = row.hotel.trim().toUpperCase();
