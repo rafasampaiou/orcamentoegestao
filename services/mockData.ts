@@ -679,7 +679,6 @@ export const getForecastData = (
   const revAptItems = [
       { id: 'REV-APT-LAZER', code: '1.01.01', label: 'Lazer', importNames: ['Lazer', 'Receita de Apartamentos'] },
       { id: 'REV-APT-EVENTOS', code: '1.01.02', label: 'Eventos', importNames: ['Eventos', 'Receita de Apartamentos'] },
-      { id: 'REV-APT-INCLUSAS', code: '1.01.03', label: 'Receitas Inclusas na diária', importNames: ['Receitas Inclusas na diária', 'Receita de Alimentos - Incluso na diária'] },
   ];
 
   revAptItems.forEach(item => {

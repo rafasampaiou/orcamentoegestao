@@ -707,7 +707,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 const isSubGroupHeader = row.isHeader && row.indentLevel === 2;
                                 const isTotal = row.isTotal;
                                 const isBlueHighlight = blueRowIds.includes(row.id);
-                                const isSpecialRevenue = ['REV-HOSP', 'REV-EXTRA', 'REV-ISS', 'REV-APT'].includes(row.id);
+                                const isSpecialRevenue = ['REV-HOSP', 'REV-EXTRA', 'REV-ISS', 'REV-APT', 'REV-TIME'].includes(row.id);
                                 const formatType = row.rowConfig?.format || 'currency';
 
                                 const renderFinancialCells = (isHeaderOrTotal = false, customBg = "") => {
