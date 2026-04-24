@@ -903,6 +903,12 @@ export const getForecastData = (
         oF += getImportedValue('Provisoes gerais', selectedYear, 'Forecast');
         oLY += getImportedValue('Provisoes gerais', (selectedYear || 0) - 1, 'Real');
 
+        // Fallback for direct import of "Outras provisões"
+        oB += getImportedValue('Outras provisões', selectedYear, 'Budget');
+        oP += getImportedValue('Outras provisões', selectedYear, 'Previa') + getImportedValue('Outras provisões', selectedYear, 'Real');
+        oF += getImportedValue('Outras provisões', selectedYear, 'Forecast');
+        oLY += getImportedValue('Outras provisões', (selectedYear || 0) - 1, 'Real');
+
         pkgAccs.forEach(acc => {
             if (acc.name.toLowerCase() === keyTemp.toLowerCase()) return;
             if (acc.name.toLowerCase() === 'provisoes gerais') return;
