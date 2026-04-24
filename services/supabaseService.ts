@@ -161,7 +161,8 @@ export const supabaseService = {
       name: h.name,
       code: h.code,
       type: h.type as any,
-      category: h.category
+      category: h.category,
+      region: h.region
     })) as Hotel[];
   },
 
@@ -172,6 +173,7 @@ export const supabaseService = {
       code: h.code,
       type: h.type,
       category: h.category,
+      region: h.region,
       updated_at: new Date().toISOString()
     }));
 
@@ -211,6 +213,33 @@ export const supabaseService = {
   async deleteHotelCategory(id: string): Promise<void> {
     const { error } = await supabase
       .from('hotel_categories')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HOTEL REGIONS
+  // ═══════════════════════════════════════════════════════════════════════════
+  async getHotelRegions(): Promise<{id: string, name: string}[]> {
+    const { data, error } = await supabase
+      .from('hotel_regions')
+      .select('*')
+      .order('name', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async upsertHotelRegion(region: {id?: string, name: string}): Promise<void> {
+    const { error } = await supabase
+      .from('hotel_regions')
+      .upsert(region, { onConflict: 'name' });
+    if (error) throw error;
+  },
+
+  async deleteHotelRegion(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('hotel_regions')
       .delete()
       .eq('id', id);
     if (error) throw error;

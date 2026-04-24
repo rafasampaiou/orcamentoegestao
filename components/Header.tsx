@@ -12,7 +12,10 @@ interface HeaderProps {
     setSelectedHotelType: (type: string) => void;
     selectedHotelCategory: string;
     setSelectedHotelCategory: (category: string) => void;
+    selectedHotelRegion: string;
+    setSelectedHotelRegion: (region: string) => void;
     hotelCategories: {id: string, name: string}[];
+    hotelRegions: {id: string, name: string}[];
     currentModule: ModuleType;
     handleMonthChange: (direction: 'prev' | 'next') => void;
     formattedDate: string;
@@ -30,7 +33,10 @@ const Header: React.FC<HeaderProps> = ({
     setSelectedHotelType,
     selectedHotelCategory,
     setSelectedHotelCategory,
+    selectedHotelRegion,
+    setSelectedHotelRegion,
     hotelCategories,
+    hotelRegions,
     currentModule,
     handleMonthChange,
     formattedDate,
@@ -95,8 +101,33 @@ const Header: React.FC<HeaderProps> = ({
                     </select>
                 </div>
 
+                {/* Hotel Region Filter */}
+                <div className="flex items-center bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 ml-2">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase mr-2">Região</span>
+                    <select 
+                        value={selectedHotelRegion} 
+                        onChange={(e) => {
+                            setSelectedHotelRegion(e.target.value);
+                            const filtered = hotels.filter(h => 
+                                (selectedHotelType === 'Todos' || h.type === selectedHotelType) &&
+                                (selectedHotelCategory === 'Todas' || h.category === selectedHotelCategory) &&
+                                (e.target.value === 'Todas' || h.region === e.target.value)
+                            );
+                            if (filtered.length > 0 && !filtered.find(h => h.name === selectedHotel)) {
+                                setSelectedHotel(filtered[0].name);
+                            }
+                        }}
+                        className="bg-transparent text-xs font-bold text-gray-700 focus:outline-none cursor-pointer"
+                    >
+                        <option value="Todas">Todas</option>
+                        {hotelRegions.map(reg => (
+                            <option key={reg.id} value={reg.name}>{reg.name}</option>
+                        ))}
+                    </select>
+                </div>
+
                 {/* Hotel Context Selector */}
-                <div className="flex items-center bg-indigo-50 px-4 py-2.5 rounded-lg border border-indigo-100">
+                <div className="flex items-center bg-indigo-50 px-4 py-2.5 rounded-lg border border-indigo-100 ml-2">
                     <Building2Icon className="text-indigo-600 mr-2" size={18} />
                     <select 
                         value={selectedHotel} 
@@ -106,7 +137,8 @@ const Header: React.FC<HeaderProps> = ({
                         {hotels
                             .filter(h => 
                                 (selectedHotelType === 'Todos' || h.type === selectedHotelType) &&
-                                (selectedHotelCategory === 'Todas' || h.category === selectedHotelCategory)
+                                (selectedHotelCategory === 'Todas' || h.category === selectedHotelCategory) &&
+                                (selectedHotelRegion === 'Todas' || h.region === selectedHotelRegion)
                             )
                             .map(h => (
                                 <option key={h.id} value={h.name}>{h.name}</option>

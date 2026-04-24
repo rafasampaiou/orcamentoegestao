@@ -19,7 +19,7 @@ import ValidationsView from './components/ValidationsView';
 import { supabase } from './services/supabaseClient';
 import { supabaseService } from './services/supabaseService';
 import { Session } from '@supabase/supabase-js';
-import { ViewState, ImportedRow, User, Hotel, HotelCategory, CostCenter, CostPackage, Account, GMDConfiguration, ModuleType, UserRole, BudgetVersion, LaborParameters, ScheduleItem, ProjectionType, ValidationRecord, DreSection } from './types';
+import { ViewState, ImportedRow, User, Hotel, HotelCategory, HotelRegion, CostCenter, CostPackage, Account, GMDConfiguration, ModuleType, UserRole, BudgetVersion, LaborParameters, ScheduleItem, ProjectionType, ValidationRecord, DreSection } from './types';
 import { Calendar, ArrowLeft, ArrowRight, Building2 as Building2Icon, Layers } from 'lucide-react';
 import { mockUsers, mockHotels, mockCostCenters, mockPackages, mockAccounts, mockGMDConfigs } from './services/mockData';
 import { Toaster, toast } from 'react-hot-toast';
@@ -30,6 +30,7 @@ const App: React.FC = () => {
   const [selectedHotel, setSelectedHotel] = useState('Atibaia');
   const [selectedHotelType, setSelectedHotelType] = useState<string>('Todos');
   const [selectedHotelCategory, setSelectedHotelCategory] = useState<string>('Todas');
+  const [selectedHotelRegion, setSelectedHotelRegion] = useState<string>('Todas');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [authChecking, setAuthChecking] = useState(true);
@@ -185,6 +186,7 @@ const App: React.FC = () => {
   const [gmdConfigs, setGmdConfigs] = useState<GMDConfiguration[]>([]);
   const [dreConfigs, setDreConfigs] = useState<Record<string, DreSection[]>>({});
   const [hotelCategories, setHotelCategories] = useState<HotelCategory[]>([]);
+  const [hotelRegions, setHotelRegions] = useState<HotelRegion[]>([]);
 
   React.useEffect(() => {
     // We want to update the active budget version whenever the hotel changes,
@@ -258,6 +260,9 @@ const App: React.FC = () => {
         
         const remoteCategories = await supabaseService.getHotelCategories();
         if (remoteCategories && isMounted) setHotelCategories(remoteCategories);
+
+        const remoteRegions = await supabaseService.getHotelRegions();
+        if (remoteRegions && isMounted) setHotelRegions(remoteRegions);
         
         hasLoadedFromSupabase.current = true;
 
@@ -665,6 +670,8 @@ const App: React.FC = () => {
             setDreConfigs={setDreConfigs}
             hotelCategories={hotelCategories}
             setHotelCategories={setHotelCategories}
+            hotelRegions={hotelRegions}
+            setHotelRegions={setHotelRegions}
           />
         );
 
@@ -909,7 +916,10 @@ const App: React.FC = () => {
           setSelectedHotelType={setSelectedHotelType}
           selectedHotelCategory={selectedHotelCategory}
           setSelectedHotelCategory={setSelectedHotelCategory}
+          selectedHotelRegion={selectedHotelRegion}
+          setSelectedHotelRegion={setSelectedHotelRegion}
           hotelCategories={hotelCategories}
+          hotelRegions={hotelRegions}
           currentModule={currentModule}
           handleMonthChange={handleMonthChange}
           formattedDate={formattedDate}

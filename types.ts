@@ -61,9 +61,15 @@ export interface Hotel {
   name: string;
   type?: 'Hotéis próprios' | 'Hotéis administrados' | 'Administradora';
   category?: string;
+  region?: string;
 }
 
 export interface HotelCategory {
+  id: string;
+  name: string;
+}
+
+export interface HotelRegion {
   id: string;
   name: string;
 }
