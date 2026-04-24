@@ -356,6 +356,7 @@ interface UnifiedAdministrationViewProps {
   setDreConfigs: React.Dispatch<React.SetStateAction<Record<string, DreSection[]>>>;
 
   currentView: ViewState;
+  setCurrentView: (view: ViewState) => void;
 }
 
 const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
@@ -374,7 +375,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   laborParametersMap, setLaborParametersMap,
   budgetSchedule, setBudgetSchedule,
   dreConfigs, setDreConfigs,
-  currentView
+  currentView,
+  setCurrentView
 }) => {
   // Main Module Tabs
   const [mainTab, setMainTab] = useState<'real' | 'budget' | 'geral'>('real');
@@ -2567,7 +2569,10 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       if (onImportData) {
         onImportData(rowsToSave, 'append');
       }
-      alert(`Dados de despesas (${scenario === 'BUDGET' ? 'Budget' : 'Forecast'}) salvos com sucesso!`);
+      const wantToValidate = confirm(`Dados de despesas (${scenario === 'BUDGET' ? 'Budget' : 'Forecast'}) salvos com sucesso!\n\nDados salvos, clique OK para validar a importação na DRE Forecast ou Cancelar para permanecer nesta tela.`);
+      if (wantToValidate) {
+        setCurrentView('dashboard');
+      }
     } catch (e: any) {
       console.error("Save error:", e);
       alert('Erro ao persistir dados: ' + (e.message || 'Erro desconhecido'));

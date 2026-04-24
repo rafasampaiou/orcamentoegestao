@@ -639,6 +639,7 @@ const App: React.FC = () => {
             packages={packages} setPackages={setPackages}
             accounts={accounts} setAccounts={setAccounts}
             gmdConfigs={gmdConfigs} setGmdConfigs={setGmdConfigs}
+            setCurrentView={setCurrentView}
             monthStatus={monthStatus}
             setMonthStatus={setMonthStatus}
             onImportData={handleImportData}

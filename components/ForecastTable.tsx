@@ -137,6 +137,12 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         return recalculateTotals(initializedData, packages, accounts);
     });
 
+    useEffect(() => {
+        if (isMonthClosed && setActiveProjectionType && activeProjectionType !== 'Fechamento oficial') {
+            setActiveProjectionType('Fechamento oficial');
+        }
+    }, [isMonthClosed, activeProjectionType, setActiveProjectionType]);
+
     const [showDetails, setShowDetails] = useState(false);
     const [calculationBase, setCalculationBase] = useState<'forecast' | 'previa'>('forecast');
     const [kpiBasis, setKpiBasis] = useState<'with_tax' | 'no_tax'>('with_tax');
@@ -429,11 +435,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2 capitalize">
                                 Demonstrativo de Resultados (DRE) - {monthName} {selectedYear}
                             </h2>
-                            {isMonthClosed && (
-                                <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-1.5 font-black uppercase tracking-wider flex items-center gap-1.5">
-                                    <Lock size={13} /> Fechamento Oficial
-                                </div>
-                            )}
                         </div>
                         <p className="text-xs text-gray-500 mt-1">
                             Visão consolidada por plano de contas e gestão matricial ({selectedHotel}).
@@ -464,11 +465,20 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             </button>
                         </div>
 
-                        {!isMonthClosed && (
-                            <span className="flex items-center gap-1 px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold border border-emerald-200">
-                                <LockOpen size={12} /> Mês Aberto
-                            </span>
-                        )}
+                        <div className="flex flex-col">
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Versão do Forecast</span>
+                            <select
+                                value={activeProjectionType || 'Reunião de Ritmo'}
+                                onChange={(e) => setActiveProjectionType && setActiveProjectionType(e.target.value as any)}
+                                disabled={isMonthClosed}
+                                className={`border rounded-md px-2 py-1 text-xs font-bold outline-none ${isMonthClosed ? 'bg-red-50 text-red-700 border-red-200 cursor-not-allowed' : 'bg-white border-gray-300 text-gray-700 focus:ring-0 focus:border-indigo-500'}`}
+                            >
+                                <option value="Reunião de Ritmo">Reunião de Ritmo</option>
+                                <option value="FCA N1">FCA N1</option>
+                                <option value="FCA N2">FCA N2</option>
+                                <option value="Fechamento oficial">Fechamento</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div className="flex gap-3">
@@ -494,15 +504,13 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             {showDetails ? <ListFilter size={20} /> : <LayoutList size={20} />}
                             {showDetails ? 'Ocultar Contas' : 'Mostrar Contas'}
                         </button>
-                        {!isMonthClosed && (
-                            <button
-                                onClick={() => setShowValidationModal(true)}
-                                className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-md text-base font-bold"
-                            >
-                                <CheckCircle2 size={20} />
-                                Validar projeção
-                            </button>
-                        )}
+                        <button
+                            onClick={() => setShowValidationModal(true)}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-md text-base font-bold"
+                        >
+                            <CheckCircle2 size={20} />
+                            {isMonthClosed ? 'Validar fechamento' : 'Validar projeção'}
+                        </button>
                         <button className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-md text-base font-bold">
                             <Download size={20} />
                             Exportar Excel
@@ -521,7 +529,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             </div>
                             <div className="space-y-2">
                                 {[
-                                    { key: 'previa', label: isMonthClosed ? 'Fechamento Oficial' : 'Prévia' },
+                                    { key: 'previa', label: isMonthClosed ? 'Fechamento' : 'Prévia' },
                                     { key: 'real', label: 'Forecast (Real)' },
                                     { key: 'budget', label: 'Meta (Budget)' },
                                     { key: 'deltaPreviaBudget', label: 'Δ Prévia - Meta R$' },
@@ -563,7 +571,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         style={{ width: columnWidths.previa }}
                                         className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 border-l border-sky-200 group relative"
                                     >
-                                        {isMonthClosed ? 'FECHAMENTO OFICIAL' : 'PRÉVIA'}
+                                        {isMonthClosed ? 'FECHAMENTO' : 'PRÉVIA'}
                                         <div
                                             onMouseDown={(e) => handleResizeStart(e, 'previa')}
                                             className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
