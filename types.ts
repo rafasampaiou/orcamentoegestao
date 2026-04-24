@@ -60,6 +60,12 @@ export interface Hotel {
   code: string;
   name: string;
   type?: 'Hotéis próprios' | 'Hotéis administrados' | 'Administradora';
+  category?: string;
+}
+
+export interface HotelCategory {
+  id: string;
+  name: string;
 }
 
 export interface CostPackage {

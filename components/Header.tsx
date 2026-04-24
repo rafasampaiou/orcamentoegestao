@@ -10,6 +10,9 @@ interface HeaderProps {
     setSelectedHotel: (hotel: string) => void;
     selectedHotelType: string;
     setSelectedHotelType: (type: string) => void;
+    selectedHotelCategory: string;
+    setSelectedHotelCategory: (category: string) => void;
+    hotelCategories: {id: string, name: string}[];
     currentModule: ModuleType;
     handleMonthChange: (direction: 'prev' | 'next') => void;
     formattedDate: string;
@@ -25,6 +28,9 @@ const Header: React.FC<HeaderProps> = ({
     setSelectedHotel,
     selectedHotelType,
     setSelectedHotelType,
+    selectedHotelCategory,
+    setSelectedHotelCategory,
+    hotelCategories,
     currentModule,
     handleMonthChange,
     formattedDate,
@@ -64,6 +70,31 @@ const Header: React.FC<HeaderProps> = ({
                     </select>
                 </div>
 
+                {/* Hotel Category Filter */}
+                <div className="flex items-center bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 ml-2">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase mr-2">Categoria</span>
+                    <select 
+                        value={selectedHotelCategory} 
+                        onChange={(e) => {
+                            setSelectedHotelCategory(e.target.value);
+                            // Auto-select first hotel of new category (if possible)
+                            const filtered = hotels.filter(h => 
+                                (selectedHotelType === 'Todos' || h.type === selectedHotelType) &&
+                                (e.target.value === 'Todas' || h.category === e.target.value)
+                            );
+                            if (filtered.length > 0 && !filtered.find(h => h.name === selectedHotel)) {
+                                setSelectedHotel(filtered[0].name);
+                            }
+                        }}
+                        className="bg-transparent text-xs font-bold text-gray-700 focus:outline-none cursor-pointer"
+                    >
+                        <option value="Todas">Todas</option>
+                        {hotelCategories.map(cat => (
+                            <option key={cat.id} value={cat.name}>{cat.name}</option>
+                        ))}
+                    </select>
+                </div>
+
                 {/* Hotel Context Selector */}
                 <div className="flex items-center bg-indigo-50 px-4 py-2.5 rounded-lg border border-indigo-100">
                     <Building2Icon className="text-indigo-600 mr-2" size={18} />
@@ -72,9 +103,15 @@ const Header: React.FC<HeaderProps> = ({
                         onChange={(e) => setSelectedHotel(e.target.value)}
                         className="bg-transparent text-sm font-bold text-indigo-900 focus:outline-none cursor-pointer"
                     >
-                        {(selectedHotelType === 'Todos' ? hotels : hotels.filter(h => h.type === selectedHotelType)).map(h => (
-                            <option key={h.id} value={h.name}>{h.name}</option>
-                        ))}
+                        {hotels
+                            .filter(h => 
+                                (selectedHotelType === 'Todos' || h.type === selectedHotelType) &&
+                                (selectedHotelCategory === 'Todas' || h.category === selectedHotelCategory)
+                            )
+                            .map(h => (
+                                <option key={h.id} value={h.name}>{h.name}</option>
+                            ))
+                        }
                     </select>
                 </div>
             </div>

@@ -2,10 +2,11 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { getForecastData } from '../services/mockData';
 import { Plus, Trash2, X, Save, Briefcase, Pencil, Calendar, PieChart, Lock, LockOpen, Settings as SettingsIcon, Users, Search, Upload, Settings, Eye, FileText, Layout, Info, ChevronUp, GripVertical, Database, BedDouble, DollarSign, Target } from 'lucide-react';
-import { User, UserRole, CostCenter, ImportedRow, Hotel, Account, BudgetVersion, LaborParameters, ScheduleItem, ImportedCostCenter, CostPackage, GMDConfiguration, ViewState, DreSection } from '../types';
+import { User, UserRole, CostCenter, ImportedRow, Hotel, Account, BudgetVersion, LaborParameters, ScheduleItem, ImportedCostCenter, CostPackage, GMDConfiguration, ViewState, DreSection, HotelCategory } from '../types';
 import TimelineView from './TimelineView';
 import { supabaseService } from '../services/supabaseService';
 import { supabaseTemp } from '../services/supabaseClient';
+import { toast } from 'react-hot-toast';
 
 // Types for DRE Configuration state
 interface DreAccount {
@@ -357,6 +358,10 @@ interface UnifiedAdministrationViewProps {
   dreConfigs: Record<string, DreSection[]>;
   setDreConfigs: React.Dispatch<React.SetStateAction<Record<string, DreSection[]>>>;
 
+  // Hotel Categories
+  hotelCategories: HotelCategory[];
+  setHotelCategories: React.Dispatch<React.SetStateAction<HotelCategory[]>>;
+
   currentView: ViewState;
   setCurrentView: (view: ViewState) => void;
 }
@@ -377,6 +382,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   laborParametersMap, setLaborParametersMap,
   budgetSchedule, setBudgetSchedule,
   dreConfigs, setDreConfigs,
+  hotelCategories, setHotelCategories,
   currentView,
   setCurrentView
 }) => {
@@ -1229,7 +1235,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   // Form States
   const [userForm, setUserForm] = useState({ name: '', email: '', role: UserRole.PACKAGE_MANAGER, hotelId: '', password: '' });
   const [costCenterForm, setCostCenterForm] = useState({ id: '', code: '', name: '', directorate: '', department: '', type: 'CR' as 'CR' | 'PDV', hotelNames: [] as string[], hierarchicalCode: '', companyCode: '' });
-  const [hotelForm, setHotelForm] = useState({ id: '', name: '', type: '' as any });
+  const [hotelForm, setHotelForm] = useState({ id: '', name: '', type: '' as any, category: '' });
+  const [categoryForm, setCategoryForm] = useState({ name: '' });
+  const [isManagingCategories, setIsManagingCategories] = useState(false);
   const [accountForm, setAccountForm] = useState<Account>({
     id: '',
     code: '',
@@ -1321,7 +1329,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
   const openNewHotel = () => {
     setEditingId(null);
-    setHotelForm({ id: '', name: '', type: '' as any });
+    setHotelForm({ id: '', name: '', type: '' as any, category: '' });
     setActiveModal('hotel');
   };
 
@@ -1329,7 +1337,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     const h = hotels.find(i => i.id === id);
     if (h) {
       setEditingId(id);
-      setHotelForm({ id: h.id, name: h.name, type: h.type as any || '' });
+      setHotelForm({ id: h.id, name: h.name, type: h.type as any || '', category: h.category || '' });
       setActiveModal('hotel');
     }
   };
@@ -1345,7 +1353,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       id: targetId,
       name: hotelForm.name,
       code: hotelCode,
-      type: hotelForm.type || undefined
+      type: hotelForm.type || undefined,
+      category: hotelForm.category || undefined
     };
 
     try {
@@ -1372,6 +1381,35 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       alert(`Erro ao salvar hotel: ${err.message || 'Verifique sua conexão.'}`);
     } finally {
       setIsSavingRegistry(false);
+    }
+  };
+
+  const handleSaveCategory = async () => {
+    if (!categoryForm.name) return;
+    setIsSavingRegistry(true);
+    try {
+      await supabaseService.upsertHotelCategory(categoryForm);
+      const updated = await supabaseService.getHotelCategories();
+      setHotelCategories(updated);
+      setCategoryForm({ name: '' });
+      toast.success('Categoria salva!');
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro ao salvar categoria.');
+    } finally {
+      setIsSavingRegistry(false);
+    }
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    if (!confirm('Tem certeza que deseja excluir esta categoria? Hotéis vinculados ficarão sem categoria.')) return;
+    try {
+      await supabaseService.deleteHotelCategory(id);
+      setHotelCategories(prev => prev.filter(c => c.id !== id));
+      toast.success('Categoria excluída.');
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro ao excluir categoria.');
     }
   };
 
@@ -4456,6 +4494,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                           <div className="flex items-center gap-2">
                             <p className="text-xs text-gray-500">ID: {h.id}</p>
                             {h.type && <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full border border-indigo-100 font-bold">{h.type}</span>}
+                            {h.category && <span className="text-[10px] bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-100 font-bold">{h.category}</span>}
                           </div>
                         </div>
                         <div className="flex gap-2">
@@ -5293,6 +5332,27 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                   <option value="Administradora">Administradora</option>
                 </select>
               </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1 flex justify-between">
+                  Categoria do Hotel
+                  <button 
+                    onClick={() => setIsManagingCategories(true)}
+                    className="text-[10px] text-indigo-600 hover:underline font-bold"
+                  >
+                    Gerenciar Categorias
+                  </button>
+                </label>
+                <select
+                  value={hotelForm.category}
+                  onChange={e => setHotelForm({ ...hotelForm, category: e.target.value })}
+                  className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                >
+                  <option value="">Selecione a categoria...</option>
+                  {hotelCategories.map(cat => (
+                    <option key={cat.id} value={cat.name}>{cat.name}</option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div className="p-6 bg-gray-50 flex gap-3">
               <button
@@ -5492,6 +5552,61 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
             </div>
           </div>
         </div>
+      )}
+      
+      {/* CATEGORY MANAGEMENT MODAL */}
+      {isManagingCategories && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4 backdrop-blur-sm">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+                  <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-indigo-600 text-white">
+                      <h3 className="text-xl font-bold">Gerenciar Categorias</h3>
+                      <button onClick={() => setIsManagingCategories(false)} className="text-white/80 hover:text-white"><X size={24} /></button>
+                  </div>
+                  <div className="p-6 space-y-4">
+                      <div className="flex gap-2">
+                          <input 
+                            type="text" 
+                            placeholder="Nova categoria..."
+                            value={categoryForm.name}
+                            onChange={e => setCategoryForm({ name: e.target.value })}
+                            className="flex-1 p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
+                          />
+                          <button 
+                            onClick={handleSaveCategory}
+                            disabled={isSavingRegistry || !categoryForm.name}
+                            className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-indigo-700 disabled:opacity-50"
+                          >
+                              {isSavingRegistry ? '...' : <Plus size={20} />}
+                          </button>
+                      </div>
+
+                      <div className="space-y-2 max-h-60 overflow-auto pr-2">
+                          {hotelCategories.map(cat => (
+                              <div key={cat.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100">
+                                  <span className="font-semibold text-gray-700">{cat.name}</span>
+                                  <button 
+                                    onClick={() => handleDeleteCategory(cat.id)}
+                                    className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
+                                  >
+                                      <Trash2 size={16} />
+                                  </button>
+                              </div>
+                          ))}
+                          {hotelCategories.length === 0 && (
+                              <p className="text-center text-gray-400 py-4 italic text-sm">Nenhuma categoria cadastrada.</p>
+                          )}
+                      </div>
+                  </div>
+                  <div className="p-6 bg-gray-50 text-right">
+                      <button 
+                        onClick={() => setIsManagingCategories(false)}
+                        className="px-6 py-2 bg-white border border-gray-300 rounded-lg font-bold text-gray-600 hover:bg-gray-100"
+                      >
+                          Fechar
+                      </button>
+                  </div>
+              </div>
+          </div>
       )}
     </div>
   );

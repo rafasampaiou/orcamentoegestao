@@ -2,13 +2,13 @@
 import { ForecastRow, Hotel, User, UserRole, Account, CostPackage, ExpenseType, ExpenseDriver, CostCenter, GMDConfiguration, ImportedRow, ForecastConfig, DreSection, DrePackage } from '../types';
 
 export const mockHotels: Hotel[] = [
-  { id: '1', code: 'ATB', name: 'Atibaia', type: 'Hotéis próprios' },
-  { id: '2', code: 'ALX', name: 'Alexania', type: 'Hotéis próprios' },
-  { id: '3', code: 'ARX', name: 'Araxá', type: 'Hotéis próprios' },
-  { id: '4', code: 'CAE', name: 'Caeté', type: 'Hotéis próprios' },
-  { id: '5', code: 'ALG', name: 'Alegro', type: 'Hotéis próprios' },
-  { id: '6', code: 'JPA', name: 'João Pessoa', type: 'Hotéis próprios' },
-  { id: '7', code: 'ADM', name: 'Administradora', type: 'Administradora' },
+  { id: '1', code: 'ATB', name: 'Atibaia', type: 'Hotéis próprios', category: 'Resort' },
+  { id: '2', code: 'ALX', name: 'Alexania', type: 'Hotéis próprios', category: 'Resort' },
+  { id: '3', code: 'ARX', name: 'Araxá', type: 'Hotéis próprios', category: 'Hotel' },
+  { id: '4', code: 'CAE', name: 'Caeté', type: 'Hotéis próprios', category: 'Resort' },
+  { id: '5', code: 'ALG', name: 'Alegro', type: 'Hotéis próprios', category: 'Hotel' },
+  { id: '6', code: 'JPA', name: 'João Pessoa', type: 'Hotéis próprios', category: 'Hotel' },
+  { id: '7', code: 'ADM', name: 'Administradora', type: 'Administradora', category: 'Administradora' },
 ];
 
 export const mockUsers: User[] = [
