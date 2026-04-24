@@ -2532,7 +2532,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
     const targetYear = selectedVersion.year || importTargetYear;
     const dataToUse = scenario === 'BUDGET' ? dreBudgetData : dreForecastData;
-    const cenario = scenario === 'BUDGET' ? 'BUDGET' : 'FORECAST';
+    const cenario = scenario === 'BUDGET' ? 'BUDGET' : 'PREVIA';
 
     Object.entries(dataToUse).forEach(([rowLabel, months]) => {
       Object.entries(months).forEach(([month, value]) => {

@@ -131,7 +131,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         const initialData = getDynamicForecastData(forecastStructure, selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData);
 
         const initializedData = initialData.map(row => {
-            const finalPrevia = isMonthClosed ? row.real : row.previa;
+            const finalPrevia = row.previa;
             return {
                 ...row,
                 previa: finalPrevia,
@@ -252,7 +252,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         }
 
         const initializedData = newData.map(row => {
-            const finalPrevia = isMonthClosed ? row.real : row.previa;
+            const finalPrevia = row.previa;
             return {
                 ...row,
                 previa: finalPrevia,
@@ -742,50 +742,32 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     const isEditableSpecial = isSpecialEditableRow(row.id);
 
                                     if (!isIndicator && (!isHeaderOrTotal || isEditableCost || isEditableSpecial)) {
-                                        if (isMonthClosed) {
-                                            realCellContent = <span className="text-gray-800 font-medium">{formatValue(row.real, formatType)}</span>;
-                                            previaCellContent = <span className="text-gray-800 font-medium">{formatValue(row.previa, formatType)}</span>;
-                                        } else {
-                                            if (row.forecastConfig.method === 'Fixed' || isEditableCost || isEditableSpecial) {
-                                                realCellContent = (
-                                                    <FormattedInput
-                                                        inputRef={(el: any) => { inputRefs.current[`input-real-${row.id}`] = el; }}
-                                                        className={inputClass}
-                                                        value={row.real}
-                                                        formatType={formatType}
-                                                        onChange={(val: number) => handleManualValueChange(row.id, 'real', val)}
-                                                        onKeyDown={(e: any) => handleKeyDown(e, row.id, 'real')}
-                                                        onPaste={(e: any) => handlePaste(e, row.id, 'real')}
-                                                    />
-                                                );
-                                            } else {
-                                                realCellContent = (
-                                                    <div className="flex items-center justify-end gap-1 cursor-help" title={`Calculado: ${row.forecastConfig.driver} ${row.forecastConfig.operator === 'divide' ? '/' : 'x'} ${row.forecastConfig.factor}`}>
-                                                        <span className="text-orange-800 font-medium">{formatValue(row.real, formatType)}</span>
-                                                    </div>
-                                                );
-                                            }
+                                        const canEdit = !isIndicator && (row.forecastConfig.method === 'Fixed' || isEditableCost || isEditableSpecial);
+                                        const canEditPrevia = !isIndicator && ((row.previaConfig?.method || 'Fixed') === 'Fixed' || isEditableCost || isEditableSpecial);
 
-                                            if ((row.previaConfig?.method || 'Fixed') === 'Fixed' || isEditableCost || isEditableSpecial) {
-                                                previaCellContent = (
-                                                    <FormattedInput
-                                                        inputRef={(el: any) => { inputRefs.current[`input-previa-${row.id}`] = el; }}
-                                                        className={inputClass}
-                                                        value={row.previa}
-                                                        formatType={formatType}
-                                                        onChange={(val: number) => handleManualValueChange(row.id, 'previa', val)}
-                                                        onKeyDown={(e: any) => handleKeyDown(e, row.id, 'previa')}
-                                                        onPaste={(e: any) => handlePaste(e, row.id, 'previa')}
-                                                    />
-                                                );
-                                            } else {
-                                                previaCellContent = (
-                                                    <div className="flex items-center justify-end gap-1 cursor-help" title={`Calculado: ${row.previaConfig?.driver} ${row.previaConfig?.operator === 'divide' ? '/' : 'x'} ${row.previaConfig?.factor}`}>
-                                                        <span className="text-orange-800 font-medium">{formatValue(row.previa, formatType)}</span>
-                                                    </div>
-                                                );
-                                            }
-                                        }
+                                        realCellContent = (
+                                            <FormattedInput
+                                                inputRef={(el: any) => { inputRefs.current[`input-real-${row.id}`] = el; }}
+                                                className={inputClass}
+                                                value={row.real}
+                                                formatType={formatType}
+                                                onChange={(val: number) => handleManualValueChange(row.id, 'real', val)}
+                                                onKeyDown={(e: any) => handleKeyDown(e, row.id, 'real')}
+                                                onPaste={(e: any) => handlePaste(e, row.id, 'real')}
+                                            />
+                                        );
+
+                                        previaCellContent = (
+                                            <FormattedInput
+                                                inputRef={(el: any) => { inputRefs.current[`input-previa-${row.id}`] = el; }}
+                                                className={inputClass}
+                                                value={row.previa}
+                                                formatType={formatType}
+                                                onChange={(val: number) => handleManualValueChange(row.id, 'previa', val)}
+                                                onKeyDown={(e: any) => handleKeyDown(e, row.id, 'previa')}
+                                                onPaste={(e: any) => handlePaste(e, row.id, 'previa')}
+                                            />
+                                        );
                                     } else if (isIndicator) {
                                         const isInputIndicator = ['IND-1', 'IND-2', 'IND-ADULTOS', 'IND-CHD', 'IND-LZ-2', 'IND-LZ-4', 'IND-LZ-5', 'IND-EV-2', 'IND-EV-4', 'IND-EV-5'].includes(row.id);
 
