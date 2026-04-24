@@ -2959,15 +2959,59 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     if (!confirm('Tem certeza que deseja excluir esta versão? Todos os dados vinculados serão perdidos.')) return;
 
     try {
+      // Find the version being deleted to identify its paired counterpart
+      const deletedVersion = isBudget
+        ? budgetVersions.find(v => v.id === id)
+        : realVersions.find(v => v.id === id);
+
+      // Delete the selected version's financial data and record
       await supabaseService.deleteFinancialDataByVersion(id);
       await supabaseService.deleteBudgetVersion(id);
 
       if (isBudget) {
         setBudgetVersions(prev => prev.filter(v => v.id !== id));
         if (activeBudgetVersionId === id) setActiveBudgetVersionId('');
+
+        // Also delete the paired Real version (same name + year + hotelId)
+        if (deletedVersion) {
+          const pairedReal = realVersions.find(v =>
+            v.name === deletedVersion.name &&
+            v.year === deletedVersion.year &&
+            v.hotelId === deletedVersion.hotelId
+          );
+          if (pairedReal) {
+            try {
+              await supabaseService.deleteFinancialDataByVersion(pairedReal.id);
+              await supabaseService.deleteBudgetVersion(pairedReal.id);
+              setRealVersions(prev => prev.filter(v => v.id !== pairedReal.id));
+              if (activeRealVersionId === pairedReal.id) setActiveRealVersionId('');
+            } catch (pairErr) {
+              console.warn('Could not delete paired Real version:', pairErr);
+            }
+          }
+        }
       } else {
         setRealVersions(prev => prev.filter(v => v.id !== id));
         if (activeRealVersionId === id) setActiveRealVersionId('');
+
+        // Also delete the paired Budget version (same name + year + hotelId)
+        if (deletedVersion) {
+          const pairedBudget = budgetVersions.find(v =>
+            v.name === deletedVersion.name &&
+            v.year === deletedVersion.year &&
+            v.hotelId === deletedVersion.hotelId
+          );
+          if (pairedBudget) {
+            try {
+              await supabaseService.deleteFinancialDataByVersion(pairedBudget.id);
+              await supabaseService.deleteBudgetVersion(pairedBudget.id);
+              setBudgetVersions(prev => prev.filter(v => v.id !== pairedBudget.id));
+              if (activeBudgetVersionId === pairedBudget.id) setActiveBudgetVersionId('');
+            } catch (pairErr) {
+              console.warn('Could not delete paired Budget version:', pairErr);
+            }
+          }
+        }
       }
     } catch (err) {
       console.error('Failed to delete version:', err);
@@ -3590,7 +3634,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
           { id: 'revenue', label: 'Receitas', icon: DollarSign },
           { id: 'taxes', label: 'Impostos', icon: PieChart },
           { id: 'expenses', label: 'Despesas', icon: Briefcase }
-        ] as { id: 'occupancy'|'revenue'|'taxes'|'expenses', label: string, icon: any }[]).map(cat => (
+        ] as { id: 'occupancy' | 'revenue' | 'taxes' | 'expenses', label: string, icon: any }[]).map(cat => (
           <button
             key={cat.id}
             onClick={() => setBudgetImportCategory(cat.id)}

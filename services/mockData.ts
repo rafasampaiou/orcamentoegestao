@@ -526,11 +526,18 @@ export const getForecastData = (
           const isCurrentYear = (rYear === selectedYear);
           
           // Filter by versionId: accept data matching either Real or Budget active version
+          // FORECAST scenario data is only matched against Real version (not Budget)
           if (row.versionId && isCurrentYear) {
-              const matchesReal = activeRealVersionId && row.versionId === activeRealVersionId;
-              const matchesBudget = activeBudgetVersionId && row.versionId === activeBudgetVersionId;
-              if (activeRealVersionId || activeBudgetVersionId) {
-                  if (!matchesReal && !matchesBudget) return;
+              if (normScenario === 'FORECAST') {
+                  // DRE Forecast imports: versionId must match the active Real version
+                  const matchesReal = activeRealVersionId && row.versionId === activeRealVersionId;
+                  if (activeRealVersionId && !matchesReal) return;
+              } else {
+                  const matchesReal = activeRealVersionId && row.versionId === activeRealVersionId;
+                  const matchesBudget = activeBudgetVersionId && row.versionId === activeBudgetVersionId;
+                  if (activeRealVersionId || activeBudgetVersionId) {
+                      if (!matchesReal && !matchesBudget) return;
+                  }
               }
           }
 
@@ -976,11 +983,17 @@ export const getDynamicForecastData = (
           else return; 
           const isCurrentYear = (rYear === selectedYear);
           if (row.versionId && isCurrentYear) {
-              const matchesBudget = activeBudgetVersionId && row.versionId === activeBudgetVersionId;
-              const matchesReal = activeRealVersionId && row.versionId === activeRealVersionId;
-              // If the page has active versions selected, only accept rows that match one of them
-              if (activeBudgetVersionId || activeRealVersionId) {
-                  if (!matchesBudget && !matchesReal) return;
+              if (normScenario === 'FORECAST') {
+                  // DRE Forecast imports: versionId must match the active Real version only
+                  const matchesReal = activeRealVersionId && row.versionId === activeRealVersionId;
+                  if (activeRealVersionId && !matchesReal) return;
+              } else {
+                  const matchesBudget = activeBudgetVersionId && row.versionId === activeBudgetVersionId;
+                  const matchesReal = activeRealVersionId && row.versionId === activeRealVersionId;
+                  // If the page has active versions selected, only accept rows that match one of them
+                  if (activeBudgetVersionId || activeRealVersionId) {
+                      if (!matchesBudget && !matchesReal) return;
+                  }
               }
           }
           const normHotel = row.hotel.trim().toUpperCase();
