@@ -429,9 +429,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2 capitalize">
                                 Demonstrativo de Resultados (DRE) - {monthName} {selectedYear}
                             </h2>
-                            {setActiveProjectionType && activeProjectionType && (
-                                <div className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-sm rounded-lg px-3 py-1.5 font-black uppercase tracking-wider">
-                                    Fechamento oficial
+                            {isMonthClosed && (
+                                <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-1.5 font-black uppercase tracking-wider flex items-center gap-1.5">
+                                    <Lock size={13} /> Fechamento Oficial
                                 </div>
                             )}
                         </div>
@@ -464,11 +464,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             </button>
                         </div>
 
-                        {isMonthClosed ? (
-                            <span className="flex items-center gap-1 px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold border border-red-200">
-                                <Lock size={12} /> Mês Fechado
-                            </span>
-                        ) : (
+                        {!isMonthClosed && (
                             <span className="flex items-center gap-1 px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold border border-emerald-200">
                                 <LockOpen size={12} /> Mês Aberto
                             </span>
@@ -498,13 +494,15 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             {showDetails ? <ListFilter size={20} /> : <LayoutList size={20} />}
                             {showDetails ? 'Ocultar Contas' : 'Mostrar Contas'}
                         </button>
-                        <button
-                            onClick={() => setShowValidationModal(true)}
-                            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-md text-base font-bold"
-                        >
-                            <CheckCircle2 size={20} />
-                            Validar projeção
-                        </button>
+                        {!isMonthClosed && (
+                            <button
+                                onClick={() => setShowValidationModal(true)}
+                                className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-md text-base font-bold"
+                            >
+                                <CheckCircle2 size={20} />
+                                Validar projeção
+                            </button>
+                        )}
                         <button className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-md text-base font-bold">
                             <Download size={20} />
                             Exportar Excel
@@ -523,7 +521,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             </div>
                             <div className="space-y-2">
                                 {[
-                                    { key: 'previa', label: 'Prévia' },
+                                    { key: 'previa', label: isMonthClosed ? 'Fechamento Oficial' : 'Prévia' },
                                     { key: 'real', label: 'Forecast (Real)' },
                                     { key: 'budget', label: 'Meta (Budget)' },
                                     { key: 'deltaPreviaBudget', label: 'Δ Prévia - Meta R$' },
@@ -565,7 +563,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         style={{ width: columnWidths.previa }}
                                         className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 border-l border-sky-200 group relative"
                                     >
-                                        {isMonthClosed ? 'REAL' : 'PRÉVIA'}
+                                        {isMonthClosed ? 'FECHAMENTO OFICIAL' : 'PRÉVIA'}
                                         <div
                                             onMouseDown={(e) => handleResizeStart(e, 'previa')}
                                             className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
