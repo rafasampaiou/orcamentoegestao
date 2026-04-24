@@ -28,6 +28,7 @@ const App: React.FC = () => {
   const [currentModule, setCurrentModule] = useState<ModuleType>('REAL');
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
   const [selectedHotel, setSelectedHotel] = useState('Atibaia');
+  const [selectedHotelType, setSelectedHotelType] = useState<string>('Todos');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [authChecking, setAuthChecking] = useState(true);
@@ -897,6 +898,8 @@ const App: React.FC = () => {
           hotels={hotels}
           selectedHotel={selectedHotel}
           setSelectedHotel={setSelectedHotel}
+          selectedHotelType={selectedHotelType}
+          setSelectedHotelType={setSelectedHotelType}
           currentModule={currentModule}
           handleMonthChange={handleMonthChange}
           formattedDate={formattedDate}

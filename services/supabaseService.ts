@@ -156,7 +156,12 @@ export const supabaseService = {
       .select('*')
       .order('name', { ascending: true });
     if (error) throw error;
-    return (data || []) as Hotel[];
+    return (data || []).map(h => ({
+      id: h.id,
+      name: h.name,
+      code: h.code,
+      type: h.type as any
+    })) as Hotel[];
   },
 
   async upsertHotels(hotels: Hotel[]): Promise<void> {
@@ -164,6 +169,7 @@ export const supabaseService = {
       id: h.id,
       name: h.name,
       code: h.code,
+      type: h.type,
       updated_at: new Date().toISOString()
     }));
 

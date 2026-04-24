@@ -2,13 +2,13 @@
 import { ForecastRow, Hotel, User, UserRole, Account, CostPackage, ExpenseType, ExpenseDriver, CostCenter, GMDConfiguration, ImportedRow, ForecastConfig, DreSection, DrePackage } from '../types';
 
 export const mockHotels: Hotel[] = [
-  { id: '1', code: 'ATB', name: 'Atibaia' },
-  { id: '2', code: 'ALX', name: 'Alexania' },
-  { id: '3', code: 'ARX', name: 'Araxá' },
-  { id: '4', code: 'CAE', name: 'Caeté' },
-  { id: '5', code: 'ALG', name: 'Alegro' },
-  { id: '6', code: 'JPA', name: 'João Pessoa' },
-  { id: '7', code: 'ADM', name: 'Administradora' },
+  { id: '1', code: 'ATB', name: 'Atibaia', type: 'Hotéis próprios' },
+  { id: '2', code: 'ALX', name: 'Alexania', type: 'Hotéis próprios' },
+  { id: '3', code: 'ARX', name: 'Araxá', type: 'Hotéis próprios' },
+  { id: '4', code: 'CAE', name: 'Caeté', type: 'Hotéis próprios' },
+  { id: '5', code: 'ALG', name: 'Alegro', type: 'Hotéis próprios' },
+  { id: '6', code: 'JPA', name: 'João Pessoa', type: 'Hotéis próprios' },
+  { id: '7', code: 'ADM', name: 'Administradora', type: 'Administradora' },
 ];
 
 export const mockUsers: User[] = [

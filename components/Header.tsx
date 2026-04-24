@@ -8,6 +8,8 @@ interface HeaderProps {
     hotels: Hotel[];
     selectedHotel: string;
     setSelectedHotel: (hotel: string) => void;
+    selectedHotelType: string;
+    setSelectedHotelType: (type: string) => void;
     currentModule: ModuleType;
     handleMonthChange: (direction: 'prev' | 'next') => void;
     formattedDate: string;
@@ -21,6 +23,8 @@ const Header: React.FC<HeaderProps> = ({
     hotels,
     selectedHotel,
     setSelectedHotel,
+    selectedHotelType,
+    setSelectedHotelType,
     currentModule,
     handleMonthChange,
     formattedDate,
@@ -38,15 +42,37 @@ const Header: React.FC<HeaderProps> = ({
                     <Layers size={20} className={sidebarCollapsed ? "text-indigo-600" : ""} />
                 </button>
 
+                {/* Hotel Type Filter */}
+                <div className="flex items-center bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 ml-2">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase mr-2">Tipo</span>
+                    <select 
+                        value={selectedHotelType} 
+                        onChange={(e) => {
+                            setSelectedHotelType(e.target.value);
+                            // Auto-select first hotel of new type if current one doesn't match
+                            const filtered = e.target.value === 'Todos' ? hotels : hotels.filter(h => h.type === e.target.value);
+                            if (filtered.length > 0 && !filtered.find(h => h.name === selectedHotel)) {
+                                setSelectedHotel(filtered[0].name);
+                            }
+                        }}
+                        className="bg-transparent text-xs font-bold text-gray-700 focus:outline-none cursor-pointer"
+                    >
+                        <option value="Todos">Todos</option>
+                        <option value="Hotéis próprios">Próprios</option>
+                        <option value="Hotéis administrados">Administrados</option>
+                        <option value="Administradora">Administradora</option>
+                    </select>
+                </div>
+
                 {/* Hotel Context Selector */}
                 <div className="flex items-center bg-indigo-50 px-4 py-2.5 rounded-lg border border-indigo-100">
-                    <Building2Icon className="text-indigo-600 mr-2" size={20} />
+                    <Building2Icon className="text-indigo-600 mr-2" size={18} />
                     <select 
                         value={selectedHotel} 
                         onChange={(e) => setSelectedHotel(e.target.value)}
-                        className="bg-transparent text-base font-bold text-indigo-900 focus:outline-none cursor-pointer"
+                        className="bg-transparent text-sm font-bold text-indigo-900 focus:outline-none cursor-pointer"
                     >
-                        {hotels.map(h => (
+                        {(selectedHotelType === 'Todos' ? hotels : hotels.filter(h => h.type === selectedHotelType)).map(h => (
                             <option key={h.id} value={h.name}>{h.name}</option>
                         ))}
                     </select>
