@@ -130,10 +130,14 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         const forecastStructure = dreConfigs?.['Forecast'] || [];
         const initialData = getDynamicForecastData(forecastStructure, selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData);
 
-        const initializedData = initialData.map(row => ({
-            ...row,
-            previaConfig: row.previaConfig || { method: 'Fixed', manualValue: row.previa }
-        }));
+        const initializedData = initialData.map(row => {
+            const finalPrevia = isMonthClosed ? row.real : row.previa;
+            return {
+                ...row,
+                previa: finalPrevia,
+                previaConfig: row.previaConfig || { method: 'Fixed', manualValue: finalPrevia }
+            };
+        });
         return recalculateTotals(initializedData, packages, accounts);
     });
 
@@ -247,12 +251,16 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             newData = getForecastData(selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData);
         }
 
-        const initializedData = newData.map(row => ({
-            ...row,
-            previaConfig: row.previaConfig || { method: 'Fixed', manualValue: row.previa }
-        }));
+        const initializedData = newData.map(row => {
+            const finalPrevia = isMonthClosed ? row.real : row.previa;
+            return {
+                ...row,
+                previa: finalPrevia,
+                previaConfig: row.previaConfig || { method: 'Fixed', manualValue: finalPrevia }
+            };
+        });
         return recalculateTotals(initializedData, packages, accounts);
-    }, [selectedMonth, selectedYear, financialData, selectedHotel, packages, accounts, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, budgetOccupancyData, dreConfigs]);
+    }, [selectedMonth, selectedYear, financialData, selectedHotel, packages, accounts, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, budgetOccupancyData, dreConfigs, isMonthClosed]);
 
     useEffect(() => {
         setData(derivedData);
