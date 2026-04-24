@@ -431,7 +431,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             }
             if (row.isHeader) return true;
             if (!row.isHeader) {
-                if (row.id.includes('p-drill-')) return true;
                 if (showDetails) return true;
             }
             return false;
