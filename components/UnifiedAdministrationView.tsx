@@ -60,9 +60,9 @@ const DRE_FORECAST_ROWS = [
   "Serviços contratados de prestadores PJ - MEI",
   "Despesas administrativas",
   "Despesas administrativas gerais",
-  "Processamento de dados e TI (TI)",
-  "Processamento de dados e TI (Martech)",
-  "Processamento de dados e TI (Outros)",
+  "Processamentos de dados e TI (TI)",
+  "Processamentos de dados e TI (Martech)",
+  "Processamentos de dados e TI (Outros)",
   "Provisoes gerais",
   "Provisao de servicos de terceiros temporarios",
   "Despesas com vendas e marketing",
@@ -2521,9 +2521,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
     // Mapping for virtual/drill-down rows to base account + CR
     const specialMapping: Record<string, { account: string, cr?: string }> = {
-      "Processamento de dados e TI (TI)": { account: "Processamento de dados e TI", cr: "ti" },
-      "Processamento de dados e TI (Martech)": { account: "Processamento de dados e TI", cr: "martech" },
-      "Processamento de dados e TI (Outros)": { account: "Processamento de dados e TI", cr: "" },
+      "Processamentos de dados e TI (TI)": { account: "Processamentos de dados e TI", cr: "ti" },
+      "Processamentos de dados e TI (Martech)": { account: "Processamentos de dados e TI", cr: "martech" },
+      "Processamentos de dados e TI (Outros)": { account: "Processamentos de dados e TI", cr: "" },
       "Marketing": { account: "Despesas com vendas e marketing", cr: "marketing" },
       "Martech": { account: "Despesas com vendas e marketing", cr: "martech" },
       "Outros setores": { account: "Despesas com vendas e marketing", cr: "" },

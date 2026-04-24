@@ -795,6 +795,12 @@ export const getForecastData = (
           pkgReal += getImportedValue(acc.name, selectedYear, 'Forecast');
           pkgLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
        });
+       // Fallback: Also check if there's a value directly for the Package name (simplified import)
+       pkgBudget += getImportedValue(pkgName, selectedYear, 'Budget');
+       pkgPrevia += getImportedValue(pkgName, selectedYear, 'Previa') + getImportedValue(pkgName, selectedYear, 'Real');
+       pkgReal += getImportedValue(pkgName, selectedYear, 'Forecast');
+       pkgLY += getImportedValue(pkgName, (selectedYear || 0) - 1, 'Real');
+
        rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', pkgName, pkgBudget, pkgReal, pkgLY, pkgPrevia, true, false, 1));
     } else if (isAdminTI) {
        // --- DESPESAS ADMINISTRATIVAS SPECIAL DRILL DOWN ---
@@ -813,9 +819,9 @@ export const getForecastData = (
        rows.push(generateRow(`p-drill-${masterName}-${pkgName}-gerais`, pkgCode, 'Costs', 'Despesas administrativas gerais', genBudget, genReal, genLY, genPrevia, false, false, 2, undefined, { method: 'Fixed' }));
 
        const subAreas = [
-           { label: 'Tech', cr: 'martech' },
+           { label: 'TI', cr: 'martech' },
            { label: 'Martech', cr: 'marketing' },
-           { label: 'Outras áreas', cr: 'OTHER_EXCEPT_MKT_MAR' }
+           { label: 'Outros setores', cr: 'OTHER_EXCEPT_MKT_MAR' }
        ];
        const tiAccs = pkgAccs.filter(acc => acc.name.toLowerCase().includes(tiAccountKeyword));
        if (tiAccs.length > 0) {
@@ -828,7 +834,7 @@ export const getForecastData = (
                    let sLY = getImportedValue(tiAcc.name, (selectedYear || 0) - 1, 'Real', sub.cr);
                    
                    // Fallback for "Tech" if "martech" CR is empty - try "ti"
-                   if (sub.label === 'Tech' && sB === 0 && sP === 0 && sR === 0) {
+                   if (sub.label === 'TI' && sB === 0 && sP === 0 && sR === 0) {
                        sB = getImportedValue(tiAcc.name, selectedYear, 'Budget', 'ti');
                        sP = getImportedValue(tiAcc.name, selectedYear, 'Previa', 'ti') + getImportedValue(tiAcc.name, selectedYear, 'Real', 'ti');
                        sR = getImportedValue(tiAcc.name, selectedYear, 'Forecast', 'ti');
@@ -842,11 +848,11 @@ export const getForecastData = (
        }
     } else if (isSalesMkt) {
        // --- DESPESAS DE VENDAS E MARKETING SPECIAL DRILL DOWN ---
-       rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', 'Despesas de Vendas e Marketing', 0, 0, 0, 0, true, false, 1));
+       rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', 'Despesas com Vendas e Marketing', 0, 0, 0, 0, true, false, 1));
        const subAreas = [
            { label: 'Martech', cr: 'martech' },
            { label: 'Marketing', cr: 'marketing' },
-           { label: 'Outras áreas', cr: 'OTHER_EXCEPT_MKT_MAR' }
+           { label: 'Outros setores', cr: 'OTHER_EXCEPT_MKT_MAR' }
        ];
        subAreas.forEach(sub => {
            let subBudget = 0; let subReal = 0; let subPrevia = 0; let subLY = 0;
@@ -856,7 +862,15 @@ export const getForecastData = (
                subReal += getImportedValue(acc.name, selectedYear, 'Forecast', sub.cr);
                subLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real', sub.cr);
            });
-           rows.push(generateRow(`p-drill-${masterName}-${pkgName}-${sub.label}`, pkgCode, 'Costs', `Despesas de Vendas e Marketing (${sub.label})`, subBudget, subReal, subLY, subPrevia, false, false, 2, undefined, { method: 'Fixed' }));
+            // Fallback for "Outros setores" category if something was imported directly for the package
+            if (sub.cr === 'OTHER_EXCEPT_MKT_MAR') {
+                subBudget += getImportedValue(pkgName, selectedYear, 'Budget');
+                subPrevia += getImportedValue(pkgName, selectedYear, 'Previa') + getImportedValue(pkgName, selectedYear, 'Real');
+                subReal += getImportedValue(pkgName, selectedYear, 'Forecast');
+                subLY += getImportedValue(pkgName, (selectedYear || 0) - 1, 'Real');
+            }
+
+            rows.push(generateRow(`p-drill-${masterName}-${pkgName}-${sub.label}`, pkgCode, 'Costs', `Despesas com Vendas e Marketing (${sub.label})`, subBudget, subReal, subLY, subPrevia, false, false, 2, undefined, { method: 'Fixed' }));
        });
     } else if (isServicosTerceiros) {
         rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', 'Serviços de Terceiros', 0, 0, 0, 0, true, false, 1));
@@ -1115,9 +1129,9 @@ export const getDynamicForecastData = (
           const tiAccounts = pkgAccs.filter(acc => acc.name.toLowerCase().includes(tiAccountKeyword));
           if (tiAccounts.length > 0) {
               const subAreas = [
-                  { label: 'Tech', cr: 'martech' },
+                  { label: 'TI', cr: 'martech' },
                   { label: 'Martech', cr: 'marketing' },
-                  { label: 'Outras áreas', cr: 'OTHER_EXCEPT_MKT_MAR' }
+                  { label: 'Outros setores', cr: 'OTHER_EXCEPT_MKT_MAR' }
               ];
               subAreas.forEach(sub => {
                   const subLabel = `Processamentos de dados e TI (${sub.label})`;
@@ -1131,7 +1145,7 @@ export const getDynamicForecastData = (
                       let ly = getImportedValue(tiAcc.name, (selectedYear || 0) - 1, 'Real', sub.cr);
 
                       // Fallback for Tech -> try 'ti' CR
-                      if (sub.label === 'Tech' && b === 0 && (p + r + f) === 0) {
+                      if (sub.label === 'TI' && b === 0 && (p + r + f) === 0) {
                           b = getImportedValue(tiAcc.name, selectedYear, 'Budget', 'ti');
                           p = getImportedValue(tiAcc.name, selectedYear, 'Previa', 'ti');
                           r = getImportedValue(tiAcc.name, selectedYear, 'Real', 'ti');
@@ -1159,10 +1173,10 @@ export const getDynamicForecastData = (
           const subAreas = [
               { label: 'Martech', cr: 'martech' },
               { label: 'Marketing', cr: 'marketing' },
-              { label: 'Outras áreas', cr: 'OTHER_EXCEPT_MKT_MAR' }
+              { label: 'Outros setores', cr: 'OTHER_EXCEPT_MKT_MAR' }
           ];
           subAreas.forEach(sub => {
-              const subLabel = `Despesas de Vendas e Marketing (${sub.label})`;
+              const subLabel = `Despesas com Vendas e Marketing (${sub.label})`;
               
               let sBudget = 0; let sPrevia = 0; let sLY = 0; let sReal = 0;
               
@@ -1179,6 +1193,14 @@ export const getDynamicForecastData = (
                   sReal += f;
                   sLY += ly;
                 });
+              }
+
+              // Fallback for "Outros setores" if something was imported directly for the package
+              if (sub.cr === 'OTHER_EXCEPT_MKT_MAR') {
+                  sBudget += getImportedValue(pkg.name, selectedYear, 'Budget');
+                  sPrevia += getImportedValue(pkg.name, selectedYear, 'Previa') + getImportedValue(pkg.name, selectedYear, 'Real');
+                  sReal += getImportedValue(pkg.name, selectedYear, 'Forecast');
+                  sLY += getImportedValue(pkg.name, (selectedYear || 0) - 1, 'Real');
               }
 
               rows.push(generateRow(`p-drill-${pkg.id}-${sub.label}`, '', 'Account', subLabel, sBudget, sReal, sLY, sPrevia, false, false, 2, undefined, { method: 'Fixed' }));
