@@ -59,6 +59,7 @@ export interface Hotel {
   id: string;
   code: string;
   name: string;
+  type?: 'Hotéis próprios' | 'Hotéis administrados' | 'Administradora';
 }
 
 export interface CostPackage {

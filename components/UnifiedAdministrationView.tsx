@@ -1229,7 +1229,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   // Form States
   const [userForm, setUserForm] = useState({ name: '', email: '', role: UserRole.PACKAGE_MANAGER, hotelId: '', password: '' });
   const [costCenterForm, setCostCenterForm] = useState({ id: '', code: '', name: '', directorate: '', department: '', type: 'CR' as 'CR' | 'PDV', hotelNames: [] as string[], hierarchicalCode: '', companyCode: '' });
-  const [hotelForm, setHotelForm] = useState({ id: '', name: '' });
+  const [hotelForm, setHotelForm] = useState({ id: '', name: '', type: '' as any });
   const [accountForm, setAccountForm] = useState<Account>({
     id: '',
     code: '',
@@ -1321,7 +1321,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
   const openNewHotel = () => {
     setEditingId(null);
-    setHotelForm({ id: '', name: '' });
+    setHotelForm({ id: '', name: '', type: '' as any });
     setActiveModal('hotel');
   };
 
@@ -1329,7 +1329,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     const h = hotels.find(i => i.id === id);
     if (h) {
       setEditingId(id);
-      setHotelForm({ id: h.id, name: h.name });
+      setHotelForm({ id: h.id, name: h.name, type: h.type as any || '' });
       setActiveModal('hotel');
     }
   };
@@ -1344,7 +1344,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     const newHotel: Hotel = {
       id: targetId,
       name: hotelForm.name,
-      code: hotelCode
+      code: hotelCode,
+      type: hotelForm.type || undefined
     };
 
     try {
@@ -4452,7 +4453,10 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                       <div key={h.id} className="p-4 border border-gray-200 rounded-xl bg-gray-50 flex justify-between items-center">
                         <div>
                           <p className="font-bold text-gray-900">{h.name}</p>
-                          <p className="text-xs text-gray-500">ID: {h.id}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs text-gray-500">ID: {h.id}</p>
+                            {h.type && <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full border border-indigo-100 font-bold">{h.type}</span>}
+                          </div>
                         </div>
                         <div className="flex gap-2">
                           <button onClick={() => openEditHotel(h.id)} className="p-1.5 text-gray-400 hover:text-indigo-600"><Pencil size={16} /></button>
@@ -5275,6 +5279,19 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                   placeholder="Nome do Hotel"
                   className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Tipo de Hotel</label>
+                <select
+                  value={hotelForm.type}
+                  onChange={e => setHotelForm({ ...hotelForm, type: e.target.value as any })}
+                  className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                >
+                  <option value="">Selecione o tipo...</option>
+                  <option value="Hotéis próprios">Hotéis próprios</option>
+                  <option value="Hotéis administrados">Hotéis administrados</option>
+                  <option value="Administradora">Administradora</option>
+                </select>
               </div>
             </div>
             <div className="p-6 bg-gray-50 flex gap-3">
