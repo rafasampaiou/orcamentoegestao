@@ -361,6 +361,7 @@ export interface BudgetVersion {
     occupancyData?: Record<string, number[]>;
     laborData?: Record<string, any>;
     extraRevenueData?: any[];
+    closedMonths?: number[];
 }
 
 export interface LaborParameters {

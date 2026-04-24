@@ -331,8 +331,7 @@ interface UnifiedAdministrationViewProps {
   gmdConfigs: GMDConfiguration[]; setGmdConfigs: React.Dispatch<React.SetStateAction<GMDConfiguration[]>>;
 
   // Month Management
-  monthStatus: Record<string, 'open' | 'closed'>;
-  setMonthStatus: React.Dispatch<React.SetStateAction<Record<string, 'open' | 'closed'>>>;
+  onToggleMonthClosure?: (month: number) => void;
 
   // Budget Versioning
   budgetVersions: BudgetVersion[];
@@ -378,7 +377,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   packages, setPackages,
   accounts, setAccounts,
   gmdConfigs, setGmdConfigs,
-  monthStatus, setMonthStatus,
+  onToggleMonthClosure,
   budgetVersions, setBudgetVersions,
   activeBudgetVersionId, setActiveBudgetVersionId,
   realVersions, setRealVersions,
@@ -4195,12 +4194,14 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                   {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => {
                     const yearOfVersion = selectedRealVersion?.year || realFilterYear;
-                    const key = `${yearOfVersion}-${String(m).padStart(2, '0')}`;
-                    const isClosed = monthStatus[key] === 'closed';
+                    const isClosed = selectedRealVersion?.closedMonths?.includes(m) || false;
                     return (
                       <div key={m} className={`p-4 rounded-lg border flex items-center justify-between ${isClosed ? 'bg-gray-50 border-gray-200' : 'bg-indigo-50/30 border-indigo-100'}`}>
                         <span className="font-bold text-gray-700 capitalize">{new Date(yearOfVersion, m - 1).toLocaleString('pt-BR', { month: 'long' })}</span>
-                        <button onClick={() => setMonthStatus(prev => ({ ...prev, [key]: isClosed ? 'open' : 'closed' }))} className={`p-2 rounded-md ${isClosed ? 'bg-gray-200 text-gray-600' : 'bg-indigo-600 text-white'}`}>
+                        <button 
+                          onClick={() => onToggleMonthClosure && onToggleMonthClosure(m)} 
+                          className={`p-2 rounded-md ${isClosed ? 'bg-emerald-600 text-white' : 'bg-indigo-600 text-white'}`}
+                        >
                           {isClosed ? <Lock size={18} /> : <LockOpen size={18} />}
                         </button>
                       </div>

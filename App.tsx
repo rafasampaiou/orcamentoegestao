@@ -118,11 +118,32 @@ const App: React.FC = () => {
 
   // Month Status State (New)
   // Record<"YYYY-MM", "open" | "closed">
-  const [monthStatus, setMonthStatus] = useState<Record<string, 'open' | 'closed'>>({});
-
   const getIsMonthClosed = (year: number, month: number) => {
-    const key = `${year}-${String(month).padStart(2, '0')}`;
-    return monthStatus[key] === 'closed';
+    const version = realVersions.find(v => v.id === activeRealVersionId);
+    if (!version) return false;
+    return version.closedMonths?.includes(month) || false;
+  };
+
+  const isClosed = getIsMonthClosed(selectedDate.getFullYear(), selectedDate.getMonth() + 1);
+
+  const handleToggleMonthClosure = async (month: number) => {
+    const version = realVersions.find(v => v.id === activeRealVersionId);
+    if (!version) return;
+
+    const currentClosed = version.closedMonths || [];
+    const newClosed = currentClosed.includes(month)
+      ? currentClosed.filter(m => m !== month)
+      : [...currentClosed, month];
+    
+    const updatedVersion = { ...version, closedMonths: newClosed };
+    
+    setRealVersions(prev => prev.map(v => v.id === version.id ? updatedVersion : v));
+    
+    try {
+      await supabaseService.upsertBudgetVersion(updatedVersion);
+    } catch (e) {
+      console.error('Falha ao salvar fechamento de mês', e);
+    }
   };
 
   // Financial Data State (Source of Truth)
@@ -513,7 +534,13 @@ const App: React.FC = () => {
               setActiveRealVersionId(id);
               setCurrentView('dashboard');
             }}
-            onToggleLock={(id) => setRealVersions(prev => prev.map(bv => bv.id === id ? { ...bv, isLocked: !bv.isLocked } : bv))}
+            onToggleLock={async (id) => {
+              const version = realVersions.find(v => v.id === id);
+              if (!version) return;
+              const updated = { ...version, isLocked: !version.isLocked };
+              setRealVersions(prev => prev.map(bv => bv.id === id ? updated : bv));
+              try { await supabaseService.upsertBudgetVersion(updated); } catch(e) { console.error(e); }
+            }}
             onCreateVersion={() => { }} // Disabled as we use replication only
             onReplicateVersion={(year, month) => {
               setReplicateTarget({ year, month });
@@ -521,7 +548,16 @@ const App: React.FC = () => {
               setReplicateModalOpen(true);
             }}
             showCreateOption={false}
-            onSetMain={(id) => setRealVersions(prev => prev.map(v => ({ ...v, isMain: v.id === id })))}
+            onSetMain={async (id) => {
+              const newVersions = realVersions.map(v => ({ ...v, isMain: v.id === id }));
+              setRealVersions(newVersions);
+              try {
+                // Persist all changes (since isMain changed for potentially two versions)
+                for (const v of newVersions) {
+                    await supabaseService.upsertBudgetVersion(v);
+                }
+              } catch(e) { console.error(e); }
+            }}
             onDelete={async (id) => {
               try {
                 await supabaseService.deleteBudgetVersion(id);
@@ -651,8 +687,7 @@ const App: React.FC = () => {
             accounts={accounts} setAccounts={setAccounts}
             gmdConfigs={gmdConfigs} setGmdConfigs={setGmdConfigs}
             setCurrentView={setCurrentView}
-            monthStatus={monthStatus}
-            setMonthStatus={setMonthStatus}
+            onToggleMonthClosure={handleToggleMonthClosure}
             onImportData={handleImportData}
             budgetVersions={budgetVersions}
             setBudgetVersions={setBudgetVersions}

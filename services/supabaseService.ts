@@ -303,6 +303,7 @@ export const supabaseService = {
       occupancyData: v.occupancy_data,
       laborData: v.labor_data,
       extraRevenueData: v.extra_revenue_data,
+      closedMonths: v.closed_months || [],
       createdAt: v.created_at,
       updatedAt: v.updated_at
     })) as BudgetVersion[];
@@ -320,6 +321,7 @@ export const supabaseService = {
       occupancy_data: version.occupancyData || {},
       labor_data: version.laborData || {},
       extra_revenue_data: version.extraRevenueData || [],
+      closed_months: version.closedMonths || [],
       updated_at: new Date().toISOString()
     };
 
