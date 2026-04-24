@@ -660,7 +660,7 @@ export const getForecastData = (
 
   rows.push(generateRow('IND-1', '', 'Indicators', 'UH Disponível', gAvailBudget, gAvailReal, 100, 0, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
   rows.push(generateRow('IND-2', '', 'Indicators', 'UH Ocupada', gOccBudget, gOccReal, 70, 0, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
-  rows.push(generateRow('IND-3', '', 'Indicators', '% Ocupação', gOccPctBudget, gAvailReal > 0 ? (gOccReal / gAvailReal) * 100 : 0, 70, 0, false, false, 0, undefined, { format: 'percent' }, 'INDICADORES GERAIS'));
+  rows.push(generateRow('IND-3', '', 'Indicators', '% de Ocupação', gOccPctBudget, gAvailReal > 0 ? (gOccReal / gAvailReal) * 100 : 0, 70, 0, false, false, 0, undefined, { format: 'percent' }, 'INDICADORES GERAIS'));
   rows.push(generateRow('IND-4', '', 'Indicators', 'DM Bruta', dmBudget, 850, 800, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
   rows.push(generateRow('IND-5', '', 'Indicators', 'PAX', gPaxBudget, gPaxReal, 190, 0, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
   rows.push(generateRow('IND-ADULTOS', '', 'Indicators', 'Adultos', gAdultsBudget, gAdultsReal, 140, 0, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
@@ -1137,10 +1137,10 @@ export const getDynamicForecastData = (
               const subAreas = [
                   { label: 'TI', cr: 'martech' },
                   { label: 'Martech', cr: 'marketing' },
-                  { label: 'Outros setores', cr: 'OTHER_EXCEPT_MKT_MAR' }
+                  { label: 'Outros', cr: 'OTHER_EXCEPT_MKT_MAR' }
               ];
               subAreas.forEach(sub => {
-                  const subLabel = `Processamentos de dados e TI (${sub.label})`;
+                  const subLabel = `Processamento de dados e TI (${sub.label})`;
                   let accBudget = 0; let accPrevia = 0; let accLY = 0; let accReal = 0;
                   
                   tiAccounts.forEach(tiAcc => {
