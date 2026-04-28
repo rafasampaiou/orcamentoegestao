@@ -2,22 +2,22 @@
 import { ForecastRow, Hotel, User, UserRole, Account, CostPackage, ExpenseType, ExpenseDriver, CostCenter, GMDConfiguration, ImportedRow, ForecastConfig, DreSection, DrePackage } from '../types';
 
 export const mockHotels: Hotel[] = [
-  { id: '1', code: 'ATB', name: 'Atibaia', type: 'Hotéis próprios', category: 'Resort', region: 'Sudeste' },
-  { id: '2', code: 'ALX', name: 'Alexania', type: 'Hotéis próprios', category: 'Resort', region: 'Centro-Oeste' },
-  { id: '3', code: 'ARX', name: 'Araxá', type: 'Hotéis próprios', category: 'Hotel', region: 'Sudeste' },
-  { id: '4', code: 'CAE', name: 'Caeté', type: 'Hotéis próprios', category: 'Resort', region: 'Sudeste' },
-  { id: '5', code: 'ALG', name: 'Alegro', type: 'Hotéis próprios', category: 'Hotel', region: 'Sudeste' },
-  { id: '6', code: 'JPA', name: 'João Pessoa', type: 'Hotéis próprios', category: 'Hotel', region: 'Nordeste' },
-  { id: '7', code: 'ADM', name: 'Administradora', type: 'Administradora', category: 'Administradora', region: 'Sudeste' },
+    { id: '1', code: 'ATB', name: 'Atibaia', type: 'Hotéis próprios', category: 'Resort', region: 'Sudeste' },
+    { id: '2', code: 'ALX', name: 'Alexania', type: 'Hotéis próprios', category: 'Resort', region: 'Centro-Oeste' },
+    { id: '3', code: 'ARX', name: 'Araxá', type: 'Hotéis próprios', category: 'Hotel', region: 'Sudeste' },
+    { id: '4', code: 'CAE', name: 'Caeté', type: 'Hotéis próprios', category: 'Resort', region: 'Sudeste' },
+    { id: '5', code: 'ALG', name: 'Alegro', type: 'Hotéis próprios', category: 'Hotel', region: 'Sudeste' },
+    { id: '6', code: 'JPA', name: 'João Pessoa', type: 'Hotéis próprios', category: 'Hotel', region: 'Nordeste' },
+    { id: '7', code: 'ADM', name: 'Administradora', type: 'Administradora', category: 'Administradora', region: 'Sudeste' },
 ];
 
 export const mockUsers: User[] = [
-  { id: 'u1', name: 'Carlos Silva', email: 'carlos@hotel.com', role: UserRole.ENTITY_MANAGER, hotelId: '1' },
-  { id: 'u2', name: 'Ana Souza', email: 'ana@hotel.com', role: UserRole.PACKAGE_MANAGER, hotelId: '1' },
-  { id: 'u3', name: 'Roberto Lima', email: 'roberto@hotel.com', role: UserRole.AREA_MANAGER, hotelId: '7' },
-  { id: 'u4', name: 'Fernanda RH', email: 'fernanda@hotel.com', role: UserRole.PACKAGE_MANAGER, hotelId: '1' },
-  { id: 'u5', name: 'João Manutenção', email: 'joao@hotel.com', role: UserRole.PACKAGE_MANAGER, hotelId: '2' },
-  { id: 'u6', name: 'Marcos MKT', email: 'marcos@hotel.com', role: UserRole.PACKAGE_MANAGER, hotelId: '7' },
+    { id: 'u1', name: 'Carlos Silva', email: 'carlos@hotel.com', role: UserRole.ENTITY_MANAGER, hotelId: '1' },
+    { id: 'u2', name: 'Ana Souza', email: 'ana@hotel.com', role: UserRole.PACKAGE_MANAGER, hotelId: '1' },
+    { id: 'u3', name: 'Roberto Lima', email: 'roberto@hotel.com', role: UserRole.AREA_MANAGER, hotelId: '7' },
+    { id: 'u4', name: 'Fernanda RH', email: 'fernanda@hotel.com', role: UserRole.PACKAGE_MANAGER, hotelId: '1' },
+    { id: 'u5', name: 'João Manutenção', email: 'joao@hotel.com', role: UserRole.PACKAGE_MANAGER, hotelId: '2' },
+    { id: 'u6', name: 'Marcos MKT', email: 'marcos@hotel.com', role: UserRole.PACKAGE_MANAGER, hotelId: '7' },
 ];
 
 // Expanded Cost Centers list based on user provided data
@@ -337,7 +337,7 @@ const generateMockData = () => {
     const packages: CostPackage[] = [];
     const accounts: Account[] = [];
     const managers = ['u1', 'u2', 'u3', 'u4', 'u5', 'u6'];
-    
+
     const packageMap = new Map<string, string>(); // Name -> ID
 
     USALI_STRUCTURE.forEach((item, index) => {
@@ -378,103 +378,103 @@ export const mockGMDConfigs: GMDConfiguration[] = [
         id: 'gmd1',
         hotelId: '1',
         entityManagerIds: ['u1'],
-        packageId: mockPackages[0].id, 
+        packageId: mockPackages[0].id,
         packageManagerId: 'u2',
         supportUserIds: ['u4'],
         linkedAccountIds: mockAccounts.filter(a => a.packageId === mockPackages[0].id).slice(0, 5).map(a => a.id),
-        costCenterIds: ['cr2'], 
-        accountManagerId: 'u3' 
+        costCenterIds: ['cr2'],
+        accountManagerId: 'u3'
     }
 ];
 
 // --- FORECAST GENERATION ---
 
 const generateRow = (
-  id: string, 
-  accountCode: string,
-  category: string, 
-  label: string, 
-  budgetVal: number,
-  realVal: number,
-  lastYearVal: number,
-  previaVal: number = 0, // NEW: Previa Value
-  isHeader = false, 
-  isTotal = false, 
-  indentLevel = 0,
-  gmdManagerName?: string,
-  config?: { type?: ExpenseType, driver?: ExpenseDriver, taxRate?: number, inputType?: 'expense' | 'tax' | 'none', format?: 'currency' | 'percent' | 'integer' | 'decimal', method?: 'Fixed' | 'Variable', factor?: number },
-  indicatorSection?: string,
-  dreConfig?: { 
-    isCalculated?: boolean, 
-    formula?: string, 
-    textColor?: string, 
-    bgColor?: string, 
-    isBold?: boolean, 
-    isItalic?: boolean 
-  }
+    id: string,
+    accountCode: string,
+    category: string,
+    label: string,
+    budgetVal: number,
+    realVal: number,
+    lastYearVal: number,
+    previaVal: number = 0, // NEW: Previa Value
+    isHeader = false,
+    isTotal = false,
+    indentLevel = 0,
+    gmdManagerName?: string,
+    config?: { type?: ExpenseType, driver?: ExpenseDriver, taxRate?: number, inputType?: 'expense' | 'tax' | 'none', format?: 'currency' | 'percent' | 'integer' | 'decimal', method?: 'Fixed' | 'Variable', factor?: number },
+    indicatorSection?: string,
+    dreConfig?: {
+        isCalculated?: boolean,
+        formula?: string,
+        textColor?: string,
+        bgColor?: string,
+        isBold?: boolean,
+        isItalic?: boolean
+    }
 ): ForecastRow => {
-  
-  const budget = budgetVal || 0;
-  const real = realVal || 0; 
-  const lastYear = lastYearVal || 0;
-  const previa = previaVal || 0;
 
-  const deltaBudgetVal = real - budget;
-  const deltaBudgetPct = budget === 0 ? 0 : ((real - budget) / budget) * 100;
-  
-  const deltaPreviaVal = real - previa;
-  const deltaPreviaPct = previa === 0 ? 0 : ((real - previa) / previa) * 100;
+    const budget = budgetVal || 0;
+    const real = realVal || 0;
+    const lastYear = lastYearVal || 0;
+    const previa = previaVal || 0;
 
-  // Initialize Default Forecast Config
-  const forecastConfig: ForecastConfig = {
-      method: config?.method || 'Fixed',
-      driver: config?.driver,
-      factor: config?.factor,
-      manualValue: real // Initialize manual value with the "Real" passed in
-  };
+    const deltaBudgetVal = real - budget;
+    const deltaBudgetPct = budget === 0 ? 0 : ((real - budget) / budget) * 100;
 
-  return {
-    id,
-    accountCode,
-    category,
-    label,
-    isHeader,
-    isTotal,
-    indentLevel, 
-    real,
-    budget,
-    lastYear,
-    previa,
-    gmdManagerName,
-    deltaBudgetVal,
-    deltaBudgetPct,
-    deltaLYVal: real - lastYear,
-    deltaLYPct: lastYear === 0 ? 0 : ((real - lastYear) / lastYear) * 100,
-    deltaPreviaVal,
-    deltaPreviaPct,
-    indicatorSection, // NEW field
-    forecastConfig, // NEW Unified Config
-    rowConfig: config ? {
-      inputType: config.inputType || 'none',
-      expenseType: config.type,
-      expenseDriver: config.driver,
-      taxRate: config.taxRate,
-      format: config.format || 'currency'
-    } : { inputType: 'none', format: 'currency' },
+    const deltaPreviaVal = real - previa;
+    const deltaPreviaPct = previa === 0 ? 0 : ((real - previa) / previa) * 100;
 
-    // Intelligent DRE fields
-    isCalculated: dreConfig?.isCalculated,
-    formula: dreConfig?.formula,
-    textColor: dreConfig?.textColor,
-    bgColor: dreConfig?.bgColor,
-    isBold: dreConfig?.isBold,
-    isItalic: dreConfig?.isItalic
-  };
+    // Initialize Default Forecast Config
+    const forecastConfig: ForecastConfig = {
+        method: config?.method || 'Fixed',
+        driver: config?.driver,
+        factor: config?.factor,
+        manualValue: real // Initialize manual value with the "Real" passed in
+    };
+
+    return {
+        id,
+        accountCode,
+        category,
+        label,
+        isHeader,
+        isTotal,
+        indentLevel,
+        real,
+        budget,
+        lastYear,
+        previa,
+        gmdManagerName,
+        deltaBudgetVal,
+        deltaBudgetPct,
+        deltaLYVal: real - lastYear,
+        deltaLYPct: lastYear === 0 ? 0 : ((real - lastYear) / lastYear) * 100,
+        deltaPreviaVal,
+        deltaPreviaPct,
+        indicatorSection, // NEW field
+        forecastConfig, // NEW Unified Config
+        rowConfig: config ? {
+            inputType: config.inputType || 'none',
+            expenseType: config.type,
+            expenseDriver: config.driver,
+            taxRate: config.taxRate,
+            format: config.format || 'currency'
+        } : { inputType: 'none', format: 'currency' },
+
+        // Intelligent DRE fields
+        isCalculated: dreConfig?.isCalculated,
+        formula: dreConfig?.formula,
+        textColor: dreConfig?.textColor,
+        bgColor: dreConfig?.bgColor,
+        isBold: dreConfig?.isBold,
+        isItalic: dreConfig?.isItalic
+    };
 };
 
 export const getForecastData = (
-    selectedMonth?: number, 
-    selectedYear?: number, 
+    selectedMonth?: number,
+    selectedYear?: number,
     importedData: ImportedRow[] = [],
     selectedHotelName?: string,
     currentHotels: Hotel[] = mockHotels,
@@ -485,494 +485,494 @@ export const getForecastData = (
     currentPackages: CostPackage[] = mockPackages,
     budgetOccupancyData: Record<string, number[]> = {}
 ): ForecastRow[] => {
-  
-  const rows: ForecastRow[] = [];
 
-  // Filter out accounts that are marked as outOfScope
-  const activeAccounts = currentAccounts.filter(acc => !acc.outOfScope);
-  const activeAccountIds = activeAccounts.map(acc => acc.id);
+    const rows: ForecastRow[] = [];
 
-  // Determine active hotel code for filtering logic
-  const activeHotel = currentHotels.find(h => h.name === selectedHotelName);
-  const activeHotelCode = activeHotel ? activeHotel.code : '';
+    // Filter out accounts that are marked as outOfScope
+    const activeAccounts = currentAccounts.filter(acc => !acc.outOfScope);
+    const activeAccountIds = activeAccounts.map(acc => acc.id);
 
-  // --- OPTIMIZATION: Build Index for Imported Data ---
-  // Key: YEAR|MONTH|HOTEL|SCENARIO|ACCOUNT_NORMALIZED
-  const dataIndex = new Map<string, number>();
+    // Determine active hotel code for filtering logic
+    const activeHotel = currentHotels.find(h => h.name === selectedHotelName);
+    const activeHotelCode = activeHotel ? activeHotel.code : '';
 
-  if (selectedMonth && selectedYear && importedData.length > 0) {
-      importedData.forEach(row => {
-          // 1. Check Status
-          if (row.status !== 'valid') return;
+    // --- OPTIMIZATION: Build Index for Imported Data ---
+    // Key: YEAR|MONTH|HOTEL|SCENARIO|ACCOUNT_NORMALIZED
+    const dataIndex = new Map<string, number>();
 
-          // 2. Parse & Check Date
-          const rYear = parseInt(row.ano);
-          const rMonth = parseInt(row.mes);
-          
-          // Filter relevant data only (Current Year, Last Year)
-          if (rMonth !== selectedMonth) return;
-          if (rYear !== selectedYear && rYear !== (selectedYear - 1)) return;
+    if (selectedMonth && selectedYear && importedData.length > 0) {
+        importedData.forEach(row => {
+            // 1. Check Status
+            if (row.status !== 'valid') return;
 
-          // 3. Normalize Scenario
-          const scen = (row.cenario || '').trim().toLowerCase();
-          let normScenario = '';
-          if (scen === 'real' || scen === 'realizado') normScenario = 'REAL';
-          else if (scen === 'budget' || scen === 'meta' || scen === 'orcamento' || scen === 'orçamento') normScenario = 'BUDGET';
-          else if (scen === 'previa' || scen === 'prévia' || scen === 'flash') normScenario = 'PREVIA';
-          else if (scen === 'forecast' || scen === 'projeção') normScenario = 'FORECAST';
-          else return; 
-          
-          // Filter by versionId if applicable (ONLY FOR CURRENT YEAR)
-          const isCurrentYear = (rYear === selectedYear);
-          
-          // Filter by versionId: accept data matching either Real or Budget active version
-          // FORECAST scenario data is only matched against Real version (not Budget)
-          if (row.versionId && isCurrentYear) {
-              if (normScenario === 'FORECAST') {
-                  // DRE Forecast imports: versionId must match the active Real version
-                  const matchesReal = activeRealVersionId && row.versionId === activeRealVersionId;
-                  if (activeRealVersionId && !matchesReal) return;
-              } else {
-                  const matchesReal = activeRealVersionId && row.versionId === activeRealVersionId;
-                  const matchesBudget = activeBudgetVersionId && row.versionId === activeBudgetVersionId;
-                  if (activeRealVersionId || activeBudgetVersionId) {
-                      if (!matchesReal && !matchesBudget) return;
-                  }
-              }
-          }
+            // 2. Parse & Check Date
+            const rYear = parseInt(row.ano);
+            const rMonth = parseInt(row.mes);
 
-          // 4. Normalize Hotel
-          const normHotel = row.hotel.trim().toUpperCase();
+            // Filter relevant data only (Current Year, Last Year)
+            if (rMonth !== selectedMonth) return;
+            if (rYear !== selectedYear && rYear !== (selectedYear - 1)) return;
 
-          // 5. Parse Value
-          const val = parseFloat(row.valor.replace(',', '.'));
-          if (isNaN(val)) return;
+            // 3. Normalize Scenario
+            const scen = (row.cenario || '').trim().toLowerCase();
+            let normScenario = '';
+            if (scen === 'real' || scen === 'realizado') normScenario = 'REAL';
+            else if (scen === 'budget' || scen === 'meta' || scen === 'orcamento' || scen === 'orçamento') normScenario = 'BUDGET';
+            else if (scen === 'previa' || scen === 'prévia' || scen === 'flash') normScenario = 'PREVIA';
+            else if (scen === 'forecast' || scen === 'projeção') normScenario = 'FORECAST';
+            else return;
 
-          // 6. Indexing
-          const normConta = row.conta.trim().toLowerCase();
-          const normCR = (row.cr || '').trim().toLowerCase();
-          
-          // Index by Account only
-          const keyConta = `${rYear}|${rMonth}|${normHotel}|${normScenario}|${normConta}`;
-          dataIndex.set(keyConta, (dataIndex.get(keyConta) || 0) + val);
+            // Filter by versionId if applicable (ONLY FOR CURRENT YEAR)
+            const isCurrentYear = (rYear === selectedYear);
 
-          // Index by Account + CR for more specific lookups
-          if (normCR) {
-              const keyContaCR = `${rYear}|${rMonth}|${normHotel}|${normScenario}|${normConta}|${normCR}`;
-              dataIndex.set(keyContaCR, (dataIndex.get(keyContaCR) || 0) + val);
-          }
-
-          // 7. Index by 'classificacao' if it exists
-          if (row.classificacao) {
-              const normClass = row.classificacao.trim().toLowerCase();
-              if (normClass && normClass !== normConta) {
-                  const keyClass = `${rYear}|${rMonth}|${normHotel}|${normScenario}|${normClass}`;
-                  dataIndex.set(keyClass, (dataIndex.get(keyClass) || 0) + val);
-              }
-          }
-      });
-  }
-
-  // Optimized Helper using Index
-  const getImportedValue = (accountName: string, targetYear: number | undefined, valueCategory: 'Real' | 'Budget' | 'Previa' | 'Forecast', crFilter?: string) => {
-    if (!selectedMonth || !targetYear) return 0;
-    
-    const targetName = accountName.trim().toLowerCase();
-    const targetCR = crFilter?.trim().toLowerCase();
-    let targetScenario = '';
-    if (valueCategory === 'Real') targetScenario = 'REAL';
-    else if (valueCategory === 'Budget') targetScenario = 'BUDGET';
-    else if (valueCategory === 'Previa') targetScenario = 'PREVIA';
-    else targetScenario = 'FORECAST';
-
-    const keysToCheck = new Set<string>();
-    const hotelsToTry = [selectedHotelName, activeHotelCode].filter(Boolean) as string[];
-
-    hotelsToTry.forEach(h => {
-        const baseKey = `${targetYear}|${selectedMonth}|${h.trim().toUpperCase()}|${targetScenario}|${targetName}`;
-        if (crFilter === 'OTHER_EXCEPT_MKT_MAR') {
-            // Special: use base key (no CR suffix) so we can do Total - Martech - Marketing
-            keysToCheck.add(baseKey);
-        } else if (targetCR) {
-            keysToCheck.add(`${baseKey}|${targetCR}`);
-        } else {
-            keysToCheck.add(baseKey);
-        }
-    });
-
-    let total = 0;
-    keysToCheck.forEach(key => {
-        if (crFilter === 'OTHER_EXCEPT_MKT_MAR') {
-             // Logic: Total (base key) - Martech - Marketing
-             const totalVal = dataIndex.get(key) || 0;
-             const martechVal = dataIndex.get(`${key}|martech`) || 0;
-             const mktVal = dataIndex.get(`${key}|marketing`) || 0;
-             total += (totalVal - martechVal - mktVal);
-        } else if (dataIndex.has(key)) {
-            total += dataIndex.get(key) || 0;
-        }
-        // REMOVED: CR fallback that was returning full account total
-        // when no CR-specific data existed, inflating sub-area values
-    });
-
-    return total;
-  };
-
-  // --- Helper to get Real Occupancy Overrides ---
-  const getRealOccValue = (rowId: string) => {
-    const contextKey = `${selectedHotelName}_${selectedYear}_${selectedMonth}`;
-    return realOccupancyData[contextKey]?.[rowId];
-  };
-
-  // 1. INDICATORS
-  
-  // Section: GERAIS
-  const gAvailReal = getRealOccValue('geral_avail') ?? 100;
-  const gOccReal = getRealOccValue('geral_sold') ?? 75;
-  const gPaxReal = getRealOccValue('geral_pax') ?? 210;
-  const gAdultsReal = getRealOccValue('geral_adults') ?? 150;
-  const gChdReal = getRealOccValue('geral_chd') ?? 60;
-
-  // Retrieve budget values from budgetOccupancyData based on the selectedMonth (0-indexed)
-  const monthIdx = selectedMonth ? selectedMonth - 1 : 0;
-  const gAvailBudget = budgetOccupancyData['geral_avail'] ? budgetOccupancyData['geral_avail'][monthIdx] : 0;
-  const gOccBudget = budgetOccupancyData['geral_sold'] ? budgetOccupancyData['geral_sold'][monthIdx] : 0;
-  const gOccPctBudget = gAvailBudget > 0 ? (gOccBudget / gAvailBudget) * 100 : 0;
-  // Get Budget Revenue values to compute Budget DM & RevPAR (Approximation or zeros if missing)
-  const gPaxBudget = budgetOccupancyData['geral_pax'] ? budgetOccupancyData['geral_pax'][monthIdx] : 0;
-  const gAdultsBudget = budgetOccupancyData['geral_adults'] ? budgetOccupancyData['geral_adults'][monthIdx] : 0;
-  const gChdBudget = budgetOccupancyData['geral_chd'] ? budgetOccupancyData['geral_chd'][monthIdx] : 0;
-  
-  // DM and Revpar Budget calculation based on imported budget vs occupancy, or from budgetOccupancyData if there were a field.
-  // We'll calculate it from imported if possible, otherwise 0 or basic calc.
-  const revLazerBudget = getImportedValue('Lazer', selectedYear, 'Budget'); 
-  const revEventosBudget = getImportedValue('Eventos', selectedYear, 'Budget');
-  const revAptBudget = revLazerBudget + revEventosBudget; 
-
-  const revExtraLazerBudget = getImportedValue('Extra Lazer', selectedYear, 'Budget');
-  const revExtraEventosBudget = getImportedValue('Extra Eventos', selectedYear, 'Budget');
-  const revExtraTotalBudget = revExtraLazerBudget + revExtraEventosBudget;
-
-  const dmBudget = gOccBudget > 0 ? revAptBudget / gOccBudget : 0;
-  const revparBudget = gAvailBudget > 0 ? revAptBudget / gAvailBudget : 0;
-  const trevporBudget = gOccBudget > 0 ? (revAptBudget + revExtraTotalBudget) / gOccBudget : 0;
-  const trevparBudget = gAvailBudget > 0 ? (revAptBudget + revExtraTotalBudget) / gAvailBudget : 0;
-
-  rows.push(generateRow('IND-1', '', 'Indicators', 'UH Disponível', gAvailBudget, gAvailReal, 100, 0, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
-  rows.push(generateRow('IND-2', '', 'Indicators', 'UH Ocupada', gOccBudget, gOccReal, 70, 0, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
-  rows.push(generateRow('IND-3', '', 'Indicators', '% de Ocupação', gOccPctBudget, gAvailReal > 0 ? (gOccReal / gAvailReal) * 100 : 0, 70, 0, false, false, 0, undefined, { format: 'percent' }, 'INDICADORES GERAIS'));
-  rows.push(generateRow('IND-4', '', 'Indicators', 'DM Bruta', dmBudget, 850, 800, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
-  rows.push(generateRow('IND-5', '', 'Indicators', 'PAX', gPaxBudget, gPaxReal, 190, 0, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
-  rows.push(generateRow('IND-ADULTOS', '', 'Indicators', 'Adultos', gAdultsBudget, gAdultsReal, 140, 0, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
-  rows.push(generateRow('IND-CHD', '', 'Indicators', 'CHD', gChdBudget, gChdReal, 50, 0, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
-  rows.push(generateRow('IND-COEF-ADULTOS', '', 'Indicators', 'Coef. Adultos', gOccBudget > 0 ? gAdultsBudget / gOccBudget : 0, gOccReal > 0 ? gAdultsReal / gOccReal : 0, 2, 0, false, false, 0, undefined, { format: 'decimal' }, 'INDICADORES GERAIS'));
-  rows.push(generateRow('IND-COEF-CHD', '', 'Indicators', 'Coef. CHD', gOccBudget > 0 ? gChdBudget / gOccBudget : 0, gOccReal > 0 ? gChdReal / gOccReal : 0, 0.7, 0, false, false, 0, undefined, { format: 'decimal' }, 'INDICADORES GERAIS'));
-  rows.push(generateRow('IND-6', '', 'Indicators', 'REVPAR', revparBudget, 637.5, 560, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
-  rows.push(generateRow('IND-TREVPOR', '', 'Indicators', 'TREVPOR', trevporBudget, 0, 0, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
-  rows.push(generateRow('IND-TREVPAR', '', 'Indicators', 'TREVPAR', trevparBudget, 0, 0, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
-
-  rows.push(generateRow('SPACER-IND-REV', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
-
-  // 2. REVENUE
-  
-  // 1.00 RECEITA BRUTA TOTAL
-  rows.push(generateRow('REV-TOTAL', '1.00', 'Revenue', 'RECEITA BRUTA TOTAL', 0, 0, 0, 0, true, true, 0));
-  
-  // 1.01 Receita de Apartamentos
-  rows.push(generateRow('REV-APT', '1.01', 'Revenue', 'Receita de Apartamentos', 0, 0, 0, 0, true, false, 1));
-  
-  const revAptItems = [
-      { id: 'REV-APT-LAZER', code: '1.01.01', label: 'Lazer', importNames: ['Lazer', 'Receita de Apartamentos'] },
-      { id: 'REV-APT-EVENTOS', code: '1.01.02', label: 'Eventos', importNames: ['Eventos', 'Receita de Apartamentos'] },
-  ];
-
-  revAptItems.forEach(item => {
-      let valBudget = 0;
-      let valReal = 0;
-      let valPrevia = 0;
-      let valLY = 0;
-
-      // Special logic for Lazer/Eventos: if label matches 'Receita de Apartamentos', we MUST filter by CR
-      const crFilter = (item.label === 'Lazer' || item.label === 'Eventos') ? item.label : undefined;
-      
-      const namesToTry = item.importNames || [item.label];
-      namesToTry.forEach(name => {
-          valBudget += getImportedValue(name, selectedYear, 'Budget', crFilter);
-          valPrevia += getImportedValue(name, selectedYear, 'Previa', crFilter);
-          valPrevia += getImportedValue(name, selectedYear, 'Real', crFilter); // Actuals go to Previa
-          valReal += 0; // Forecast column starts empty
-          valLY += getImportedValue(name, (selectedYear || 0) - 1, 'Real', crFilter);
-      });
-      
-      rows.push(generateRow(item.id, item.code, 'Revenue', item.label, valBudget, valReal, valLY, valPrevia, false, false, 2));
-  });
-
-  // 1.02 Receitas Extras
-  rows.push(generateRow('REV-EXTRA', '1.02', 'Revenue', 'Receitas Extras', 0, 0, 0, 0, true, false, 1));
-  
-  const revExtraItems = [
-      { id: 'REV-EXTRA-LAZER', code: '1.02.01', label: 'Lazer', importName: 'Extra Lazer' },
-      { id: 'REV-EXTRA-EVENTOS', code: '1.02.02', label: 'Eventos', importName: 'Extra Eventos' },
-  ];
-
-  revExtraItems.forEach(item => {
-      const valBudget = getImportedValue(item.label, selectedYear, 'Budget');
-      const valPrevia = getImportedValue(item.label, selectedYear, 'Previa') + getImportedValue(item.label, selectedYear, 'Real');
-      const valReal = 0; // Empty Forecast
-      const valLY = getImportedValue(item.label, (selectedYear || 0) - 1, 'Real');
-      rows.push(generateRow(item.id, item.code, 'Revenue', item.label, valBudget, valReal, valLY, valPrevia, false, false, 2));
-  });
-  
-  // 1.03 Cancelamento de Time Share
-  const valBudgetTS = getImportedValue('Cancelamento de Time Share', selectedYear, 'Budget');
-  const valPreviaTS = getImportedValue('Cancelamento de Time Share', selectedYear, 'Previa') + getImportedValue('Cancelamento de Time Share', selectedYear, 'Real');
-  const valRealTS = 0;
-  const valLYTS = getImportedValue('Cancelamento de Time Share', (selectedYear || 0) - 1, 'Real');
-  rows.push(generateRow('REV-TIME', '1.03', 'Revenue', 'Cancelamento de Time Share', valBudgetTS, valRealTS, valLYTS, valPreviaTS, false, false, 1));
-
-  // 1.04 Receita de ISS
-  const valBudgetISS = getImportedValue('Receita de ISS', selectedYear, 'Budget');
-  const valPreviaISS = getImportedValue('Receita de ISS', selectedYear, 'Previa') + getImportedValue('Receita de ISS', selectedYear, 'Real');
-  const valRealISS = 0;
-  const valLYISS = getImportedValue('Receita de ISS', (selectedYear || 0) - 1, 'Real');
-  rows.push(generateRow('REV-ISS', '1.04', 'Revenue', 'Receita de ISS', valBudgetISS, valRealISS, valLYISS, valPreviaISS, false, false, 1));
-
-  rows.push(generateRow('SPACER-BEFORE-IMP', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
-
-  // 1.05 Impostos (Azul conforme Receita Líquida, recuo zero)
-  const valBudgetImp = getImportedValue('Impostos', selectedYear, 'Budget');
-  const valPreviaImp = getImportedValue('Impostos', selectedYear, 'Previa') + getImportedValue('Impostos', selectedYear, 'Real');
-  const valRealImp = 0;
-  const valLYImp = getImportedValue('Impostos', (selectedYear || 0) - 1, 'Real');
-  rows.push(generateRow('REV-IMP', '1.05', 'Revenue', 'Impostos', valBudgetImp, valRealImp, valLYImp, valPreviaImp, false, false, 0));
-
-  rows.push(generateRow('SPACER-AFTER-IMP', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
-
-  // 3.00 Receita Líquida
-  rows.push(generateRow('REV-NET', '3.00', 'Revenue', 'RECEITA LÍQUIDA', 0, 0, 0, 0, true, true, 0)); 
-  
-  rows.push(generateRow('SPACER-REV-CST', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
-
-  // 3. COSTS & EXPENSES (Hierarchical Breakdown)
-  rows.push(generateRow('CST-HEAD', '3.00', 'Costs', 'CUSTOS E DESPESAS OPERACIONAIS', 0, 0, 0, 0, true, true, 0));
-
-  // Get unique Package identifiers (Master + Package name) for Expense accounts
-  const expenseAccounts = activeAccounts.filter(a => a.classification === 'Expense');
-  
-  // Create unique keys for each Package to avoid name collisions across Masters
-  const packageKeys = Array.from(new Set(expenseAccounts.map(a => `${a.masterPackage || ''}|${a.package || ''}`))).filter(k => k.split('|')[1]);
-  
-  const getMinOrder = (accs: Account[]) => Math.min(...accs.map(a => a.sortOrder || 999));
-
-  // Sort all packages by the minimum sortOrder of their accounts
-  const sortedPackageKeys = packageKeys.sort((a, b) => {
-    const [masterA, pkgA] = a.split('|');
-    const [masterB, pkgB] = b.split('|');
-    const orderA = getMinOrder(expenseAccounts.filter(acc => acc.masterPackage === masterA && acc.package === pkgA));
-    const orderB = getMinOrder(expenseAccounts.filter(acc => acc.masterPackage === masterB && acc.package === pkgB));
-    return orderA - orderB || a.localeCompare(b);
-  });
-
-  sortedPackageKeys.forEach(key => {
-    const [masterName, pkgName] = key.split('|');
-    const pkgAccs = expenseAccounts.filter(a => a.masterPackage === masterName && a.package === pkgName);
-    const pkgCode = pkgAccs[0]?.packageCode || '';
-    
-    // Check for special drill-down cases
-    const isAdminTI = masterName === 'DESPESAS ADMINISTRATIVAS' && pkgName === 'Despesas Administrativas';
-    const isSalesMkt = masterName === 'DESPESAS COM VENDAS E MARKETING' && pkgName === 'Despesas com Vendas e Marketing';
-    const isServicosTerceiros = pkgName.toUpperCase() === 'SERVIÇOS DE TERCEIROS' || pkgName.toUpperCase() === 'SERVIÇO DE TERCEIROS';
-    const isProvisoes = pkgName.toUpperCase() === 'PROVISÕES GERAIS' || pkgName.toUpperCase() === 'PROVISOES GERAIS';
-
-
-    let pkgBudget = 0; let pkgReal = 0; let pkgPrevia = 0; let pkgLY = 0;
-
-    if (!isAdminTI && !isSalesMkt && !isServicosTerceiros && !isProvisoes) {
-       // STANDARD PACKAGE - Aggregate values directly
-       pkgAccs.forEach(acc => {
-          pkgBudget += getImportedValue(acc.name, selectedYear, 'Budget');
-          pkgPrevia += getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real');
-          pkgReal += getImportedValue(acc.name, selectedYear, 'Forecast');
-          pkgLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
-       });
-       // Fallback: Also check if there's a value directly for the Package name (simplified import)
-       pkgBudget += getImportedValue(pkgName, selectedYear, 'Budget');
-       pkgPrevia += getImportedValue(pkgName, selectedYear, 'Previa') + getImportedValue(pkgName, selectedYear, 'Real');
-       pkgReal += getImportedValue(pkgName, selectedYear, 'Forecast');
-       pkgLY += getImportedValue(pkgName, (selectedYear || 0) - 1, 'Real');
-
-       rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', pkgName, pkgBudget, pkgReal, pkgLY, pkgPrevia, true, false, 1));
-    } else if (isAdminTI) {
-       // --- DESPESAS ADMINISTRATIVAS SPECIAL DRILL DOWN ---
-       rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', 'Despesas Administrativas', 0, 0, 0, 0, true, false, 1));
-
-       let genBudget = 0; let genReal = 0; let genPrevia = 0; let genLY = 0;
-       const tiAccountKeyword = 'processamento';
-       
-       pkgAccs.forEach(acc => {
-           if (acc.name.toLowerCase().includes(tiAccountKeyword)) return;
-           genBudget += getImportedValue(acc.name, selectedYear, 'Budget');
-           genPrevia += getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real');
-           genReal += getImportedValue(acc.name, selectedYear, 'Forecast');
-           genLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
-       });
-       rows.push(generateRow(`p-drill-${masterName}-${pkgName}-gerais`, pkgCode, 'Costs', 'Despesas administrativas gerais', genBudget, genReal, genLY, genPrevia, false, false, 2, undefined, { method: 'Fixed' }));
-
-       const subAreas = [
-           { label: 'TI', cr: 'martech' },
-           { label: 'Martech', cr: 'marketing' },
-           { label: 'Outros setores', cr: 'OTHER_EXCEPT_MKT_MAR' }
-       ];
-       const tiAccs = pkgAccs.filter(acc => acc.name.toLowerCase().includes(tiAccountKeyword));
-       if (tiAccs.length > 0) {
-           subAreas.forEach(sub => {
-               let subBudget = 0; let subPrevia = 0; let subReal = 0; let subLY = 0;
-               tiAccs.forEach(tiAcc => {
-                   let sB = getImportedValue(tiAcc.name, selectedYear, 'Budget', sub.cr);
-                   let sP = getImportedValue(tiAcc.name, selectedYear, 'Previa', sub.cr) + getImportedValue(tiAcc.name, selectedYear, 'Real', sub.cr);
-                   let sR = getImportedValue(tiAcc.name, selectedYear, 'Forecast', sub.cr);
-                   let sLY = getImportedValue(tiAcc.name, (selectedYear || 0) - 1, 'Real', sub.cr);
-                   
-                   // Fallback for "Tech" if "martech" CR is empty - try "ti"
-                   if (sub.label === 'TI' && sB === 0 && sP === 0 && sR === 0) {
-                       sB = getImportedValue(tiAcc.name, selectedYear, 'Budget', 'ti');
-                       sP = getImportedValue(tiAcc.name, selectedYear, 'Previa', 'ti') + getImportedValue(tiAcc.name, selectedYear, 'Real', 'ti');
-                       sR = getImportedValue(tiAcc.name, selectedYear, 'Forecast', 'ti');
-                       sLY = getImportedValue(tiAcc.name, (selectedYear || 0) - 1, 'Real', 'ti');
-                   }
-                   
-                   subBudget += sB; subPrevia += sP; subReal += sR; subLY += sLY;
-               });
-               rows.push(generateRow(`p-drill-${masterName}-${pkgName}-${sub.label}`, pkgCode, 'Costs', `Processamentos de dados e TI (${sub.label})`, subBudget, subReal, subLY, subPrevia, false, false, 2, undefined, { method: 'Fixed' }));
-           });
-       }
-    } else if (isSalesMkt) {
-       // --- DESPESAS DE VENDAS E MARKETING SPECIAL DRILL DOWN ---
-       rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', 'Despesas com Vendas e Marketing', 0, 0, 0, 0, true, false, 1));
-       const subAreas = [
-           { label: 'Martech', cr: 'martech' },
-           { label: 'Marketing', cr: 'marketing' },
-           { label: 'Outros setores', cr: 'OTHER_EXCEPT_MKT_MAR' }
-       ];
-       subAreas.forEach(sub => {
-           let subBudget = 0; let subReal = 0; let subPrevia = 0; let subLY = 0;
-           pkgAccs.forEach(acc => {
-               subBudget += getImportedValue(acc.name, selectedYear, 'Budget', sub.cr);
-               subPrevia += getImportedValue(acc.name, selectedYear, 'Previa', sub.cr) + getImportedValue(acc.name, selectedYear, 'Real', sub.cr);
-               subReal += getImportedValue(acc.name, selectedYear, 'Forecast', sub.cr);
-               subLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real', sub.cr);
-           });
-            // Fallback for "Outros setores" category if something was imported directly for the package
-            if (sub.cr === 'OTHER_EXCEPT_MKT_MAR') {
-                subBudget += getImportedValue(pkgName, selectedYear, 'Budget');
-                subPrevia += getImportedValue(pkgName, selectedYear, 'Previa') + getImportedValue(pkgName, selectedYear, 'Real');
-                subReal += getImportedValue(pkgName, selectedYear, 'Forecast');
-                subLY += getImportedValue(pkgName, (selectedYear || 0) - 1, 'Real');
+            // Filter by versionId: accept data matching either Real or Budget active version
+            // FORECAST scenario data is only matched against Real version (not Budget)
+            if (row.versionId && isCurrentYear) {
+                if (normScenario === 'FORECAST') {
+                    // DRE Forecast imports: versionId must match the active Real version
+                    const matchesReal = activeRealVersionId && row.versionId === activeRealVersionId;
+                    if (activeRealVersionId && !matchesReal) return;
+                } else {
+                    const matchesReal = activeRealVersionId && row.versionId === activeRealVersionId;
+                    const matchesBudget = activeBudgetVersionId && row.versionId === activeBudgetVersionId;
+                    if (activeRealVersionId || activeBudgetVersionId) {
+                        if (!matchesReal && !matchesBudget) return;
+                    }
+                }
             }
 
-            rows.push(generateRow(`p-drill-${masterName}-${pkgName}-${sub.label}`, pkgCode, 'Costs', `Despesas com Vendas e Marketing (${sub.label})`, subBudget, subReal, subLY, subPrevia, false, false, 2, undefined, { method: 'Fixed' }));
-       });
-    } else if (isServicosTerceiros) {
-        rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', 'Serviços de Terceiros', 0, 0, 0, 0, true, false, 1));
-        const subAreas = [
-               { label: 'Servicos de terceiros temporarios', name: 'Servicos de terceiros temporarios' },
-               { label: 'Serviço de terceiros recorrente', name: 'Serviço de terceiros recorrente' },
-               { label: 'Serviços contratados de prestadores PJ - MEI', name: 'Serviços contratados de prestadores PJ - MEI' }
-        ];
-        subAreas.forEach(sub => {
-            const b = getImportedValue(sub.name, selectedYear, 'Budget');
-            const p = getImportedValue(sub.name, selectedYear, 'Previa') + getImportedValue(sub.name, selectedYear, 'Real');
-            const f = getImportedValue(sub.name, selectedYear, 'Forecast');
-            const ly = getImportedValue(sub.name, (selectedYear || 0) - 1, 'Real');
-            rows.push(generateRow(`p-drill-${masterName}-${pkgName}-${sub.name}`, pkgCode, 'Costs', sub.label, b, f, ly, p, false, false, 2, undefined, { method: 'Fixed' }));
+            // 4. Normalize Hotel
+            const normHotel = row.hotel.trim().toUpperCase();
+
+            // 5. Parse Value
+            const val = parseFloat(row.valor.replace(',', '.'));
+            if (isNaN(val)) return;
+
+            // 6. Indexing
+            const normConta = row.conta.trim().toLowerCase();
+            const normCR = (row.cr || '').trim().toLowerCase();
+
+            // Index by Account only
+            const keyConta = `${rYear}|${rMonth}|${normHotel}|${normScenario}|${normConta}`;
+            dataIndex.set(keyConta, (dataIndex.get(keyConta) || 0) + val);
+
+            // Index by Account + CR for more specific lookups
+            if (normCR) {
+                const keyContaCR = `${rYear}|${rMonth}|${normHotel}|${normScenario}|${normConta}|${normCR}`;
+                dataIndex.set(keyContaCR, (dataIndex.get(keyContaCR) || 0) + val);
+            }
+
+            // 7. Index by 'classificacao' if it exists
+            if (row.classificacao) {
+                const normClass = row.classificacao.trim().toLowerCase();
+                if (normClass && normClass !== normConta) {
+                    const keyClass = `${rYear}|${rMonth}|${normHotel}|${normScenario}|${normClass}`;
+                    dataIndex.set(keyClass, (dataIndex.get(keyClass) || 0) + val);
+                }
+            }
         });
-     } else if (isProvisoes) {
-        rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', 'Provisões Gerais', 0, 0, 0, 0, true, false, 1));
-        const keyTemp = 'Provisao de servicos de terceiros temporarios';
-        const tB = getImportedValue(keyTemp, selectedYear, 'Budget');
-        const tP = getImportedValue(keyTemp, selectedYear, 'Previa') + getImportedValue(keyTemp, selectedYear, 'Real');
-        const tF = getImportedValue(keyTemp, selectedYear, 'Forecast');
-        const tLY = getImportedValue(keyTemp, (selectedYear || 0) - 1, 'Real');
-        
-        rows.push(generateRow(`p-drill-${masterName}-${pkgName}-temporarios`, pkgCode, 'Costs', keyTemp, tB, tF, tLY, tP, false, false, 2, undefined, { method: 'Fixed' }));
+    }
 
-        let oB = 0; let oP = 0; let oF = 0; let oLY = 0;
-        
-        oB += getImportedValue('Provisoes gerais', selectedYear, 'Budget');
-        oP += getImportedValue('Provisoes gerais', selectedYear, 'Previa') + getImportedValue('Provisoes gerais', selectedYear, 'Real');
-        oF += getImportedValue('Provisoes gerais', selectedYear, 'Forecast');
-        oLY += getImportedValue('Provisoes gerais', (selectedYear || 0) - 1, 'Real');
+    // Optimized Helper using Index
+    const getImportedValue = (accountName: string, targetYear: number | undefined, valueCategory: 'Real' | 'Budget' | 'Previa' | 'Forecast', crFilter?: string) => {
+        if (!selectedMonth || !targetYear) return 0;
 
-        // Fallback for direct import of "Outras provisões"
-        oB += getImportedValue('Outras provisões', selectedYear, 'Budget');
-        oP += getImportedValue('Outras provisões', selectedYear, 'Previa') + getImportedValue('Outras provisões', selectedYear, 'Real');
-        oF += getImportedValue('Outras provisões', selectedYear, 'Forecast');
-        oLY += getImportedValue('Outras provisões', (selectedYear || 0) - 1, 'Real');
+        const targetName = accountName.trim().toLowerCase();
+        const targetCR = crFilter?.trim().toLowerCase();
+        let targetScenario = '';
+        if (valueCategory === 'Real') targetScenario = 'REAL';
+        else if (valueCategory === 'Budget') targetScenario = 'BUDGET';
+        else if (valueCategory === 'Previa') targetScenario = 'PREVIA';
+        else targetScenario = 'FORECAST';
 
-        pkgAccs.forEach(acc => {
-            if (acc.name.toLowerCase() === keyTemp.toLowerCase()) return;
-            if (acc.name.toLowerCase() === 'provisoes gerais') return;
-            
-            oB += getImportedValue(acc.name, selectedYear, 'Budget');
-            oP += getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real');
-            oF += getImportedValue(acc.name, selectedYear, 'Forecast');
-            oLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
+        const keysToCheck = new Set<string>();
+        const hotelsToTry = [selectedHotelName, activeHotelCode].filter(Boolean) as string[];
+
+        hotelsToTry.forEach(h => {
+            const baseKey = `${targetYear}|${selectedMonth}|${h.trim().toUpperCase()}|${targetScenario}|${targetName}`;
+            if (crFilter === 'OTHER_EXCEPT_MKT_MAR') {
+                // Special: use base key (no CR suffix) so we can do Total - Martech - Marketing
+                keysToCheck.add(baseKey);
+            } else if (targetCR) {
+                keysToCheck.add(`${baseKey}|${targetCR}`);
+            } else {
+                keysToCheck.add(baseKey);
+            }
         });
 
-        rows.push(generateRow(`p-drill-${masterName}-${pkgName}-outras`, pkgCode, 'Costs', 'Outras provisões', oB, oF, oLY, oP, false, false, 2, undefined, { method: 'Fixed' }));
-     }
-  });
+        let total = 0;
+        keysToCheck.forEach(key => {
+            if (crFilter === 'OTHER_EXCEPT_MKT_MAR') {
+                // Logic: Total (base key) - Martech - Marketing
+                const totalVal = dataIndex.get(key) || 0;
+                const martechVal = dataIndex.get(`${key}|martech`) || 0;
+                const mktVal = dataIndex.get(`${key}|marketing`) || 0;
+                total += (totalVal - martechVal - mktVal);
+            } else if (dataIndex.has(key)) {
+                total += dataIndex.get(key) || 0;
+            }
+            // REMOVED: CR fallback that was returning full account total
+            // when no CR-specific data existed, inflating sub-area values
+        });
 
-  // 4. RESULTS
-  rows.push(generateRow('SPACER-RES', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
-  rows.push(generateRow('RES-OP-SEM-IMP', '6.00.00', 'Result', 'RESULTADO OPERACIONAL (G.O.P) SEM IMPOSTOS', 0, 0, 0, 0, true, true, 0));
-  rows.push(generateRow('RES-OP-COM-IMP', '6.01.00', 'Result', 'RESULTADO OPERACIONAL (G.O.P) COM IMPOSTOS', 0, 0, 0, 0, true, true, 0));
-  
-  // KPI: Transformação / Reatividade
-  rows.push(generateRow('KPI-TRANS-BUDGET', '', 'Result', 'Transformação/Reatividade (Meta)', 0, 0, 0, 0, true, true, 0));
-  rows.push(generateRow('KPI-TRANS-LY', '', 'Result', 'Transformação/Reatividade (Ano Anterior)', 0, 0, 0, 0, true, true, 0));
+        return total;
+    };
 
-  const applyOverrides = () => {
-      const activeHotelCodeUpper = activeHotelCode.trim().toUpperCase();
-      const selHotelNameUpper = (selectedHotelName || '').trim().toUpperCase();
-      
-      rows.forEach(r => {
-          const targetName = `override_${r.id}`.toLowerCase();
-          
-          const tryOverride = (scenarioKey: string) => {
-              for (const h of [selHotelNameUpper, activeHotelCodeUpper].filter(Boolean)) {
-                 const key = `${selectedYear}|${selectedMonth}|${h}|${scenarioKey}|${targetName}`;
-                 if (dataIndex.has(key)) {
-                     return dataIndex.get(key);
-                 }
-              }
-              return undefined;
-          };
+    // --- Helper to get Real Occupancy Overrides ---
+    const getRealOccValue = (rowId: string) => {
+        const contextKey = `${selectedHotelName}_${selectedYear}_${selectedMonth}`;
+        return realOccupancyData[contextKey]?.[rowId];
+    };
 
-          const realOverride = tryOverride('REAL');
-          if (realOverride !== undefined) {
-              r.real = realOverride;
-              r.isManualOverride = true;
-              if (r.forecastConfig) r.forecastConfig.manualValue = realOverride;
-          }
+    // 1. INDICATORS
 
-          const previaOverride = tryOverride('PREVIA');
-          if (previaOverride !== undefined) {
-              r.previa = previaOverride;
-              r.isManualPreviaOverride = true;
-              if (r.previaConfig) r.previaConfig.manualValue = previaOverride;
-          }
-      });
-  };
-  applyOverrides();
+    // Section: GERAIS
+    const gAvailReal = getRealOccValue('geral_avail') ?? 100;
+    const gOccReal = getRealOccValue('geral_sold') ?? 75;
+    const gPaxReal = getRealOccValue('geral_pax') ?? 210;
+    const gAdultsReal = getRealOccValue('geral_adults') ?? 150;
+    const gChdReal = getRealOccValue('geral_chd') ?? 60;
 
-  return rows;
+    // Retrieve budget values from budgetOccupancyData based on the selectedMonth (0-indexed)
+    const monthIdx = selectedMonth ? selectedMonth - 1 : 0;
+    const gAvailBudget = budgetOccupancyData['geral_avail'] ? budgetOccupancyData['geral_avail'][monthIdx] : 0;
+    const gOccBudget = budgetOccupancyData['geral_sold'] ? budgetOccupancyData['geral_sold'][monthIdx] : 0;
+    const gOccPctBudget = gAvailBudget > 0 ? (gOccBudget / gAvailBudget) * 100 : 0;
+    // Get Budget Revenue values to compute Budget DM & RevPAR (Approximation or zeros if missing)
+    const gPaxBudget = budgetOccupancyData['geral_pax'] ? budgetOccupancyData['geral_pax'][monthIdx] : 0;
+    const gAdultsBudget = budgetOccupancyData['geral_adults'] ? budgetOccupancyData['geral_adults'][monthIdx] : 0;
+    const gChdBudget = budgetOccupancyData['geral_chd'] ? budgetOccupancyData['geral_chd'][monthIdx] : 0;
+
+    // DM and Revpar Budget calculation based on imported budget vs occupancy, or from budgetOccupancyData if there were a field.
+    // We'll calculate it from imported if possible, otherwise 0 or basic calc.
+    const revLazerBudget = getImportedValue('Lazer', selectedYear, 'Budget');
+    const revEventosBudget = getImportedValue('Eventos', selectedYear, 'Budget');
+    const revAptBudget = revLazerBudget + revEventosBudget;
+
+    const revExtraLazerBudget = getImportedValue('Extra Lazer', selectedYear, 'Budget');
+    const revExtraEventosBudget = getImportedValue('Extra Eventos', selectedYear, 'Budget');
+    const revExtraTotalBudget = revExtraLazerBudget + revExtraEventosBudget;
+
+    const dmBudget = gOccBudget > 0 ? revAptBudget / gOccBudget : 0;
+    const revparBudget = gAvailBudget > 0 ? revAptBudget / gAvailBudget : 0;
+    const trevporBudget = gOccBudget > 0 ? (revAptBudget + revExtraTotalBudget) / gOccBudget : 0;
+    const trevparBudget = gAvailBudget > 0 ? (revAptBudget + revExtraTotalBudget) / gAvailBudget : 0;
+
+    rows.push(generateRow('IND-1', '', 'Indicators', 'UH Disponível', gAvailBudget, gAvailReal, 100, 0, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-2', '', 'Indicators', 'UH Ocupada', gOccBudget, gOccReal, 70, 0, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-3', '', 'Indicators', '% de Ocupação', gOccPctBudget, gAvailReal > 0 ? (gOccReal / gAvailReal) * 100 : 0, 70, 0, false, false, 0, undefined, { format: 'percent' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-4', '', 'Indicators', 'DM Bruta', dmBudget, 850, 800, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-5', '', 'Indicators', 'PAX', gPaxBudget, gPaxReal, 190, 0, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-ADULTOS', '', 'Indicators', 'Adultos', gAdultsBudget, gAdultsReal, 140, 0, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-CHD', '', 'Indicators', 'CHD', gChdBudget, gChdReal, 50, 0, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-COEF-ADULTOS', '', 'Indicators', 'Coef. Adultos', gOccBudget > 0 ? gAdultsBudget / gOccBudget : 0, gOccReal > 0 ? gAdultsReal / gOccReal : 0, 2, 0, false, false, 0, undefined, { format: 'decimal' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-COEF-CHD', '', 'Indicators', 'Coef. CHD', gOccBudget > 0 ? gChdBudget / gOccBudget : 0, gOccReal > 0 ? gChdReal / gOccReal : 0, 0.7, 0, false, false, 0, undefined, { format: 'decimal' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-6', '', 'Indicators', 'REVPAR', revparBudget, 637.5, 560, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-TREVPOR', '', 'Indicators', 'TREVPOR', trevporBudget, 0, 0, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-TREVPAR', '', 'Indicators', 'TREVPAR', trevparBudget, 0, 0, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
+
+    rows.push(generateRow('SPACER-IND-REV', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
+
+    // 2. REVENUE
+
+    // 1.00 RECEITA BRUTA TOTAL
+    rows.push(generateRow('REV-TOTAL', '1.00', 'Revenue', 'RECEITA BRUTA TOTAL', 0, 0, 0, 0, true, true, 0));
+
+    // 1.01 Receita de Apartamentos
+    rows.push(generateRow('REV-APT', '1.01', 'Revenue', 'Receita de Apartamentos', 0, 0, 0, 0, true, false, 1));
+
+    const revAptItems = [
+        { id: 'REV-APT-LAZER', code: '1.01.01', label: 'Lazer', importNames: ['Lazer', 'Receita de Apartamentos'] },
+        { id: 'REV-APT-EVENTOS', code: '1.01.02', label: 'Eventos', importNames: ['Eventos', 'Receita de Apartamentos'] },
+    ];
+
+    revAptItems.forEach(item => {
+        let valBudget = 0;
+        let valReal = 0;
+        let valPrevia = 0;
+        let valLY = 0;
+
+        // Special logic for Lazer/Eventos: if label matches 'Receita de Apartamentos', we MUST filter by CR
+        const crFilter = (item.label === 'Lazer' || item.label === 'Eventos') ? item.label : undefined;
+
+        const namesToTry = item.importNames || [item.label];
+        namesToTry.forEach(name => {
+            valBudget += getImportedValue(name, selectedYear, 'Budget', crFilter);
+            valPrevia += getImportedValue(name, selectedYear, 'Previa', crFilter);
+            valPrevia += getImportedValue(name, selectedYear, 'Real', crFilter); // Actuals go to Previa
+            valReal += 0; // Forecast column starts empty
+            valLY += getImportedValue(name, (selectedYear || 0) - 1, 'Real', crFilter);
+        });
+
+        rows.push(generateRow(item.id, item.code, 'Revenue', item.label, valBudget, valReal, valLY, valPrevia, false, false, 2));
+    });
+
+    // 1.02 Receitas Extras
+    rows.push(generateRow('REV-EXTRA', '1.02', 'Revenue', 'Receitas Extras', 0, 0, 0, 0, true, false, 1));
+
+    const revExtraItems = [
+        { id: 'REV-EXTRA-LAZER', code: '1.02.01', label: 'Lazer', importName: 'Extra Lazer' },
+        { id: 'REV-EXTRA-EVENTOS', code: '1.02.02', label: 'Eventos', importName: 'Extra Eventos' },
+    ];
+
+    revExtraItems.forEach(item => {
+        const valBudget = getImportedValue(item.label, selectedYear, 'Budget');
+        const valPrevia = getImportedValue(item.label, selectedYear, 'Previa') + getImportedValue(item.label, selectedYear, 'Real');
+        const valReal = 0; // Empty Forecast
+        const valLY = getImportedValue(item.label, (selectedYear || 0) - 1, 'Real');
+        rows.push(generateRow(item.id, item.code, 'Revenue', item.label, valBudget, valReal, valLY, valPrevia, false, false, 2));
+    });
+
+    // 1.03 Cancelamento de Time Share
+    const valBudgetTS = getImportedValue('Cancelamento de Time Share', selectedYear, 'Budget');
+    const valPreviaTS = getImportedValue('Cancelamento de Time Share', selectedYear, 'Previa') + getImportedValue('Cancelamento de Time Share', selectedYear, 'Real');
+    const valRealTS = 0;
+    const valLYTS = getImportedValue('Cancelamento de Time Share', (selectedYear || 0) - 1, 'Real');
+    rows.push(generateRow('REV-TIME', '1.03', 'Revenue', 'Cancelamento de Time Share', valBudgetTS, valRealTS, valLYTS, valPreviaTS, false, false, 1));
+
+    // 1.04 Receita de ISS
+    const valBudgetISS = getImportedValue('Receita de ISS', selectedYear, 'Budget');
+    const valPreviaISS = getImportedValue('Receita de ISS', selectedYear, 'Previa') + getImportedValue('Receita de ISS', selectedYear, 'Real');
+    const valRealISS = 0;
+    const valLYISS = getImportedValue('Receita de ISS', (selectedYear || 0) - 1, 'Real');
+    rows.push(generateRow('REV-ISS', '1.04', 'Revenue', 'Receita de ISS', valBudgetISS, valRealISS, valLYISS, valPreviaISS, false, false, 1));
+
+    rows.push(generateRow('SPACER-BEFORE-IMP', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
+
+    // 1.05 Impostos (Azul conforme Receita Líquida, recuo zero)
+    const valBudgetImp = getImportedValue('Impostos', selectedYear, 'Budget');
+    const valPreviaImp = getImportedValue('Impostos', selectedYear, 'Previa') + getImportedValue('Impostos', selectedYear, 'Real');
+    const valRealImp = 0;
+    const valLYImp = getImportedValue('Impostos', (selectedYear || 0) - 1, 'Real');
+    rows.push(generateRow('REV-IMP', '1.05', 'Revenue', 'Impostos', valBudgetImp, valRealImp, valLYImp, valPreviaImp, false, false, 0));
+
+    rows.push(generateRow('SPACER-AFTER-IMP', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
+
+    // 3.00 Receita Líquida
+    rows.push(generateRow('REV-NET', '3.00', 'Revenue', 'RECEITA LÍQUIDA', 0, 0, 0, 0, true, true, 0));
+
+    rows.push(generateRow('SPACER-REV-CST', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
+
+    // 3. COSTS & EXPENSES (Hierarchical Breakdown)
+    rows.push(generateRow('CST-HEAD', '3.00', 'Costs', 'CUSTOS E DESPESAS OPERACIONAIS', 0, 0, 0, 0, true, true, 0));
+
+    // Get unique Package identifiers (Master + Package name) for Expense accounts
+    const expenseAccounts = activeAccounts.filter(a => a.classification === 'Expense');
+
+    // Create unique keys for each Package to avoid name collisions across Masters
+    const packageKeys = Array.from(new Set(expenseAccounts.map(a => `${a.masterPackage || ''}|${a.package || ''}`))).filter(k => k.split('|')[1]);
+
+    const getMinOrder = (accs: Account[]) => Math.min(...accs.map(a => a.sortOrder || 999));
+
+    // Sort all packages by the minimum sortOrder of their accounts
+    const sortedPackageKeys = packageKeys.sort((a, b) => {
+        const [masterA, pkgA] = a.split('|');
+        const [masterB, pkgB] = b.split('|');
+        const orderA = getMinOrder(expenseAccounts.filter(acc => acc.masterPackage === masterA && acc.package === pkgA));
+        const orderB = getMinOrder(expenseAccounts.filter(acc => acc.masterPackage === masterB && acc.package === pkgB));
+        return orderA - orderB || a.localeCompare(b);
+    });
+
+    sortedPackageKeys.forEach(key => {
+        const [masterName, pkgName] = key.split('|');
+        const pkgAccs = expenseAccounts.filter(a => a.masterPackage === masterName && a.package === pkgName);
+        const pkgCode = pkgAccs[0]?.packageCode || '';
+
+        // Check for special drill-down cases
+        const isAdminTI = masterName === 'DESPESAS ADMINISTRATIVAS' && pkgName === 'Despesas Administrativas';
+        const isSalesMkt = masterName === 'DESPESAS COM VENDAS E MARKETING' && pkgName === 'Despesas com Vendas e Marketing';
+        const isServicosTerceiros = pkgName.toUpperCase() === 'SERVIÇOS DE TERCEIROS' || pkgName.toUpperCase() === 'SERVIÇO DE TERCEIROS';
+        const isProvisoes = pkgName.toUpperCase() === 'PROVISÕES GERAIS' || pkgName.toUpperCase() === 'PROVISOES GERAIS';
+
+
+        let pkgBudget = 0; let pkgReal = 0; let pkgPrevia = 0; let pkgLY = 0;
+
+        if (!isAdminTI && !isSalesMkt && !isServicosTerceiros && !isProvisoes) {
+            // STANDARD PACKAGE - Aggregate values directly
+            pkgAccs.forEach(acc => {
+                pkgBudget += getImportedValue(acc.name, selectedYear, 'Budget');
+                pkgPrevia += getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real');
+                pkgReal += getImportedValue(acc.name, selectedYear, 'Forecast');
+                pkgLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
+            });
+            // Fallback: Also check if there's a value directly for the Package name (simplified import)
+            pkgBudget += getImportedValue(pkgName, selectedYear, 'Budget');
+            pkgPrevia += getImportedValue(pkgName, selectedYear, 'Previa') + getImportedValue(pkgName, selectedYear, 'Real');
+            pkgReal += getImportedValue(pkgName, selectedYear, 'Forecast');
+            pkgLY += getImportedValue(pkgName, (selectedYear || 0) - 1, 'Real');
+
+            rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', pkgName, pkgBudget, pkgReal, pkgLY, pkgPrevia, true, false, 1));
+        } else if (isAdminTI) {
+            // --- DESPESAS ADMINISTRATIVAS SPECIAL DRILL DOWN ---
+            rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', 'Despesas Administrativas', 0, 0, 0, 0, true, false, 1));
+
+            let genBudget = 0; let genReal = 0; let genPrevia = 0; let genLY = 0;
+            const tiAccountKeyword = 'processamento';
+
+            pkgAccs.forEach(acc => {
+                if (acc.name.toLowerCase().includes(tiAccountKeyword)) return;
+                genBudget += getImportedValue(acc.name, selectedYear, 'Budget');
+                genPrevia += getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real');
+                genReal += getImportedValue(acc.name, selectedYear, 'Forecast');
+                genLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
+            });
+            rows.push(generateRow(`p-drill-${masterName}-${pkgName}-gerais`, pkgCode, 'Costs', 'Despesas administrativas gerais', genBudget, genReal, genLY, genPrevia, false, false, 2, undefined, { method: 'Fixed' }));
+
+            const subAreas = [
+                { label: 'TI', cr: 'martech' },
+                { label: 'Martech', cr: 'marketing' },
+                { label: 'Outros setores', cr: 'OTHER_EXCEPT_MKT_MAR' }
+            ];
+            const tiAccs = pkgAccs.filter(acc => acc.name.toLowerCase().includes(tiAccountKeyword));
+            if (tiAccs.length > 0) {
+                subAreas.forEach(sub => {
+                    let subBudget = 0; let subPrevia = 0; let subReal = 0; let subLY = 0;
+                    tiAccs.forEach(tiAcc => {
+                        let sB = getImportedValue(tiAcc.name, selectedYear, 'Budget', sub.cr);
+                        let sP = getImportedValue(tiAcc.name, selectedYear, 'Previa', sub.cr) + getImportedValue(tiAcc.name, selectedYear, 'Real', sub.cr);
+                        let sR = getImportedValue(tiAcc.name, selectedYear, 'Forecast', sub.cr);
+                        let sLY = getImportedValue(tiAcc.name, (selectedYear || 0) - 1, 'Real', sub.cr);
+
+                        // Fallback for "Tech" if "martech" CR is empty - try "ti"
+                        if (sub.label === 'TI' && sB === 0 && sP === 0 && sR === 0) {
+                            sB = getImportedValue(tiAcc.name, selectedYear, 'Budget', 'ti');
+                            sP = getImportedValue(tiAcc.name, selectedYear, 'Previa', 'ti') + getImportedValue(tiAcc.name, selectedYear, 'Real', 'ti');
+                            sR = getImportedValue(tiAcc.name, selectedYear, 'Forecast', 'ti');
+                            sLY = getImportedValue(tiAcc.name, (selectedYear || 0) - 1, 'Real', 'ti');
+                        }
+
+                        subBudget += sB; subPrevia += sP; subReal += sR; subLY += sLY;
+                    });
+                    rows.push(generateRow(`p-drill-${masterName}-${pkgName}-${sub.label}`, pkgCode, 'Costs', `Processamentos de dados e TI (${sub.label})`, subBudget, subReal, subLY, subPrevia, false, false, 2, undefined, { method: 'Fixed' }));
+                });
+            }
+        } else if (isSalesMkt) {
+            // --- DESPESAS DE VENDAS E MARKETING SPECIAL DRILL DOWN ---
+            rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', 'Despesas com Vendas e Marketing', 0, 0, 0, 0, true, false, 1));
+            const subAreas = [
+                { label: 'Martech', cr: 'martech' },
+                { label: 'Marketing', cr: 'marketing' },
+                { label: 'Outros setores', cr: 'OTHER_EXCEPT_MKT_MAR' }
+            ];
+            subAreas.forEach(sub => {
+                let subBudget = 0; let subReal = 0; let subPrevia = 0; let subLY = 0;
+                pkgAccs.forEach(acc => {
+                    subBudget += getImportedValue(acc.name, selectedYear, 'Budget', sub.cr);
+                    subPrevia += getImportedValue(acc.name, selectedYear, 'Previa', sub.cr) + getImportedValue(acc.name, selectedYear, 'Real', sub.cr);
+                    subReal += getImportedValue(acc.name, selectedYear, 'Forecast', sub.cr);
+                    subLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real', sub.cr);
+                });
+                // Fallback for "Outros setores" category if something was imported directly for the package
+                if (sub.cr === 'OTHER_EXCEPT_MKT_MAR') {
+                    subBudget += getImportedValue(pkgName, selectedYear, 'Budget');
+                    subPrevia += getImportedValue(pkgName, selectedYear, 'Previa') + getImportedValue(pkgName, selectedYear, 'Real');
+                    subReal += getImportedValue(pkgName, selectedYear, 'Forecast');
+                    subLY += getImportedValue(pkgName, (selectedYear || 0) - 1, 'Real');
+                }
+
+                rows.push(generateRow(`p-drill-${masterName}-${pkgName}-${sub.label}`, pkgCode, 'Costs', `Despesas com Vendas e Marketing (${sub.label})`, subBudget, subReal, subLY, subPrevia, false, false, 2, undefined, { method: 'Fixed' }));
+            });
+        } else if (isServicosTerceiros) {
+            rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', 'Serviços de Terceiros', 0, 0, 0, 0, true, false, 1));
+            const subAreas = [
+                { label: 'Servicos de terceiros temporarios', name: 'Servicos de terceiros temporarios' },
+                { label: 'Serviço de terceiros recorrente', name: 'Serviço de terceiros recorrente' },
+                { label: 'Serviços contratados de prestadores PJ - MEI', name: 'Serviços contratados de prestadores PJ - MEI' }
+            ];
+            subAreas.forEach(sub => {
+                const b = getImportedValue(sub.name, selectedYear, 'Budget');
+                const p = getImportedValue(sub.name, selectedYear, 'Previa') + getImportedValue(sub.name, selectedYear, 'Real');
+                const f = getImportedValue(sub.name, selectedYear, 'Forecast');
+                const ly = getImportedValue(sub.name, (selectedYear || 0) - 1, 'Real');
+                rows.push(generateRow(`p-drill-${masterName}-${pkgName}-${sub.name}`, pkgCode, 'Costs', sub.label, b, f, ly, p, false, false, 2, undefined, { method: 'Fixed' }));
+            });
+        } else if (isProvisoes) {
+            rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', 'Provisões Gerais', 0, 0, 0, 0, true, false, 1));
+            const keyTemp = 'Provisao de servicos de terceiros temporarios';
+            const tB = getImportedValue(keyTemp, selectedYear, 'Budget');
+            const tP = getImportedValue(keyTemp, selectedYear, 'Previa') + getImportedValue(keyTemp, selectedYear, 'Real');
+            const tF = getImportedValue(keyTemp, selectedYear, 'Forecast');
+            const tLY = getImportedValue(keyTemp, (selectedYear || 0) - 1, 'Real');
+
+            rows.push(generateRow(`p-drill-${masterName}-${pkgName}-temporarios`, pkgCode, 'Costs', keyTemp, tB, tF, tLY, tP, false, false, 2, undefined, { method: 'Fixed' }));
+
+            let oB = 0; let oP = 0; let oF = 0; let oLY = 0;
+
+            oB += getImportedValue('Provisoes gerais', selectedYear, 'Budget');
+            oP += getImportedValue('Provisoes gerais', selectedYear, 'Previa') + getImportedValue('Provisoes gerais', selectedYear, 'Real');
+            oF += getImportedValue('Provisoes gerais', selectedYear, 'Forecast');
+            oLY += getImportedValue('Provisoes gerais', (selectedYear || 0) - 1, 'Real');
+
+            // Fallback for direct import of "Outras provisões"
+            oB += getImportedValue('Outras provisões', selectedYear, 'Budget');
+            oP += getImportedValue('Outras provisões', selectedYear, 'Previa') + getImportedValue('Outras provisões', selectedYear, 'Real');
+            oF += getImportedValue('Outras provisões', selectedYear, 'Forecast');
+            oLY += getImportedValue('Outras provisões', (selectedYear || 0) - 1, 'Real');
+
+            pkgAccs.forEach(acc => {
+                if (acc.name.toLowerCase() === keyTemp.toLowerCase()) return;
+                if (acc.name.toLowerCase() === 'provisoes gerais') return;
+
+                oB += getImportedValue(acc.name, selectedYear, 'Budget');
+                oP += getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real');
+                oF += getImportedValue(acc.name, selectedYear, 'Forecast');
+                oLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
+            });
+
+            rows.push(generateRow(`p-drill-${masterName}-${pkgName}-outras`, pkgCode, 'Costs', 'Outras provisões', oB, oF, oLY, oP, false, false, 2, undefined, { method: 'Fixed' }));
+        }
+    });
+
+    // 4. RESULTS
+    rows.push(generateRow('SPACER-RES', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
+    rows.push(generateRow('RES-OP-SEM-IMP', '6.00.00', 'Result', 'RESULTADO OPERACIONAL (G.O.P) SEM IMPOSTOS', 0, 0, 0, 0, true, true, 0));
+    rows.push(generateRow('RES-OP-COM-IMP', '6.01.00', 'Result', 'RESULTADO OPERACIONAL (G.O.P) COM IMPOSTOS', 0, 0, 0, 0, true, true, 0));
+
+    // KPI: Transformação / Reatividade
+    rows.push(generateRow('KPI-TRANS-BUDGET', '', 'Result', 'Transformação/Reatividade (Meta)', 0, 0, 0, 0, true, true, 0));
+    rows.push(generateRow('KPI-TRANS-LY', '', 'Result', 'Transformação/Reatividade (Ano Anterior)', 0, 0, 0, 0, true, true, 0));
+
+    const applyOverrides = () => {
+        const activeHotelCodeUpper = activeHotelCode.trim().toUpperCase();
+        const selHotelNameUpper = (selectedHotelName || '').trim().toUpperCase();
+
+        rows.forEach(r => {
+            const targetName = `override_${r.id}`.toLowerCase();
+
+            const tryOverride = (scenarioKey: string) => {
+                for (const h of [selHotelNameUpper, activeHotelCodeUpper].filter(Boolean)) {
+                    const key = `${selectedYear}|${selectedMonth}|${h}|${scenarioKey}|${targetName}`;
+                    if (dataIndex.has(key)) {
+                        return dataIndex.get(key);
+                    }
+                }
+                return undefined;
+            };
+
+            const realOverride = tryOverride('REAL');
+            if (realOverride !== undefined) {
+                r.real = realOverride;
+                r.isManualOverride = true;
+                if (r.forecastConfig) r.forecastConfig.manualValue = realOverride;
+            }
+
+            const previaOverride = tryOverride('PREVIA');
+            if (previaOverride !== undefined) {
+                r.previa = previaOverride;
+                r.isManualPreviaOverride = true;
+                if (r.previaConfig) r.previaConfig.manualValue = previaOverride;
+            }
+        });
+    };
+    applyOverrides();
+
+    return rows;
 };
 
 export const getDynamicForecastData = (
     structure: DreSection[],
-    selectedMonth?: number, 
-    selectedYear?: number, 
+    selectedMonth?: number,
+    selectedYear?: number,
     importedData: ImportedRow[] = [],
     selectedHotelName?: string,
     currentHotels: Hotel[] = mockHotels,
@@ -983,344 +983,344 @@ export const getDynamicForecastData = (
     currentPackages: CostPackage[] = mockPackages,
     budgetOccupancyData: Record<string, number[]> = {}
 ): ForecastRow[] => {
-  const rows: ForecastRow[] = [];
+    const rows: ForecastRow[] = [];
 
-  // --- REUSE INDEXING LOGIC FROM getForecastData (Internal implementation) ---
-  const dataIndex = new Map<string, number>();
-  if (selectedMonth && selectedYear && importedData.length > 0) {
-      importedData.forEach(row => {
-          if (row.status !== 'valid') return;
-          const rYear = parseInt(row.ano);
-          const rMonth = parseInt(row.mes);
-          if (rMonth !== selectedMonth) return;
-          if (rYear !== selectedYear && rYear !== (selectedYear - 1)) return;
-          const scen = (row.cenario || '').trim().toLowerCase();
-          let normScenario = '';
-          if (scen === 'real' || scen === 'realizado') normScenario = 'REAL';
-          else if (scen === 'budget' || scen === 'meta' || scen === 'orcamento' || scen === 'orçamento') normScenario = 'BUDGET';
-          else if (scen === 'previa' || scen === 'prévia' || scen === 'flash') normScenario = 'PREVIA';
-          else if (scen === 'forecast' || scen === 'projeção') normScenario = 'FORECAST';
-          else return; 
-          const isCurrentYear = (rYear === selectedYear);
-          if (row.versionId && isCurrentYear) {
-              if (normScenario === 'FORECAST') {
-                  // DRE Forecast imports: versionId must match the active Real version only
-                  const matchesReal = activeRealVersionId && row.versionId === activeRealVersionId;
-                  if (activeRealVersionId && !matchesReal) return;
-              } else {
-                  const matchesBudget = activeBudgetVersionId && row.versionId === activeBudgetVersionId;
-                  const matchesReal = activeRealVersionId && row.versionId === activeRealVersionId;
-                  // If the page has active versions selected, only accept rows that match one of them
-                  if (activeBudgetVersionId || activeRealVersionId) {
-                      if (!matchesBudget && !matchesReal) return;
-                  }
-              }
-          }
-          const normHotel = row.hotel.trim().toUpperCase();
-          const val = parseFloat(row.valor.replace(',', '.'));
-          if (isNaN(val)) return;
-          const normConta = row.conta.trim().toLowerCase();
-          const normCR = (row.cr || '').trim().toLowerCase();
-          const keyConta = `${rYear}|${rMonth}|${normHotel}|${normScenario}|${normConta}`;
-          dataIndex.set(keyConta, (dataIndex.get(keyConta) || 0) + val);
-          if (normCR) {
-              const keyContaCR = `${rYear}|${rMonth}|${normHotel}|${normScenario}|${normConta}|${normCR}`;
-              dataIndex.set(keyContaCR, (dataIndex.get(keyContaCR) || 0) + val);
-          }
-      });
-  }
+    // --- REUSE INDEXING LOGIC FROM getForecastData (Internal implementation) ---
+    const dataIndex = new Map<string, number>();
+    if (selectedMonth && selectedYear && importedData.length > 0) {
+        importedData.forEach(row => {
+            if (row.status !== 'valid') return;
+            const rYear = parseInt(row.ano);
+            const rMonth = parseInt(row.mes);
+            if (rMonth !== selectedMonth) return;
+            if (rYear !== selectedYear && rYear !== (selectedYear - 1)) return;
+            const scen = (row.cenario || '').trim().toLowerCase();
+            let normScenario = '';
+            if (scen === 'real' || scen === 'realizado') normScenario = 'REAL';
+            else if (scen === 'budget' || scen === 'meta' || scen === 'orcamento' || scen === 'orçamento') normScenario = 'BUDGET';
+            else if (scen === 'previa' || scen === 'prévia' || scen === 'flash') normScenario = 'PREVIA';
+            else if (scen === 'forecast' || scen === 'projeção') normScenario = 'FORECAST';
+            else return;
+            const isCurrentYear = (rYear === selectedYear);
+            if (row.versionId && isCurrentYear) {
+                if (normScenario === 'FORECAST') {
+                    // DRE Forecast imports: versionId must match the active Real version only
+                    const matchesReal = activeRealVersionId && row.versionId === activeRealVersionId;
+                    if (activeRealVersionId && !matchesReal) return;
+                } else {
+                    const matchesBudget = activeBudgetVersionId && row.versionId === activeBudgetVersionId;
+                    const matchesReal = activeRealVersionId && row.versionId === activeRealVersionId;
+                    // If the page has active versions selected, only accept rows that match one of them
+                    if (activeBudgetVersionId || activeRealVersionId) {
+                        if (!matchesBudget && !matchesReal) return;
+                    }
+                }
+            }
+            const normHotel = row.hotel.trim().toUpperCase();
+            const val = parseFloat(row.valor.replace(',', '.'));
+            if (isNaN(val)) return;
+            const normConta = row.conta.trim().toLowerCase();
+            const normCR = (row.cr || '').trim().toLowerCase();
+            const keyConta = `${rYear}|${rMonth}|${normHotel}|${normScenario}|${normConta}`;
+            dataIndex.set(keyConta, (dataIndex.get(keyConta) || 0) + val);
+            if (normCR) {
+                const keyContaCR = `${rYear}|${rMonth}|${normHotel}|${normScenario}|${normConta}|${normCR}`;
+                dataIndex.set(keyContaCR, (dataIndex.get(keyContaCR) || 0) + val);
+            }
+        });
+    }
 
-  const activeHotel = currentHotels.find(h => h.name === selectedHotelName);
-  const activeHotelCode = activeHotel ? activeHotel.code : '';
+    const activeHotel = currentHotels.find(h => h.name === selectedHotelName);
+    const activeHotelCode = activeHotel ? activeHotel.code : '';
 
-  const getImportedValue = (accountName: string, targetYear: number | undefined, valueCategory: 'Real' | 'Budget' | 'Previa' | 'Forecast', crFilter?: string) => {
-    if (!selectedMonth || !targetYear) return 0;
-    const targetName = accountName.trim().toLowerCase();
-    const targetCR = crFilter?.trim().toLowerCase();
-    let targetScenario = '';
-    if (valueCategory === 'Real') targetScenario = 'REAL';
-    else if (valueCategory === 'Budget') targetScenario = 'BUDGET';
-    else if (valueCategory === 'Previa') targetScenario = 'PREVIA';
-    else targetScenario = 'FORECAST';
-    const hotelsToTry = [selectedHotelName, activeHotelCode].filter(Boolean) as string[];
-    let total = 0;
-    hotelsToTry.forEach(h => {
-        const baseKey = `${targetYear}|${selectedMonth}|${h.trim().toUpperCase()}|${targetScenario}|${targetName}`;
-        if (targetCR === 'OTHER_EXCEPT_MKT_MAR') {
-             // Logic: Total - Martech - Marketing
-             const totalVal = dataIndex.get(baseKey) || 0;
-             const martechVal = dataIndex.get(`${baseKey}|martech`) || 0;
-             const mktVal = dataIndex.get(`${baseKey}|marketing`) || 0;
-             total += (totalVal - martechVal - mktVal);
-        } else if (targetCR) {
-            total += dataIndex.get(`${baseKey}|${targetCR}`) || 0;
-        } else {
-            total += dataIndex.get(baseKey) || 0;
-        }
-    });
-    return total;
-  };
+    const getImportedValue = (accountName: string, targetYear: number | undefined, valueCategory: 'Real' | 'Budget' | 'Previa' | 'Forecast', crFilter?: string) => {
+        if (!selectedMonth || !targetYear) return 0;
+        const targetName = accountName.trim().toLowerCase();
+        const targetCR = crFilter?.trim().toLowerCase();
+        let targetScenario = '';
+        if (valueCategory === 'Real') targetScenario = 'REAL';
+        else if (valueCategory === 'Budget') targetScenario = 'BUDGET';
+        else if (valueCategory === 'Previa') targetScenario = 'PREVIA';
+        else targetScenario = 'FORECAST';
+        const hotelsToTry = [selectedHotelName, activeHotelCode].filter(Boolean) as string[];
+        let total = 0;
+        hotelsToTry.forEach(h => {
+            const baseKey = `${targetYear}|${selectedMonth}|${h.trim().toUpperCase()}|${targetScenario}|${targetName}`;
+            if (targetCR === 'OTHER_EXCEPT_MKT_MAR') {
+                // Logic: Total - Martech - Marketing
+                const totalVal = dataIndex.get(baseKey) || 0;
+                const martechVal = dataIndex.get(`${baseKey}|martech`) || 0;
+                const mktVal = dataIndex.get(`${baseKey}|marketing`) || 0;
+                total += (totalVal - martechVal - mktVal);
+            } else if (targetCR) {
+                total += dataIndex.get(`${baseKey}|${targetCR}`) || 0;
+            } else {
+                total += dataIndex.get(baseKey) || 0;
+            }
+        });
+        return total;
+    };
 
-  const getRealOccValue = (rowId: string) => {
-    const contextKey = `${selectedHotelName}_${selectedYear}_${selectedMonth}`;
-    return realOccupancyData[contextKey]?.[rowId];
-  };
+    const getRealOccValue = (rowId: string) => {
+        const contextKey = `${selectedHotelName}_${selectedYear}_${selectedMonth}`;
+        return realOccupancyData[contextKey]?.[rowId];
+    };
 
-  // --- BUILD ROWS BASED ON STRUCTURE ---
-  structure.forEach(section => {
-    // 1. Header Row
-    rows.push(generateRow(
-      section.id, 
-      '', 
-      'Section', 
-      section.name, 
-      0, 0, 0, 0, 
-      true, 
-      section.isTotal, 
-      0,
-      undefined,
-      { inputType: 'none', format: 'currency' }
-    ));
-
-    // 2. Packages within section
-    section.packages.forEach(pkg => {
-      // Special indicators check
-      if (pkg.name.startsWith('IND-')) {
-          // Handle built-in indicators like REVPAR, etc.
-          // For now, let's just map them if they exist in our indicator logic
-          // (Simplified for this version)
-      }
-
-      const valBudget = getImportedValue(pkg.name, selectedYear, 'Budget');
-      const valPrevia = getImportedValue(pkg.name, selectedYear, 'Previa') + getImportedValue(pkg.name, selectedYear, 'Real'); // Actuals to Previa
-      const valReal = getImportedValue(pkg.name, selectedYear, 'Forecast'); // Forecast
-
-      const valLY = getImportedValue(pkg.name, (selectedYear || 0) - 1, 'Real');
-
-      rows.push(generateRow(
-        pkg.id, 
-        '', 
-        'Package', 
-        pkg.name, 
-        valBudget, valReal, valLY, valPrevia, 
-        true, 
-        pkg.isTotal, 
-        1
-      ));
-
-      // 3. Optional: Accounts within package
-      const pkgAccs = currentAccounts.filter(a => a.package === pkg.name || a.packageId === pkg.id);
-      
-      const isAdminPkg = pkg.name.toUpperCase() === 'DESPESAS ADMINISTRATIVAS';
-      const isSalesMktPkg = pkg.name.toUpperCase() === 'DESPESAS COM VENDAS E MARKETING';
-      const isServicosTerceirosPkg = pkg.name.toUpperCase() === 'SERVIÇOS DE TERCEIROS' || pkg.name.toUpperCase() === 'SERVIÇO DE TERCEIROS';
-      const isProvisoesPkg = pkg.name.toUpperCase() === 'PROVISÕES GERAIS' || pkg.name.toUpperCase() === 'PROVISOES GERAIS';
-
-      if (isAdminPkg) {
-          // --- SPECIAL CASE: ADMINISTRATIVAS ---
-          // 1. Despesas administrativas gerais (All except TI)
-          let genBudget = 0; let genReal = 0; let genPrevia = 0; let genLY = 0;
-          const tiAccountKeyword = 'processamento';
-          
-          pkgAccs.forEach(acc => {
-              if (acc.name.toLowerCase().includes(tiAccountKeyword)) return;
-              genBudget += getImportedValue(acc.name, selectedYear, 'Budget');
-              genPrevia += getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real');
-              genReal += getImportedValue(acc.name, selectedYear, 'Forecast');
-              genLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
-          });
-          rows.push(generateRow(`p-drill-${pkg.id}-gerais`, '', 'Account', 'Despesas administrativas gerais', genBudget, genReal, genLY, genPrevia, false, false, 2, undefined, { method: 'Fixed' }));
-
-          // 2. TI Breakdown
-          const tiAccounts = pkgAccs.filter(acc => acc.name.toLowerCase().includes(tiAccountKeyword));
-          if (tiAccounts.length > 0) {
-              const subAreas = [
-                  { label: 'TI', cr: 'martech' },
-                  { label: 'Martech', cr: 'marketing' },
-                  { label: 'Outros', cr: 'OTHER_EXCEPT_MKT_MAR' }
-              ];
-              subAreas.forEach(sub => {
-                  const subLabel = `Processamento de dados e TI (${sub.label})`;
-                  let accBudget = 0; let accPrevia = 0; let accLY = 0; let accReal = 0;
-                  
-                  tiAccounts.forEach(tiAcc => {
-                      let b = getImportedValue(tiAcc.name, selectedYear, 'Budget', sub.cr);
-                      let p = getImportedValue(tiAcc.name, selectedYear, 'Previa', sub.cr);
-                      let r = getImportedValue(tiAcc.name, selectedYear, 'Real', sub.cr);
-                      let f = getImportedValue(tiAcc.name, selectedYear, 'Forecast', sub.cr);
-                      let ly = getImportedValue(tiAcc.name, (selectedYear || 0) - 1, 'Real', sub.cr);
-
-                      // Fallback for Tech -> try 'ti' CR
-                      if (sub.label === 'TI' && b === 0 && (p + r + f) === 0) {
-                          b = getImportedValue(tiAcc.name, selectedYear, 'Budget', 'ti');
-                          p = getImportedValue(tiAcc.name, selectedYear, 'Previa', 'ti');
-                          r = getImportedValue(tiAcc.name, selectedYear, 'Real', 'ti');
-                          f = getImportedValue(tiAcc.name, selectedYear, 'Forecast', 'ti');
-                          ly = getImportedValue(tiAcc.name, (selectedYear || 0) - 1, 'Real', 'ti');
-                      }
-
-                      accBudget += b;
-                      accPrevia += (p + r);
-                      accReal += f;
-                      accLY += ly;
-                  });
-
-                  rows.push(generateRow(`p-drill-${pkg.id}-${sub.label}`, '', 'Account', subLabel, accBudget, accReal, accLY, accPrevia, false, false, 2, undefined, { method: 'Fixed' }));
-              });
-          }
-          return; // Skip normal accounts
-      }
-
-      if (isSalesMktPkg) {
-          // --- SPECIAL CASE: SALES & MKT ---
-          const mktAccountKeyword = 'vendas';
-          const mktAccounts = pkgAccs.filter(acc => acc.name.toLowerCase().includes(mktAccountKeyword));
-          
-          const subAreas = [
-              { label: 'Martech', cr: 'martech' },
-              { label: 'Marketing', cr: 'marketing' },
-              { label: 'Outros setores', cr: 'OTHER_EXCEPT_MKT_MAR' }
-          ];
-          subAreas.forEach(sub => {
-              const subLabel = `Despesas com Vendas e Marketing (${sub.label})`;
-              
-              let sBudget = 0; let sPrevia = 0; let sLY = 0; let sReal = 0;
-              
-              if (mktAccounts.length > 0) {
-                mktAccounts.forEach(mktAcc => {
-                  const b = getImportedValue(mktAcc.name, selectedYear, 'Budget', sub.cr);
-                  const p = getImportedValue(mktAcc.name, selectedYear, 'Previa', sub.cr);
-                  const r = getImportedValue(mktAcc.name, selectedYear, 'Real', sub.cr);
-                  const f = getImportedValue(mktAcc.name, selectedYear, 'Forecast', sub.cr);
-                  const ly = getImportedValue(mktAcc.name, (selectedYear || 0) - 1, 'Real', sub.cr);
-
-                  sBudget += b;
-                  sPrevia += (p + r);
-                  sReal += f;
-                  sLY += ly;
-                });
-              }
-
-              // Fallback for "Outros setores" if something was imported directly for the package
-              if (sub.cr === 'OTHER_EXCEPT_MKT_MAR') {
-                  sBudget += getImportedValue(pkg.name, selectedYear, 'Budget');
-                  sPrevia += getImportedValue(pkg.name, selectedYear, 'Previa') + getImportedValue(pkg.name, selectedYear, 'Real');
-                  sReal += getImportedValue(pkg.name, selectedYear, 'Forecast');
-                  sLY += getImportedValue(pkg.name, (selectedYear || 0) - 1, 'Real');
-              }
-
-              rows.push(generateRow(`p-drill-${pkg.id}-${sub.label}`, '', 'Account', subLabel, sBudget, sReal, sLY, sPrevia, false, false, 2, undefined, { method: 'Fixed' }));
-          });
-          return; // Skip normal accounts
-      }
-
-      if (isServicosTerceirosPkg) {
-          // --- SPECIAL CASE: SERVIÇOS DE TERCEIROS ---
-          const subAreas = [
-               { label: 'Servicos de terceiros temporarios', name: 'Servicos de terceiros temporarios' },
-               { label: 'Serviço de terceiros recorrente', name: 'Serviço de terceiros recorrente' },
-               { label: 'Serviços contratados de prestadores PJ - MEI', name: 'Serviços contratados de prestadores PJ - MEI' }
-          ];
-          
-          subAreas.forEach(sub => {
-              const b = getImportedValue(sub.name, selectedYear, 'Budget');
-              const p = getImportedValue(sub.name, selectedYear, 'Previa') + getImportedValue(sub.name, selectedYear, 'Real');
-              const f = getImportedValue(sub.name, selectedYear, 'Forecast');
-              const ly = getImportedValue(sub.name, (selectedYear || 0) - 1, 'Real');
-              rows.push(generateRow(`p-drill-${pkg.id}-${sub.name}`, '', 'Account', sub.label, b, f, ly, p, false, false, 2, undefined, { method: 'Fixed' }));
-          });
-          return; // Skip normal accounts
-      }
-
-      if (isProvisoesPkg) {
-          // --- SPECIAL CASE: PROVISOES GERAIS ---
-          const keyTemp = 'Provisao de servicos de terceiros temporarios';
-          const tB = getImportedValue(keyTemp, selectedYear, 'Budget');
-          const tP = getImportedValue(keyTemp, selectedYear, 'Previa') + getImportedValue(keyTemp, selectedYear, 'Real');
-          const tF = getImportedValue(keyTemp, selectedYear, 'Forecast');
-          const tLY = getImportedValue(keyTemp, (selectedYear || 0) - 1, 'Real');
-          
-          rows.push(generateRow(`p-drill-${pkg.id}-temporarios`, '', 'Account', keyTemp, tB, tF, tLY, tP, false, false, 2, undefined, { method: 'Fixed' }));
-
-          let oB = 0; let oP = 0; let oF = 0; let oLY = 0;
-          
-          oB += getImportedValue('Provisoes gerais', selectedYear, 'Budget');
-          oP += getImportedValue('Provisoes gerais', selectedYear, 'Previa') + getImportedValue('Provisoes gerais', selectedYear, 'Real');
-          oF += getImportedValue('Provisoes gerais', selectedYear, 'Forecast');
-          oLY += getImportedValue('Provisoes gerais', (selectedYear || 0) - 1, 'Real');
-
-          pkgAccs.forEach(acc => {
-              if (acc.name.toLowerCase() === keyTemp.toLowerCase()) return;
-              if (acc.name.toLowerCase() === 'provisoes gerais') return;
-              
-              oB += getImportedValue(acc.name, selectedYear, 'Budget');
-              oP += getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real');
-              oF += getImportedValue(acc.name, selectedYear, 'Forecast');
-              oLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
-          });
-
-          rows.push(generateRow(`p-drill-${pkg.id}-outras`, '', 'Account', 'Outras provisões', oB, oF, oLY, oP, false, false, 2, undefined, { method: 'Fixed' }));
-          return; // Skip normal accounts
-      }
-
-      pkgAccs.forEach(acc => {
-        const accBudget = getImportedValue(acc.name, selectedYear, 'Budget');
-        const accPrevia = getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real');
-        const accReal = getImportedValue(acc.name, selectedYear, 'Forecast');
-        const accLY = getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
-
+    // --- BUILD ROWS BASED ON STRUCTURE ---
+    structure.forEach(section => {
+        // 1. Header Row
         rows.push(generateRow(
-          acc.id, 
-          acc.code, 
-          'Account', 
-          acc.name, 
-          accBudget, accReal, accLY, accPrevia, 
-          false, 
-          false, 
-          2,
-          undefined,
-          { method: 'Fixed' }
+            section.id,
+            '',
+            'Section',
+            section.name,
+            0, 0, 0, 0,
+            true,
+            section.isTotal,
+            0,
+            undefined,
+            { inputType: 'none', format: 'currency' }
         ));
-      });
+
+        // 2. Packages within section
+        section.packages.forEach(pkg => {
+            // Special indicators check
+            if (pkg.name.startsWith('IND-')) {
+                // Handle built-in indicators like REVPAR, etc.
+                // For now, let's just map them if they exist in our indicator logic
+                // (Simplified for this version)
+            }
+
+            const valBudget = getImportedValue(pkg.name, selectedYear, 'Budget');
+            const valPrevia = getImportedValue(pkg.name, selectedYear, 'Previa') + getImportedValue(pkg.name, selectedYear, 'Real'); // Actuals to Previa
+            const valReal = getImportedValue(pkg.name, selectedYear, 'Forecast'); // Forecast
+
+            const valLY = getImportedValue(pkg.name, (selectedYear || 0) - 1, 'Real');
+
+            rows.push(generateRow(
+                pkg.id,
+                '',
+                'Package',
+                pkg.name,
+                valBudget, valReal, valLY, valPrevia,
+                true,
+                pkg.isTotal,
+                1
+            ));
+
+            // 3. Optional: Accounts within package
+            const pkgAccs = currentAccounts.filter(a => a.package === pkg.name || a.packageId === pkg.id);
+
+            const isAdminPkg = pkg.name.toUpperCase() === 'DESPESAS ADMINISTRATIVAS';
+            const isSalesMktPkg = pkg.name.toUpperCase() === 'DESPESAS COM VENDAS E MARKETING';
+            const isServicosTerceirosPkg = pkg.name.toUpperCase() === 'SERVIÇOS DE TERCEIROS' || pkg.name.toUpperCase() === 'SERVIÇO DE TERCEIROS';
+            const isProvisoesPkg = pkg.name.toUpperCase() === 'PROVISÕES GERAIS' || pkg.name.toUpperCase() === 'PROVISOES GERAIS';
+
+            if (isAdminPkg) {
+                // --- SPECIAL CASE: ADMINISTRATIVAS ---
+                // 1. Despesas administrativas gerais (All except TI)
+                let genBudget = 0; let genReal = 0; let genPrevia = 0; let genLY = 0;
+                const tiAccountKeyword = 'processamento';
+
+                pkgAccs.forEach(acc => {
+                    if (acc.name.toLowerCase().includes(tiAccountKeyword)) return;
+                    genBudget += getImportedValue(acc.name, selectedYear, 'Budget');
+                    genPrevia += getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real');
+                    genReal += getImportedValue(acc.name, selectedYear, 'Forecast');
+                    genLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
+                });
+                rows.push(generateRow(`p-drill-${pkg.id}-gerais`, '', 'Account', 'Despesas administrativas gerais', genBudget, genReal, genLY, genPrevia, false, false, 2, undefined, { method: 'Fixed' }));
+
+                // 2. TI Breakdown
+                const tiAccounts = pkgAccs.filter(acc => acc.name.toLowerCase().includes(tiAccountKeyword));
+                if (tiAccounts.length > 0) {
+                    const subAreas = [
+                        { label: 'TI', cr: 'martech' },
+                        { label: 'Martech', cr: 'marketing' },
+                        { label: 'Outros', cr: 'OTHER_EXCEPT_MKT_MAR' }
+                    ];
+                    subAreas.forEach(sub => {
+                        const subLabel = `Processamento de dados e TI (${sub.label})`;
+                        let accBudget = 0; let accPrevia = 0; let accLY = 0; let accReal = 0;
+
+                        tiAccounts.forEach(tiAcc => {
+                            let b = getImportedValue(tiAcc.name, selectedYear, 'Budget', sub.cr);
+                            let p = getImportedValue(tiAcc.name, selectedYear, 'Previa', sub.cr);
+                            let r = getImportedValue(tiAcc.name, selectedYear, 'Real', sub.cr);
+                            let f = getImportedValue(tiAcc.name, selectedYear, 'Forecast', sub.cr);
+                            let ly = getImportedValue(tiAcc.name, (selectedYear || 0) - 1, 'Real', sub.cr);
+
+                            // Fallback for Tech -> try 'ti' CR
+                            if (sub.label === 'TI' && b === 0 && (p + r + f) === 0) {
+                                b = getImportedValue(tiAcc.name, selectedYear, 'Budget', 'ti');
+                                p = getImportedValue(tiAcc.name, selectedYear, 'Previa', 'ti');
+                                r = getImportedValue(tiAcc.name, selectedYear, 'Real', 'ti');
+                                f = getImportedValue(tiAcc.name, selectedYear, 'Forecast', 'ti');
+                                ly = getImportedValue(tiAcc.name, (selectedYear || 0) - 1, 'Real', 'ti');
+                            }
+
+                            accBudget += b;
+                            accPrevia += (p + r);
+                            accReal += f;
+                            accLY += ly;
+                        });
+
+                        rows.push(generateRow(`p-drill-${pkg.id}-${sub.label}`, '', 'Account', subLabel, accBudget, accReal, accLY, accPrevia, false, false, 2, undefined, { method: 'Fixed' }));
+                    });
+                }
+                return; // Skip normal accounts
+            }
+
+            if (isSalesMktPkg) {
+                // --- SPECIAL CASE: SALES & MKT ---
+                const mktAccountKeyword = 'vendas';
+                const mktAccounts = pkgAccs.filter(acc => acc.name.toLowerCase().includes(mktAccountKeyword));
+
+                const subAreas = [
+                    { label: 'Martech', cr: 'martech' },
+                    { label: 'Marketing', cr: 'marketing' },
+                    { label: 'Outros setores', cr: 'OTHER_EXCEPT_MKT_MAR' }
+                ];
+                subAreas.forEach(sub => {
+                    const subLabel = `Despesas com Vendas e Marketing (${sub.label})`;
+
+                    let sBudget = 0; let sPrevia = 0; let sLY = 0; let sReal = 0;
+
+                    if (mktAccounts.length > 0) {
+                        mktAccounts.forEach(mktAcc => {
+                            const b = getImportedValue(mktAcc.name, selectedYear, 'Budget', sub.cr);
+                            const p = getImportedValue(mktAcc.name, selectedYear, 'Previa', sub.cr);
+                            const r = getImportedValue(mktAcc.name, selectedYear, 'Real', sub.cr);
+                            const f = getImportedValue(mktAcc.name, selectedYear, 'Forecast', sub.cr);
+                            const ly = getImportedValue(mktAcc.name, (selectedYear || 0) - 1, 'Real', sub.cr);
+
+                            sBudget += b;
+                            sPrevia += (p + r);
+                            sReal += f;
+                            sLY += ly;
+                        });
+                    }
+
+                    // Fallback for "Outros setores" if something was imported directly for the package
+                    if (sub.cr === 'OTHER_EXCEPT_MKT_MAR') {
+                        sBudget += getImportedValue(pkg.name, selectedYear, 'Budget');
+                        sPrevia += getImportedValue(pkg.name, selectedYear, 'Previa') + getImportedValue(pkg.name, selectedYear, 'Real');
+                        sReal += getImportedValue(pkg.name, selectedYear, 'Forecast');
+                        sLY += getImportedValue(pkg.name, (selectedYear || 0) - 1, 'Real');
+                    }
+
+                    rows.push(generateRow(`p-drill-${pkg.id}-${sub.label}`, '', 'Account', subLabel, sBudget, sReal, sLY, sPrevia, false, false, 2, undefined, { method: 'Fixed' }));
+                });
+                return; // Skip normal accounts
+            }
+
+            if (isServicosTerceirosPkg) {
+                // --- SPECIAL CASE: SERVIÇOS DE TERCEIROS ---
+                const subAreas = [
+                    { label: 'Servicos de terceiros temporarios', name: 'Servicos de terceiros temporarios' },
+                    { label: 'Serviço de terceiros recorrente', name: 'Serviço de terceiros recorrente' },
+                    { label: 'Serviços contratados de prestadores PJ - MEI', name: 'Serviços contratados de prestadores PJ - MEI' }
+                ];
+
+                subAreas.forEach(sub => {
+                    const b = getImportedValue(sub.name, selectedYear, 'Budget');
+                    const p = getImportedValue(sub.name, selectedYear, 'Previa') + getImportedValue(sub.name, selectedYear, 'Real');
+                    const f = getImportedValue(sub.name, selectedYear, 'Forecast');
+                    const ly = getImportedValue(sub.name, (selectedYear || 0) - 1, 'Real');
+                    rows.push(generateRow(`p-drill-${pkg.id}-${sub.name}`, '', 'Account', sub.label, b, f, ly, p, false, false, 2, undefined, { method: 'Fixed' }));
+                });
+                return; // Skip normal accounts
+            }
+
+            if (isProvisoesPkg) {
+                // --- SPECIAL CASE: PROVISOES GERAIS ---
+                const keyTemp = 'Provisao de servicos de terceiros temporarios';
+                const tB = getImportedValue(keyTemp, selectedYear, 'Budget');
+                const tP = getImportedValue(keyTemp, selectedYear, 'Previa') + getImportedValue(keyTemp, selectedYear, 'Real');
+                const tF = getImportedValue(keyTemp, selectedYear, 'Forecast');
+                const tLY = getImportedValue(keyTemp, (selectedYear || 0) - 1, 'Real');
+
+                rows.push(generateRow(`p-drill-${pkg.id}-temporarios`, '', 'Account', keyTemp, tB, tF, tLY, tP, false, false, 2, undefined, { method: 'Fixed' }));
+
+                let oB = 0; let oP = 0; let oF = 0; let oLY = 0;
+
+                oB += getImportedValue('Provisoes gerais', selectedYear, 'Budget');
+                oP += getImportedValue('Provisoes gerais', selectedYear, 'Previa') + getImportedValue('Provisoes gerais', selectedYear, 'Real');
+                oF += getImportedValue('Provisoes gerais', selectedYear, 'Forecast');
+                oLY += getImportedValue('Provisoes gerais', (selectedYear || 0) - 1, 'Real');
+
+                pkgAccs.forEach(acc => {
+                    if (acc.name.toLowerCase() === keyTemp.toLowerCase()) return;
+                    if (acc.name.toLowerCase() === 'provisoes gerais') return;
+
+                    oB += getImportedValue(acc.name, selectedYear, 'Budget');
+                    oP += getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real');
+                    oF += getImportedValue(acc.name, selectedYear, 'Forecast');
+                    oLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
+                });
+
+                rows.push(generateRow(`p-drill-${pkg.id}-outras`, '', 'Account', 'Outras provisões', oB, oF, oLY, oP, false, false, 2, undefined, { method: 'Fixed' }));
+                return; // Skip normal accounts
+            }
+
+            pkgAccs.forEach(acc => {
+                const accBudget = getImportedValue(acc.name, selectedYear, 'Budget');
+                const accPrevia = getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real');
+                const accReal = getImportedValue(acc.name, selectedYear, 'Forecast');
+                const accLY = getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
+
+                rows.push(generateRow(
+                    acc.id,
+                    acc.code,
+                    'Account',
+                    acc.name,
+                    accBudget, accReal, accLY, accPrevia,
+                    false,
+                    false,
+                    2,
+                    undefined,
+                    { method: 'Fixed' }
+                ));
+            });
+        });
+
+        // Add a spacer after each section
+        rows.push(generateRow(`spacer-${section.id}`, '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
     });
 
-    // Add a spacer after each section
-    rows.push(generateRow(`spacer-${section.id}`, '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
-  });
+    const applyOverrides = () => {
+        const activeHotelCodeUpper = activeHotelCode.trim().toUpperCase();
+        const selHotelNameUpper = (selectedHotelName || '').trim().toUpperCase();
 
-  const applyOverrides = () => {
-      const activeHotelCodeUpper = activeHotelCode.trim().toUpperCase();
-      const selHotelNameUpper = (selectedHotelName || '').trim().toUpperCase();
-      
-      rows.forEach(r => {
-          const targetName = `override_${r.id}`.toLowerCase();
-          
-          const tryOverride = (scenarioKey: string) => {
-              for (const h of [selHotelNameUpper, activeHotelCodeUpper].filter(Boolean)) {
-                 const key = `${selectedYear}|${selectedMonth}|${h}|${scenarioKey}|${targetName}`;
-                 if (dataIndex.has(key)) {
-                     return dataIndex.get(key);
-                 }
-              }
-              return undefined;
-          };
+        rows.forEach(r => {
+            const targetName = `override_${r.id}`.toLowerCase();
 
-          const realOverride = tryOverride('REAL');
-          if (realOverride !== undefined) {
-              r.real = realOverride;
-              r.isManualOverride = true;
-              if (r.forecastConfig) r.forecastConfig.manualValue = realOverride;
-          }
+            const tryOverride = (scenarioKey: string) => {
+                for (const h of [selHotelNameUpper, activeHotelCodeUpper].filter(Boolean)) {
+                    const key = `${selectedYear}|${selectedMonth}|${h}|${scenarioKey}|${targetName}`;
+                    if (dataIndex.has(key)) {
+                        return dataIndex.get(key);
+                    }
+                }
+                return undefined;
+            };
 
-          const previaOverride = tryOverride('PREVIA');
-          if (previaOverride !== undefined) {
-              r.previa = previaOverride;
-              r.isManualPreviaOverride = true;
-              if (r.previaConfig) r.previaConfig.manualValue = previaOverride;
-          }
-      });
-  };
-  applyOverrides();
+            const realOverride = tryOverride('REAL');
+            if (realOverride !== undefined) {
+                r.real = realOverride;
+                r.isManualOverride = true;
+                if (r.forecastConfig) r.forecastConfig.manualValue = realOverride;
+            }
 
-  return rows;
+            const previaOverride = tryOverride('PREVIA');
+            if (previaOverride !== undefined) {
+                r.previa = previaOverride;
+                r.isManualPreviaOverride = true;
+                if (r.previaConfig) r.previaConfig.manualValue = previaOverride;
+            }
+        });
+    };
+    applyOverrides();
+
+    return rows;
 };

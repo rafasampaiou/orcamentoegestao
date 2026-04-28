@@ -426,7 +426,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             if (row.category === 'Indicators') {
                 if (showDetails) return true;
                 // List of indicators to show when "Ocultar Contas" (showDetails is false) is active
-                const allowedIndicators = ['IND-2', 'IND-3', 'IND-4', 'IND-5', 'IND-6', 'IND-TREVPOR'];
+                const allowedIndicators = ['IND-1', 'IND-2', 'IND-3', 'IND-4', 'IND-5', 'IND-6', 'IND-TREVPOR'];
                 return allowedIndicators.includes(row.id);
             }
             if (row.isHeader) return true;
