@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { getForecastData, getDynamicForecastData } from '../services/mockData';
-import { Download, ListFilter, LayoutList, Settings2, ChevronUp, Activity, TrendingUp, Lock, LockOpen, CheckCircle2, X } from 'lucide-react';
+import { Upload, ListFilter, LayoutList, Settings2, ChevronUp, Activity, TrendingUp, Lock, LockOpen, CheckCircle2, X, FileSpreadsheet, AlertCircle, CheckCircle } from 'lucide-react';
 import { ExpenseDriver, ImportedRow, Account, CostPackage, Hotel, ForecastRow, ForecastConfig, ForecastOperator, ColumnVisibility, UserRole } from '../types';
 import { evaluateFormula } from '../utils/formulaEngine';
 import { supabaseService } from '../services/supabaseService';
@@ -61,6 +61,72 @@ const formatPercentDiff = (val: number | undefined) => {
 };
 
 const blueRowIds = ['REV-TOTAL', 'REV-NET', 'CST-HEAD', 'RES-OP', 'RES-PCT', 'REV-IMP', 'RES-OP-SEM-IMP', 'RES-OP-COM-IMP'];
+
+// Mapeamento: Label do template → ID da linha no DRE Forecast
+// As colunas do template são: Descrição | Prévia | Forecast | Meta | Last Year
+const IMPORT_LABEL_MAP: Record<string, string> = {
+    'uh disponível': 'IND-1',
+    'uh disponivel': 'IND-1',
+    'uh ocupada': 'IND-2',
+    'adultos': 'IND-ADULTOS',
+    'chd': 'IND-CHD',
+    'revpar': 'IND-6',
+    'trevpor': 'IND-TREVPOR',
+    'trevpar': 'IND-TREVPAR',
+    'receita de apartamentos (lazer)': 'REV-APT-LAZER',
+    'receita de apartamentos (eventos)': 'REV-APT-EVENTOS',
+    'receitas extras (lazer)': 'REV-EXTRA-LAZER',
+    'receitas extras (eventos)': 'REV-EXTRA-EVENTOS',
+    'cancelamento de time share': 'REV-TIME',
+    'receita de iss': 'REV-ISS',
+    'impostos': 'REV-IMP',
+    // costs - use dynamic IDs via label fallback
+    'custo de alimentos': '__label__',
+    'custo de bebidas': '__label__',
+    'custo de produtos diversos': '__label__',
+    'custo de outras receitas': '__label__',
+    'despesas administrativas': '__label__',
+    'despesas administrativas gerais': '__label__',
+    'processamentos de dados e ti (ti)': '__label__',
+    'processamentos de dados e ti (martech)': '__label__',
+    'processamentos de dados e ti (outros setores)': '__label__',
+    'beneficios aos colaboradores': '__label__',
+    'despesas com pessoal': '__label__',
+    'encargos sociais': '__label__',
+    'serviços de terceiros': '__label__',
+    'servicos de terceiros temporarios': '__label__',
+    'serviço de terceiros recorrente': '__label__',
+    'serviços contratados de prestadores pj - mei': '__label__',
+    'despesas com vendas e marketing': '__label__',
+    'despesas com vendas e marketing (martech)': '__label__',
+    'despesas com vendas e marketing (marketing)': '__label__',
+    'despesas com vendas e marketing (outros setores)': '__label__',
+    'despesas financeiras e bancárias': '__label__',
+    'despesas financeiras e bancarias': '__label__',
+    'despesas com conservação e limpeza': '__label__',
+    'despesas com conservacao e limpeza': '__label__',
+    'despesas com manutenção': '__label__',
+    'despesas com manutencao': '__label__',
+    'despesas com serviços públicos': '__label__',
+    'despesas com servicos publicos': '__label__',
+    'despesas operacionais': '__label__',
+    'arrendamento': '__label__',
+    'despesa tributaria': '__label__',
+    'outros impostos': '__label__',
+    'provisões gerais': '__label__',
+    'provisoes gerais': '__label__',
+    'provisao de servicos de terceiros temporarios': '__label__',
+    'outras provisões': '__label__',
+    'outras provisoes': '__label__',
+};
+
+const parseNum = (s: string): number => {
+    if (!s || s.trim() === '' || s.trim() === '-') return 0;
+    // Handle both comma-decimal (pt-BR) and dot-decimal formats
+    const cleaned = s.trim().replace(/[R$\s]/g, '').replace(/\./g, '').replace(',', '.');
+    const n = parseFloat(cleaned);
+    return isNaN(n) ? 0 : n;
+};
 
 const inputClass = "w-full text-right bg-transparent border border-transparent hover:bg-gray-50 focus:bg-white focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 rounded px-1 text-indigo-900 font-semibold outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
 
@@ -148,6 +214,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     }, [isMonthClosed, activeProjectionType, setActiveProjectionType]);
 
     const [showDetails, setShowDetails] = useState(false);
+    const [showImportModal, setShowImportModal] = useState(false);
+    const [importText, setImportText] = useState('');
+    const [importResult, setImportResult] = useState<{ success: number; skipped: string[] } | null>(null);
     const [calculationBase, setCalculationBase] = useState<'forecast' | 'previa'>('forecast');
     const [kpiBasis, setKpiBasis] = useState<'with_tax' | 'no_tax'>('with_tax');
 
@@ -524,9 +593,12 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             <CheckCircle2 size={20} />
                             {isMonthClosed ? 'Validar fechamento' : 'Validar projeção'}
                         </button>
-                        <button className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-md text-base font-bold">
-                            <Download size={20} />
-                            Exportar Excel
+                        <button
+                            onClick={() => { setImportText(''); setImportResult(null); setShowImportModal(true); }}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-md text-base font-bold"
+                        >
+                            <Upload size={20} />
+                            Importar do Excel
                         </button>
                     </div>
                 </div>
@@ -976,6 +1048,161 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                     </table>
                 </div>
             </div>
+
+            {/* ====== MODAL: IMPORTAR DO EXCEL ====== */}
+            {showImportModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95">
+                        {/* Header */}
+                        <div className="flex items-center justify-between p-5 border-b border-gray-100 bg-emerald-50">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
+                                    <FileSpreadsheet size={22} />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold text-emerald-900">Importar do Excel</h2>
+                                    <p className="text-sm text-emerald-700">Cole os dados copiados da planilha abaixo (Ctrl+V)</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setShowImportModal(false)}
+                                className="text-emerald-400 hover:text-emerald-600 transition-colors p-2 hover:bg-emerald-100 rounded-full"
+                            >
+                                <X size={22} />
+                            </button>
+                        </div>
+
+                        {/* Template hint */}
+                        <div className="px-6 pt-4 pb-2">
+                            <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-xs text-blue-800 font-mono leading-relaxed">
+                                <span className="font-bold text-blue-900 block mb-1">Formato esperado (colunas separadas por Tab):</span>
+                                Descrição{"\t"}Prévia{"\t"}Forecast{"\t"}Meta{"\t"}Last Year<br/>
+                                UH Disponível{"\t"}100{"\t"}110{"\t"}105{"\t"}95<br/>
+                                UH Ocupada{"\t"}75{"\t"}80{"\t"}78{"\t"}70<br/>
+                                <span className="text-blue-500 italic">... (outras linhas)</span>
+                            </div>
+                        </div>
+
+                        {/* Textarea */}
+                        <div className="flex-1 overflow-y-auto px-6 py-3">
+                            <label className="block text-xs font-bold text-gray-700 mb-1.5">Dados copiados do Excel:</label>
+                            <textarea
+                                className="w-full border border-gray-300 rounded-xl p-3 text-xs font-mono focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none resize-none bg-gray-50"
+                                rows={14}
+                                placeholder={`Copie as células do Excel (incluindo a linha de cabeçalho) e cole aqui...\n\nDescriçãoTABPréviaForecastMetaLast Year\nUH Disponível\t100\t110\t105\t95\nUH Ocupada\t75\t80\t78\t70`}
+                                value={importText}
+                                onChange={e => { setImportText(e.target.value); setImportResult(null); }}
+                                onPaste={e => {
+                                    // Allow default paste, clear result
+                                    setImportResult(null);
+                                }}
+                                autoFocus
+                            />
+                        </div>
+
+                        {/* Result feedback */}
+                        {importResult && (
+                            <div className="px-6 pb-3">
+                                <div className={`rounded-lg p-3 flex items-start gap-3 text-sm ${
+                                    importResult.success > 0 ? 'bg-emerald-50 border border-emerald-200' : 'bg-amber-50 border border-amber-200'
+                                }`}>
+                                    {importResult.success > 0
+                                        ? <CheckCircle size={18} className="text-emerald-600 mt-0.5 shrink-0" />
+                                        : <AlertCircle size={18} className="text-amber-600 mt-0.5 shrink-0" />
+                                    }
+                                    <div>
+                                        <span className={`font-bold ${ importResult.success > 0 ? 'text-emerald-800' : 'text-amber-800'}`}>
+                                            {importResult.success > 0
+                                                ? `${importResult.success} linha(s) importada(s) com sucesso!`
+                                                : 'Nenhuma linha reconhecida.'}
+                                        </span>
+                                        {importResult.skipped.length > 0 && (
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                Não reconhecidas: {importResult.skipped.join(', ')}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Footer */}
+                        <div className="p-5 border-t border-gray-100 bg-white flex justify-end gap-3">
+                            <button
+                                onClick={() => setShowImportModal(false)}
+                                className="px-5 py-2.5 text-gray-600 font-bold hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={() => {
+                                    const lines = importText.split(/\r?\n/).filter(l => l.trim());
+                                    if (lines.length < 2) {
+                                        setImportResult({ success: 0, skipped: ['Nenhum dado encontrado'] });
+                                        return;
+                                    }
+
+                                    // Detect header row (skip it)
+                                    const dataLines = lines[0].toLowerCase().includes('descriç') || lines[0].toLowerCase().includes('descri') || lines[0].toLowerCase().includes('previa') || lines[0].toLowerCase().includes('prévia')
+                                        ? lines.slice(1)
+                                        : lines;
+
+                                    const success: string[] = [];
+                                    const skipped: string[] = [];
+
+                                    setData(prevData => {
+                                        const newData = prevData.map(r => ({ ...r }));
+                                        const labelMap = new Map(newData.map(r => [r.label.trim().toLowerCase(), r]));
+
+                                        dataLines.forEach(line => {
+                                            const cols = line.split('\t');
+                                            if (cols.length < 2) return;
+
+                                            const rawLabel = cols[0].trim();
+                                            const normLabel = rawLabel.toLowerCase();
+
+                                            // Values: cols[1]=Prévia, cols[2]=Forecast, cols[3]=Meta, cols[4]=LastYear
+                                            const valPrevia  = parseNum(cols[1] || '');
+                                            const valForecast = parseNum(cols[2] || '');
+                                            const valMeta    = parseNum(cols[3] || '');
+                                            const valLY      = parseNum(cols[4] || '');
+
+                                            // Try direct ID mapping first
+                                            const mappedId = IMPORT_LABEL_MAP[normLabel];
+                                            let targetRow = mappedId && mappedId !== '__label__'
+                                                ? newData.find(r => r.id === mappedId)
+                                                : undefined;
+
+                                            // Fallback: match by label
+                                            if (!targetRow) {
+                                                targetRow = labelMap.get(normLabel);
+                                            }
+
+                                            if (targetRow) {
+                                                if (valPrevia  !== 0) { targetRow.previa  = valPrevia;  targetRow.isManualPreviaOverride = true; if (targetRow.previaConfig) targetRow.previaConfig.manualValue = valPrevia; }
+                                                if (valForecast !== 0) { targetRow.real    = valForecast; targetRow.isManualOverride = true; if (targetRow.forecastConfig) { targetRow.forecastConfig.method = 'Fixed'; targetRow.forecastConfig.manualValue = valForecast; } }
+                                                if (valMeta    !== 0) { targetRow.budget  = valMeta; }
+                                                if (valLY      !== 0) { targetRow.lastYear = valLY; }
+                                                success.push(rawLabel);
+                                            } else if (normLabel && normLabel !== 'descrição' && normLabel !== 'descricao') {
+                                                skipped.push(rawLabel);
+                                            }
+                                        });
+
+                                        return recalculateTotals(newData, packages, accounts);
+                                    });
+
+                                    setImportResult({ success: success.length, skipped });
+                                }}
+                                className="px-5 py-2.5 bg-emerald-600 text-white font-bold rounded-lg shadow-md hover:bg-emerald-700 transition-colors flex items-center gap-2"
+                            >
+                                <Upload size={18} />
+                                Aplicar Importação
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {showValidationModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
