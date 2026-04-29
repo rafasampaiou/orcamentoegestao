@@ -67,27 +67,23 @@ const Auth: React.FC = () => {
           <div
             className="inline-flex p-4 rounded-2xl mb-6 border"
             style={{
-              background: 'rgba(21, 86, 69, 0.35)',
-              borderColor: 'rgba(34,197,94,0.3)',
-              boxShadow: '0 0 24px rgba(21,86,69,0.4)'
+              background: 'rgba(248, 152, 28, 0.15)',
+              borderColor: 'rgba(248,152,28,0.35)',
+              boxShadow: '0 0 24px rgba(248,152,28,0.25)'
             }}
           >
-            <TrendingUp className="w-10 h-10" style={{ color: '#4ade80' }} />
+            <TrendingUp className="w-10 h-10" style={{ color: '#F8981C' }} />
           </div>
 
           <h1 className="text-4xl font-extrabold text-white tracking-tight leading-tight mb-2">
             Forecast{' '}
-            <span style={{ color: '#4ade80' }}>&</span>{' '}
-            <span style={{
-              background: 'linear-gradient(90deg, #4ade80, #86efac)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent'
-            }}>
+            <span style={{ color: '#F8981C' }}>&amp;</span>{' '}
+            <span style={{ color: '#F8981C' }}>
               Budget
             </span>
           </h1>
 
-          <p className="text-sm font-medium mt-1" style={{ color: 'rgba(134,239,172,0.55)' }}>
+          <p className="text-sm font-medium mt-1" style={{ color: 'rgba(255,255,255,0.5)' }}>
             Acesso Restrito · Controle Orçamentário
           </p>
         </div>
@@ -96,12 +92,12 @@ const Auth: React.FC = () => {
         <form onSubmit={handleAuth} className="space-y-5">
           {/* Email */}
           <div className="space-y-2">
-            <label className="text-xs font-semibold uppercase tracking-widest ml-1" style={{ color: 'rgba(134,239,172,0.6)' }}>
+            <label className="text-xs font-semibold uppercase tracking-widest ml-1" style={{ color: 'rgba(255,255,255,0.65)' }}>
               E-mail Corporativo
             </label>
             <div className="relative group">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <Mail className="w-5 h-5 transition-colors" style={{ color: '#4ade80' }} />
+                <Mail className="w-5 h-5 transition-colors" style={{ color: 'rgba(255,255,255,0.5)' }} />
               </div>
               <input
                 type="email"
@@ -112,8 +108,7 @@ const Auth: React.FC = () => {
                 className="block w-full pl-12 pr-4 py-4 rounded-2xl text-white transition-all outline-none"
                 style={{
                   background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(21,86,69,0.5)',
-                  placeholder: 'rgba(134,239,172,0.2)'
+                  border: '1px solid rgba(21,86,69,0.5)'
                 }}
                 onFocus={e => { e.currentTarget.style.borderColor = 'rgba(74,222,128,0.5)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(74,222,128,0.1)'; }}
                 onBlur={e => { e.currentTarget.style.borderColor = 'rgba(21,86,69,0.5)'; e.currentTarget.style.boxShadow = 'none'; }}
@@ -123,12 +118,12 @@ const Auth: React.FC = () => {
 
           {/* Password */}
           <div className="space-y-2">
-            <label className="text-xs font-semibold uppercase tracking-widest ml-1" style={{ color: 'rgba(134,239,172,0.6)' }}>
+            <label className="text-xs font-semibold uppercase tracking-widest ml-1" style={{ color: 'rgba(255,255,255,0.65)' }}>
               Senha
             </label>
             <div className="relative group">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <Lock className="w-5 h-5 transition-colors" style={{ color: '#4ade80' }} />
+                <Lock className="w-5 h-5 transition-colors" style={{ color: 'rgba(255,255,255,0.5)' }} />
               </div>
               <input
                 type="password"
@@ -181,7 +176,7 @@ const Auth: React.FC = () => {
 
         {/* Footer */}
         <div className="mt-8 text-center pt-7" style={{ borderTop: '1px solid rgba(21,86,69,0.4)' }}>
-          <p className="text-xs italic" style={{ color: 'rgba(134,239,172,0.35)' }}>
+          <p className="text-xs italic" style={{ color: 'rgba(255,255,255,0.3)' }}>
             Contate o administrador para solicitar acesso.
           </p>
         </div>
@@ -189,7 +184,7 @@ const Auth: React.FC = () => {
 
       <style dangerouslySetInnerHTML={{ __html: `
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
-        input::placeholder { color: rgba(134,239,172,0.25); }
+        input::placeholder { color: rgba(255,255,255,0.25); }
       ` }} />
     </div>
   );
