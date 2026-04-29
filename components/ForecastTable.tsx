@@ -1256,55 +1256,77 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     }
 
                                     // Detect header row (skip it)
-                                    const dataLines = lines[0].toLowerCase().includes('descriç') || lines[0].toLowerCase().includes('descri') || lines[0].toLowerCase().includes('previa') || lines[0].toLowerCase().includes('prévia')
-                                        ? lines.slice(1)
-                                        : lines;
+                                    const firstLower = lines[0].toLowerCase();
+                                    const dataLines = (
+                                        firstLower.includes('descri') ||
+                                        firstLower.includes('previa') ||
+                                        firstLower.includes('prévia') ||
+                                        firstLower.includes('forecast')
+                                    ) ? lines.slice(1) : lines;
 
                                     const success: string[] = [];
                                     const skipped: string[] = [];
 
-                                    setData(prevData => {
-                                        const newData = prevData.map(r => ({ ...r }));
-                                        const labelMap = new Map(newData.map(r => [r.label.trim().toLowerCase(), r]));
+                                    // Helper: strip accents for fuzzy matching
+                                    const stripAccents = (s: string) =>
+                                        s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-                                        dataLines.forEach(line => {
-                                            const cols = line.split('\t');
-                                            if (cols.length < 2) return;
+                                    // ─── Work with a SYNCHRONOUS snapshot of current data ───
+                                    // (fixes React setState-updater timing bug: success/skipped
+                                    //  were populated inside the lazy updater, already empty
+                                    //  when setImportResult ran right after setData())
+                                    const newData = data.map(r => ({ ...r, forecastConfig: { ...r.forecastConfig }, previaConfig: r.previaConfig ? { ...r.previaConfig } : undefined }));
+                                    const labelMap = new Map(newData.map(r => [r.label.trim().toLowerCase(), r]));
+                                    const labelMapNA = new Map(newData.map(r => [stripAccents(r.label.trim().toLowerCase()), r]));
+                                    // Accent-stripped version of IMPORT_LABEL_MAP keys
+                                    const importMapNA: Record<string, string> = {};
+                                    Object.entries(IMPORT_LABEL_MAP).forEach(([k, v]) => { importMapNA[stripAccents(k)] = v; });
 
-                                            const rawLabel = cols[0].trim();
-                                            const normLabel = rawLabel.toLowerCase();
+                                    dataLines.forEach(line => {
+                                        // Auto-detect separator: tab (Excel default) or semicolon
+                                        const sep = line.includes('\t') ? '\t' : ';';
+                                        const cols = line.split(sep);
+                                        if (cols.length < 2) return;
 
-                                            // Values: cols[1]=Prévia, cols[2]=Forecast, cols[3]=Meta, cols[4]=LastYear
-                                            const valPrevia  = parseNum(cols[1] || '');
-                                            const valForecast = parseNum(cols[2] || '');
-                                            const valMeta    = parseNum(cols[3] || '');
-                                            const valLY      = parseNum(cols[4] || '');
+                                        const rawLabel = cols[0].trim();
+                                        if (!rawLabel) return;
 
-                                            // Try direct ID mapping first
-                                            const mappedId = IMPORT_LABEL_MAP[normLabel];
-                                            let targetRow = mappedId && mappedId !== '__label__'
-                                                ? newData.find(r => r.id === mappedId)
-                                                : undefined;
+                                        const normLabel    = rawLabel.toLowerCase();
+                                        const normLabelNA  = stripAccents(normLabel);
 
-                                            // Fallback: match by label
-                                            if (!targetRow) {
-                                                targetRow = labelMap.get(normLabel);
-                                            }
+                                        // Values: cols[1]=Prévia, cols[2]=Forecast, cols[3]=Meta, cols[4]=LastYear
+                                        const valPrevia   = parseNum(cols[1] || '');
+                                        const valForecast = parseNum(cols[2] || '');
+                                        const valMeta     = parseNum(cols[3] || '');
+                                        const valLY       = parseNum(cols[4] || '');
 
-                                            if (targetRow) {
-                                                if (valPrevia  !== 0) { targetRow.previa  = valPrevia;  targetRow.isManualPreviaOverride = true; if (targetRow.previaConfig) targetRow.previaConfig.manualValue = valPrevia; }
-                                                if (valForecast !== 0) { targetRow.real    = valForecast; targetRow.isManualOverride = true; if (targetRow.forecastConfig) { targetRow.forecastConfig.method = 'Fixed'; targetRow.forecastConfig.manualValue = valForecast; } }
-                                                if (valMeta    !== 0) { targetRow.budget  = valMeta; }
-                                                if (valLY      !== 0) { targetRow.lastYear = valLY; }
-                                                success.push(rawLabel);
-                                            } else if (normLabel && normLabel !== 'descrição' && normLabel !== 'descricao') {
-                                                skipped.push(rawLabel);
-                                            }
-                                        });
+                                        // 1. Direct ID mapping (with accents)
+                                        let mappedId = IMPORT_LABEL_MAP[normLabel];
+                                        // 2. Direct ID mapping (without accents fallback)
+                                        if (!mappedId) mappedId = importMapNA[normLabelNA];
 
-                                        return recalculateTotals(newData, packages, accounts);
+                                        let targetRow = mappedId && mappedId !== '__label__'
+                                            ? newData.find(r => r.id === mappedId)
+                                            : undefined;
+
+                                        // 3. Fallback: match by full label (with accents)
+                                        if (!targetRow) targetRow = labelMap.get(normLabel);
+                                        // 4. Fallback: match by full label (without accents)
+                                        if (!targetRow) targetRow = labelMapNA.get(normLabelNA);
+
+                                        if (targetRow) {
+                                            if (valPrevia   !== 0) { targetRow.previa = valPrevia; targetRow.isManualPreviaOverride = true; if (targetRow.previaConfig) targetRow.previaConfig.manualValue = valPrevia; }
+                                            if (valForecast !== 0) { targetRow.real = valForecast; targetRow.isManualOverride = true; if (targetRow.forecastConfig) { targetRow.forecastConfig.method = 'Fixed'; targetRow.forecastConfig.manualValue = valForecast; } }
+                                            if (valMeta     !== 0) { targetRow.budget = valMeta; }
+                                            if (valLY       !== 0) { targetRow.lastYear = valLY; }
+                                            success.push(rawLabel);
+                                        } else if (normLabel && !['descrição','descricao','descriçao','description'].includes(normLabel)) {
+                                            skipped.push(rawLabel);
+                                        }
                                     });
 
+                                    // Apply data and feedback synchronously (no lazy updater)
+                                    setData(recalculateTotals(newData, packages, accounts));
                                     setImportResult({ success: success.length, skipped });
                                 }}
                                 className="px-5 py-2.5 bg-emerald-600 text-white font-bold rounded-lg shadow-md hover:bg-emerald-700 transition-colors flex items-center gap-2"
