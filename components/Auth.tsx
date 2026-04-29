@@ -42,14 +42,7 @@ const Auth: React.FC = () => {
         style={{ background: 'radial-gradient(circle, rgba(248,152,28,0.05) 0%, transparent 70%)', filter: 'blur(60px)', animation: 'pulse 6s ease-in-out infinite 3s' }}
       />
 
-      {/* Subtle grid overlay */}
-      <div
-        className="absolute inset-0 opacity-[0.03]"
-        style={{
-          backgroundImage: `linear-gradient(rgba(0,0,0,1) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,1) 1px, transparent 1px)`,
-          backgroundSize: '40px 40px'
-        }}
-      />
+      {/* Grid overlay removed */}
 
       {/* Card */}
       <div
@@ -81,7 +74,7 @@ const Auth: React.FC = () => {
             </span>
           </h1>
 
-          <p className="text-sm font-medium mt-1" style={{ color: 'rgba(255,255,255,0.5)' }}>
+          <p className="text-sm font-medium mt-1" style={{ color: '#ffffff' }}>
             Acesso Restrito · Controle Orçamentário
           </p>
         </div>
@@ -90,12 +83,12 @@ const Auth: React.FC = () => {
         <form onSubmit={handleAuth} className="space-y-5">
           {/* Email */}
           <div className="space-y-2">
-            <label className="text-xs font-semibold uppercase tracking-widest ml-1" style={{ color: 'rgba(255,255,255,0.65)' }}>
+            <label className="text-xs font-semibold uppercase tracking-widest ml-1" style={{ color: '#ffffff' }}>
               E-mail Corporativo
             </label>
             <div className="relative group">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <Mail className="w-5 h-5 transition-colors" style={{ color: 'rgba(255,255,255,0.5)' }} />
+                <Mail className="w-5 h-5 transition-colors" style={{ color: '#ffffff' }} />
               </div>
               <input
                 type="email"
@@ -116,12 +109,12 @@ const Auth: React.FC = () => {
 
           {/* Password */}
           <div className="space-y-2">
-            <label className="text-xs font-semibold uppercase tracking-widest ml-1" style={{ color: 'rgba(255,255,255,0.65)' }}>
+            <label className="text-xs font-semibold uppercase tracking-widest ml-1" style={{ color: '#ffffff' }}>
               Senha
             </label>
             <div className="relative group">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <Lock className="w-5 h-5 transition-colors" style={{ color: 'rgba(255,255,255,0.5)' }} />
+                <Lock className="w-5 h-5 transition-colors" style={{ color: '#ffffff' }} />
               </div>
               <input
                 type="password"
@@ -174,7 +167,7 @@ const Auth: React.FC = () => {
 
         {/* Footer */}
         <div className="mt-8 text-center pt-7" style={{ borderTop: '1px solid rgba(21,86,69,0.4)' }}>
-          <p className="text-xs italic" style={{ color: 'rgba(255,255,255,0.3)' }}>
+          <p className="text-xs italic" style={{ color: '#ffffff' }}>
             Contate o administrador para solicitar acesso.
           </p>
         </div>
@@ -182,7 +175,7 @@ const Auth: React.FC = () => {
 
       <style dangerouslySetInnerHTML={{ __html: `
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
-        input::placeholder { color: rgba(255,255,255,0.25); }
+        input::placeholder { color: rgba(255,255,255,0.7); }
       ` }} />
     </div>
   );
