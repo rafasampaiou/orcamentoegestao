@@ -26,27 +26,27 @@ const Auth: React.FC = () => {
   return (
     <div
       className="min-h-screen flex items-center justify-center relative overflow-hidden font-['Outfit',sans-serif]"
-      style={{ background: 'linear-gradient(135deg, #155645 0%, #0c3d30 40%, #000000 100%)' }}
+      style={{ backgroundColor: '#ffffff' }}
     >
       {/* Animated glow orbs */}
       <div
         className="absolute top-[-15%] left-[-10%] w-[50%] h-[50%] rounded-full animate-pulse"
-        style={{ background: 'radial-gradient(circle, rgba(21,86,69,0.55) 0%, transparent 70%)', filter: 'blur(80px)' }}
+        style={{ background: 'radial-gradient(circle, rgba(21,86,69,0.08) 0%, transparent 70%)', filter: 'blur(80px)' }}
       />
       <div
         className="absolute bottom-[-15%] right-[-10%] w-[45%] h-[45%] rounded-full"
-        style={{ background: 'radial-gradient(circle, rgba(21,86,69,0.4) 0%, transparent 70%)', filter: 'blur(100px)', animation: 'pulse 4s ease-in-out infinite 1.5s' }}
+        style={{ background: 'radial-gradient(circle, rgba(21,86,69,0.05) 0%, transparent 70%)', filter: 'blur(100px)', animation: 'pulse 4s ease-in-out infinite 1.5s' }}
       />
       <div
         className="absolute top-[40%] right-[20%] w-[25%] h-[25%] rounded-full"
-        style={{ background: 'radial-gradient(circle, rgba(34,197,94,0.08) 0%, transparent 70%)', filter: 'blur(60px)', animation: 'pulse 6s ease-in-out infinite 3s' }}
+        style={{ background: 'radial-gradient(circle, rgba(248,152,28,0.05) 0%, transparent 70%)', filter: 'blur(60px)', animation: 'pulse 6s ease-in-out infinite 3s' }}
       />
 
       {/* Subtle grid overlay */}
       <div
-        className="absolute inset-0 opacity-[0.04]"
+        className="absolute inset-0 opacity-[0.03]"
         style={{
-          backgroundImage: `linear-gradient(rgba(255,255,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.3) 1px, transparent 1px)`,
+          backgroundImage: `linear-gradient(rgba(0,0,0,1) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,1) 1px, transparent 1px)`,
           backgroundSize: '40px 40px'
         }}
       />
@@ -55,11 +55,9 @@ const Auth: React.FC = () => {
       <div
         className="relative z-10 w-full max-w-md mx-4 p-9 rounded-[2rem] shadow-2xl border"
         style={{
-          background: 'rgba(21, 86, 69, 0.12)',
-          backdropFilter: 'blur(28px)',
-          WebkitBackdropFilter: 'blur(28px)',
-          borderColor: 'rgba(21, 86, 69, 0.45)',
-          boxShadow: '0 0 60px rgba(21,86,69,0.25), 0 30px 60px rgba(0,0,0,0.5)'
+          background: 'linear-gradient(135deg, #155645 0%, #0c3d30 50%, #000000 100%)',
+          borderColor: 'rgba(21, 86, 69, 0.4)',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 40px rgba(21, 86, 69, 0.15)'
         }}
       >
         {/* Logo & Title */}
