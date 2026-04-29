@@ -217,6 +217,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     const [showImportModal, setShowImportModal] = useState(false);
     const [importText, setImportText] = useState('');
     const [importResult, setImportResult] = useState<{ success: number; skipped: string[] } | null>(null);
+    const [showImportLines, setShowImportLines] = useState(false);
     const [calculationBase, setCalculationBase] = useState<'forecast' | 'previa'>('forecast');
     const [kpiBasis, setKpiBasis] = useState<'with_tax' | 'no_tax'>('with_tax');
 
@@ -1072,14 +1073,131 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             </button>
                         </div>
 
-                        {/* Template hint */}
-                        <div className="px-6 pt-4 pb-2">
+                        {/* Template hint + Collapsible lines list */}
+                        <div className="px-6 pt-4 pb-2 space-y-3">
+                            {/* Format example */}
                             <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-xs text-blue-800 font-mono leading-relaxed">
                                 <span className="font-bold text-blue-900 block mb-1">Formato esperado (colunas separadas por Tab):</span>
                                 Descrição{"\t"}Prévia{"\t"}Forecast{"\t"}Meta{"\t"}Last Year<br/>
                                 UH Disponível{"\t"}100{"\t"}110{"\t"}105{"\t"}95<br/>
                                 UH Ocupada{"\t"}75{"\t"}80{"\t"}78{"\t"}70<br/>
                                 <span className="text-blue-500 italic">... (outras linhas)</span>
+                            </div>
+
+                            {/* Collapsible: lines that can be imported */}
+                            <div className="border border-emerald-200 rounded-xl overflow-hidden">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowImportLines(v => !v)}
+                                    className="w-full flex items-center justify-between px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 transition-colors text-emerald-800 font-semibold text-xs"
+                                >
+                                    <span className="flex items-center gap-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+                                        Ver linhas que podem ser importadas
+                                    </span>
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                                        className={`transition-transform duration-200 ${showImportLines ? 'rotate-180' : ''}`}
+                                    >
+                                        <polyline points="6 9 12 15 18 9"/>
+                                    </svg>
+                                </button>
+
+                                {showImportLines && (
+                                    <div className="bg-white px-4 py-3 max-h-64 overflow-y-auto">
+                                        <p className="text-xs text-gray-500 mb-3">A primeira coluna da planilha deve conter exatamente um dos nomes abaixo:</p>
+
+                                        {/* Indicadores */}
+                                        <div className="mb-3">
+                                            <span className="text-[10px] font-bold uppercase tracking-widest text-sky-600 bg-sky-50 px-2 py-0.5 rounded-md block mb-1.5">📊 Indicadores</span>
+                                            <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+                                                {[
+                                                    'UH Disponível',
+                                                    'UH Ocupada',
+                                                    'Adultos',
+                                                    'CHD',
+                                                    'RevPAR',
+                                                    'TRevPOR',
+                                                    'TRevPAR',
+                                                ].map(l => (
+                                                    <span key={l} className="text-xs font-mono text-gray-700 py-0.5 border-b border-gray-50">{l}</span>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Receita */}
+                                        <div className="mb-3">
+                                            <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md block mb-1.5">💰 Receita</span>
+                                            <div className="grid grid-cols-1 gap-y-0.5">
+                                                {[
+                                                    'Receita de Apartamentos (Lazer)',
+                                                    'Receita de Apartamentos (Eventos)',
+                                                    'Receitas Extras (Lazer)',
+                                                    'Receitas Extras (Eventos)',
+                                                    'Cancelamento de Time Share',
+                                                    'Receita de ISS',
+                                                    'Impostos',
+                                                ].map(l => (
+                                                    <span key={l} className="text-xs font-mono text-gray-700 py-0.5 border-b border-gray-50">{l}</span>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Custos */}
+                                        <div className="mb-3">
+                                            <span className="text-[10px] font-bold uppercase tracking-widest text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md block mb-1.5">🏷️ Custos</span>
+                                            <div className="grid grid-cols-1 gap-y-0.5">
+                                                {[
+                                                    'Custo de Alimentos',
+                                                    'Custo de Bebidas',
+                                                    'Custo de Produtos Diversos',
+                                                    'Custo de Outras Receitas',
+                                                ].map(l => (
+                                                    <span key={l} className="text-xs font-mono text-gray-700 py-0.5 border-b border-gray-50">{l}</span>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Despesas */}
+                                        <div>
+                                            <span className="text-[10px] font-bold uppercase tracking-widest text-orange-600 bg-orange-50 px-2 py-0.5 rounded-md block mb-1.5">📋 Despesas</span>
+                                            <div className="grid grid-cols-1 gap-y-0.5">
+                                                {[
+                                                    'Despesas Administrativas',
+                                                    'Despesas Administrativas Gerais',
+                                                    'Processamentos de Dados e TI (TI)',
+                                                    'Processamentos de Dados e TI (Martech)',
+                                                    'Processamentos de Dados e TI (Outros Setores)',
+                                                    'Beneficios aos Colaboradores',
+                                                    'Despesas com Pessoal',
+                                                    'Encargos Sociais',
+                                                    'Serviços de Terceiros',
+                                                    'Servicos de Terceiros Temporarios',
+                                                    'Serviço de Terceiros Recorrente',
+                                                    'Serviços Contratados de Prestadores PJ - MEI',
+                                                    'Despesas com Vendas e Marketing',
+                                                    'Despesas com Vendas e Marketing (Martech)',
+                                                    'Despesas com Vendas e Marketing (Marketing)',
+                                                    'Despesas com Vendas e Marketing (Outros Setores)',
+                                                    'Despesas Financeiras e Bancárias',
+                                                    'Despesas com Conservação e Limpeza',
+                                                    'Despesas com Manutenção',
+                                                    'Despesas com Serviços Públicos',
+                                                    'Despesas Operacionais',
+                                                    'Arrendamento',
+                                                    'Despesa Tributaria',
+                                                    'Outros Impostos',
+                                                    'Provisões Gerais',
+                                                    'Provisao de Servicos de Terceiros Temporarios',
+                                                    'Outras Provisões',
+                                                ].map(l => (
+                                                    <span key={l} className="text-xs font-mono text-gray-700 py-0.5 border-b border-gray-50">{l}</span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
