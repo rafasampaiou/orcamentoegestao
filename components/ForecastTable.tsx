@@ -1588,6 +1588,18 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
         const revApt = rowMap.get('REV-APT')?.[field] || 0;
         const revExtra = rowMap.get('REV-EXTRA')?.[field] || 0;
 
+        // % de Ocupação = UH Ocupada / UH Disponível * 100
+        const occPct = rowMap.get('IND-3');
+        if (occPct) occPct[field] = avail > 0 ? (occ / avail) * 100 : 0;
+
+        // Coeficientes de Adultos e CHD
+        const adults = rowMap.get('IND-ADULTOS')?.[field] || 0;
+        const chd = rowMap.get('IND-CHD')?.[field] || 0;
+        const coefAdultos = rowMap.get('IND-COEF-ADULTOS');
+        if (coefAdultos) coefAdultos[field] = occ > 0 ? adults / occ : 0;
+        const coefChd = rowMap.get('IND-COEF-CHD');
+        if (coefChd) coefChd[field] = occ > 0 ? chd / occ : 0;
+
         const dm = rowMap.get('IND-4');
         if (dm) dm[field] = occ > 0 ? revApt / occ : 0;
 
