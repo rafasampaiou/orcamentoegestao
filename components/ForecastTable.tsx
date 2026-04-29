@@ -70,9 +70,7 @@ const IMPORT_LABEL_MAP: Record<string, string> = {
     'uh ocupada': 'IND-2',
     'adultos': 'IND-ADULTOS',
     'chd': 'IND-CHD',
-    'revpar': 'IND-6',
-    'trevpor': 'IND-TREVPOR',
-    'trevpar': 'IND-TREVPAR',
+    // 'revpar', 'trevpor', 'trevpar' são calculados automaticamente — não importar
     'receita de apartamentos (lazer)': 'REV-APT-LAZER',
     'receita de apartamentos (eventos)': 'REV-APT-EVENTOS',
     'receitas extras (lazer)': 'REV-EXTRA-LAZER',
@@ -1117,9 +1115,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                                     'UH Ocupada',
                                                     'Adultos',
                                                     'CHD',
-                                                    'RevPAR',
-                                                    'TRevPOR',
-                                                    'TRevPAR',
                                                 ].map(l => (
                                                     <span key={l} className="text-xs font-mono text-gray-700 py-0.5 border-b border-gray-50">{l}</span>
                                                 ))}
