@@ -33,8 +33,8 @@ const NavItem: React.FC<{
       onClick={onClick}
       className={`w-full flex items-center gap-2.5 ${pl} pr-3 py-1.5 text-[11px] font-semibold rounded-lg transition-all duration-150 ${
         active
-          ? 'bg-indigo-600/20 text-indigo-300 border-l-2 border-indigo-400 rounded-l-none'
-          : 'text-slate-400 hover:bg-slate-800/70 hover:text-white'
+          ? 'bg-[#F8981C]/20 text-[#F8981C] border-l-2 border-[#F8981C] rounded-l-none'
+          : 'text-slate-300 hover:bg-black/20 hover:text-white'
       }`}
     >
       <Icon size={13} className="shrink-0" />
@@ -57,11 +57,11 @@ const GroupHeader: React.FC<{
     <button
       onClick={onToggle}
       className={`w-full flex items-center justify-between ${pl} pr-3 py-2 rounded-lg transition-all ${
-        active ? 'text-white' : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
+        active ? 'text-white' : 'text-slate-300 hover:bg-black/20 hover:text-white'
       }`}
     >
       <div className="flex items-center gap-2">
-        <Icon size={depth === 0 ? 15 : 13} className={active ? 'text-indigo-400' : ''} />
+        <Icon size={depth === 0 ? 15 : 13} className={active ? 'text-[#F8981C]' : ''} />
         <span className={`font-black uppercase tracking-wider ${depth === 0 ? 'text-[11px]' : 'text-[10px]'}`}>
           {label}
         </span>
@@ -105,48 +105,48 @@ const Sidebar: React.FC<SidebarProps> = ({
   // collapsed mode
   if (collapsed) {
     return (
-      <div className="w-20 bg-[#0f172a] text-slate-300 h-screen flex flex-col fixed left-0 top-0 shadow-2xl z-50 border-r border-slate-800/50">
+      <div className="w-20 bg-[#155645] text-slate-300 h-screen flex flex-col fixed left-0 top-0 shadow-2xl z-50 border-r border-black/20">
         <div className="p-4 flex justify-center">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-indigo-600 flex items-center justify-center shadow-lg">
-            <Building2 className="text-white" size={20} />
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center shadow-lg" style={{ background: 'rgba(248,152,28,0.15)', border: '1px solid rgba(248,152,28,0.3)', boxShadow: '0 0 15px rgba(248,152,28,0.2)' }}>
+            <TrendingUp className="text-[#F8981C]" size={20} />
           </div>
         </div>
         <nav className="flex-1 flex flex-col items-center gap-4 py-4">
           <button onClick={() => go('dashboard', 'REAL')} title="Tauá Real">
-            <TrendingUp size={22} className={currentModule === 'REAL' && !isAdminView(currentView) ? 'text-emerald-400' : 'text-slate-500'} />
+            <TrendingUp size={22} className={currentModule === 'REAL' && !isAdminView(currentView) ? 'text-[#F8981C]' : 'text-slate-400'} />
           </button>
-          <div className="w-6 h-px bg-slate-800" />
+          <div className="w-6 h-px bg-white/10" />
           <button onClick={() => go('dre_budget', 'BUDGET')} title="Tauá Budget">
-            <HardDrive size={22} className={currentModule === 'BUDGET' && !isAdminView(currentView) ? 'text-emerald-400' : 'text-slate-500'} />
+            <HardDrive size={22} className={currentModule === 'BUDGET' && !isAdminView(currentView) ? 'text-[#F8981C]' : 'text-slate-400'} />
           </button>
           {isAdmin && (
             <>
-              <div className="w-6 h-px bg-slate-800" />
+              <div className="w-6 h-px bg-white/10" />
               <button onClick={() => go('admin_real_versions')} title="Administração">
-                <Settings size={22} className={isAdminView(currentView) ? 'text-indigo-400' : 'text-slate-500'} />
+                <Settings size={22} className={isAdminView(currentView) ? 'text-[#F8981C]' : 'text-slate-400'} />
               </button>
             </>
           )}
         </nav>
-        <div className="p-3 border-t border-slate-800/50 flex flex-col items-center gap-3">
-          <div className="w-7 h-7 rounded-full bg-indigo-500 flex items-center justify-center text-[10px] font-black">{initials}</div>
-          <button onClick={() => alert('Saindo...')}><LogOut size={17} className="text-red-400/70 hover:text-red-400" /></button>
+        <div className="p-3 border-t border-white/10 flex flex-col items-center gap-3">
+          <div className="w-7 h-7 rounded-full bg-[#F8981C] flex items-center justify-center text-[10px] font-black text-white">{initials}</div>
+          <button onClick={() => alert('Saindo...')}><LogOut size={17} className="text-red-400/80 hover:text-red-400" /></button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="w-[280px] bg-[#0f172a] text-slate-300 h-screen flex flex-col fixed left-0 top-0 shadow-2xl z-50 border-r border-slate-800/50">
+    <div className="w-[280px] bg-[#155645] text-slate-300 h-screen flex flex-col fixed left-0 top-0 shadow-2xl z-50 border-r border-black/20">
       {/* Brand */}
       <div className="px-4 py-4 shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-400 to-indigo-600 flex items-center justify-center shadow-lg shrink-0">
-            <Building2 className="text-white" size={17} />
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center shadow-lg shrink-0" style={{ background: 'rgba(248,152,28,0.15)', border: '1px solid rgba(248,152,28,0.3)' }}>
+            <TrendingUp className="text-[#F8981C]" size={17} />
           </div>
           <div>
-            <h1 className="font-black text-white text-sm leading-tight">Tauá Finance</h1>
-            <p className="text-[9px] text-slate-500 uppercase font-bold tracking-widest">Intelligent DRE Engine</p>
+            <h1 className="font-black text-white text-sm leading-tight">Forecast &amp; Budget</h1>
+            <p className="text-[9px] text-white/50 uppercase font-bold tracking-widest">Intelligent DRE Engine</p>
           </div>
         </div>
       </div>
@@ -269,9 +269,9 @@ const Sidebar: React.FC<SidebarProps> = ({
       </nav>
 
       {/* Footer */}
-      <div className="px-2 py-3 border-t border-slate-800/50 shrink-0">
-        <div className="flex items-center gap-2.5 px-3 py-2 bg-slate-800/30 rounded-xl mb-1">
-          <div className="w-7 h-7 rounded-full bg-indigo-500 flex items-center justify-center text-[10px] font-black shrink-0">{initials}</div>
+      <div className="px-2 py-3 border-t border-white/10 shrink-0">
+        <div className="flex items-center gap-2.5 px-3 py-2 bg-black/20 rounded-xl mb-1">
+          <div className="w-7 h-7 rounded-full bg-[#F8981C] text-white flex items-center justify-center text-[10px] font-black shrink-0">{initials}</div>
           <div className="overflow-hidden">
             <p className="text-[11px] font-black text-white truncate">{user.name}</p>
             <p className="text-[9px] text-slate-500 truncate lowercase">{user.role}</p>
