@@ -240,8 +240,8 @@ const App: React.FC = () => {
       if (matchingVersion.id !== activeBudgetVersionId) {
         setActiveBudgetVersionId(matchingVersion.id);
       }
-    } else if (activeBudgetVersionId && currentModule === 'BUDGET') {
-      // Only clear the version if we are strictly in the Budget module and found no mismatch/fallback
+    } else if (activeBudgetVersionId) {
+      // Clear version if found mismatch/fallback
       setActiveBudgetVersionId('');
     }
   }, [selectedHotel, budgetVersions, hotels, activeBudgetVersionId, currentModule]);
@@ -393,11 +393,7 @@ const App: React.FC = () => {
 
   const handleModuleChange = (module: ModuleType) => {
     setCurrentModule(module);
-    if (module === 'REAL') {
-      setCurrentView('real_home');
-    } else if (module === 'BUDGET') {
-      setCurrentView('budget_home');
-    }
+    setCurrentView('dashboard'); 
   };
 
   React.useEffect(() => {
@@ -503,16 +499,8 @@ const App: React.FC = () => {
     setReplicateModalOpen(false);
     setReplicateTarget(null);
 
-    // Navigation logic based on user choice
-    if (replicateMode === 'BUDGET') {
-      if (options.type === 'new_projected' && options.insertNewOccupancy) {
-        setCurrentView('occupancy_budget');
-      } else {
-        setCurrentView('dre_budget');
-      }
-    } else {
-      setCurrentView('dashboard');
-    }
+    // Navigation logic
+    setCurrentView('dashboard');
   };
 
   const renderContent = () => {
@@ -523,7 +511,7 @@ const App: React.FC = () => {
       case 'real_home': return (
         <div className="p-8 max-w-7xl mx-auto w-full">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Tauá Real</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Gestão Forecast & GMD</h1>
             <p className="text-gray-500">Selecione uma versão de realizado para trabalhar.</p>
           </div>
           <TimelineView
@@ -654,11 +642,6 @@ const App: React.FC = () => {
       case 'admin_real_import':
       case 'admin_real_schedule':
       case 'admin_real_dre':
-      // Admin > Tauá Budget
-      case 'admin_budget_versions':
-      case 'admin_budget_usali':
-      case 'admin_budget_labor':
-      case 'admin_budget_import':
       // Admin > Tauá Geral
       case 'admin_geral_accounts':
       case 'admin_geral_hotels':
@@ -671,7 +654,6 @@ const App: React.FC = () => {
       // Legacy
       case 'admin_geral':
       case 'admin_real':
-      case 'admin_budget':
       case 'admin_users':
       case 'admin_hotels':
       case 'admin_gmd':
@@ -709,203 +691,6 @@ const App: React.FC = () => {
             setHotelRegions={setHotelRegions}
           />
         );
-
-      // --- BUDGET MODULE ---
-      case 'budget_home': return (
-        <div className="p-8 max-w-7xl mx-auto w-full">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Tauá Budget</h1>
-            <p className="text-gray-500">Selecione uma versão de orçamento para trabalhar ou crie uma nova.</p>
-          </div>
-          <TimelineView
-            title="Planejamentos (Orçamento)"
-            versions={budgetVersions.filter(v => !v.hotelId || v.hotelId === (hotels.find(h => h.name === selectedHotel)?.code || selectedHotel))}
-            activeVersionId={activeBudgetVersionId}
-            onSelectVersion={(id) => {
-              setActiveBudgetVersionId(id);
-              const isAdm = selectedHotel === 'Administradora' || hotels.find(h => h.name === selectedHotel)?.code === 'ADM';
-              setCurrentView(isAdm ? 'dre_budget' : 'occupancy_budget');
-            }}
-            onToggleLock={(id) => setBudgetVersions(prev => prev.map(bv => bv.id === id ? { ...bv, isLocked: !bv.isLocked } : bv))}
-            onCreateVersion={async (year, month, name, hotelId) => {
-              const newVersionId = `v-${Date.now()}`;
-              const realVersionId = `r-${Date.now()}`;
-
-              const newBudgetVersion: BudgetVersion = {
-                id: newVersionId,
-                name,
-                year,
-                month: month || 1,
-                createdAt: new Date().toISOString(),
-                isLocked: false,
-                isMain: budgetVersions.length === 0,
-                hotelId: hotelId,
-                occupancyData: {}
-              };
-
-              const newRealVersion: BudgetVersion = {
-                id: realVersionId,
-                name,
-                year,
-                month: month || 1,
-                createdAt: new Date().toISOString(),
-                isLocked: false,
-                isMain: realVersions.length === 0,
-                hotelId: hotelId
-              };
-
-              // Save both to Supabase
-              try {
-                await Promise.all([
-                  supabaseService.upsertBudgetVersion(newBudgetVersion),
-                  supabaseService.upsertBudgetVersion(newRealVersion)
-                ]);
-                toast.success('Versões criadas com sucesso!');
-              } catch (e) {
-                console.error('Failed to create versions in Supabase', e);
-                toast.error('Erro ao salvar no banco.');
-              }
-
-              setBudgetVersions(prev => [...prev, newBudgetVersion]);
-              setRealVersions(prev => [...prev, newRealVersion]);
-              setActiveBudgetVersionId(newVersionId);
-              setBudgetOccupancyDataMap(prev => ({ ...prev, [newVersionId]: {} }));
-
-              const isAdm = hotelId === 'ADM' || hotelId === 'Administradora';
-              
-              // Switch to the created hotel's view so the user sees the new version
-              const hObj = hotels.find(h => h.id === hotelId || h.code === hotelId);
-              if (hObj) setSelectedHotel(hObj.name);
-
-              setCurrentView(isAdm ? 'dre_budget' : 'occupancy_budget');
-            }}
-            hotels={hotels}
-            onReplicateVersion={(year, month) => {
-              setReplicateTarget({ year, month });
-              setReplicateMode('BUDGET');
-              setReplicateModalOpen(true);
-            }}
-            onSetMain={(id) => setBudgetVersions(prev => prev.map(v => ({ ...v, isMain: v.id === id })))}
-            onDelete={async (id) => {
-              try {
-                await supabaseService.deleteBudgetVersion(id);
-                setBudgetVersions(prev => prev.filter(v => v.id !== id));
-                if (activeBudgetVersionId === id) {
-                  setActiveBudgetVersionId(budgetVersions.find(v => v.id !== id)?.id || '');
-                }
-              } catch (e) {
-                console.error('Failed to delete version from Supabase', e);
-              }
-            }}
-          />
-          {replicateTarget && replicateMode === 'BUDGET' && (
-            <ReplicateBudgetModal
-              isOpen={replicateModalOpen}
-              onClose={() => {
-                setReplicateModalOpen(false);
-                setReplicateTarget(null);
-              }}
-              targetYear={replicateTarget.year}
-              targetMonth={replicateTarget.month}
-              availableVersions={budgetVersions}
-              budgetVersions={budgetVersions}
-              mode="BUDGET"
-              onReplicate={handleReplicateBudget}
-            />
-          )}
-        </div>
-      );
-      case 'occupancy_budget': return (
-        <OccupancyView
-          isBudget={true}
-          budgetData={budgetOccupancyDataMap[activeBudgetVersionId] || {}}
-          setBudgetData={(newData) => {
-            setBudgetOccupancyDataMap(prev => ({
-              ...prev,
-              [activeBudgetVersionId]: typeof newData === 'function' ? newData(prev[activeBudgetVersionId] || {}) : newData
-            }));
-          }}
-          onSaveOccupancy={async () => {
-            const version = budgetVersions.find(v => v.id === activeBudgetVersionId);
-            if (version) {
-              // Use refs to always read the LATEST state, avoiding stale closure bug
-              const latestOccupancy = budgetOccupancyDataMapRef.current[activeBudgetVersionId] || {};
-              const latestLabor = globalLaborDataMapRef.current[activeBudgetVersionId] || {};
-              const latestExtra = extraRevenueDataMapRef.current[activeBudgetVersionId] || [];
-              const versionToSave = {
-                ...version,
-                occupancyData: latestOccupancy,
-                laborData: latestLabor,
-                extraRevenueData: latestExtra
-              };
-              try {
-                await supabaseService.upsertBudgetVersion(versionToSave);
-                toast.success('Ocupação salva com sucesso!');
-              } catch (e) {
-                toast.error('Erro ao salvar ocupação.');
-                console.error(e);
-              }
-            }
-          }}
-          onClearOccupancy={async () => {
-            setBudgetOccupancyDataMap(prev => ({ ...prev, [activeBudgetVersionId]: {} }));
-            const version = budgetVersions.find(v => v.id === activeBudgetVersionId);
-            if (version) {
-              const versionToSave = {
-                ...version,
-                occupancyData: {},
-                laborData: globalLaborDataMapRef.current[activeBudgetVersionId] || {},
-                extraRevenueData: extraRevenueDataMapRef.current[activeBudgetVersionId] || []
-              };
-              try {
-                await supabaseService.upsertBudgetVersion(versionToSave);
-                toast.success('Dados de ocupação apagados.');
-              } catch (e) {
-                toast.error('Erro ao limpar ocupação.');
-                console.error(e);
-              }
-            }
-          }}
-        />
-      );
-      case 'labor_budget': return (
-        <ErrorBoundary>
-          <BudgetLaborView
-            key={activeBudgetVersionId}
-            costCenters={costCenters}
-            laborParameters={laborParametersMap[activeBudgetVersionId] || defaultLaborParams}
-            accounts={accounts}
-            packages={packages}
-            budgetOccupancyData={budgetOccupancyDataMap[activeBudgetVersionId] || {}}
-            laborData={globalLaborDataMap[activeBudgetVersionId]}
-            setLaborData={(data) => setGlobalLaborDataMap(prev => ({ ...prev, [activeBudgetVersionId]: data }))}
-          />
-        </ErrorBoundary>
-      );
-      case 'extra_revenue_budget': return (
-        <ErrorBoundary>
-          <BudgetExtraRevView
-            key={activeBudgetVersionId}
-            budgetOccupancyData={budgetOccupancyDataMap[activeBudgetVersionId] || {}}
-            extraRevenueData={extraRevenueDataMap[activeBudgetVersionId]}
-            setExtraRevenueData={(data) => setExtraRevenueDataMap(prev => ({ ...prev, [activeBudgetVersionId]: data }))}
-          />
-        </ErrorBoundary>
-      );
-      case 'dre_budget': return (
-        <ErrorBoundary>
-          <BudgetDREView
-            accounts={accounts}
-            costCenters={costCenters}
-            sidebarCollapsed={sidebarCollapsed}
-            onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
-            selectedHotel={selectedHotel}
-            selectedYear={budgetVersions.find(v => v.id === activeBudgetVersionId)?.year || selectedDate.getFullYear()}
-            activeBudgetVersionId={activeBudgetVersionId}
-          />
-        </ErrorBoundary>
-      );
-
       default: return (
         <div className="p-8 text-center text-gray-500">
           Selecione uma opção no menu lateral.

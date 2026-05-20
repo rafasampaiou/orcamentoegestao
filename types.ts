@@ -221,12 +221,12 @@ export type ViewState =
   | 'gmd'
   | 'validations'
 
-  // BUDGET Module
-  | 'budget_home'
-  | 'occupancy_budget'
-  | 'labor_budget'
-  | 'extra_revenue_budget'
-  | 'dre_budget'
+  // BUDGET Module (Removed)
+  // | 'budget_home'
+  // | 'occupancy_budget'
+  // | 'labor_budget'
+  // | 'extra_revenue_budget'
+  // | 'dre_budget'
 
   // ADMIN > Tauá Real
   | 'admin_real_versions'
@@ -235,11 +235,11 @@ export type ViewState =
   | 'admin_real_schedule'
   | 'admin_real_dre'
 
-  // ADMIN > Tauá Budget
-  | 'admin_budget_versions'
-  | 'admin_budget_usali'
-  | 'admin_budget_labor'
-  | 'admin_budget_import'
+  // ADMIN > Tauá Budget (Removed)
+  // | 'admin_budget_versions'
+  // | 'admin_budget_usali'
+  // | 'admin_budget_labor'
+  // | 'admin_budget_import'
 
   // ADMIN > Tauá Geral
   | 'admin_geral_accounts'
@@ -254,13 +254,12 @@ export type ViewState =
   // Legacy (redirect targets)
   | 'admin_geral'
   | 'admin_real'
-  | 'admin_budget'
   | 'admin_users'
   | 'admin_hotels'
   | 'admin_gmd'
   | 'admin';
 
-export type ModuleType = 'REAL' | 'BUDGET';
+export type ModuleType = 'REAL';
 
 export interface ColumnVisibility {
   previa: boolean;

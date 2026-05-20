@@ -84,10 +84,8 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const [exp, setExp] = useState<Record<string, boolean>>({
     real:        currentModule === 'REAL' && !isAdminView(currentView),
-    budget:      currentModule === 'BUDGET' && !isAdminView(currentView),
     admin:       isAdminView(currentView),
     adminReal:   currentView.startsWith('admin_real'),
-    adminBudget: currentView.startsWith('admin_budget'),
     adminGeral:  currentView.startsWith('admin_geral') || ['admin_users','admin_hotels','admin_gmd'].includes(currentView),
   });
 
@@ -112,12 +110,8 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
         <nav className="flex-1 flex flex-col items-center gap-4 py-4">
-          <button onClick={() => go('dashboard', 'REAL')} title="Tauá Real">
+          <button onClick={() => go('dashboard', 'REAL')} title="Gestão Forecast & GMD">
             <TrendingUp size={22} className={currentModule === 'REAL' && !isAdminView(currentView) ? 'text-[#F8981C]' : 'text-slate-400'} />
-          </button>
-          <div className="w-6 h-px bg-white/10" />
-          <button onClick={() => go('dre_budget', 'BUDGET')} title="Tauá Budget">
-            <HardDrive size={22} className={currentModule === 'BUDGET' && !isAdminView(currentView) ? 'text-[#F8981C]' : 'text-slate-400'} />
           </button>
           {isAdmin && (
             <>
@@ -173,7 +167,8 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {/* ══ TAUÁ BUDGET ══ */}
+        {/* ══ TAUÁ BUDGET ══ (REMOVE) */}
+        {/*
         <GroupHeader
           label="Tauá Budget (Orçamento)"
           icon={HardDrive}
@@ -190,6 +185,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <NavItem depth={1} label="USALI Final"     icon={Table2}     active={currentView === 'dre_budget'}           onClick={() => go('dre_budget', 'BUDGET')} />
           </div>
         )}
+        */}
 
         {/* ══ ADMINISTRAÇÃO ══ */}
         {isAdmin && (
@@ -223,7 +219,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                   </div>
                 )}
 
-                {/* ── Admin > Tauá Budget ── */}
+                {/* ── Admin > Tauá Budget ── (REMOVE) */}
+                {/* 
                 <GroupHeader
                   label="Tauá Budget"
                   icon={HardDrive}
@@ -239,6 +236,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     <NavItem depth={2} label="Mão de Obra"        icon={Users2}   active={currentView === 'admin_budget_labor'}    onClick={() => go('admin_budget_labor')} />
                   </div>
                 )}
+                */}
 
                 {/* ── Admin > Tauá Geral ── */}
                 <GroupHeader

@@ -391,7 +391,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   setCurrentView
 }) => {
   // Main Module Tabs
-  const [mainTab, setMainTab] = useState<'real' | 'budget' | 'geral'>('real');
+  const [mainTab, setMainTab] = useState<'real' | 'geral'>('real');
 
   // Sync internal tabs when sidebar view changes
   React.useEffect(() => {
@@ -407,42 +407,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     } else if (currentView === 'admin_real_dre') {
       setMainTab('real'); setActiveRealTab('dre_params');
       // ── Admin > Tauá Budget ────────────────────────────────────────
-    } else if (currentView === 'admin_budget_versions') {
-      setMainTab('budget'); setActiveBudgetTab('versions');
-    } else if (currentView === 'admin_budget_usali') {
-      setMainTab('budget'); setActiveBudgetTab('expense_characteristics');
-    } else if (currentView === 'admin_budget_labor') {
-      setMainTab('budget'); setActiveBudgetTab('labor');
-    } else if (currentView === 'admin_budget_import') {
-      setMainTab('geral'); setActiveGeralTab('import');
-      // ── Admin > Tauá Geral ─────────────────────────────────────────
-    } else if (currentView === 'admin_geral_accounts') {
-      setMainTab('geral'); setActiveGeralTab('registries'); setActiveRegistryTab('accounts');
-    } else if (currentView === 'admin_geral_hotels') {
-      setMainTab('geral'); setActiveGeralTab('registries'); setActiveRegistryTab('hotels');
-    } else if (currentView === 'admin_geral_costcenters') {
-      setMainTab('geral'); setActiveGeralTab('registries'); setActiveRegistryTab('costCenters');
-    } else if (currentView === 'admin_geral_users') {
-      setMainTab('geral'); setActiveGeralTab('registries'); setActiveRegistryTab('users');
-    } else if (currentView === 'admin_geral_logs') {
-      setMainTab('geral'); setActiveGeralTab('registries'); setActiveRegistryTab('logs');
-    } else if (currentView === 'admin_geral_gmd') {
-      setMainTab('geral'); setActiveGeralTab('gmd');
-    } else if (currentView === 'admin_geral_permissions') {
-      setMainTab('geral'); setActiveGeralTab('permissions');
-    } else if (currentView === 'admin_geral_import') {
-      setMainTab('geral'); setActiveGeralTab('import');
-      // ── Legacy redirects ───────────────────────────────────────────
-    } else if (currentView === 'admin_geral') {
-      setMainTab('geral'); setActiveGeralTab('registries'); setActiveRegistryTab('accounts');
-    } else if (currentView === 'admin_real') {
-      setMainTab('real'); setActiveRealTab('versions');
-    } else if (currentView === 'admin_budget') {
-      setMainTab('budget'); setActiveBudgetTab('versions');
-    } else if (currentView === 'admin_users') {
-      setMainTab('geral'); setActiveGeralTab('registries'); setActiveRegistryTab('users');
-    } else if (currentView === 'admin_hotels') {
-      setMainTab('geral'); setActiveGeralTab('registries'); setActiveRegistryTab('hotels');
     } else if (currentView === 'admin_gmd') {
       setMainTab('geral'); setActiveGeralTab('gmd');
     }
@@ -458,10 +422,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
   // Sub-tabs for Tauá Geral
   const [activeGeralTab, setActiveGeralTab] = useState<'registries' | 'gmd' | 'permissions' | 'import' | 'dre_view'>('registries');
-
-  // Sub-tabs for Tauá Budget
-  const [activeBudgetTab, setActiveBudgetTab] = useState<'versions' | 'labor' | 'expense_characteristics' | 'import'>('versions');
-  const [budgetFilterYear, setBudgetFilterYear] = useState<number>(new Date().getFullYear());
 
   // Registry Sub-tabs (Now under Geral)
   const [activeRegistryTab, setActiveRegistryTab] = useState<'users' | 'logs' | 'hotels' | 'costCenters' | 'packages' | 'accounts' | 'dre_structure'>('users');
@@ -4299,139 +4259,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     );
   };
 
-  const renderTauáBudget = () => {
-    const selectedBudgetVersion = budgetVersions.find(v => v.id === activeBudgetVersionId);
-    const hasSelectedVersion = !!activeBudgetVersionId && !!selectedBudgetVersion;
-
-    return (
-      <div className="space-y-6">
-        {/* Selected Version Banner */}
-        {activeBudgetTab !== 'versions' && (
-          <div className={`p-4 rounded-xl border flex items-center justify-between ${hasSelectedVersion
-            ? 'bg-indigo-50 border-indigo-200'
-            : 'bg-amber-50 border-amber-200'
-            }`}>
-            <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${hasSelectedVersion ? 'bg-indigo-600 text-white' : 'bg-amber-400 text-white'
-                }`}>
-                <Database size={20} />
-              </div>
-              <div>
-                {hasSelectedVersion ? (
-                  <>
-                    <p className="text-sm font-black text-indigo-900">Versão selecionada para configuração: <span className="text-indigo-600">{selectedBudgetVersion.name} ({selectedBudgetVersion.year})</span></p>
-                    <p className="text-xs text-indigo-700 mt-0.5">As abas de configuração e importação agora irão operar sobre esta versão.</p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-sm font-bold text-amber-900">Selecione a versão que deseja configurar clicando na engrenagem</p>
-                  </>
-                )}
-              </div>
-            </div>
-            {hasSelectedVersion && (
-              <button
-                onClick={() => setActiveBudgetTab('versions')}
-                className="px-3 py-1.5 bg-white border border-indigo-200 text-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-100 transition-all"
-              >
-                Trocar Versão
-              </button>
-            )}
-          </div>
-        )}
-
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm min-h-[400px]">
-          {activeBudgetTab === 'versions' && (
-            <div className="space-y-6">
-              <TimelineView
-                title="Planejamentos (Orçamento)"
-                versions={budgetVersions}
-                activeVersionId={activeBudgetVersionId}
-                onSelectVersion={setActiveBudgetVersionId}
-                onToggleLock={(id) => handleToggleVersionLock(id, true)}
-                onDelete={(id) => handleDeleteVersion(id, true)}
-                onCreateVersion={(y, m, n, h) => { }}
-                showCreateOption={false}
-                showSettingsIcon={true}
-              />
-            </div>
-          )}
-          {activeBudgetTab === 'expense_characteristics' && (
-            !hasSelectedVersion ? (
-              <div className="text-center py-20 space-y-4">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
-                  <Lock className="text-gray-400" size={28} />
-                </div>
-                <h3 className="text-xl font-bold text-gray-400">Selecione uma versão primeiro</h3>
-                <p className="text-gray-400 text-sm max-w-sm mx-auto">Acesse a aba <strong>Versões</strong> e selecione ou crie a versão do orçamento que deseja configurar.</p>
-                <button onClick={() => setActiveBudgetTab('versions')} className="text-indigo-600 font-bold text-sm hover:underline">Ir para Versões →</button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h4 className="font-bold text-gray-700">Característica da Despesa (Fixo vs Variável)</h4>
-                  <div className="text-xs text-slate-500 italic">
-                    Defina como cada conta deve se comportar durante a projeção de novas versões do orçamento.
-                  </div>
-                </div>
-                <div className="overflow-hidden border border-gray-200 rounded-lg">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Código</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome da Conta</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Comportamento (Budget)</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {accounts.map(acc => (
-                        <tr key={acc.id}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-500">{acc.id}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{acc.name}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <select
-                              value={acc.type || 'Fixed'}
-                              onChange={(e) => {
-                                const newType = e.target.value as Account['type'];
-                                setAccounts(prev => prev.map(a => a.id === acc.id ? { ...a, type: newType } : a));
-                              }}
-                              className="border border-gray-300 rounded px-2 py-1 text-sm focus:ring-indigo-500 focus:border-indigo-500"
-                            >
-                              <option value="Fixed">Fixo</option>
-                              <option value="Variable_PAX">Variável (PAX)</option>
-                              <option value="Variable_UH">Variável (UH Ocupada)</option>
-                              <option value="Variable_Revenue">Variável (Receita)</option>
-                              <option value="Variable_Staff">Variável (Quadro de Pessoal)</option>
-                            </select>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )
-          )}
-          {activeBudgetTab === 'labor' && (
-            !hasSelectedVersion ? (
-              <div className="text-center py-20 space-y-4">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
-                  <Lock className="text-gray-400" size={28} />
-                </div>
-                <h3 className="text-xl font-bold text-gray-400">Selecione uma versão primeiro</h3>
-                <p className="text-gray-400 text-sm max-w-sm mx-auto">Acesse a aba <strong>Versões</strong> e selecione a versão do orçamento que deseja configurar.</p>
-                <button onClick={() => setActiveBudgetTab('versions')} className="text-indigo-600 font-bold text-sm hover:underline">Ir para Versões →</button>
-              </div>
-            ) : (
-              <div className="space-y-8">
-                {renderLaborParametersForm(activeBudgetVersionId)}
-              </div>
-            )
-          )}
-        </div>
-      </div>
-    );
-  };
 
   const renderTauáGeral = () => {
     return (
@@ -5160,11 +4987,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     admin_real_import: { title: 'Importação de Dados', subtitle: 'Importe dados financeiros reais em lote.', breadcrumb: 'Administração › Tauá Real › Importação' },
     admin_real_schedule: { title: 'Cronograma', subtitle: 'Defina o cronograma de elaboração do forecast.', breadcrumb: 'Administração › Tauá Real › Cronograma' },
     admin_real_dre: { title: 'Parâmetros DRE', subtitle: 'Edite a estrutura e ordem da DRE do Forecast.', breadcrumb: 'Administração › Tauá Real › Parâmetros DRE' },
-    // Admin > Tauá Budget
-    admin_budget_versions: { title: 'Versões de Orçamento', subtitle: 'Selecione a versão do orçamento que deseja configurar clicando na engrenagem. É necessário escolher uma versão antes de editar configurações ou importar dados.', breadcrumb: 'Administração › Tauá Budget › Versões' },
-    admin_budget_usali: { title: 'USALI / Config', subtitle: 'Configure a estrutura USALI e características.', breadcrumb: 'Administração › Tauá Budget › USALI' },
-    admin_budget_labor: { title: 'Mão de Obra', subtitle: 'Parâmetros de encargos e projeções de pessoal.', breadcrumb: 'Administração › Tauá Budget › Mão de Obra' },
-    admin_budget_import: { title: 'Importação da Meta', subtitle: 'Importe os dados da meta na versão selecionada.', breadcrumb: 'Administração › Tauá Budget › Importação da Meta' },
     // Admin > Tauá Geral
     admin_geral_accounts: { title: 'Plano de Contas', subtitle: 'Cadastro e ordenação de Pacotes Master, Pacotes e Contas.', breadcrumb: 'Administração › Tauá Geral › Plano de Contas' },
     admin_geral_hotels: { title: 'Hotéis e Unidades', subtitle: 'Cadastro de unidades hoteleiras.', breadcrumb: 'Administração › Tauá Geral › Hotéis' },
@@ -5176,8 +4998,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     admin_geral_import: { title: 'Importação de Cadastros', subtitle: 'Importe plano de contas e centros de resultado.', breadcrumb: 'Administração › Tauá Geral › Importação' },
     // Legacy
     admin_geral: { title: 'Plano de Contas', subtitle: 'Cadastro e ordenação do plano de contas.', breadcrumb: 'Administração › Tauá Geral' },
-    admin_real: { title: 'Config Tauá Real', subtitle: 'Versões e configurações do Forecast.', breadcrumb: 'Administração › Tauá Real' },
-    admin_budget: { title: 'Config Tauá Budget', subtitle: 'Versões e configurações do Orçamento.', breadcrumb: 'Administração › Tauá Budget' },
+    admin_real: { title: 'Config Forecast & GMD', subtitle: 'Versões e configurações do Forecast.', breadcrumb: 'Administração › Forecast & GMD' },
     admin_users: { title: 'Usuários e Logs', subtitle: 'Gerenciamento de usuários e auditoria de acessos.', breadcrumb: 'Administração › Usuários' },
     admin_hotels: { title: 'Hotéis e Setores', subtitle: 'Cadastro de unidades e centros de resultado.', breadcrumb: 'Administração › Hotéis' },
     admin_gmd: { title: 'Configuração GMD', subtitle: 'Matriz GMD: pacotes, gestores e associações.', breadcrumb: 'Administração › GMD' },
@@ -5199,7 +5020,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       </div>
 
       {mainTab === 'real' && renderTauáReal()}
-      {mainTab === 'budget' && renderTauáBudget()}
       {mainTab === 'geral' && renderTauáGeral()}
 
       {/* Modals for Registries */}
