@@ -1445,7 +1445,10 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
           parentId: acc.parentId || '',
           classification: acc.classification || 'Revenue',
           allocationRules: acc.allocationRules || [],
-          budgetSource: acc.budgetSource || ''
+          budgetSource: acc.budgetSource || '',
+          expenseType: acc.expenseType || 'Fixo',
+          expenseDriver: acc.expenseDriver || 'Receita',
+          expenseFactor: acc.expenseFactor || 0
         });
       }
     }
@@ -1939,7 +1942,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         continue;
       }
 
-      const [tipo, escopo, masterPacote, pacote, id, name] = cols.map(c => c?.trim() || '');
+      // Mapping: Tipo, Escopo, Master, Pacote, Código, Conta, Comportamento, Direcionador, Fator
+      const [tipo, escopo, masterPacote, pacote, id, name, behavior, driver, factor] = cols.map(c => c?.trim() || '');
 
       let status: 'valid' | 'error' = 'valid';
       const msgParts: string[] = [];
@@ -1968,6 +1972,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         packageCode: derivedPkgCode,
         masterPackage: masterPacote,
         masterPackageCode: derivedMasterPkgCode,
+        behavior,
+        driver,
+        factor: factor ? parseFloat(factor.replace(',', '.')) : 0,
         status,
         msg: msgParts.join(' | '),
         originalLine: i + 1
@@ -1994,7 +2001,10 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         packageCode: a.packageCode,
         masterPackage: a.masterPackage,
         masterPackageCode: a.masterPackageCode,
-        type: 'Fixed' as const,
+        type: (a.behavior || '').toLowerCase().includes('vari') ? 'Variable_PAX' : 'Fixed', // Legacy field
+        expenseType: (a.behavior || '').toLowerCase().includes('vari') ? 'Variável' : 'Fixo',
+        expenseDriver: a.driver as any,
+        expenseFactor: (a as any).factor || 0,
         classification: isRevenue ? 'Revenue' : (isExpense ? 'Expense' : undefined),
         outOfScope: isOutOfScope,
         sortOrder: index,
@@ -4004,7 +4014,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
             </div>
             <p className="text-[10px]">Cole os dados do Excel ou carregue um CSV com as seguintes colunas:</p>
             <code className="block mt-2 bg-white/50 p-2 rounded border border-amber-100 text-[10px] font-mono italic">
-              Tipo | Escopo ou Fora | Pacote Master | Pacote | Código | Conta Contábil
+              Tipo | Escopo ou Fora | Pacote Master | Pacote | Código | Conta Contábil | Comportamento | Direcionador | Fator
             </code>
           </div>
           <textarea
@@ -4726,6 +4736,53 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                 <option value="Indicator">Indicador Operacional</option>
                                 <option value="Occupancy">Ocupação</option>
                               </select>
+                            </div>
+
+                            <div className="pt-2 border-t border-slate-100 mt-2">
+                              <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Variabilidade</label>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Comportamento</label>
+                                  <select
+                                    value={accountForm.expenseType || 'Fixo'}
+                                    onChange={e => setAccountForm({ ...accountForm, expenseType: e.target.value as any })}
+                                    className="w-full bg-slate-50 border-none rounded-lg p-2 text-xs font-bold focus:ring-2 focus:ring-indigo-500"
+                                  >
+                                    <option value="Fixo">Fixo</option>
+                                    <option value="Variável">Variável</option>
+                                  </select>
+                                </div>
+                                {accountForm.expenseType === 'Variável' && (
+                                    <>
+                                      <div>
+                                        <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Baseado em</label>
+                                        <select
+                                          value={accountForm.expenseDriver || 'Receita'}
+                                          onChange={e => setAccountForm({ ...accountForm, expenseDriver: e.target.value as any })}
+                                          className="w-full bg-slate-50 border-none rounded-lg p-2 text-xs font-bold focus:ring-2 focus:ring-indigo-500"
+                                        >
+                                          <option value="UH Ocupada">UH Ocupada</option>
+                                          <option value="PAX">PAX</option>
+                                          <option value="Receita">Receita</option>
+                                          <option value="Emocionadores">Emocionadores</option>
+                                          <option value="Extras">Extras</option>
+                                        </select>
+                                      </div>
+                                      <div className="mt-2 col-span-2">
+                                        <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Índice / Fator de Projeção</label>
+                                        <input
+                                          type="number"
+                                          step="0.000001"
+                                          value={accountForm.expenseFactor || 0}
+                                          onChange={e => setAccountForm({ ...accountForm, expenseFactor: parseFloat(e.target.value) })}
+                                          className="w-full bg-slate-50 border-none rounded-lg p-2 text-xs font-bold focus:ring-2 focus:ring-indigo-500"
+                                          placeholder="Ex: 0.05 para 5% ou 1.5 para multiplicador"
+                                        />
+                                        <p className="text-[9px] text-gray-400 mt-1 italic">Multiplicador aplicado sobre o direcionador selecionado.</p>
+                                      </div>
+                                    </>
+                                )}
+                              </div>
                             </div>
 
                             <div className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">

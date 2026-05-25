@@ -113,6 +113,9 @@ export interface Account {
   classification?: 'Indicator' | 'Revenue' | 'Tax' | 'Expense' | 'GOP' | 'Occupancy';
   allocationRules?: any[];
   budgetSource?: string;
+  expenseType?: ExpenseType;
+  expenseDriver?: ExpenseDriver;
+  expenseFactor?: number;
 }
 
 export interface GMDConfiguration {
@@ -331,6 +334,8 @@ export interface ImportedAccount {
     packageCode?: string;
     masterPackage?: string;
     masterPackageCode?: string;
+    behavior?: string; // Comportamento (Fixo/Variável)
+    driver?: string; // Direcionador
     status: 'valid' | 'error';
     msg?: string;
     originalLine?: number;

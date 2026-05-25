@@ -29,7 +29,10 @@ export const supabaseService = {
       parentId: a.parent_id,
       classification: a.classification,
       allocationRules: a.allocation_rules,
-      budgetSource: a.budget_source
+      budgetSource: a.budget_source,
+      expenseType: a.expense_type,
+      expenseDriver: a.expense_driver,
+      expenseFactor: a.expense_factor
     })) as Account[];
   },
 
@@ -51,6 +54,9 @@ export const supabaseService = {
       classification: a.classification,
       allocation_rules: a.allocationRules,
       budget_source: a.budgetSource,
+      expense_type: a.expenseType,
+      expense_driver: a.expenseDriver,
+      expense_factor: a.expenseFactor,
       updated_at: new Date().toISOString()
     }));
 
