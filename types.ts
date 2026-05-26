@@ -448,5 +448,6 @@ export interface Justification {
   // Completion Fields
   recoveredValue?: number;
   completionObservation?: string;
+  assignedAreaManagerId?: string;
 }
 

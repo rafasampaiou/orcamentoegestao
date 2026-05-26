@@ -216,6 +216,15 @@ const App: React.FC = () => {
     };
   }, [session, loggedInProfile]);
 
+  const [hotels, setHotels] = useState<Hotel[]>([]);
+  const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
+  const [packages, setPackages] = useState<CostPackage[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [gmdConfigs, setGmdConfigs] = useState<GMDConfiguration[]>([]);
+  const [dreConfigs, setDreConfigs] = useState<Record<string, DreSection[]>>({});
+  const [hotelCategories, setHotelCategories] = useState<HotelCategory[]>([]);
+  const [hotelRegions, setHotelRegions] = useState<HotelRegion[]>([]);
+
   React.useEffect(() => {
     if (hotels.length === 0 || !currentUser || !currentUser.hotelId) return;
     
@@ -230,15 +239,6 @@ const App: React.FC = () => {
       }
     }
   }, [currentUser, hotels, selectedHotel]);
-
-  const [hotels, setHotels] = useState<Hotel[]>([]);
-  const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
-  const [packages, setPackages] = useState<CostPackage[]>([]);
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [gmdConfigs, setGmdConfigs] = useState<GMDConfiguration[]>([]);
-  const [dreConfigs, setDreConfigs] = useState<Record<string, DreSection[]>>({});
-  const [hotelCategories, setHotelCategories] = useState<HotelCategory[]>([]);
-  const [hotelRegions, setHotelRegions] = useState<HotelRegion[]>([]);
 
   React.useEffect(() => {
     // We want to update the active budget version whenever the hotel changes,

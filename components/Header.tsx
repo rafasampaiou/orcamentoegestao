@@ -154,7 +154,7 @@ const Header: React.FC<HeaderProps> = ({
 
             <div className="flex items-center gap-4">
                 {/* MONTH SELECTOR - HIDDEN IN BUDGET MODULE */}
-                {currentModule !== 'BUDGET' && (
+                {((currentModule as string) !== 'BUDGET') && (
                     <div className="flex items-center gap-3 bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
                         <button onClick={() => handleMonthChange('prev')} className="p-1.5 hover:bg-gray-100 rounded text-gray-500">
                             <ArrowLeft size={18} />
@@ -169,7 +169,7 @@ const Header: React.FC<HeaderProps> = ({
                     </div>
                 )}
 
-                {currentModule !== 'BUDGET' && <div className="h-8 w-px bg-gray-200 mx-1"></div>}
+                {((currentModule as string) !== 'BUDGET') && <div className="h-8 w-px bg-gray-200 mx-1"></div>}
                 
                 <div className="flex items-center gap-4">
                     <div className="flex items-center gap-3 p-1.5 rounded-lg">
