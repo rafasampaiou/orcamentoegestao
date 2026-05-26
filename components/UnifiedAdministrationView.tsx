@@ -626,51 +626,51 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const [permissionsMatrix, setPermissionsMatrix] = useState<Record<string, Record<string, Record<UserRole, boolean>>>>({
     'GMD': {
       'Criar Nova Versão GMD': {
-        [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false, [UserRole.ADMIN_UNIDADE]: true,
+        [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false,
         [UserRole.ENTITY_MANAGER]: false, [UserRole.PACKAGE_MANAGER]: false, [UserRole.AREA_MANAGER]: false,
         [UserRole.COST_ANALYST]: true, [UserRole.AREA_ANALYST]: false
       },
       'Aprovar Fechamento GMD': {
-        [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: true, [UserRole.ADMIN_UNIDADE]: false,
+        [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: true,
         [UserRole.ENTITY_MANAGER]: false, [UserRole.PACKAGE_MANAGER]: false, [UserRole.AREA_MANAGER]: false,
         [UserRole.COST_ANALYST]: false, [UserRole.AREA_ANALYST]: false
       },
       'Justificar Desvios': {
-        [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false, [UserRole.ADMIN_UNIDADE]: true,
+        [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false,
         [UserRole.ENTITY_MANAGER]: true, [UserRole.PACKAGE_MANAGER]: true, [UserRole.AREA_MANAGER]: true,
         [UserRole.COST_ANALYST]: true, [UserRole.AREA_ANALYST]: true
       }
     },
     'Orçamento': {
       'Criar Versão de Orçamento': {
-        [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false, [UserRole.ADMIN_UNIDADE]: true,
+        [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false,
         [UserRole.ENTITY_MANAGER]: false, [UserRole.PACKAGE_MANAGER]: false, [UserRole.AREA_MANAGER]: false,
         [UserRole.COST_ANALYST]: true, [UserRole.AREA_ANALYST]: false
       },
       'Importar Massivo (Excel)': {
-        [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false, [UserRole.ADMIN_UNIDADE]: false,
+        [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false,
         [UserRole.ENTITY_MANAGER]: false, [UserRole.PACKAGE_MANAGER]: false, [UserRole.AREA_MANAGER]: false,
         [UserRole.COST_ANALYST]: true, [UserRole.AREA_ANALYST]: false
       },
       'Editar Parâmetros de Mão de Obra': {
-        [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false, [UserRole.ADMIN_UNIDADE]: true,
+        [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false,
         [UserRole.ENTITY_MANAGER]: false, [UserRole.PACKAGE_MANAGER]: false, [UserRole.AREA_MANAGER]: false,
         [UserRole.COST_ANALYST]: true, [UserRole.AREA_ANALYST]: false
       }
     },
     'Cadastros e Configurações': {
       'Tabela de Usuários': {
-        [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false, [UserRole.ADMIN_UNIDADE]: true,
+        [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false,
         [UserRole.ENTITY_MANAGER]: false, [UserRole.PACKAGE_MANAGER]: false, [UserRole.AREA_MANAGER]: false,
         [UserRole.COST_ANALYST]: false, [UserRole.AREA_ANALYST]: false
       },
       'Plano de Contas Master/Pacote': {
-        [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false, [UserRole.ADMIN_UNIDADE]: false,
+        [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false,
         [UserRole.ENTITY_MANAGER]: false, [UserRole.PACKAGE_MANAGER]: false, [UserRole.AREA_MANAGER]: false,
         [UserRole.COST_ANALYST]: true, [UserRole.AREA_ANALYST]: false
       },
       'Configuração de Setores (CR/PDV)': {
-        [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false, [UserRole.ADMIN_UNIDADE]: true,
+        [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false,
         [UserRole.ENTITY_MANAGER]: false, [UserRole.PACKAGE_MANAGER]: false, [UserRole.AREA_MANAGER]: false,
         [UserRole.COST_ANALYST]: true, [UserRole.AREA_ANALYST]: false
       }

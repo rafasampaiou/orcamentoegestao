@@ -1,7 +1,6 @@
 export enum UserRole {
   ADMIN = 'ADMIN geral',
   DIRETORIA = 'Diretoria',
-  ADMIN_UNIDADE = 'ADMIN de unidade',
   ENTITY_MANAGER = 'Gerente de Entidade',
   PACKAGE_MANAGER = 'Gerente de Pacotes',
   AREA_MANAGER = 'Gerente de Área',

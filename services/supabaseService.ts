@@ -370,8 +370,6 @@ export const supabaseService = {
         const roleLower = p.role.trim().toLowerCase();
         if (roleLower === 'administrador' || roleLower === 'admin' || roleLower === 'admin geral') {
           mappedRole = UserRole.ADMIN;
-        } else if (roleLower === 'admin de unidade') {
-          mappedRole = UserRole.ADMIN_UNIDADE;
         }
       }
 
