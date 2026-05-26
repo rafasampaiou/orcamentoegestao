@@ -364,11 +364,22 @@ export const supabaseService = {
           // fallback
         }
       }
+      
+      let mappedRole = (p.role || 'Gestor de Pacote') as UserRole;
+      if (p.role) {
+        const roleLower = p.role.trim().toLowerCase();
+        if (roleLower === 'administrador' || roleLower === 'admin' || roleLower === 'admin geral') {
+          mappedRole = UserRole.ADMIN;
+        } else if (roleLower === 'admin de unidade') {
+          mappedRole = UserRole.ADMIN_UNIDADE;
+        }
+      }
+
       return {
         id: p.id,
         name: p.full_name || '',
         email: p.email || '',
-        role: (p.role || 'Gestor de Pacote') as UserRole,
+        role: mappedRole,
         hotelId: p.hotel_id || undefined,
         tempPassword: p.temp_password || undefined,
         avatarUrl: p.avatar_url || undefined,
