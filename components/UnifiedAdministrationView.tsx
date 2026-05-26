@@ -380,6 +380,20 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   // Main Module Tabs
   const [mainTab, setMainTab] = useState<'real' | 'geral'>('real');
 
+  // Memoized packages list for Package Manager selection in User Form
+  const uniquePackagesList = useMemo(() => {
+    const pkgs = new Set<string>();
+    accounts.forEach(a => { if (a.package) pkgs.add(a.package.trim()); });
+    return Array.from(pkgs).sort();
+  }, [accounts]);
+
+  // Memoized cost centers list for Area Manager selection in User Form
+  const uniqueCostCentersList = useMemo(() => {
+    const map = new Map<string, CostCenter>();
+    costCenters.forEach(cc => { if (cc.code) map.set(cc.code, cc); });
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [costCenters]);
+
   // Sync internal tabs when sidebar view changes
   React.useEffect(() => {
     // ── Admin > Tauá Real ──────────────────────────────────────────
@@ -5393,11 +5407,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                   <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Pacotes de Despesa</label>
                     <div className="p-3 border border-gray-200 rounded-xl bg-gray-50 max-h-40 overflow-y-auto space-y-2 custom-scrollbar">
-                      {React.useMemo(() => {
-                        const pkgs = new Set<string>();
-                        accounts.forEach(a => { if (a.package) pkgs.add(a.package.trim()); });
-                        return Array.from(pkgs).sort();
-                      }, [accounts]).map(pkg => (
+                      {uniquePackagesList.map(pkg => (
                         <label key={pkg} className="flex items-center gap-2.5 text-xs font-medium text-gray-700 cursor-pointer hover:text-indigo-600">
                           <input
                             type="checkbox"
@@ -5451,11 +5461,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                   <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Centros de Resultado (CR)</label>
                     <div className="p-3 border border-gray-200 rounded-xl bg-gray-50 max-h-48 overflow-y-auto space-y-2 custom-scrollbar">
-                      {React.useMemo(() => {
-                        const map = new Map<string, CostCenter>();
-                        costCenters.forEach(cc => { if (cc.code) map.set(cc.code, cc); });
-                        return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-                      }, [costCenters]).map(cc => (
+                      {uniqueCostCentersList.map(cc => (
                         <label key={cc.code} className="flex items-center gap-2.5 text-xs font-medium text-gray-700 cursor-pointer hover:text-indigo-600" title={cc.hierarchicalCode}>
                           <input
                             type="checkbox"
