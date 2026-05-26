@@ -383,7 +383,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   // Sync internal tabs when sidebar view changes
   React.useEffect(() => {
     // ── Admin > Tauá Real ──────────────────────────────────────────
-    if (currentView === 'admin_real_versions') {
+    if (currentView === 'admin_real_versions' || currentView === 'admin_real' || currentView === 'admin') {
       setMainTab('real'); setActiveRealTab('versions');
     } else if (currentView === 'admin_real_closure') {
       setMainTab('real'); setActiveRealTab('closure');
@@ -393,6 +393,24 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       setMainTab('real'); setActiveRealTab('schedule');
     } else if (currentView === 'admin_real_dre') {
       setMainTab('real'); setActiveRealTab('dre_params');
+    }
+    // ── Admin > Tauá Geral ─────────────────────────────────────────
+    else if (currentView === 'admin_geral_accounts' || currentView === 'admin_geral') {
+      setMainTab('geral'); setActiveGeralTab('registries'); setActiveRegistryTab('accounts');
+    } else if (currentView === 'admin_geral_hotels' || currentView === 'admin_hotels') {
+      setMainTab('geral'); setActiveGeralTab('registries'); setActiveRegistryTab('hotels');
+    } else if (currentView === 'admin_geral_costcenters') {
+      setMainTab('geral'); setActiveGeralTab('registries'); setActiveRegistryTab('costCenters');
+    } else if (currentView === 'admin_geral_users' || currentView === 'admin_users') {
+      setMainTab('geral'); setActiveGeralTab('registries'); setActiveRegistryTab('users');
+    } else if (currentView === 'admin_geral_logs') {
+      setMainTab('geral'); setActiveGeralTab('registries'); setActiveRegistryTab('logs');
+    } else if (currentView === 'admin_geral_gmd' || currentView === 'admin_gmd') {
+      setMainTab('geral'); setActiveGeralTab('gmd');
+    } else if (currentView === 'admin_geral_permissions') {
+      setMainTab('geral'); setActiveGeralTab('permissions');
+    } else if (currentView === 'admin_geral_import') {
+      setMainTab('geral'); setActiveGeralTab('import');
     } else if (currentView === 'admin_geral_forecast') {
       setMainTab('geral'); setActiveGeralTab('forecast');
     }
