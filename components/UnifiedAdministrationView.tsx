@@ -4,6 +4,7 @@ import { getForecastData } from '../services/mockData';
 import { Plus, Trash2, X, Save, Briefcase, Pencil, Calendar, PieChart, Lock, LockOpen, Settings as SettingsIcon, Users, Search, Upload, Settings, Eye, FileText, Layout, Info, ChevronUp, GripVertical, Database, BedDouble, DollarSign, Target } from 'lucide-react';
 import { User, UserRole, CostCenter, ImportedRow, Hotel, Account, BudgetVersion, LaborParameters, ScheduleItem, ImportedCostCenter, CostPackage, GMDConfiguration, ViewState, DreSection, HotelCategory, HotelRegion, ImportedAccount } from '../types';
 import TimelineView from './TimelineView';
+import ReplicateBudgetModal, { ReplicationOptions } from './ReplicateBudgetModal';
 import { supabaseService } from '../services/supabaseService';
 import { supabaseTemp } from '../services/supabaseClient';
 import { toast } from 'react-hot-toast';
@@ -437,6 +438,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
   const [activeRealTab, setActiveRealTab] = useState<'versions' | 'closure' | 'import' | 'labor' | 'schedule' | 'dre_params'>('versions');
   const [realFilterYear, setRealFilterYear] = useState<number>(new Date().getFullYear());
+  const [replicateModalOpen, setReplicateModalOpen] = useState(false);
+  const [replicateTarget, setReplicateTarget] = useState<{ year: number, month: number } | null>(null);
+  const [replicateMode, setReplicateMode] = useState<'BUDGET' | 'REAL'>('REAL');
 
   // Sub-tabs for Tauá Geral
   const [activeGeralTab, setActiveGeralTab] = useState<'registries' | 'gmd' | 'permissions' | 'import' | 'dre_view' | 'forecast'>('registries');
@@ -3041,6 +3045,217 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     }
   };
 
+  const onCreateVersion = async (year: number, month: number, name: string, hotelId: string) => {
+    const timestamp = Date.now();
+    const realId = `r-${timestamp}`;
+    const budgetId = `v-${timestamp}`;
+
+    const newRealVersion: BudgetVersion = {
+      id: realId,
+      name: name,
+      year: year,
+      month: month,
+      isMain: false,
+      isLocked: false,
+      hotelId: hotelId,
+      occupancyData: {},
+      laborData: {},
+      extraRevenueData: [],
+      closedMonths: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    const newBudgetVersion: BudgetVersion = {
+      id: budgetId,
+      name: name,
+      year: year,
+      month: month,
+      isMain: false,
+      isLocked: false,
+      hotelId: hotelId,
+      occupancyData: {},
+      laborData: {},
+      extraRevenueData: [],
+      closedMonths: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    try {
+      // 1. Save both to Supabase
+      await supabaseService.upsertBudgetVersion(newRealVersion);
+      await supabaseService.upsertBudgetVersion(newBudgetVersion);
+
+      // 2. Update parent state
+      setRealVersions(prev => [...prev, newRealVersion]);
+      setBudgetVersions(prev => [...prev, newBudgetVersion]);
+
+      // 3. Set active Realized/Budget version
+      setActiveRealVersionId(realId);
+      setActiveBudgetVersionId(budgetId);
+
+      toast.success(`Versões ${name} criadas com sucesso!`);
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro ao criar novas versões.');
+    }
+  };
+
+  const handleReplicateBudget = async (sourceVersionId: string, options: ReplicationOptions) => {
+    if (!replicateTarget) return;
+
+    try {
+      const isSourceReal = sourceVersionId.startsWith('r');
+      
+      // Find source versions (both real and budget if possible, to replicate paired versions)
+      const sourceRealVersion = isSourceReal 
+        ? realVersions.find(v => v.id === sourceVersionId)
+        : realVersions.find(v => {
+            const bv = budgetVersions.find(b => b.id === sourceVersionId);
+            return bv && v.name === bv.name && v.year === bv.year && v.hotelId === bv.hotelId;
+          });
+          
+      const sourceBudgetVersion = !isSourceReal
+        ? budgetVersions.find(v => v.id === sourceVersionId)
+        : budgetVersions.find(v => {
+            const rv = realVersions.find(r => r.id === sourceVersionId);
+            return rv && v.name === rv.name && v.year === rv.year && v.hotelId === rv.hotelId;
+          });
+
+      const timestamp = Date.now();
+      const newRealVersionId = `r-${timestamp}`;
+      const newBudgetVersionId = `v-${timestamp}`;
+
+      // Create new version records with replicated metadata
+      const newRealVersion: BudgetVersion = {
+        id: newRealVersionId,
+        name: options.name,
+        year: replicateTarget.year,
+        month: replicateTarget.month,
+        isMain: false,
+        isLocked: false,
+        hotelId: sourceRealVersion?.hotelId || sourceBudgetVersion?.hotelId,
+        occupancyData: sourceRealVersion?.occupancyData || {},
+        laborData: sourceRealVersion?.laborData || {},
+        extraRevenueData: sourceRealVersion?.extraRevenueData || [],
+        closedMonths: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      const newBudgetVersion: BudgetVersion = {
+        id: newBudgetVersionId,
+        name: options.name,
+        year: replicateTarget.year,
+        month: replicateTarget.month,
+        isMain: false,
+        isLocked: false,
+        hotelId: sourceBudgetVersion?.hotelId || sourceRealVersion?.hotelId,
+        occupancyData: sourceBudgetVersion?.occupancyData || {},
+        laborData: sourceBudgetVersion?.laborData || {},
+        extraRevenueData: sourceBudgetVersion?.extraRevenueData || [],
+        closedMonths: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      // 1. Save new versions to database
+      await supabaseService.upsertBudgetVersion(newRealVersion);
+      await supabaseService.upsertBudgetVersion(newBudgetVersion);
+
+      // 2. Replicate financial data in DB
+      let replicatedRealData: ImportedRow[] = [];
+      let replicatedBudgetData: ImportedRow[] = [];
+
+      if (options.type === 'pull_budget_meta' && options.budgetYear) {
+        // Pull Meta from Budget to Real
+        await supabaseService.pullBudgetMetaToReal(options.budgetYear, newRealVersionId);
+        replicatedRealData = await supabaseService.getFinancialDataByVersion(newRealVersionId);
+      } else {
+        // Replicate Real financial data
+        if (sourceRealVersion) {
+          const sourceRealData = await supabaseService.getFinancialDataByVersion(sourceRealVersion.id);
+          const newData: ImportedRow[] = sourceRealData.map(row => {
+            let newValue = parseFloat(row.valor) || 0;
+            return {
+              ...row,
+              valor: newValue.toFixed(2),
+              versionId: newRealVersionId,
+              ano: replicateTarget.year.toString(),
+              mes: replicateTarget.month?.toString() || row.mes
+            };
+          });
+          if (newData.length > 0) {
+            await supabaseService.saveFinancialData(newData);
+            replicatedRealData = newData;
+          }
+        }
+
+        // Replicate Budget financial data
+        if (sourceBudgetVersion) {
+          const sourceBudgetData = await supabaseService.getFinancialDataByVersion(sourceBudgetVersion.id);
+          const newData: ImportedRow[] = sourceBudgetData.map(row => {
+            let newValue = parseFloat(row.valor) || 0;
+            
+            if (options.type === 'new_projected') {
+              const account = accounts.find(a => a.name === row.conta || a.code === row.conta);
+              if (account) {
+                if (account.type === 'Fixed' && options.projectFixedWithInflation && options.inflationRate !== undefined) {
+                  newValue = newValue * (1 + options.inflationRate / 100);
+                }
+              }
+            }
+
+            return {
+              ...row,
+              valor: newValue.toFixed(2),
+              versionId: newBudgetVersionId,
+              ano: replicateTarget.year.toString(),
+              mes: replicateTarget.month?.toString() || row.mes
+            };
+          });
+          if (newData.length > 0) {
+            await supabaseService.saveFinancialData(newData);
+            replicatedBudgetData = newData;
+          }
+        }
+      }
+
+      // 3. Update parent states
+      setRealVersions(prev => [...prev, newRealVersion]);
+      setBudgetVersions(prev => [...prev, newBudgetVersion]);
+      
+      const allNewData = [...replicatedRealData, ...replicatedBudgetData];
+      if (onImportData && allNewData.length > 0) {
+        onImportData(allNewData, 'append');
+      }
+
+      // Copy labor parameters (for UI config parameter map)
+      const sourceId = sourceRealVersion?.id || sourceBudgetVersion?.id;
+      if (sourceId && laborParametersMap[sourceId]) {
+        setLaborParametersMap(prev => ({
+          ...prev,
+          [newRealVersionId]: { ...prev[sourceId] },
+          [newBudgetVersionId]: { ...prev[sourceId] }
+        }));
+      }
+
+      // Set active versions
+      setActiveRealVersionId(newRealVersionId);
+      setActiveBudgetVersionId(newBudgetVersionId);
+
+      toast.success(`Versão ${options.name} replicada com sucesso!`);
+      
+      // Close modal
+      setReplicateModalOpen(false);
+      setReplicateTarget(null);
+    } catch (err) {
+      console.error('Replication Error:', err);
+      toast.error('Erro ao replicar dados. Verifique a conexão.');
+    }
+  };
+
   const handleDeleteVersion = async (id: string, isBudget: boolean) => {
     if (!confirm('Tem certeza que deseja excluir esta versão? Todos os dados vinculados serão perdidos.')) return;
 
@@ -4167,17 +4382,40 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm min-h-[400px]">
           {activeRealTab === 'versions' && (
-            <TimelineView
-              title="Planejamentos (Realizado)"
-              versions={realVersions}
-              activeVersionId={activeRealVersionId}
-              onSelectVersion={setActiveRealVersionId}
-              onToggleLock={(id) => handleToggleVersionLock(id, false)}
-              onDelete={(id) => handleDeleteVersion(id, false)}
-              onCreateVersion={(y, m, n, h) => { }}
-              showCreateOption={false}
-              showSettingsIcon={true}
-            />
+            <>
+              <TimelineView
+                title="Planejamentos (Realizado)"
+                versions={realVersions}
+                activeVersionId={activeRealVersionId}
+                onSelectVersion={setActiveRealVersionId}
+                onToggleLock={(id) => handleToggleVersionLock(id, false)}
+                onDelete={(id) => handleDeleteVersion(id, false)}
+                onCreateVersion={onCreateVersion}
+                onReplicateVersion={(year, month) => {
+                  setReplicateTarget({ year, month });
+                  setReplicateMode('REAL');
+                  setReplicateModalOpen(true);
+                }}
+                showCreateOption={true}
+                hotels={hotels}
+                showSettingsIcon={true}
+              />
+              {replicateTarget && replicateMode === 'REAL' && (
+                <ReplicateBudgetModal
+                  isOpen={replicateModalOpen}
+                  onClose={() => {
+                    setReplicateModalOpen(false);
+                    setReplicateTarget(null);
+                  }}
+                  targetYear={replicateTarget.year}
+                  targetMonth={replicateTarget.month}
+                  availableVersions={realVersions}
+                  budgetVersions={budgetVersions}
+                  mode="REAL"
+                  onReplicate={handleReplicateBudget}
+                />
+              )}
+            </>
           )}
           {activeRealTab === 'closure' && (
             !hasSelectedRealVersion ? (
