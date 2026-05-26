@@ -179,8 +179,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                 {/* Versões / Fechamento */}
                 <NavItem depth={1} label="Versões"          icon={Database}        active={currentView === 'admin_real_versions'} onClick={() => go('admin_real_versions')} />
                 <NavItem depth={1} label="Fechamento"       icon={Lock}            active={currentView === 'admin_real_closure'}  onClick={() => go('admin_real_closure')} />
-                <NavItem depth={1} label="Cronograma"       icon={Calendar}        active={currentView === 'admin_real_schedule'} onClick={() => go('admin_real_schedule')} />
-                <NavItem depth={1} label="Parâmetros DRE"   icon={GanttChartSquare} active={currentView === 'admin_real_dre'}    onClick={() => go('admin_real_dre')} />
 
                 {/* Divisor visual suave */}
                 <div className="my-1.5 mx-3 h-px bg-white/5" />
@@ -191,7 +189,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <NavItem depth={1} label="Setores (CR)"     icon={Layers}          active={currentView === 'admin_geral_costcenters'} onClick={() => go('admin_geral_costcenters')} />
                 <NavItem depth={1} label="Usuários"         icon={Users}           active={currentView === 'admin_geral_users'}       onClick={() => go('admin_geral_users')} />
                 <NavItem depth={1} label="Logs"             icon={FileText}        active={currentView === 'admin_geral_logs'}        onClick={() => go('admin_geral_logs')} />
-                <NavItem depth={1} label="Config GMD"       icon={CheckCircle2}    active={currentView === 'admin_geral_gmd'}         onClick={() => go('admin_geral_gmd')} />
                 <NavItem depth={1} label="Permissões"       icon={ShieldCheck}     active={currentView === 'admin_geral_permissions'} onClick={() => go('admin_geral_permissions')} />
                 <NavItem depth={1} label="Importação"       icon={Upload}          active={currentView === 'admin_geral_import'}      onClick={() => go('admin_geral_import')} />
                 <NavItem depth={1} label="Forecast (Drivers)" icon={TrendingUp}    active={currentView === 'admin_geral_forecast'}    onClick={() => go('admin_geral_forecast')} />
