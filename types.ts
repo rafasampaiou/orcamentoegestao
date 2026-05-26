@@ -142,7 +142,7 @@ export interface GMDConfiguration {
 
 export type ExpenseType = 'Fixo' | 'Variável';
 // Updated Driver List per user request
-export type ExpenseDriver = 'UH Ocupada' | 'PAX' | 'Receita' | 'Emocionadores' | 'Extras';
+export type ExpenseDriver = 'UH Ocupada' | 'PAX' | 'Receita' | 'Receita Bruta' | 'Emocionadores' | 'Emocionadores (CLT)' | 'KPI de produtividade' | 'Definido Manualmente' | 'Extras';
 export type ForecastOperator = 'multiply' | 'divide';
 
 export interface ForecastConfig {

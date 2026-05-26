@@ -1550,9 +1550,20 @@ function getDriverValue(driver: ExpenseDriver | undefined, allRows: ForecastRow[
     switch (driver) {
         case 'UH Ocupada': targetRowId = 'IND-2'; break;
         case 'PAX': targetRowId = 'IND-5'; break;
-        case 'Emocionadores': targetRowId = 'IND-7'; break;
+        case 'Emocionadores':
+        case 'Emocionadores (CLT)':
+            targetRowId = 'IND-7';
+            break;
         case 'Extras': targetRowId = 'IND-8'; break;
-        case 'Receita': targetRowId = 'REV-TOTAL'; break;
+        case 'Receita':
+        case 'Receita Bruta':
+            targetRowId = 'REV-TOTAL';
+            break;
+        case 'KPI de produtividade':
+            targetRowId = 'IND-KPI';
+            break;
+        case 'Definido Manualmente':
+            return 0;
         default: return 0;
     }
 

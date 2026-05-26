@@ -670,6 +670,7 @@ export const getForecastData = (
     rows.push(generateRow('IND-6', '', 'Indicators', 'REVPAR', revparBudget, 637.5, 560, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
     rows.push(generateRow('IND-TREVPOR', '', 'Indicators', 'TREVPOR', trevporBudget, 0, 0, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
     rows.push(generateRow('IND-TREVPAR', '', 'Indicators', 'TREVPAR', trevparBudget, 0, 0, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-KPI', '', 'Indicators', 'KPI de produtividade', 0, 1.5, 1.4, 0, false, false, 0, undefined, { format: 'decimal' }, 'INDICADORES GERAIS'));
 
     rows.push(generateRow('SPACER-IND-REV', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
 

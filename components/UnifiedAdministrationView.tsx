@@ -4853,11 +4853,12 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                           onChange={e => setAccountForm({ ...accountForm, expenseDriver: e.target.value as any })}
                                           className="w-full bg-slate-50 border-none rounded-lg p-2 text-xs font-bold focus:ring-2 focus:ring-indigo-500"
                                         >
+                                          <option value="PAX">PAX (hóspedes)</option>
                                           <option value="UH Ocupada">UH Ocupada</option>
-                                          <option value="PAX">PAX</option>
-                                          <option value="Receita">Receita</option>
-                                          <option value="Emocionadores">Emocionadores</option>
-                                          <option value="Extras">Extras</option>
+                                          <option value="Receita Bruta">Receita Bruta</option>
+                                          <option value="Emocionadores (CLT)">Emocionadores (CLT)</option>
+                                          <option value="KPI de produtividade">KPI de produtividade</option>
+                                          <option value="Definido Manualmente">Definido Manualmente</option>
                                         </select>
                                       </div>
                                       <div className="mt-2 col-span-2">
@@ -5256,10 +5257,10 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                           <option value="">— Selecione o driver —</option>
                           <option value="PAX">PAX (hóspedes)</option>
                           <option value="UH Ocupada">UH Ocupada</option>
-                          <option value="Receita">Receita Total</option>
-                          <option value="Receita A&B">Receita A&B</option>
-                          <option value="Receita Hospedagem">Receita de Hospedagem</option>
-                          <option value="Emocionadores">Emocionadores</option>
+                          <option value="Receita Bruta">Receita Bruta</option>
+                          <option value="Emocionadores (CLT)">Emocionadores (CLT)</option>
+                          <option value="KPI de produtividade">KPI de produtividade</option>
+                          <option value="Definido Manualmente">Definido Manualmente</option>
                         </select>
                       ) : (
                         <div className="flex items-center gap-2 px-3 py-2">
