@@ -641,23 +641,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         [UserRole.COST_ANALYST]: true, [UserRole.AREA_ANALYST]: true
       }
     },
-    'Orçamento': {
-      'Criar Versão de Orçamento': {
-        [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false,
-        [UserRole.ENTITY_MANAGER]: false, [UserRole.PACKAGE_MANAGER]: false, [UserRole.AREA_MANAGER]: false,
-        [UserRole.COST_ANALYST]: true, [UserRole.AREA_ANALYST]: false
-      },
-      'Importar Massivo (Excel)': {
-        [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false,
-        [UserRole.ENTITY_MANAGER]: false, [UserRole.PACKAGE_MANAGER]: false, [UserRole.AREA_MANAGER]: false,
-        [UserRole.COST_ANALYST]: true, [UserRole.AREA_ANALYST]: false
-      },
-      'Editar Parâmetros de Mão de Obra': {
-        [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false,
-        [UserRole.ENTITY_MANAGER]: false, [UserRole.PACKAGE_MANAGER]: false, [UserRole.AREA_MANAGER]: false,
-        [UserRole.COST_ANALYST]: true, [UserRole.AREA_ANALYST]: false
-      }
-    },
     'Cadastros e Configurações': {
       'Tabela de Usuários': {
         [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false,
@@ -684,7 +667,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       try {
         const matrix = await supabaseService.getPermissions();
         if (Object.keys(matrix).length > 0) {
-          setPermissionsMatrix(matrix);
+          // Remove Orçamento from loaded matrix
+          const { Orçamento, ...filteredMatrix } = matrix as any;
+          setPermissionsMatrix(filteredMatrix);
         }
       } catch (e) {
         console.error("Failed to load permissions", e);
