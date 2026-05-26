@@ -257,6 +257,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     <NavItem depth={2} label="Config GMD"         icon={CheckCircle2} active={currentView === 'admin_geral_gmd'}         onClick={() => go('admin_geral_gmd')} />
                     <NavItem depth={2} label="Permissões"         icon={ShieldCheck}  active={currentView === 'admin_geral_permissions'} onClick={() => go('admin_geral_permissions')} />
                     <NavItem depth={2} label="Importação"         icon={Upload}       active={currentView === 'admin_geral_import'}      onClick={() => go('admin_geral_import')} />
+                    <NavItem depth={2} label="Forecast (Drivers)" icon={TrendingUp}   active={currentView === 'admin_geral_forecast'}    onClick={() => go('admin_geral_forecast')} />
                   </div>
                 )}
 

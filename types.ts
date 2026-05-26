@@ -253,6 +253,7 @@ export type ViewState =
   | 'admin_geral_gmd'
   | 'admin_geral_permissions'
   | 'admin_geral_import'
+  | 'admin_geral_forecast'
 
   // Legacy (redirect targets)
   | 'admin_geral'
@@ -336,6 +337,7 @@ export interface ImportedAccount {
     masterPackageCode?: string;
     behavior?: string; // Comportamento (Fixo/Variável)
     driver?: string; // Direcionador
+    factor?: number; // Fator de projeção
     status: 'valid' | 'error';
     msg?: string;
     originalLine?: number;

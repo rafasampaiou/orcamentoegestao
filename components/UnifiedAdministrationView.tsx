@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { getForecastData } from '../services/mockData';
 import { Plus, Trash2, X, Save, Briefcase, Pencil, Calendar, PieChart, Lock, LockOpen, Settings as SettingsIcon, Users, Search, Upload, Settings, Eye, FileText, Layout, Info, ChevronUp, GripVertical, Database, BedDouble, DollarSign, Target } from 'lucide-react';
-import { User, UserRole, CostCenter, ImportedRow, Hotel, Account, BudgetVersion, LaborParameters, ScheduleItem, ImportedCostCenter, CostPackage, GMDConfiguration, ViewState, DreSection, HotelCategory, HotelRegion } from '../types';
+import { User, UserRole, CostCenter, ImportedRow, Hotel, Account, BudgetVersion, LaborParameters, ScheduleItem, ImportedCostCenter, CostPackage, GMDConfiguration, ViewState, DreSection, HotelCategory, HotelRegion, ImportedAccount } from '../types';
 import TimelineView from './TimelineView';
 import { supabaseService } from '../services/supabaseService';
 import { supabaseTemp } from '../services/supabaseClient';
@@ -28,19 +28,6 @@ interface LocalDreSection {
   items: DrePackage[];
 }
 
-interface ImportedAccount {
-  id: string;
-  name: string;
-  tipo?: string;
-  escopo?: string;
-  package?: string;
-  packageCode?: string;
-  masterPackage?: string;
-  masterPackageCode?: string;
-  status: 'valid' | 'error';
-  msg: string;
-  originalLine: number;
-}
 
 // --- CONSTANTS FOR STRUCTURED IMPORTS ---
 const DRE_FORECAST_ROWS = [
@@ -406,9 +393,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       setMainTab('real'); setActiveRealTab('schedule');
     } else if (currentView === 'admin_real_dre') {
       setMainTab('real'); setActiveRealTab('dre_params');
-      // ── Admin > Tauá Budget ────────────────────────────────────────
-    } else if (currentView === 'admin_gmd') {
-      setMainTab('geral'); setActiveGeralTab('gmd');
+    } else if (currentView === 'admin_geral_forecast') {
+      setMainTab('geral'); setActiveGeralTab('forecast');
     }
   }, [currentView]);
 
@@ -421,7 +407,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const [realFilterYear, setRealFilterYear] = useState<number>(new Date().getFullYear());
 
   // Sub-tabs for Tauá Geral
-  const [activeGeralTab, setActiveGeralTab] = useState<'registries' | 'gmd' | 'permissions' | 'import' | 'dre_view'>('registries');
+  const [activeGeralTab, setActiveGeralTab] = useState<'registries' | 'gmd' | 'permissions' | 'import' | 'dre_view' | 'forecast'>('registries');
 
   // Registry Sub-tabs (Now under Geral)
   const [activeRegistryTab, setActiveRegistryTab] = useState<'users' | 'logs' | 'hotels' | 'costCenters' | 'packages' | 'accounts' | 'dre_structure'>('users');
@@ -5032,7 +5018,180 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               )}
             </div>
           )}
+          {activeGeralTab === 'forecast' && renderForecastVariability()}
         </div>
+      </div>
+    );
+  };
+
+  // ─── Forecast Variability Config ───────────────────────────────────────────
+  const renderForecastVariability = () => {
+    // Use the canonical DRE Forecast rows as the source of truth
+    const forecastRows = DRE_FORECAST_ROWS;
+
+    // Helper: find or create a "forecast config" for a given row label
+    const getConfig = (rowLabel: string) => {
+      const acc = accounts.find(a => a.name.toLowerCase() === rowLabel.toLowerCase());
+      return {
+        expenseType: acc?.expenseType || 'Fixo',
+        expenseDriver: acc?.expenseDriver || '',
+        factor: acc?.expenseFactor ?? '',
+      };
+    };
+
+    const updateAccountField = (rowLabel: string, field: string, value: any) => {
+      setAccounts(prev => {
+        const idx = prev.findIndex(a => a.name.toLowerCase() === rowLabel.toLowerCase());
+        if (idx === -1) return prev; // Account not yet imported — skip silently
+        const updated = [...prev];
+        updated[idx] = { ...updated[idx], [field]: value };
+        return updated;
+      });
+    };
+
+    return (
+      <div className="space-y-4">
+        {/* Header bar */}
+        <div className="flex justify-between items-center bg-gradient-to-r from-indigo-50 to-slate-50 p-5 rounded-2xl border border-indigo-100 shadow-sm">
+          <div>
+            <h4 className="font-black text-slate-800 text-base">Drivers de Variabilidade — DRE Forecast</h4>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Defina se cada linha do Forecast é <strong>Fixa</strong> ou <strong>Variável</strong> e qual indicador operacional a move (PAX, UH Ocupada, Receita etc.).
+            </p>
+          </div>
+          <button
+            onClick={async () => {
+              setIsSavingRegistry(true);
+              try {
+                await supabaseService.upsertAccounts(accounts);
+                toast.success('Configurações de variabilidade salvas!');
+              } catch (e) {
+                toast.error('Erro ao salvar. Tente novamente.');
+              } finally {
+                setIsSavingRegistry(false);
+              }
+            }}
+            disabled={isSavingRegistry}
+            className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 disabled:opacity-50 transition-all active:scale-95"
+          >
+            {isSavingRegistry
+              ? <><span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> Salvando...</>
+              : <><Save size={16} /> Salvar Alterações</>
+            }
+          </button>
+        </div>
+
+        {/* Legend */}
+        <div className="flex gap-4 text-[10px] font-bold uppercase text-slate-500 px-1">
+          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-slate-100 border border-slate-200 inline-block" /> Fixo</span>
+          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-orange-100 border border-orange-200 inline-block" /> Variável</span>
+        </div>
+
+        {/* Table */}
+        <div className="overflow-x-auto border border-gray-200 rounded-2xl shadow-sm bg-white">
+          <table className="min-w-full divide-y divide-gray-100">
+            <thead className="bg-[#f8fafc]">
+              <tr>
+                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-500 uppercase tracking-widest">Conta / Linha DRE</th>
+                <th className="px-6 py-4 text-center text-[10px] font-black text-gray-500 uppercase tracking-widest w-40">Comportamento</th>
+                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-500 uppercase tracking-widest w-72">Indicador Driver</th>
+                <th className="px-6 py-4 text-center text-[10px] font-black text-gray-500 uppercase tracking-widest w-36">Fator (%)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {forecastRows.map((rowLabel, i) => {
+                const cfg = getConfig(rowLabel);
+                const isVariable = cfg.expenseType === 'Variável';
+                // Detect sub-items (rows in parentheses = breakdown of a parent)
+                const isBreakdown = rowLabel.includes('(');
+                return (
+                  <tr
+                    key={rowLabel}
+                    className={`transition-colors group ${
+                      isVariable ? 'bg-orange-50/30 hover:bg-orange-50/60' : 'hover:bg-slate-50/50'
+                    } ${isBreakdown ? 'opacity-80' : ''}`}
+                  >
+                    {/* Row label */}
+                    <td className={`px-6 py-3.5 text-sm ${isBreakdown ? 'pl-10 text-slate-500 font-medium' : 'font-bold text-slate-800'}`}>
+                      {isBreakdown && <span className="text-slate-300 mr-2">└</span>}
+                      {rowLabel}
+                    </td>
+
+                    {/* Tipo: Fixo / Variável */}
+                    <td className="px-6 py-3.5 text-center">
+                      <div className="flex gap-1 justify-center">
+                        <button
+                          onClick={() => updateAccountField(rowLabel, 'expenseType', 'Fixo')}
+                          className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg border transition-all ${
+                            !isVariable
+                              ? 'bg-slate-700 text-white border-slate-700 shadow-sm'
+                              : 'bg-white text-slate-400 border-slate-200 hover:border-slate-400'
+                          }`}
+                        >Fixo</button>
+                        <button
+                          onClick={() => updateAccountField(rowLabel, 'expenseType', 'Variável')}
+                          className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg border transition-all ${
+                            isVariable
+                              ? 'bg-orange-500 text-white border-orange-500 shadow-sm shadow-orange-100'
+                              : 'bg-white text-slate-400 border-slate-200 hover:border-orange-300 hover:text-orange-500'
+                          }`}
+                        >Variável</button>
+                      </div>
+                    </td>
+
+                    {/* Driver */}
+                    <td className="px-6 py-3.5">
+                      {isVariable ? (
+                        <select
+                          value={cfg.expenseDriver}
+                          onChange={(e) => updateAccountField(rowLabel, 'expenseDriver', e.target.value)}
+                          className="w-full text-sm px-3 py-2 border border-orange-100 rounded-xl bg-orange-50/40 font-semibold text-slate-700 focus:ring-2 focus:ring-orange-300 outline-none transition-all shadow-sm"
+                        >
+                          <option value="">— Selecione o driver —</option>
+                          <option value="PAX">PAX (hóspedes)</option>
+                          <option value="UH Ocupada">UH Ocupada</option>
+                          <option value="Receita">Receita Total</option>
+                          <option value="Receita A&B">Receita A&B</option>
+                          <option value="Receita Hospedagem">Receita de Hospedagem</option>
+                          <option value="Emocionadores">Emocionadores</option>
+                        </select>
+                      ) : (
+                        <div className="flex items-center gap-2 px-3 py-2">
+                          <div className="w-2 h-2 rounded-full bg-slate-200" />
+                          <span className="text-[11px] text-gray-300 italic font-medium">não variável</span>
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Factor */}
+                    <td className="px-6 py-3.5 text-center">
+                      {isVariable ? (
+                        <div className="relative inline-flex items-center">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={cfg.factor}
+                            onChange={(e) => updateAccountField(rowLabel, 'expenseFactor', parseFloat(e.target.value) || 0)}
+                            className="w-28 text-sm px-3 py-2 pr-7 border border-orange-100 rounded-xl bg-orange-50/40 font-mono font-bold text-orange-700 text-right focus:ring-2 focus:ring-orange-300 outline-none transition-all shadow-sm placeholder:text-orange-200"
+                            placeholder="0.00"
+                          />
+                          <span className="absolute right-3 text-[11px] font-black text-orange-300 pointer-events-none">%</span>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-gray-200">—</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <p className="text-[10px] text-slate-400 italic px-1">
+          * Clique em <strong>Salvar Alterações</strong> para persistir. Contas não importadas no Plano de Contas serão ignoradas. O fator define o percentual do indicador aplicado à projeção.
+        </p>
       </div>
     );
   };
@@ -5053,6 +5212,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     admin_geral_gmd: { title: 'Configuração GMD', subtitle: 'Matriz GMD: pacotes, gestores e associações.', breadcrumb: 'Administração › Tauá Geral › Config GMD' },
     admin_geral_permissions: { title: 'Matriz de Permissões', subtitle: 'Configure os perfis e acessos por funcionalidade.', breadcrumb: 'Administração › Tauá Geral › Permissões' },
     admin_geral_import: { title: 'Importação de Cadastros', subtitle: 'Importe plano de contas e centros de resultado.', breadcrumb: 'Administração › Tauá Geral › Importação' },
+    admin_geral_forecast: { title: 'Configuração de Forecast', subtitle: 'Defina quais contas são variáveis e quais seus direcionadores.', breadcrumb: 'Administração › Tauá Geral › Forecast' },
     // Legacy
     admin_geral: { title: 'Plano de Contas', subtitle: 'Cadastro e ordenação do plano de contas.', breadcrumb: 'Administração › Tauá Geral' },
     admin_real: { title: 'Config Forecast & GMD', subtitle: 'Versões e configurações do Forecast.', breadcrumb: 'Administração › Forecast & GMD' },

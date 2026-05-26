@@ -1279,10 +1279,9 @@ export const getDynamicForecastData = (
                     false,
                     2,
                     undefined,
-                    { 
+                    {
                         method: acc.expenseType === 'Variável' ? 'Variable' : 'Fixed',
                         driver: acc.expenseDriver,
-                        factor: acc.expenseFactor,
                         type: acc.expenseType
                     }
                 ));
