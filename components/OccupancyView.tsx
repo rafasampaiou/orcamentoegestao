@@ -353,6 +353,7 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
 }) => {
 
     const canEditOccupancy = currentUser?.role === UserRole.ADMIN ||
+                            currentUser?.role === UserRole.ADMIN_UNIDADE ||
                             currentUser?.role === UserRole.ENTITY_MANAGER ||
                             currentUser?.role === UserRole.COST_ANALYST;
 

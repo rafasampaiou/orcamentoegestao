@@ -83,7 +83,7 @@ const GMDView: React.FC<GMDViewProps> = ({
 
   const canUserResolveJustification = (just: Justification) => {
       if (!currentUser) return false;
-      if (currentUser.role === UserRole.ADMIN) return true;
+      if (currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.ADMIN_UNIDADE) return true;
       if (currentUser.role === UserRole.DIRETORIA) return false;
 
       const config = gmdConfigs.find(c => c.id === just.gmdConfigId);
@@ -941,7 +941,7 @@ const GMDView: React.FC<GMDViewProps> = ({
                                 {canUserResolveJustification(selectedJustification) && (
                                     <div className="flex flex-col gap-2">
                                         {/* Entity Managers, Cost Analysts, and Admins can finalize */}
-                                        {[UserRole.ADMIN, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST].includes(currentUser?.role as any) ? (
+                                        {[UserRole.ADMIN, UserRole.ADMIN_UNIDADE, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST].includes(currentUser?.role as any) ? (
                                             <div className="flex gap-3">
                                                 <button onClick={() => handleCompletePlan(selectedJustification.id)} className="flex-1 bg-green-600 text-white py-2.5 rounded-lg text-sm font-bold hover:bg-green-700 flex justify-center items-center gap-2 shadow-sm transition-colors">
                                                     <CheckCircle size={16} /> Confirmar Conclusão

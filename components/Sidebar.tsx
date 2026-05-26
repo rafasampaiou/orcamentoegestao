@@ -80,7 +80,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   user,
   collapsed,
 }) => {
-  const isAdmin = user.role === UserRole.ADMIN;
+  const isAdmin = user.role === UserRole.ADMIN || user.role === UserRole.ADMIN_UNIDADE;
 
   const [exp, setExp] = useState<Record<string, boolean>>({
     real:  currentModule === 'REAL' && !isAdminView(currentView),

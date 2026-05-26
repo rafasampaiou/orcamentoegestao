@@ -691,10 +691,10 @@ const App: React.FC = () => {
       case 'admin_hotels':
       case 'admin_gmd':
       case 'admin':
-        if (currentUser.role !== UserRole.ADMIN) {
+        if (currentUser.role !== UserRole.ADMIN && currentUser.role !== UserRole.ADMIN_UNIDADE) {
           return (
             <div className="p-8 text-center text-red-500 font-bold bg-white rounded-2xl border border-red-200 max-w-xl mx-auto shadow-sm mt-12">
-              Acesso negado. Apenas o perfil ADMIN Geral possui acesso à área administrativa.
+              Acesso negado. Apenas perfis Administradores possuem acesso à área administrativa.
             </div>
           );
         }

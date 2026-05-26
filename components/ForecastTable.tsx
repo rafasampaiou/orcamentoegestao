@@ -191,11 +191,13 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     dreConfigs
 }) => {
     const canEditForecast = currentUser?.role === UserRole.ADMIN ||
+                            currentUser?.role === UserRole.ADMIN_UNIDADE ||
                             currentUser?.role === UserRole.ENTITY_MANAGER ||
                             currentUser?.role === UserRole.COST_ANALYST ||
                             currentUser?.role === UserRole.PACKAGE_MANAGER;
 
     const canValidate = currentUser?.role === UserRole.ADMIN ||
+                        currentUser?.role === UserRole.ADMIN_UNIDADE ||
                         currentUser?.role === UserRole.ENTITY_MANAGER ||
                         currentUser?.role === UserRole.COST_ANALYST;
 
@@ -351,7 +353,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         if (!currentUser) return false;
         
         // ADMIN Geral, Gerente de Entidade, and Analista de Custos have full edit access
-        if ([UserRole.ADMIN, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST].includes(currentUser.role as any)) {
+        if ([UserRole.ADMIN, UserRole.ADMIN_UNIDADE, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST].includes(currentUser.role as any)) {
             return true;
         }
         
@@ -494,7 +496,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 if (!isIndicator) {
                     canEdit = field === 'real' ? canEditReal : canEditPrevia;
                 } else if (isInputIndicator || isManualRow) {
-                    canEdit = [UserRole.ADMIN, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST].includes(currentUser?.role as any);
+                    canEdit = [UserRole.ADMIN, UserRole.ADMIN_UNIDADE, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST].includes(currentUser?.role as any);
                 }
 
                 if (canEdit) {
@@ -902,7 +904,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         );
                                     } else if (isIndicator) {
                                         const isInputIndicator = ['IND-1', 'IND-2', 'IND-ADULTOS', 'IND-CHD', 'IND-LZ-2', 'IND-LZ-4', 'IND-LZ-5', 'IND-EV-2', 'IND-EV-4', 'IND-EV-5'].includes(row.id);
-                                        const canEditIndicator = [UserRole.ADMIN, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST].includes(currentUser?.role as any);
+                                        const canEditIndicator = [UserRole.ADMIN, UserRole.ADMIN_UNIDADE, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST].includes(currentUser?.role as any);
 
                                         if (canEditIndicator && (isInputIndicator || isManualRow) && !isMonthClosed) {
                                             realCellContent = (
