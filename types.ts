@@ -34,6 +34,9 @@ export interface User {
   avatarUrl?: string;
   hotelId?: string; // Link user to a specific Hotel/Entity
   tempPassword?: string; // Storing temporary password for admin viewing
+  responsiblePackages?: string[];
+  responsibleRevenues?: string[];
+  responsibleCostCenters?: string[];
   createdAt?: string;
   lastAccess?: string;
 }

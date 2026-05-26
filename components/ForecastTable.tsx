@@ -190,6 +190,15 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     currentUser,
     dreConfigs
 }) => {
+    const canEditForecast = currentUser?.role === UserRole.ADMIN ||
+                            currentUser?.role === UserRole.ENTITY_MANAGER ||
+                            currentUser?.role === UserRole.COST_ANALYST ||
+                            currentUser?.role === UserRole.PACKAGE_MANAGER;
+
+    const canValidate = currentUser?.role === UserRole.ADMIN ||
+                        currentUser?.role === UserRole.ENTITY_MANAGER ||
+                        currentUser?.role === UserRole.COST_ANALYST;
+
     const [data, setData] = useState<ForecastRow[]>(() => {
         const forecastStructure = dreConfigs?.['Forecast'] || [];
         const initialData = getDynamicForecastData(forecastStructure, selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData);
@@ -338,6 +347,51 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         return ['REV-APT-LAZER', 'REV-APT-EVENTOS', 'REV-EXTRA-LAZER', 'REV-EXTRA-EVENTOS', 'REV-TIME', 'REV-ISS', 'REV-IMP'].includes(id);
     };
 
+    const isRowEditableForUser = (row: ForecastRow) => {
+        if (!currentUser) return false;
+        
+        // ADMIN Geral, Gerente de Entidade, and Analista de Custos have full edit access
+        if ([UserRole.ADMIN, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST].includes(currentUser.role as any)) {
+            return true;
+        }
+        
+        // Gerente de Pacotes can only edit their assigned packages and revenues
+        if (currentUser.role === UserRole.PACKAGE_MANAGER) {
+            if (row.category === 'Costs') {
+                // If it's a package header
+                if (row.isHeader && row.indentLevel === 1) {
+                    return currentUser.responsiblePackages?.includes(row.label) || false;
+                }
+                // If it's an individual account
+                const accId = row.id.split('-')[0];
+                const acc = accounts.find(a => a.id === accId);
+                if (acc && acc.package) {
+                    return currentUser.responsiblePackages?.includes(acc.package) || false;
+                }
+                // Fallback checking label or indicatorSection
+                return currentUser.responsiblePackages?.some(p => 
+                    row.label.toLowerCase().includes(p.toLowerCase()) || 
+                    (row.indicatorSection && row.indicatorSection.toLowerCase().includes(p.toLowerCase()))
+                ) || false;
+            }
+            
+            if (isSpecialEditableRow(row.id)) {
+                const revenueMap: Record<string, string> = {
+                    'REV-APT-LAZER': 'Receita de Apartamentos (Lazer)',
+                    'REV-APT-EVENTOS': 'Receita de Apartamentos (Eventos)',
+                    'REV-EXTRA-LAZER': 'Receitas Extras (Lazer)',
+                    'REV-EXTRA-EVENTOS': 'Receitas Extras (Eventos)'
+                };
+                const assignedRevenue = revenueMap[row.id];
+                if (assignedRevenue) {
+                    return currentUser.responsibleRevenues?.includes(assignedRevenue) || false;
+                }
+            }
+        }
+        
+        return false;
+    };
+
     const toggleConfigRow = (id: string) => {
         setExpandedConfigRows(prev => {
             const next = new Set(prev);
@@ -433,14 +487,14 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 const isIndicator = row.id.startsWith('IND-');
                 const isManualRow = ['IND-MO-2', 'IND-MO-3'].includes(row.id);
                 const isInputIndicator = ['IND-1', 'IND-LZ-2', 'IND-LZ-4', 'IND-LZ-5', 'IND-EV-2', 'IND-EV-4', 'IND-EV-5'].includes(row.id);
-                const canEditReal = !isMonthClosed && (!row.isHeader || isSpecialEditableRow(row.id)) && !row.isTotal && (row.forecastConfig.method === 'Fixed' || isSpecialEditableRow(row.id));
-                const canEditPrevia = !isMonthClosed && (!row.isHeader || isSpecialEditableRow(row.id)) && !row.isTotal && ((row.previaConfig?.method || 'Fixed') === 'Fixed' || isSpecialEditableRow(row.id));
+                const canEditReal = !isMonthClosed && (!row.isHeader || isSpecialEditableRow(row.id)) && !row.isTotal && (row.forecastConfig.method === 'Fixed' || isSpecialEditableRow(row.id)) && isRowEditableForUser(row);
+                const canEditPrevia = !isMonthClosed && (!row.isHeader || isSpecialEditableRow(row.id)) && !row.isTotal && ((row.previaConfig?.method || 'Fixed') === 'Fixed' || isSpecialEditableRow(row.id)) && isRowEditableForUser(row);
 
                 let canEdit = false;
                 if (!isIndicator) {
                     canEdit = field === 'real' ? canEditReal : canEditPrevia;
                 } else if (isInputIndicator || isManualRow) {
-                    canEdit = true;
+                    canEdit = [UserRole.ADMIN, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST].includes(currentUser?.role as any);
                 }
 
                 if (canEdit) {
@@ -585,20 +639,24 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             {showDetails ? <ListFilter size={20} /> : <LayoutList size={20} />}
                             {showDetails ? 'Ocultar Contas' : 'Mostrar Contas'}
                         </button>
-                        <button
-                            onClick={() => setShowValidationModal(true)}
-                            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-md text-base font-bold"
-                        >
-                            <CheckCircle2 size={20} />
-                            {isMonthClosed ? 'Validar fechamento' : 'Validar projeção'}
-                        </button>
-                        <button
-                            onClick={() => { setImportText(''); setImportResult(null); setShowImportModal(true); }}
-                            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-md text-base font-bold"
-                        >
-                            <Upload size={20} />
-                            Importar do Excel
-                        </button>
+                        {canValidate && (
+                            <button
+                                onClick={() => setShowValidationModal(true)}
+                                className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-md text-base font-bold"
+                            >
+                                <CheckCircle2 size={20} />
+                                {isMonthClosed ? 'Validar fechamento' : 'Validar projeção'}
+                            </button>
+                        )}
+                        {canEditForecast && (
+                            <button
+                                onClick={() => { setImportText(''); setImportResult(null); setShowImportModal(true); }}
+                                className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-md text-base font-bold"
+                            >
+                                <Upload size={20} />
+                                Importar do Excel
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -817,10 +875,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     const isEditableCost = row.category === 'Costs';
                                     const isEditableSpecial = isSpecialEditableRow(row.id);
 
-                                    if (!isIndicator && (!isHeaderOrTotal || isEditableCost || isEditableSpecial)) {
-                                        const canEdit = !isIndicator && (row.forecastConfig.method === 'Fixed' || isEditableCost || isEditableSpecial);
-                                        const canEditPrevia = !isIndicator && ((row.previaConfig?.method || 'Fixed') === 'Fixed' || isEditableCost || isEditableSpecial);
-
+                                    const isRowEditable = isRowEditableForUser(row);
+                                    if (canEditForecast && isRowEditable && !isIndicator && (!isHeaderOrTotal || isEditableCost || isEditableSpecial)) {
                                         realCellContent = (
                                             <FormattedInput
                                                 inputRef={(el: any) => { inputRefs.current[`input-real-${row.id}`] = el; }}
@@ -846,8 +902,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         );
                                     } else if (isIndicator) {
                                         const isInputIndicator = ['IND-1', 'IND-2', 'IND-ADULTOS', 'IND-CHD', 'IND-LZ-2', 'IND-LZ-4', 'IND-LZ-5', 'IND-EV-2', 'IND-EV-4', 'IND-EV-5'].includes(row.id);
+                                        const canEditIndicator = [UserRole.ADMIN, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST].includes(currentUser?.role as any);
 
-                                        if ((isInputIndicator || isManualRow) && !isMonthClosed) {
+                                        if (canEditIndicator && (isInputIndicator || isManualRow) && !isMonthClosed) {
                                             realCellContent = (
                                                 <FormattedInput
                                                     inputRef={(el: any) => { inputRefs.current[`input-real-${row.id}`] = el; }}
@@ -892,7 +949,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                                     onPaste={(e: any) => handlePaste(e, row.id, 'previa')}
                                                 />
                                             );
-                                        } else if ((isInputIndicator || isManualRow) && isMonthClosed) {
+                                        } else if ((isInputIndicator || isManualRow) && (isMonthClosed || !canEditForecast)) {
                                             realCellContent = <span className="font-medium">{formatValue(row.real, formatType)}</span>;
                                             previaCellContent = <span className="font-medium">{formatValue(row.previa, formatType)}</span>;
                                         }

@@ -67,7 +67,8 @@ const Header: React.FC<HeaderProps> = ({
                                 setSelectedHotel(filtered[0].name);
                             }
                         }}
-                        className="bg-transparent text-xs font-bold text-gray-700 focus:outline-none cursor-pointer"
+                        disabled={currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.DIRETORIA && currentUser?.role !== UserRole.PACKAGE_MANAGER && !!currentUser?.hotelId}
+                        className="bg-transparent text-xs font-bold text-gray-700 focus:outline-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                         <option value="Todos">Todos</option>
                         <option value="Hotéis próprios">Próprios</option>
@@ -92,7 +93,8 @@ const Header: React.FC<HeaderProps> = ({
                                 setSelectedHotel(filtered[0].name);
                             }
                         }}
-                        className="bg-transparent text-xs font-bold text-gray-700 focus:outline-none cursor-pointer"
+                        disabled={currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.DIRETORIA && currentUser?.role !== UserRole.PACKAGE_MANAGER && !!currentUser?.hotelId}
+                        className="bg-transparent text-xs font-bold text-gray-700 focus:outline-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                         <option value="Todas">Todas</option>
                         {hotelCategories.map(cat => (
@@ -117,7 +119,8 @@ const Header: React.FC<HeaderProps> = ({
                                 setSelectedHotel(filtered[0].name);
                             }
                         }}
-                        className="bg-transparent text-xs font-bold text-gray-700 focus:outline-none cursor-pointer"
+                        disabled={currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.DIRETORIA && currentUser?.role !== UserRole.PACKAGE_MANAGER && !!currentUser?.hotelId}
+                        className="bg-transparent text-xs font-bold text-gray-700 focus:outline-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                         <option value="Todas">Todas</option>
                         {hotelRegions.map(reg => (
@@ -132,7 +135,8 @@ const Header: React.FC<HeaderProps> = ({
                     <select 
                         value={selectedHotel} 
                         onChange={(e) => setSelectedHotel(e.target.value)}
-                        className="bg-transparent text-sm font-bold text-indigo-900 focus:outline-none cursor-pointer"
+                        disabled={currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.DIRETORIA && currentUser?.role !== UserRole.PACKAGE_MANAGER && !!currentUser?.hotelId}
+                        className="bg-transparent text-sm font-bold text-indigo-900 focus:outline-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                         {hotels
                             .filter(h => 

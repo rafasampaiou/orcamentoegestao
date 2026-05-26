@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Settings2, ChevronUp, Save, Trash2, CheckCircle } from 'lucide-react';
-import { ColumnVisibility, ImportedRow } from '../types';
+import { ColumnVisibility, ImportedRow, User, UserRole } from '../types';
 
 // --- Types ---
 interface OccupancyViewProps {
@@ -20,6 +20,7 @@ interface OccupancyViewProps {
     // Naming & type
     activeProjectionType?: import('../types').ProjectionType;
     setActiveProjectionType?: React.Dispatch<React.SetStateAction<import('../types').ProjectionType>>;
+    currentUser?: User;
 }
 
 interface BudgetRow {
@@ -132,8 +133,9 @@ const BudgetOccupancyTable: React.FC<{
     data: Record<string, number[]>,
     onUpdate: (rowId: string, monthIndex: number, value: number) => void,
     decimalOverrides: Record<string, number>,
-    onToggleDecimals: (rowId: string) => void
-}> = ({ title, rows, data, onUpdate, decimalOverrides, onToggleDecimals }) => {
+    onToggleDecimals: (rowId: string) => void,
+    canEdit: boolean
+}> = ({ title, rows, data, onUpdate, decimalOverrides, onToggleDecimals, canEdit }) => {
 
     const handlePaste = (e: React.ClipboardEvent, startRowId: string, startMonthIndex: number) => {
         e.preventDefault();
@@ -232,7 +234,7 @@ const BudgetOccupancyTable: React.FC<{
                                     </td>
                                     {MONTHS.map((_, idx) => (
                                         <td key={idx} className="px-1 py-1 border-r border-gray-100 text-center">
-                                            {row.isInput ? (
+                                            {row.isInput && canEdit ? (
                                                 <TableInput
                                                     value={rowValues[idx]}
                                                     format={row.format}
@@ -346,8 +348,13 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
     setRealOccupancyData,
     financialData,
     activeProjectionType,
-    setActiveProjectionType
+    setActiveProjectionType,
+    currentUser
 }) => {
+
+    const canEditOccupancy = currentUser?.role === UserRole.ADMIN ||
+                            currentUser?.role === UserRole.ENTITY_MANAGER ||
+                            currentUser?.role === UserRole.COST_ANALYST;
 
     const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>({
         previa: true,
@@ -750,7 +757,7 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
                                         </td>
                                         {columnVisibility.previa && (
                                             <td className="px-2 py-2 text-right bg-purple-50/20 text-purple-800 font-medium border-r border-gray-100">
-                                                {row.isManualReal ? (
+                                                {row.isManualReal && canEditOccupancy ? (
                                                     <TableInput
                                                         value={previa || 0}
                                                         format={row.format}
@@ -770,7 +777,7 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
                                         )}
                                         {columnVisibility.real && (
                                             <td className="px-2 py-2 text-right bg-sky-50/30 border-r border-gray-100">
-                                                {row.isManualReal ? (
+                                                {row.isManualReal && canEditOccupancy ? (
                                                     <TableInput
                                                         value={forecast || 0}
                                                         format={row.format}
@@ -922,6 +929,7 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
                     <h2 className="text-2xl font-bold text-gray-900">Orçamento de Ocupação</h2>
                     <p className="text-gray-500 mt-1">Projeção mensal de ocupação e receitas (Lazer e Eventos).</p>
                 </div>
+            {canEditOccupancy && (
                 <div className="flex items-center gap-3">
                     <button
                         onClick={handleManualSave}
@@ -942,6 +950,7 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
                         Limpar Dados de Ocupação
                     </button>
                 </div>
+            )}
             </div>
 
             {showClearConfirm && (
@@ -974,9 +983,9 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
                 </div>
             )}
 
-            <BudgetOccupancyTable title="Geral" rows={geralRows} data={budgetData} onUpdate={handleUpdate} decimalOverrides={decimalOverrides} onToggleDecimals={toggleDecimals} />
-            <BudgetOccupancyTable title="Lazer" rows={lazerRows} data={budgetData} onUpdate={handleUpdate} decimalOverrides={decimalOverrides} onToggleDecimals={toggleDecimals} />
-            <BudgetOccupancyTable title="Eventos" rows={eventRows} data={budgetData} onUpdate={handleUpdate} decimalOverrides={decimalOverrides} onToggleDecimals={toggleDecimals} />
+            <BudgetOccupancyTable title="Geral" rows={geralRows} data={budgetData} onUpdate={handleUpdate} decimalOverrides={decimalOverrides} onToggleDecimals={toggleDecimals} canEdit={canEditOccupancy} />
+            <BudgetOccupancyTable title="Lazer" rows={lazerRows} data={budgetData} onUpdate={handleUpdate} decimalOverrides={decimalOverrides} onToggleDecimals={toggleDecimals} canEdit={canEditOccupancy} />
+            <BudgetOccupancyTable title="Eventos" rows={eventRows} data={budgetData} onUpdate={handleUpdate} decimalOverrides={decimalOverrides} onToggleDecimals={toggleDecimals} canEdit={canEditOccupancy} />
         </div>
     );
 };

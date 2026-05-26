@@ -104,14 +104,13 @@ const App: React.FC = () => {
     { id: 's4', step: 'Revisão Final', startDate: '2025-10-16', endDate: '2025-10-31', status: 'pending' }
   ]);
 
-  // Mock current user - In a real app, this would come from auth
-  const [currentUser] = useState<User>({
+  const defaultUser: User = {
     id: 'admin-1',
     name: 'Rafael Souza',
     email: 'rafael.souza@taua.com.br',
     role: UserRole.ADMIN,
     hotelId: '7'
-  });
+  };
 
   // Date State for Forecast - Defaults to Today
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -198,8 +197,40 @@ const App: React.FC = () => {
 
   // --- REGISTRY STATE (LIFTED FROM SETTINGS) ---
   // This ensures data persists when switching tabs
-  // --- REGISTRY STATE ---
   const [users, setUsers] = useState<User[]>([]);
+
+  const loggedInProfile = React.useMemo(() => {
+    if (!session) return null;
+    return users.find(u => u.email.toLowerCase() === session.user.email?.toLowerCase()) || null;
+  }, [session, users]);
+
+  const currentUser = React.useMemo<User>(() => {
+    if (!session) return defaultUser;
+    if (loggedInProfile) return loggedInProfile;
+    return {
+      id: session.user.id,
+      name: session.user.email?.split('@')[0] || 'Usuário',
+      email: session.user.email || '',
+      role: UserRole.ADMIN, // Default fallback
+      hotelId: '7'
+    };
+  }, [session, loggedInProfile]);
+
+  React.useEffect(() => {
+    if (hotels.length === 0 || !currentUser || !currentUser.hotelId) return;
+    
+    const isRestricted = currentUser.role !== UserRole.ADMIN && 
+                         currentUser.role !== UserRole.DIRETORIA && 
+                         currentUser.role !== UserRole.PACKAGE_MANAGER;
+                         
+    if (isRestricted) {
+      const userHotel = hotels.find(h => h.id === currentUser.hotelId || h.code === currentUser.hotelId);
+      if (userHotel && selectedHotel !== userHotel.name) {
+        setSelectedHotel(userHotel.name);
+      }
+    }
+  }, [currentUser, hotels, selectedHotel]);
+
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
   const [packages, setPackages] = useState<CostPackage[]>([]);
@@ -612,6 +643,7 @@ const App: React.FC = () => {
           financialData={importedFinancialData}
           activeProjectionType={activeProjectionType}
           setActiveProjectionType={setActiveProjectionType}
+          currentUser={currentUser}
         />
       );
       case 'comparatives': return <ComparativesView />;
@@ -627,6 +659,7 @@ const App: React.FC = () => {
           selectedMonth={selectedDate.getMonth() + 1}
           selectedYear={selectedDate.getFullYear()}
           initialSelectedHotel={selectedHotel}
+          currentUser={currentUser}
         />
       );
       case 'validations': return (
@@ -658,6 +691,13 @@ const App: React.FC = () => {
       case 'admin_hotels':
       case 'admin_gmd':
       case 'admin':
+        if (currentUser.role !== UserRole.ADMIN) {
+          return (
+            <div className="p-8 text-center text-red-500 font-bold bg-white rounded-2xl border border-red-200 max-w-xl mx-auto shadow-sm mt-12">
+              Acesso negado. Apenas o perfil ADMIN Geral possui acesso à área administrativa.
+            </div>
+          );
+        }
         return (
           <UnifiedAdministrationView
             currentView={currentView}

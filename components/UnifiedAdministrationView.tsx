@@ -1201,7 +1201,17 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const [showAccountEditor, setShowAccountEditor] = useState(false);
 
   // Form States
-  const [userForm, setUserForm] = useState({ name: '', email: '', role: UserRole.PACKAGE_MANAGER, hotelId: '', password: '' });
+  // Form States
+  const [userForm, setUserForm] = useState({
+    name: '',
+    email: '',
+    role: UserRole.PACKAGE_MANAGER,
+    hotelId: '',
+    password: '',
+    responsiblePackages: [] as string[],
+    responsibleRevenues: [] as string[],
+    responsibleCostCenters: [] as string[]
+  });
   const [costCenterForm, setCostCenterForm] = useState({ id: '', code: '', name: '', directorate: '', department: '', type: 'CR' as 'CR' | 'PDV', hotelNames: [] as string[], hierarchicalCode: '', companyCode: '' });
   const [hotelForm, setHotelForm] = useState({ id: '', name: '', type: '' as any, category: '', region: '' });
   const [categoryForm, setCategoryForm] = useState({ name: '' });
@@ -1251,7 +1261,16 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
   const openNewUser = () => {
     setEditingId(null);
-    setUserForm({ name: '', email: '', role: UserRole.PACKAGE_MANAGER, hotelId: '', password: '' });
+    setUserForm({
+      name: '',
+      email: '',
+      role: UserRole.PACKAGE_MANAGER,
+      hotelId: '',
+      password: '',
+      responsiblePackages: [],
+      responsibleRevenues: [],
+      responsibleCostCenters: []
+    });
     setActiveModal('user');
   };
 
@@ -1259,7 +1278,16 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     const u = users.find(i => i.id === id);
     if (u) {
       setEditingId(id);
-      setUserForm({ name: u.name, email: u.email, role: u.role, hotelId: u.hotelId || '', password: '' });
+      setUserForm({
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        hotelId: u.hotelId || '',
+        password: '',
+        responsiblePackages: u.responsiblePackages || [],
+        responsibleRevenues: u.responsibleRevenues || [],
+        responsibleCostCenters: u.responsibleCostCenters || []
+      });
       setActiveModal('user');
     }
   };
@@ -1559,8 +1587,11 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         name: userForm.name,
         email: userForm.email,
         role: userForm.role,
-        hotelId: userForm.hotelId,
-        tempPassword: userForm.password || undefined
+        hotelId: userForm.hotelId || undefined,
+        tempPassword: userForm.password || undefined,
+        responsiblePackages: userForm.responsiblePackages || [],
+        responsibleRevenues: userForm.responsibleRevenues || [],
+        responsibleCostCenters: userForm.responsibleCostCenters || []
       };
 
       const returnedUuid = await supabaseService.adminSaveProfile(newUserReq);
@@ -4294,6 +4325,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unidade</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Perfil</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Responsabilidades</th>
                           <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Data Cadastro</th>
                           <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Últ. Acesso</th>
                           <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
@@ -4309,6 +4341,63 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{userHotel?.name || '-'}</td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-medium">
                                 <span className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[10px] uppercase font-bold">{u.role}</span>
+                              </td>
+                              <td className="px-6 py-4 text-xs text-gray-500 max-w-[240px]">
+                                {u.role === UserRole.PACKAGE_MANAGER && (
+                                  <div className="space-y-1">
+                                    {u.responsiblePackages && u.responsiblePackages.length > 0 && (
+                                      <div>
+                                        <span className="font-black block text-[8px] text-gray-400 uppercase tracking-widest leading-none mb-0.5">Pacotes</span>
+                                        <div className="flex flex-wrap gap-1">
+                                          {u.responsiblePackages.map(p => (
+                                            <span key={p} className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[9px] font-bold">{p}</span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {u.responsibleRevenues && u.responsibleRevenues.length > 0 && (
+                                      <div className="pt-1">
+                                        <span className="font-black block text-[8px] text-gray-400 uppercase tracking-widest leading-none mb-0.5">Receitas</span>
+                                        <div className="flex flex-wrap gap-1">
+                                          {u.responsibleRevenues.map(r => (
+                                            <span key={r} className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[9px] font-bold">{r}</span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {(!u.responsiblePackages || u.responsiblePackages.length === 0) && (!u.responsibleRevenues || u.responsibleRevenues.length === 0) && (
+                                      <span className="text-gray-400 italic text-[11px]">Nenhum pacote/receita atribuído</span>
+                                    )}
+                                  </div>
+                                )}
+                                {(u.role === UserRole.AREA_MANAGER || u.role === UserRole.AREA_ANALYST) && (
+                                  <div>
+                                    {u.responsibleCostCenters && u.responsibleCostCenters.length > 0 ? (
+                                      <div>
+                                        <span className="font-black block text-[8px] text-gray-400 uppercase tracking-widest leading-none mb-0.5">CRs</span>
+                                        <div className="flex flex-wrap gap-1">
+                                          {u.responsibleCostCenters.map(ccId => {
+                                            const cc = costCenters.find(c => c.code === ccId || c.id === ccId);
+                                            return (
+                                              <span key={ccId} className="px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded text-[9px] font-bold" title={cc?.name || ccId}>{cc?.name || ccId}</span>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <span className="text-gray-400 italic text-[11px]">Nenhum CR atribuído</span>
+                                    )}
+                                  </div>
+                                )}
+                                {(u.role === UserRole.ENTITY_MANAGER || u.role === UserRole.COST_ANALYST) && (
+                                  <span className="text-emerald-700 font-bold text-[9px] uppercase tracking-wider bg-emerald-50 px-2 py-0.5 rounded">Vínculo com Unidade</span>
+                                )}
+                                {u.role === UserRole.ADMIN && (
+                                  <span className="text-indigo-700 font-bold text-[9px] uppercase tracking-wider bg-indigo-50 px-2 py-0.5 rounded">Acesso Completo</span>
+                                )}
+                                {u.role === UserRole.DIRETORIA && (
+                                  <span className="text-slate-600 font-bold text-[9px] uppercase tracking-wider bg-slate-100 px-2 py-0.5 rounded">Acesso Consulta</span>
+                                )}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-mono text-gray-500">
                                 {u.createdAt ? new Date(u.createdAt).toLocaleDateString('pt-BR') : '-'}
@@ -5260,12 +5349,12 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       {/* Modals for Registries */}
       {activeModal === 'user' && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-indigo-600 text-white">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-indigo-600 text-white shrink-0">
               <h3 className="text-xl font-bold">{editingId ? 'Editar Usuário' : 'Novo Usuário'}</h3>
               <button onClick={() => setActiveModal(null)} className="text-white/80 hover:text-white"><X size={24} /></button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1">Nome Completo</label>
                 <input type="text" value={userForm.name} onChange={e => setUserForm({ ...userForm, name: e.target.value })} className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ex: João Silva" />
@@ -5288,16 +5377,111 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Hotel Principal</label>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Hotel Principal / Unidade</label>
                 <select value={userForm.hotelId} onChange={e => setUserForm({ ...userForm, hotelId: e.target.value })} className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none">
                   <option value="">Selecione um hotel...</option>
                   {hotels.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
                 </select>
               </div>
+
+              {/* Condicionais de Responsabilidade com base no Perfil */}
+              {userForm.role === UserRole.PACKAGE_MANAGER && (
+                <div className="space-y-4 pt-2 border-t border-gray-100">
+                  <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-widest">Responsabilidade do Gerente de Pacotes</h4>
+                  
+                  {/* Expense Packages */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Pacotes de Despesa</label>
+                    <div className="p-3 border border-gray-200 rounded-xl bg-gray-50 max-h-40 overflow-y-auto space-y-2 custom-scrollbar">
+                      {React.useMemo(() => {
+                        const pkgs = new Set<string>();
+                        accounts.forEach(a => { if (a.package) pkgs.add(a.package.trim()); });
+                        return Array.from(pkgs).sort();
+                      }, [accounts]).map(pkg => (
+                        <label key={pkg} className="flex items-center gap-2.5 text-xs font-medium text-gray-700 cursor-pointer hover:text-indigo-600">
+                          <input
+                            type="checkbox"
+                            checked={userForm.responsiblePackages?.includes(pkg) || false}
+                            onChange={e => {
+                              const current = userForm.responsiblePackages || [];
+                              if (e.target.checked) setUserForm({ ...userForm, responsiblePackages: [...current, pkg] });
+                              else setUserForm({ ...userForm, responsiblePackages: current.filter(p => p !== pkg) });
+                            }}
+                            className="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5"
+                          />
+                          {pkg}
+                        </label>
+                      ))}
+                      {accounts.length === 0 && <p className="text-[10px] text-gray-400 italic">Carregando pacotes...</p>}
+                    </div>
+                  </div>
+
+                  {/* Revenue Categories */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Categorias de Receita</label>
+                    <div className="p-3 border border-gray-200 rounded-xl bg-gray-50 space-y-2">
+                      {[
+                        'Receita de Apartamentos (Lazer)',
+                        'Receita de Apartamentos (Eventos)',
+                        'Receitas Extras (Lazer)',
+                        'Receitas Extras (Eventos)'
+                      ].map(rev => (
+                        <label key={rev} className="flex items-center gap-2.5 text-xs font-medium text-gray-700 cursor-pointer hover:text-indigo-600">
+                          <input
+                            type="checkbox"
+                            checked={userForm.responsibleRevenues?.includes(rev) || false}
+                            onChange={e => {
+                              const current = userForm.responsibleRevenues || [];
+                              if (e.target.checked) setUserForm({ ...userForm, responsibleRevenues: [...current, rev] });
+                              else setUserForm({ ...userForm, responsibleRevenues: current.filter(r => r !== rev) });
+                            }}
+                            className="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5"
+                          />
+                          {rev}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {(userForm.role === UserRole.AREA_MANAGER || userForm.role === UserRole.AREA_ANALYST) && (
+                <div className="space-y-3 pt-2 border-t border-gray-100">
+                  <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-widest">Responsabilidade do Gerente/Analista de Área</h4>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Centros de Resultado (CR)</label>
+                    <div className="p-3 border border-gray-200 rounded-xl bg-gray-50 max-h-48 overflow-y-auto space-y-2 custom-scrollbar">
+                      {React.useMemo(() => {
+                        const map = new Map<string, CostCenter>();
+                        costCenters.forEach(cc => { if (cc.code) map.set(cc.code, cc); });
+                        return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+                      }, [costCenters]).map(cc => (
+                        <label key={cc.code} className="flex items-center gap-2.5 text-xs font-medium text-gray-700 cursor-pointer hover:text-indigo-600" title={cc.hierarchicalCode}>
+                          <input
+                            type="checkbox"
+                            checked={userForm.responsibleCostCenters?.includes(cc.code) || false}
+                            onChange={e => {
+                              const current = userForm.responsibleCostCenters || [];
+                              if (e.target.checked) setUserForm({ ...userForm, responsibleCostCenters: [...current, cc.code] });
+                              else setUserForm({ ...userForm, responsibleCostCenters: current.filter(c => c !== cc.code) });
+                            }}
+                            className="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5"
+                          />
+                          <div>
+                            <span className="font-bold block text-gray-800">{cc.name}</span>
+                            <span className="text-[9px] text-gray-400 font-mono leading-none">{cc.code} • {cc.department || 'Sem depto'}</span>
+                          </div>
+                        </label>
+                      ))}
+                      {costCenters.length === 0 && <p className="text-[10px] text-gray-400 italic">Nenhum CR cadastrado.</p>}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="p-6 bg-gray-50 flex gap-3">
-              <button onClick={() => setActiveModal(null)} className="flex-1 py-3 border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-gray-100">Cancelar</button>
-              <button onClick={handleSaveUser} className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200">Salvar</button>
+            <div className="p-6 bg-gray-50 flex gap-3 border-t border-gray-100 shrink-0">
+              <button onClick={() => setActiveModal(null)} className="flex-1 py-3 border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-gray-100 transition-colors">Cancelar</button>
+              <button onClick={handleSaveUser} className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-colors">Salvar</button>
             </div>
           </div>
         </div>

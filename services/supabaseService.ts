@@ -355,17 +355,38 @@ export const supabaseService = {
       .order('full_name', { ascending: true });
     if (error) throw error;
 
-    return (data || []).map(p => ({
-      id: p.id,
-      name: p.full_name || '',
-      email: p.email || '',
-      role: (p.role || 'Gestor de Pacote') as UserRole,
-      hotelId: p.hotel_id || undefined,
-      tempPassword: p.temp_password || undefined
-    })) as User[];
+    return (data || []).map(p => {
+      let meta: any = {};
+      if (p.avatar_url && p.avatar_url.trim().startsWith('{')) {
+        try {
+          meta = JSON.parse(p.avatar_url);
+        } catch (e) {
+          // fallback
+        }
+      }
+      return {
+        id: p.id,
+        name: p.full_name || '',
+        email: p.email || '',
+        role: (p.role || 'Gestor de Pacote') as UserRole,
+        hotelId: p.hotel_id || undefined,
+        tempPassword: p.temp_password || undefined,
+        avatarUrl: p.avatar_url || undefined,
+        responsiblePackages: meta.responsiblePackages || [],
+        responsibleRevenues: meta.responsibleRevenues || [],
+        responsibleCostCenters: meta.responsibleCostCenters || []
+      };
+    }) as User[];
   },
 
   async upsertProfile(user: User): Promise<void> {
+    const meta = {
+      responsiblePackages: user.responsiblePackages || [],
+      responsibleRevenues: user.responsibleRevenues || [],
+      responsibleCostCenters: user.responsibleCostCenters || []
+    };
+    const avatarUrl = JSON.stringify(meta);
+
     const record = {
       id: user.id,
       full_name: user.name,
@@ -373,6 +394,7 @@ export const supabaseService = {
       role: user.role,
       hotel_id: user.hotelId || null,
       temp_password: user.tempPassword || null,
+      avatar_url: avatarUrl,
       updated_at: new Date().toISOString()
     };
 
@@ -383,6 +405,13 @@ export const supabaseService = {
   },
 
   async adminSaveProfile(user: User): Promise<string> {
+      const meta = {
+        responsiblePackages: user.responsiblePackages || [],
+        responsibleRevenues: user.responsibleRevenues || [],
+        responsibleCostCenters: user.responsibleCostCenters || []
+      };
+      const avatarUrl = JSON.stringify(meta);
+
       const { data, error } = await supabase.rpc('admin_save_user', {
           p_id: user.id,
           p_email: user.email,
@@ -396,6 +425,13 @@ export const supabaseService = {
       });
       
       if (error) throw error;
+
+      // Update the avatar_url column with the serialized metadata
+      await supabase
+        .from('profiles')
+        .update({ avatar_url: avatarUrl })
+        .eq('id', data);
+
       return data as string; // UUID of the user
   },
 

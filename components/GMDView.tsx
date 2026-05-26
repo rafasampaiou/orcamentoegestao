@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { Network, ChevronRight, ChevronDown, Filter, AlertTriangle, CheckCircle, FileText, ClipboardList, ShieldCheck, ShieldAlert, Calendar, DollarSign, CheckSquare, Search, X, FileEdit, ExternalLink } from 'lucide-react';
-import { GMDConfiguration, Account, CostPackage, Hotel, ImportedRow, User, Justification, CostCenter } from '../types';
+import { GMDConfiguration, Account, CostPackage, Hotel, ImportedRow, User, Justification, CostCenter, UserRole } from '../types';
 
 interface FilterCardProps {
     type: string;
@@ -47,6 +47,7 @@ interface GMDViewProps {
     selectedMonth: number;
     selectedYear: number;
     initialSelectedHotel: string;
+    currentUser?: User;
 }
 
 // Helper to format currency
@@ -55,7 +56,7 @@ const formatPercent = (val: number) => `${val.toFixed(1)}%`;
 
 const GMDView: React.FC<GMDViewProps> = ({ 
     gmdConfigs, accounts, packages, hotels, financialData, users, costCenters,
-    selectedMonth, selectedYear, initialSelectedHotel 
+    selectedMonth, selectedYear, initialSelectedHotel, currentUser 
 }) => {
   const [activeTab, setActiveTab] = useState<'monitor' | 'justifications'>('monitor');
   const [currentHotel, setCurrentHotel] = useState(initialSelectedHotel);
@@ -78,6 +79,45 @@ const GMDView: React.FC<GMDViewProps> = ({
   const [planPresentationDate, setPlanPresentationDate] = useState('');
   const [recoveredValue, setRecoveredValue] = useState('');
   const [completionObs, setCompletionObs] = useState('');
+  const [assignedAreaManagerId, setAssignedAreaManagerId] = useState('');
+
+  const canUserResolveJustification = (just: Justification) => {
+      if (!currentUser) return false;
+      if (currentUser.role === UserRole.ADMIN) return true;
+      if (currentUser.role === UserRole.DIRETORIA) return false;
+
+      const config = gmdConfigs.find(c => c.id === just.gmdConfigId);
+      if (!config) return false;
+
+      // Gerente de Entidade e Analista de Custos: can resolve/approve if in their hotel
+      if (currentUser.role === UserRole.ENTITY_MANAGER || currentUser.role === UserRole.COST_ANALYST) {
+          const userHotelObj = hotels.find(h => h.id === currentUser.hotelId || h.code === currentUser.hotelId);
+          const configHotelObj = hotels.find(h => h.id === config.hotelId);
+          return !userHotelObj || !configHotelObj || userHotelObj.name === configHotelObj.name;
+      }
+
+      // Gerente de Pacotes: can resolve if the package is under their responsibility
+      if (currentUser.role === UserRole.PACKAGE_MANAGER) {
+          const pkg = masterPackages.find(p => p.id === config.packageId || p.name === config.packageId);
+          const isResponsibleForPkg = pkg && currentUser.responsiblePackages?.includes(pkg.name);
+          const isResponsibleForRev = currentUser.responsibleRevenues?.some(rev => 
+              pkg?.name.toLowerCase().includes(rev.toLowerCase())
+          );
+          return isResponsibleForPkg || isResponsibleForRev || false;
+      }
+
+      // Gerente de Área / Analista de área: can resolve if CR matches responsibleCostCenters OR directed to them
+      if (currentUser.role === UserRole.AREA_MANAGER || currentUser.role === UserRole.AREA_ANALYST) {
+          if (just.assignedAreaManagerId === currentUser.id) return true;
+          
+          const hasResponsibleCR = config.costCenterIds?.some(ccId => 
+              currentUser.responsibleCostCenters?.includes(ccId)
+          );
+          return hasResponsibleCR || false;
+      }
+
+      return false;
+  };
 
   // Derive Master Packages from Accounts for GMD
   const masterPackages = useMemo(() => {
@@ -309,6 +349,7 @@ const GMDView: React.FC<GMDViewProps> = ({
       setPlanPresentationDate(just.actionPlanPresentationDate || '');
       setRecoveredValue(just.recoveredValue ? just.recoveredValue.toString() : '');
       setCompletionObs(just.completionObservation || '');
+      setAssignedAreaManagerId(just.assignedAreaManagerId || '');
   };
 
   const closeJustificationModal = () => {
@@ -320,6 +361,7 @@ const GMDView: React.FC<GMDViewProps> = ({
       setPlanPresentationDate('');
       setRecoveredValue('');
       setCompletionObs('');
+      setAssignedAreaManagerId('');
   };
 
   const handleJustificationSubmit = (id: string) => {
@@ -341,6 +383,7 @@ const GMDView: React.FC<GMDViewProps> = ({
               actionPlanStartDate: planStartDate,
               actionPlanEndDate: planEndDate,
               actionPlanPresentationDate: planPresentationDate,
+              assignedAreaManagerId: assignedAreaManagerId,
               status: newStatus
           } : j
       ));
@@ -356,6 +399,18 @@ const GMDView: React.FC<GMDViewProps> = ({
             completionObservation: completionObs
         } : j
       ));
+      closeJustificationModal();
+  };
+
+  const handleUpdateExecution = (id: string) => {
+      setJustifications(prev => prev.map(j => 
+        j.id === id ? {
+            ...j,
+            recoveredValue: parseFloat(recoveredValue.replace(',', '.') || '0'),
+            completionObservation: completionObs
+        } : j
+      ));
+      alert("Progresso salvo com sucesso!");
       closeJustificationModal();
   };
 
@@ -676,7 +731,7 @@ const GMDView: React.FC<GMDViewProps> = ({
                                                         className="flex items-center justify-center w-full px-3 py-1.5 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors shadow-sm font-bold text-[10px] uppercase tracking-wide gap-1"
                                                     >
                                                         <ExternalLink size={12} />
-                                                        {just.status === 'Concluído' ? 'Abrir' : 'Resolver'}
+                                                        {just.status === 'Concluído' ? 'Visualizar' : canUserResolveJustification(just) ? 'Resolver' : 'Visualizar'}
                                                     </button>
                                                 </td>
                                             </tr>
@@ -741,6 +796,14 @@ const GMDView: React.FC<GMDViewProps> = ({
                         })()}
                     </div>
 
+                    {/* Read-Only Warning Banner */}
+                    {!canUserResolveJustification(selectedJustification) && selectedJustification.status !== 'Concluído' && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 font-semibold flex items-center gap-2">
+                            <ShieldAlert size={16} className="text-amber-600 shrink-0" />
+                            <span>Modo de Visualização Apenas. Seu perfil não possui permissão para editar ou iniciar este plano de ação.</span>
+                        </div>
+                    )}
+
                     <hr className="border-gray-100" />
 
                     <div className="space-y-4">
@@ -749,51 +812,73 @@ const GMDView: React.FC<GMDViewProps> = ({
                                 <FileText size={16} className="text-indigo-500" /> 
                                 Justificativa e Plano de Ação
                             </label>
-                            {selectedJustification.status === 'Pendentes' && (
+                            {selectedJustification.status === 'Pendentes' && canUserResolveJustification(selectedJustification) && (
                                 <span className="text-[10px] text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full animate-pulse">Ação Necessária</span>
                             )}
                         </div>
                         
                         {selectedJustification.status === 'Pendentes' ? (
-                            <div className="space-y-4 bg-indigo-50/50 p-4 rounded-lg border border-indigo-100">
-                                <div>
-                                    <label className="text-xs font-bold text-gray-700 block mb-1">Qual o motivo do desvio?</label>
-                                    <textarea 
-                                        className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
-                                        rows={2}
-                                        placeholder="Explique detalhadamente..."
-                                        value={justificationText}
-                                        onChange={(e) => setJustificationText(e.target.value)}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-gray-700 block mb-1">Plano de Ação para correção</label>
-                                    <textarea 
-                                        className="w-full border border-indigo-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                                        rows={3}
-                                        placeholder="O que será feito para reverter ou conter este desvio?"
-                                        value={actionPlanText}
-                                        onChange={(e) => setActionPlanText(e.target.value)}
-                                    />
-                                </div>
-                                <div className="grid grid-cols-3 gap-3">
+                            canUserResolveJustification(selectedJustification) ? (
+                                <div className="space-y-4 bg-indigo-50/50 p-4 rounded-lg border border-indigo-100">
                                     <div>
-                                        <label className="text-[10px] font-bold text-indigo-600 block mb-1">Início da Correção</label>
-                                        <input type="date" value={planStartDate} onChange={(e) => setPlanStartDate(e.target.value)} className="w-full text-xs p-2 border border-indigo-200 rounded outline-none focus:ring-1 focus:ring-indigo-500" />
+                                        <label className="text-xs font-bold text-gray-700 block mb-1">Qual o motivo do desvio?</label>
+                                        <textarea 
+                                            className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                            rows={2}
+                                            placeholder="Explique detalhadamente..."
+                                            value={justificationText}
+                                            onChange={(e) => setJustificationText(e.target.value)}
+                                        />
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-bold text-indigo-600 block mb-1">Fim da Correção</label>
-                                        <input type="date" value={planEndDate} onChange={(e) => setPlanEndDate(e.target.value)} className="w-full text-xs p-2 border border-indigo-200 rounded outline-none focus:ring-1 focus:ring-indigo-500" />
+                                        <label className="text-xs font-bold text-gray-700 block mb-1">Plano de Ação para correção</label>
+                                        <textarea 
+                                            className="w-full border border-indigo-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                            rows={3}
+                                            placeholder="O que será feito para reverter ou conter este desvio?"
+                                            value={actionPlanText}
+                                            onChange={(e) => setActionPlanText(e.target.value)}
+                                        />
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-bold text-indigo-600 block mb-1">Data de Apresentação</label>
-                                        <input type="date" value={planPresentationDate} onChange={(e) => setPlanPresentationDate(e.target.value)} className="w-full text-xs p-2 border border-indigo-200 rounded outline-none focus:ring-1 focus:ring-indigo-500" />
+                                        <label className="text-xs font-bold text-gray-700 block mb-1">Direcionar para Gerente de Área / Analista</label>
+                                        <select
+                                            value={assignedAreaManagerId}
+                                            onChange={(e) => setAssignedAreaManagerId(e.target.value)}
+                                            className="w-full text-xs p-2.5 border border-gray-300 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-medium"
+                                        >
+                                            <option value="">Selecione o gestor de área...</option>
+                                            {users
+                                                .filter(u => u.role === UserRole.AREA_MANAGER || u.role === UserRole.AREA_ANALYST)
+                                                .map(u => (
+                                                    <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                                                ))
+                                            }
+                                        </select>
                                     </div>
+                                    <div className="grid grid-cols-3 gap-3">
+                                        <div>
+                                            <label className="text-[10px] font-bold text-indigo-600 block mb-1">Início da Correção</label>
+                                            <input type="date" value={planStartDate} onChange={(e) => setPlanStartDate(e.target.value)} className="w-full text-xs p-2 border border-indigo-200 rounded outline-none focus:ring-1 focus:ring-indigo-500 bg-white" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-indigo-600 block mb-1">Fim da Correção</label>
+                                            <input type="date" value={planEndDate} onChange={(e) => setPlanEndDate(e.target.value)} className="w-full text-xs p-2 border border-indigo-200 rounded outline-none focus:ring-1 focus:ring-indigo-500 bg-white" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-indigo-600 block mb-1">Data de Apresentação</label>
+                                            <input type="date" value={planPresentationDate} onChange={(e) => setPlanPresentationDate(e.target.value)} className="w-full text-xs p-2 border border-indigo-200 rounded outline-none focus:ring-1 focus:ring-indigo-500 bg-white" />
+                                        </div>
+                                    </div>
+                                    <button onClick={() => handleActionPlanSubmit(selectedJustification.id, 'Em andamento')} className="w-full bg-indigo-600 text-white py-3 mt-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors shadow-sm">
+                                        Iniciar Plano de Ação
+                                    </button>
                                 </div>
-                                <button onClick={() => handleActionPlanSubmit(selectedJustification.id, 'Em andamento')} className="w-full bg-indigo-600 text-white py-3 mt-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors shadow-sm">
-                                    Iniciar Plano de Ação
-                                </button>
-                            </div>
+                            ) : (
+                                <div className="text-center py-6 border border-dashed border-gray-200 rounded-lg bg-gray-50 text-gray-500">
+                                    Nenhum plano de ação iniciado para este desvio pendente.
+                                </div>
+                            )
                         ) : (
                             <div className="space-y-3">
                                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm text-gray-700">
@@ -803,6 +888,13 @@ const GMDView: React.FC<GMDViewProps> = ({
                                 <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-3">
                                     <p className="font-bold text-xs text-blue-500 mb-1">Plano de Ação:</p>
                                     <p className="text-sm text-gray-800 mb-3">{selectedJustification.actionPlan}</p>
+                                    
+                                    {selectedJustification.assignedAreaManagerId && (
+                                        <div className="mb-3 text-xs text-gray-600">
+                                            <span className="font-bold">Direcionado para:</span> {users.find(u => u.id === selectedJustification.assignedAreaManagerId)?.name || 'Gestor'}
+                                        </div>
+                                    )}
+
                                     <div className="flex gap-4 text-[10px] text-blue-700 font-bold bg-white p-2 rounded border border-blue-100">
                                         <span className="flex items-center gap-1"><Calendar size={12} /> Início: {selectedJustification.actionPlanStartDate ? new Date(selectedJustification.actionPlanStartDate).toLocaleDateString('pt-BR') : '-'}</span>
                                         <span className="flex items-center gap-1"><Calendar size={12} /> Fim: {selectedJustification.actionPlanEndDate ? new Date(selectedJustification.actionPlanEndDate).toLocaleDateString('pt-BR') : '-'}</span>
@@ -817,7 +909,7 @@ const GMDView: React.FC<GMDViewProps> = ({
                     {['Em andamento', 'Atrasado'].includes(selectedJustification.status) && (
                         <div className="pt-6 mt-6 border-t border-dashed border-gray-300">
                             <h4 className="font-bold text-green-800 text-sm mb-3 flex items-center gap-2">
-                                <CheckSquare size={16} /> Conclusão do Plano
+                                <CheckSquare size={16} /> Execução & Conclusão do Plano
                             </h4>
                             <div className="bg-green-50 p-4 rounded-lg border border-green-200 space-y-3">
                                 <div>
@@ -826,33 +918,53 @@ const GMDView: React.FC<GMDViewProps> = ({
                                         <DollarSign size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-green-600" />
                                         <input 
                                             type="text" 
-                                            className="w-full pl-7 pr-3 py-2 border border-green-300 rounded text-sm focus:ring-2 focus:ring-green-500 outline-none"
+                                            className="w-full pl-7 pr-3 py-2 border border-green-300 rounded text-sm focus:ring-2 focus:ring-green-500 outline-none bg-white"
                                             placeholder="0,00"
                                             value={recoveredValue}
                                             onChange={(e) => setRecoveredValue(e.target.value)}
+                                            disabled={!canUserResolveJustification(selectedJustification)}
                                         />
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold text-green-700 mb-1">Observações Finais</label>
+                                    <label className="block text-xs font-bold text-green-700 mb-1">Observações de Execução / Finais</label>
                                     <textarea 
-                                        className="w-full px-3 py-2 border border-green-300 rounded text-sm focus:ring-2 focus:ring-green-500 outline-none"
+                                        className="w-full px-3 py-2 border border-green-300 rounded text-sm focus:ring-2 focus:ring-green-500 outline-none bg-white"
                                         rows={2}
-                                        placeholder="Resultado obtido..."
+                                        placeholder="Atualize o status ou resultado obtido..."
                                         value={completionObs}
                                         onChange={(e) => setCompletionObs(e.target.value)}
+                                        disabled={!canUserResolveJustification(selectedJustification)}
                                     />
                                 </div>
-                                <div className="flex gap-3">
-                                    <button onClick={() => handleCompletePlan(selectedJustification.id)} className="flex-1 bg-green-600 text-white py-2 rounded-lg text-sm font-bold hover:bg-green-700 flex justify-center items-center gap-2">
-                                        <CheckCircle size={16} /> Confirmar Conclusão
-                                    </button>
-                                    {selectedJustification.status === 'Em andamento' && (
-                                        <button onClick={() => handleActionPlanSubmit(selectedJustification.id, 'Atrasado')} className="flex-1 bg-orange-600 text-white py-2 rounded-lg text-sm font-bold hover:bg-orange-700 flex justify-center items-center gap-2">
-                                            <AlertTriangle size={16} /> Marcar Atrasado
-                                        </button>
-                                    )}
-                                </div>
+                                
+                                {canUserResolveJustification(selectedJustification) && (
+                                    <div className="flex flex-col gap-2">
+                                        {/* Entity Managers, Cost Analysts, and Admins can finalize */}
+                                        {[UserRole.ADMIN, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST].includes(currentUser?.role as any) ? (
+                                            <div className="flex gap-3">
+                                                <button onClick={() => handleCompletePlan(selectedJustification.id)} className="flex-1 bg-green-600 text-white py-2.5 rounded-lg text-sm font-bold hover:bg-green-700 flex justify-center items-center gap-2 shadow-sm transition-colors">
+                                                    <CheckCircle size={16} /> Confirmar Conclusão
+                                                </button>
+                                                {selectedJustification.status === 'Em andamento' && (
+                                                    <button onClick={() => handleActionPlanSubmit(selectedJustification.id, 'Atrasado')} className="flex-1 bg-orange-600 text-white py-2.5 rounded-lg text-sm font-bold hover:bg-orange-700 flex justify-center items-center gap-2 shadow-sm transition-colors">
+                                                        <AlertTriangle size={16} /> Marcar Atrasado
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            /* Other roles with edit access (Package Managers / Area Managers) can execute and save progress */
+                                            <div className="space-y-2">
+                                                <button onClick={() => handleUpdateExecution(selectedJustification.id)} className="w-full bg-indigo-600 text-white py-2.5 rounded-lg text-sm font-bold hover:bg-indigo-700 flex justify-center items-center gap-2 shadow-sm transition-colors">
+                                                    <CheckCircle size={16} /> Salvar Progresso da Execução
+                                                </button>
+                                                <p className="text-[10px] text-center text-gray-500 font-semibold italic">
+                                                    Aguardando aprovação e finalização da Diretoria ou Gerente de Entidade.
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -860,16 +972,16 @@ const GMDView: React.FC<GMDViewProps> = ({
                     {selectedJustification.status === 'Concluído' && (
                         <div className="bg-green-100/50 border border-green-200 rounded-lg p-4 mt-4">
                             <div className="flex items-center gap-2 text-green-800 font-bold mb-2">
-                                <CheckCircle size={18} /> Plano Concluído
+                                <CheckCircle size={18} /> Plano Concluído & Aprovado
                             </div>
                             <div className="grid grid-cols-2 gap-4 text-sm mb-2">
                                 <div>
-                                    <span className="block text-xs text-green-600">Valor Recuperado</span>
+                                    <span className="block text-xs text-green-600 font-bold">Valor Recuperado</span>
                                     <span className="font-bold text-gray-800">{formatCurrency(selectedJustification.recoveredValue || 0)}</span>
                                 </div>
                             </div>
                             <p className="text-xs text-green-900 italic border-t border-green-200 pt-2 mt-2">
-                                "{selectedJustification.completionObservation}"
+                                "{selectedJustification.completionObservation || 'Sem observações adicionais.'}"
                             </p>
                         </div>
                     )}
