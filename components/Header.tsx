@@ -1,6 +1,6 @@
 import React from 'react';
 import { Layers, Building2 as Building2Icon, ArrowLeft, ArrowRight, Calendar, LogOut } from 'lucide-react';
-import { User, Hotel, ModuleType, UserRole } from '../types';
+import { User, Hotel, ModuleType, UserRole, ViewState } from '../types';
 
 interface HeaderProps {
     sidebarCollapsed: boolean;
@@ -21,6 +21,7 @@ interface HeaderProps {
     formattedDate: string;
     currentUser: User;
     onLogout: () => void;
+    currentView: ViewState;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -41,8 +42,11 @@ const Header: React.FC<HeaderProps> = ({
     handleMonthChange,
     formattedDate,
     currentUser,
-    onLogout
+    onLogout,
+    currentView
 }) => {
+    const showFilters = !currentView.startsWith('admin');
+
     return (
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shrink-0 z-10 font-['Inter',sans-serif]">
             <div className="flex items-center gap-4">
@@ -54,107 +58,111 @@ const Header: React.FC<HeaderProps> = ({
                     <Layers size={20} className={sidebarCollapsed ? "text-indigo-600" : ""} />
                 </button>
 
-                {/* Hotel Type Filter */}
-                <div className="flex items-center bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 ml-2">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase mr-2">Tipo</span>
-                    <select 
-                        value={selectedHotelType} 
-                        onChange={(e) => {
-                            setSelectedHotelType(e.target.value);
-                            // Auto-select first hotel of new type if current one doesn't match
-                            const filtered = e.target.value === 'Todos' ? hotels : hotels.filter(h => h.type === e.target.value);
-                            if (filtered.length > 0 && !filtered.find(h => h.name === selectedHotel)) {
-                                setSelectedHotel(filtered[0].name);
-                            }
-                        }}
-                        disabled={currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.DIRETORIA && currentUser?.role !== UserRole.PACKAGE_MANAGER && !!currentUser?.hotelId}
-                        className="bg-transparent text-xs font-bold text-gray-700 focus:outline-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                        <option value="Todos">Todos</option>
-                        <option value="Hotéis próprios">Próprios</option>
-                        <option value="Hotéis administrados">Administrados</option>
-                        <option value="Administradora">Administradora</option>
-                    </select>
-                </div>
+                {showFilters && (
+                    <>
+                        {/* Hotel Type Filter */}
+                        <div className="flex items-center bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 ml-2">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase mr-2">Tipo</span>
+                            <select 
+                                value={selectedHotelType} 
+                                onChange={(e) => {
+                                    setSelectedHotelType(e.target.value);
+                                    // Auto-select first hotel of new type if current one doesn't match
+                                    const filtered = e.target.value === 'Todos' ? hotels : hotels.filter(h => h.type === e.target.value);
+                                    if (filtered.length > 0 && !filtered.find(h => h.name === selectedHotel)) {
+                                        setSelectedHotel(filtered[0].name);
+                                    }
+                                }}
+                                disabled={currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.DIRETORIA && currentUser?.role !== UserRole.PACKAGE_MANAGER && !!currentUser?.hotelId}
+                                className="bg-transparent text-xs font-bold text-gray-700 focus:outline-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                                <option value="Todos">Todos</option>
+                                <option value="Hotéis próprios">Próprios</option>
+                                <option value="Hotéis administrados">Administrados</option>
+                                <option value="Administradora">Administradora</option>
+                            </select>
+                        </div>
 
-                {/* Hotel Category Filter */}
-                <div className="flex items-center bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 ml-2">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase mr-2">Categoria</span>
-                    <select 
-                        value={selectedHotelCategory} 
-                        onChange={(e) => {
-                            setSelectedHotelCategory(e.target.value);
-                            // Auto-select first hotel of new category (if possible)
-                            const filtered = hotels.filter(h => 
-                                (selectedHotelType === 'Todos' || h.type === selectedHotelType) &&
-                                (e.target.value === 'Todas' || h.category === e.target.value)
-                            );
-                            if (filtered.length > 0 && !filtered.find(h => h.name === selectedHotel)) {
-                                setSelectedHotel(filtered[0].name);
-                            }
-                        }}
-                        disabled={currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.DIRETORIA && currentUser?.role !== UserRole.PACKAGE_MANAGER && !!currentUser?.hotelId}
-                        className="bg-transparent text-xs font-bold text-gray-700 focus:outline-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                        <option value="Todas">Todas</option>
-                        {hotelCategories.map(cat => (
-                            <option key={cat.id} value={cat.name}>{cat.name}</option>
-                        ))}
-                    </select>
-                </div>
+                        {/* Hotel Category Filter */}
+                        <div className="flex items-center bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 ml-2">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase mr-2">Categoria</span>
+                            <select 
+                                value={selectedHotelCategory} 
+                                onChange={(e) => {
+                                    setSelectedHotelCategory(e.target.value);
+                                    // Auto-select first hotel of new category (if possible)
+                                    const filtered = hotels.filter(h => 
+                                        (selectedHotelType === 'Todos' || h.type === selectedHotelType) &&
+                                        (e.target.value === 'Todas' || h.category === e.target.value)
+                                    );
+                                    if (filtered.length > 0 && !filtered.find(h => h.name === selectedHotel)) {
+                                        setSelectedHotel(filtered[0].name);
+                                    }
+                                }}
+                                disabled={currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.DIRETORIA && currentUser?.role !== UserRole.PACKAGE_MANAGER && !!currentUser?.hotelId}
+                                className="bg-transparent text-xs font-bold text-gray-700 focus:outline-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                                <option value="Todas">Todas</option>
+                                {hotelCategories.map(cat => (
+                                    <option key={cat.id} value={cat.name}>{cat.name}</option>
+                                ))}
+                            </select>
+                        </div>
 
-                {/* Hotel Region Filter */}
-                <div className="flex items-center bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 ml-2">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase mr-2">Região</span>
-                    <select 
-                        value={selectedHotelRegion} 
-                        onChange={(e) => {
-                            setSelectedHotelRegion(e.target.value);
-                            const filtered = hotels.filter(h => 
-                                (selectedHotelType === 'Todos' || h.type === selectedHotelType) &&
-                                (selectedHotelCategory === 'Todas' || h.category === selectedHotelCategory) &&
-                                (e.target.value === 'Todas' || h.region === e.target.value)
-                            );
-                            if (filtered.length > 0 && !filtered.find(h => h.name === selectedHotel)) {
-                                setSelectedHotel(filtered[0].name);
-                            }
-                        }}
-                        disabled={currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.DIRETORIA && currentUser?.role !== UserRole.PACKAGE_MANAGER && !!currentUser?.hotelId}
-                        className="bg-transparent text-xs font-bold text-gray-700 focus:outline-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                        <option value="Todas">Todas</option>
-                        {hotelRegions.map(reg => (
-                            <option key={reg.id} value={reg.name}>{reg.name}</option>
-                        ))}
-                    </select>
-                </div>
+                        {/* Hotel Region Filter */}
+                        <div className="flex items-center bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 ml-2">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase mr-2">Região</span>
+                            <select 
+                                value={selectedHotelRegion} 
+                                onChange={(e) => {
+                                    setSelectedHotelRegion(e.target.value);
+                                    const filtered = hotels.filter(h => 
+                                        (selectedHotelType === 'Todos' || h.type === selectedHotelType) &&
+                                        (selectedHotelCategory === 'Todas' || h.category === selectedHotelCategory) &&
+                                        (e.target.value === 'Todas' || h.region === e.target.value)
+                                    );
+                                    if (filtered.length > 0 && !filtered.find(h => h.name === selectedHotel)) {
+                                        setSelectedHotel(filtered[0].name);
+                                    }
+                                }}
+                                disabled={currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.DIRETORIA && currentUser?.role !== UserRole.PACKAGE_MANAGER && !!currentUser?.hotelId}
+                                className="bg-transparent text-xs font-bold text-gray-700 focus:outline-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                                <option value="Todas">Todas</option>
+                                {hotelRegions.map(reg => (
+                                    <option key={reg.id} value={reg.name}>{reg.name}</option>
+                                ))}
+                            </select>
+                        </div>
 
-                {/* Hotel Context Selector */}
-                <div className="flex items-center bg-indigo-50 px-4 py-2.5 rounded-lg border border-indigo-100 ml-2">
-                    <Building2Icon className="text-indigo-600 mr-2" size={18} />
-                    <select 
-                        value={selectedHotel} 
-                        onChange={(e) => setSelectedHotel(e.target.value)}
-                        disabled={currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.DIRETORIA && currentUser?.role !== UserRole.PACKAGE_MANAGER && !!currentUser?.hotelId}
-                        className="bg-transparent text-sm font-bold text-indigo-900 focus:outline-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                        {hotels
-                            .filter(h => 
-                                (selectedHotelType === 'Todos' || h.type === selectedHotelType) &&
-                                (selectedHotelCategory === 'Todas' || h.category === selectedHotelCategory) &&
-                                (selectedHotelRegion === 'Todas' || h.region === selectedHotelRegion)
-                            )
-                            .map(h => (
-                                <option key={h.id} value={h.name}>{h.name}</option>
-                            ))
-                        }
-                    </select>
-                </div>
+                        {/* Hotel Context Selector */}
+                        <div className="flex items-center bg-indigo-50 px-4 py-2.5 rounded-lg border border-indigo-100 ml-2">
+                            <Building2Icon className="text-indigo-600 mr-2" size={18} />
+                            <select 
+                                value={selectedHotel} 
+                                onChange={(e) => setSelectedHotel(e.target.value)}
+                                disabled={currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.DIRETORIA && currentUser?.role !== UserRole.PACKAGE_MANAGER && !!currentUser?.hotelId}
+                                className="bg-transparent text-sm font-bold text-indigo-900 focus:outline-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                                {hotels
+                                    .filter(h => 
+                                        (selectedHotelType === 'Todos' || h.type === selectedHotelType) &&
+                                        (selectedHotelCategory === 'Todas' || h.category === selectedHotelCategory) &&
+                                        (selectedHotelRegion === 'Todas' || h.region === selectedHotelRegion)
+                                    )
+                                    .map(h => (
+                                        <option key={h.id} value={h.name}>{h.name}</option>
+                                    ))
+                                }
+                            </select>
+                        </div>
+                    </>
+                )}
             </div>
 
             <div className="flex items-center gap-4">
                 {/* MONTH SELECTOR - HIDDEN IN BUDGET MODULE */}
-                {((currentModule as string) !== 'BUDGET') && (
+                {(showFilters && (currentModule as string) !== 'BUDGET') && (
                     <div className="flex items-center gap-3 bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
                         <button onClick={() => handleMonthChange('prev')} className="p-1.5 hover:bg-gray-100 rounded text-gray-500">
                             <ArrowLeft size={18} />
@@ -169,7 +177,7 @@ const Header: React.FC<HeaderProps> = ({
                     </div>
                 )}
 
-                {((currentModule as string) !== 'BUDGET') && <div className="h-8 w-px bg-gray-200 mx-1"></div>}
+                {(showFilters && (currentModule as string) !== 'BUDGET') && <div className="h-8 w-px bg-gray-200 mx-1"></div>}
                 
                 <div className="flex items-center gap-4">
                     <div className="flex items-center gap-3 p-1.5 rounded-lg">
@@ -184,7 +192,7 @@ const Header: React.FC<HeaderProps> = ({
 
                     <button 
                         onClick={onLogout}
-                        className="p-2.5 hover:bg-red-50 hover:text-red-600 rounded-xl text-gray-400 Transition-all active:scale-95 group"
+                        className="p-2.5 hover:bg-red-50 hover:text-red-600 rounded-xl text-gray-400 transition-all active:scale-95 group"
                         title="Sair"
                     >
                         <LogOut size={20} className="group-hover:translate-x-0.5 transition-transform" />

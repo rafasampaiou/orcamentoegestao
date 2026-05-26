@@ -789,6 +789,7 @@ const App: React.FC = () => {
             email: session.user.email || currentUser.email
           }}
           onLogout={handleLogout}
+          currentView={currentView}
         />
 
         {/* Main Scrollable Content */}
