@@ -74,20 +74,22 @@ const App: React.FC = () => {
   React.useEffect(() => {
     if (activeRealVersionId) {
       const version = realVersions.find(v => v.id === activeRealVersionId);
-      if (version && version.hotel) {
-        setSelectedHotel(version.hotel);
+      if (version) {
+        const hotelName = hotels.find(h => h.code === version.hotelId || h.id === version.hotelId)?.name || version.hotel;
+        if (hotelName) setSelectedHotel(hotelName);
       }
     }
-  }, [activeRealVersionId, realVersions]);
+  }, [activeRealVersionId, realVersions, hotels]);
 
   React.useEffect(() => {
     if (activeBudgetVersionId) {
       const version = budgetVersions.find(v => v.id === activeBudgetVersionId);
-      if (version && version.hotel) {
-        setSelectedHotel(version.hotel);
+      if (version) {
+        const hotelName = hotels.find(h => h.code === version.hotelId || h.id === version.hotelId)?.name || version.hotel;
+        if (hotelName) setSelectedHotel(hotelName);
       }
     }
-  }, [activeBudgetVersionId, budgetVersions]);
+  }, [activeBudgetVersionId, budgetVersions, hotels]);
 
   // --- LABOR PARAMETERS STATE ---
   const defaultLaborParams: LaborParameters = {
