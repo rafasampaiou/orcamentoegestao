@@ -535,7 +535,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   };
 
   const handleDeleteImportHistory = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta importação? Todos os dados vinculados serão removidos do banco de dados.')) return;
+    if (!window.confirm('Tem certeza que deseja excluir esta importação? Todos os dados vinculados serão removidos do banco de dados.')) return;
     try {
       await supabaseService.deleteImport(id);
       setImportHistory(prev => prev.filter(h => h.id !== id));
@@ -3107,21 +3107,21 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
     try {
       const isSourceReal = sourceVersionId.startsWith('r');
-      
+
       // Find source versions (both real and budget if possible, to replicate paired versions)
-      const sourceRealVersion = isSourceReal 
+      const sourceRealVersion = isSourceReal
         ? realVersions.find(v => v.id === sourceVersionId)
         : realVersions.find(v => {
-            const bv = budgetVersions.find(b => b.id === sourceVersionId);
-            return bv && v.name === bv.name && v.year === bv.year && v.hotelId === bv.hotelId;
-          });
-          
+          const bv = budgetVersions.find(b => b.id === sourceVersionId);
+          return bv && v.name === bv.name && v.year === bv.year && v.hotelId === bv.hotelId;
+        });
+
       const sourceBudgetVersion = !isSourceReal
         ? budgetVersions.find(v => v.id === sourceVersionId)
         : budgetVersions.find(v => {
-            const rv = realVersions.find(r => r.id === sourceVersionId);
-            return rv && v.name === rv.name && v.year === rv.year && v.hotelId === rv.hotelId;
-          });
+          const rv = realVersions.find(r => r.id === sourceVersionId);
+          return rv && v.name === rv.name && v.year === rv.year && v.hotelId === rv.hotelId;
+        });
 
       const timestamp = Date.now();
       const newRealVersionId = `r-${timestamp}`;
@@ -3197,7 +3197,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
           const sourceBudgetData = await supabaseService.getFinancialDataByVersion(sourceBudgetVersion.id);
           const newData: ImportedRow[] = sourceBudgetData.map(row => {
             let newValue = parseFloat(row.valor) || 0;
-            
+
             if (options.type === 'new_projected') {
               const account = accounts.find(a => a.name === row.conta || a.code === row.conta);
               if (account) {
@@ -3225,7 +3225,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       // 3. Update parent states
       setRealVersions(prev => [...prev, newRealVersion]);
       setBudgetVersions(prev => [...prev, newBudgetVersion]);
-      
+
       const allNewData = [...replicatedRealData, ...replicatedBudgetData];
       if (onImportData && allNewData.length > 0) {
         onImportData(allNewData, 'append');
@@ -3246,7 +3246,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       setActiveBudgetVersionId(newBudgetVersionId);
 
       toast.success(`Versão ${options.name} replicada com sucesso!`);
-      
+
       // Close modal
       setReplicateModalOpen(false);
       setReplicateTarget(null);
@@ -4438,8 +4438,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                     return (
                       <div key={m} className={`p-4 rounded-lg border flex items-center justify-between ${isClosed ? 'bg-gray-50 border-gray-200' : 'bg-indigo-50/30 border-indigo-100'}`}>
                         <span className="font-bold text-gray-700 capitalize">{new Date(yearOfVersion, m - 1).toLocaleString('pt-BR', { month: 'long' })}</span>
-                        <button 
-                          onClick={() => onToggleMonthClosure && onToggleMonthClosure(m)} 
+                        <button
+                          onClick={() => onToggleMonthClosure && onToggleMonthClosure(m)}
                           className={`p-2 rounded-md ${isClosed ? 'bg-emerald-600 text-white' : 'bg-indigo-600 text-white'}`}
                         >
                           {isClosed ? <Lock size={18} /> : <LockOpen size={18} />}
@@ -5081,35 +5081,35 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                   </select>
                                 </div>
                                 {accountForm.expenseType === 'Variável' && (
-                                    <>
-                                      <div>
-                                        <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Baseado em</label>
-                                        <select
-                                          value={accountForm.expenseDriver || 'Receita'}
-                                          onChange={e => setAccountForm({ ...accountForm, expenseDriver: e.target.value as any })}
-                                          className="w-full bg-slate-50 border-none rounded-lg p-2 text-xs font-bold focus:ring-2 focus:ring-indigo-500"
-                                        >
-                                          <option value="PAX">PAX (hóspedes)</option>
-                                          <option value="UH Ocupada">UH Ocupada</option>
-                                          <option value="Receita Bruta">Receita Bruta</option>
-                                          <option value="Emocionadores (CLT)">Emocionadores (CLT)</option>
-                                          <option value="KPI de produtividade">KPI de produtividade</option>
-                                          <option value="Definido Manualmente">Definido Manualmente</option>
-                                        </select>
-                                      </div>
-                                      <div className="mt-2 col-span-2">
-                                        <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Índice / Fator de Projeção</label>
-                                        <input
-                                          type="number"
-                                          step="0.000001"
-                                          value={accountForm.expenseFactor || 0}
-                                          onChange={e => setAccountForm({ ...accountForm, expenseFactor: parseFloat(e.target.value) })}
-                                          className="w-full bg-slate-50 border-none rounded-lg p-2 text-xs font-bold focus:ring-2 focus:ring-indigo-500"
-                                          placeholder="Ex: 0.05 para 5% ou 1.5 para multiplicador"
-                                        />
-                                        <p className="text-[9px] text-gray-400 mt-1 italic">Multiplicador aplicado sobre o direcionador selecionado.</p>
-                                      </div>
-                                    </>
+                                  <>
+                                    <div>
+                                      <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Baseado em</label>
+                                      <select
+                                        value={accountForm.expenseDriver || 'Receita'}
+                                        onChange={e => setAccountForm({ ...accountForm, expenseDriver: e.target.value as any })}
+                                        className="w-full bg-slate-50 border-none rounded-lg p-2 text-xs font-bold focus:ring-2 focus:ring-indigo-500"
+                                      >
+                                        <option value="PAX">PAX (hóspedes)</option>
+                                        <option value="UH Ocupada">UH Ocupada</option>
+                                        <option value="Receita Bruta">Receita Bruta</option>
+                                        <option value="Emocionadores (CLT)">Emocionadores (CLT)</option>
+                                        <option value="KPI de produtividade">KPI de produtividade</option>
+                                        <option value="Definido Manualmente">Definido Manualmente</option>
+                                      </select>
+                                    </div>
+                                    <div className="mt-2 col-span-2">
+                                      <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Índice / Fator de Projeção</label>
+                                      <input
+                                        type="number"
+                                        step="0.000001"
+                                        value={accountForm.expenseFactor || 0}
+                                        onChange={e => setAccountForm({ ...accountForm, expenseFactor: parseFloat(e.target.value) })}
+                                        className="w-full bg-slate-50 border-none rounded-lg p-2 text-xs font-bold focus:ring-2 focus:ring-indigo-500"
+                                        placeholder="Ex: 0.05 para 5% ou 1.5 para multiplicador"
+                                      />
+                                      <p className="text-[9px] text-gray-400 mt-1 italic">Multiplicador aplicado sobre o direcionador selecionado.</p>
+                                    </div>
+                                  </>
                                 )}
                               </div>
                             </div>
@@ -5450,9 +5450,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 return (
                   <tr
                     key={rowLabel}
-                    className={`transition-colors group ${
-                      isVariable ? 'bg-orange-50/30 hover:bg-orange-50/60' : 'hover:bg-slate-50/50'
-                    } ${isBreakdown ? 'opacity-80' : ''}`}
+                    className={`transition-colors group ${isVariable ? 'bg-orange-50/30 hover:bg-orange-50/60' : 'hover:bg-slate-50/50'
+                      } ${isBreakdown ? 'opacity-80' : ''}`}
                   >
                     {/* Row label */}
                     <td className={`px-6 py-3.5 text-sm ${isBreakdown ? 'pl-10 text-slate-500 font-medium' : 'font-bold text-slate-800'}`}>
@@ -5465,19 +5464,17 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                       <div className="flex gap-1 justify-center">
                         <button
                           onClick={() => updateAccountField(rowLabel, 'expenseType', 'Fixo')}
-                          className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg border transition-all ${
-                            !isVariable
+                          className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg border transition-all ${!isVariable
                               ? 'bg-slate-700 text-white border-slate-700 shadow-sm'
                               : 'bg-white text-slate-400 border-slate-200 hover:border-slate-400'
-                          }`}
+                            }`}
                         >Fixo</button>
                         <button
                           onClick={() => updateAccountField(rowLabel, 'expenseType', 'Variável')}
-                          className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg border transition-all ${
-                            isVariable
+                          className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg border transition-all ${isVariable
                               ? 'bg-orange-500 text-white border-orange-500 shadow-sm shadow-orange-100'
                               : 'bg-white text-slate-400 border-slate-200 hover:border-orange-300 hover:text-orange-500'
-                          }`}
+                            }`}
                         >Variável</button>
                       </div>
                     </td>
@@ -5624,7 +5621,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               {userForm.role === UserRole.PACKAGE_MANAGER && (
                 <div className="space-y-4 pt-2 border-t border-gray-100">
                   <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-widest">Responsabilidade do Gerente de Pacotes</h4>
-                  
+
                   {/* Expense Packages */}
                   <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Pacotes de Despesa</label>
@@ -5840,7 +5837,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1 flex justify-between">
                   Categoria do Hotel
-                  <button 
+                  <button
                     onClick={() => setIsManagingCategories(true)}
                     className="text-[10px] text-indigo-600 hover:underline font-bold"
                   >
@@ -5861,7 +5858,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1 flex justify-between">
                   Região do Hotel
-                  <button 
+                  <button
                     onClick={() => setIsManagingRegions(true)}
                     className="text-[10px] text-indigo-600 hover:underline font-bold"
                   >
@@ -6079,115 +6076,115 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
           </div>
         </div>
       )}
-      
+
       {/* CATEGORY MANAGEMENT MODAL */}
       {isManagingCategories && (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4 backdrop-blur-sm">
-              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-                  <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-indigo-600 text-white">
-                      <h3 className="text-xl font-bold">Gerenciar Categorias</h3>
-                      <button onClick={() => setIsManagingCategories(false)} className="text-white/80 hover:text-white"><X size={24} /></button>
-                  </div>
-                  <div className="p-6 space-y-4">
-                      <div className="flex gap-2">
-                          <input 
-                            type="text" 
-                            placeholder="Nova categoria..."
-                            value={categoryForm.name}
-                            onChange={e => setCategoryForm({ name: e.target.value })}
-                            className="flex-1 p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
-                          />
-                          <button 
-                            onClick={handleSaveCategory}
-                            disabled={isSavingRegistry || !categoryForm.name}
-                            className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-indigo-700 disabled:opacity-50"
-                          >
-                              {isSavingRegistry ? '...' : <Plus size={20} />}
-                          </button>
-                      </div>
-
-                      <div className="space-y-2 max-h-60 overflow-auto pr-2">
-                          {hotelCategories.map(cat => (
-                              <div key={cat.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100">
-                                  <span className="font-semibold text-gray-700">{cat.name}</span>
-                                  <button 
-                                    onClick={() => handleDeleteCategory(cat.id)}
-                                    className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
-                                  >
-                                      <Trash2 size={16} />
-                                  </button>
-                              </div>
-                          ))}
-                          {hotelCategories.length === 0 && (
-                              <p className="text-center text-gray-400 py-4 italic text-sm">Nenhuma categoria cadastrada.</p>
-                          )}
-                      </div>
-                  </div>
-                  <div className="p-6 bg-gray-50 text-right">
-                      <button 
-                        onClick={() => setIsManagingCategories(false)}
-                        className="px-6 py-2 bg-white border border-gray-300 rounded-lg font-bold text-gray-600 hover:bg-gray-100"
-                      >
-                          Fechar
-                      </button>
-                  </div>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-indigo-600 text-white">
+              <h3 className="text-xl font-bold">Gerenciar Categorias</h3>
+              <button onClick={() => setIsManagingCategories(false)} className="text-white/80 hover:text-white"><X size={24} /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Nova categoria..."
+                  value={categoryForm.name}
+                  onChange={e => setCategoryForm({ name: e.target.value })}
+                  className="flex-1 p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <button
+                  onClick={handleSaveCategory}
+                  disabled={isSavingRegistry || !categoryForm.name}
+                  className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {isSavingRegistry ? '...' : <Plus size={20} />}
+                </button>
               </div>
+
+              <div className="space-y-2 max-h-60 overflow-auto pr-2">
+                {hotelCategories.map(cat => (
+                  <div key={cat.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100">
+                    <span className="font-semibold text-gray-700">{cat.name}</span>
+                    <button
+                      onClick={() => handleDeleteCategory(cat.id)}
+                      className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))}
+                {hotelCategories.length === 0 && (
+                  <p className="text-center text-gray-400 py-4 italic text-sm">Nenhuma categoria cadastrada.</p>
+                )}
+              </div>
+            </div>
+            <div className="p-6 bg-gray-50 text-right">
+              <button
+                onClick={() => setIsManagingCategories(false)}
+                className="px-6 py-2 bg-white border border-gray-300 rounded-lg font-bold text-gray-600 hover:bg-gray-100"
+              >
+                Fechar
+              </button>
+            </div>
           </div>
+        </div>
       )}
-      
+
       {/* REGION MANAGEMENT MODAL */}
       {isManagingRegions && (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4 backdrop-blur-sm">
-              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-                  <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-indigo-600 text-white">
-                      <h3 className="text-xl font-bold">Gerenciar Regiões</h3>
-                      <button onClick={() => setIsManagingRegions(false)} className="text-white/80 hover:text-white"><X size={24} /></button>
-                  </div>
-                  <div className="p-6 space-y-4">
-                      <div className="flex gap-2">
-                          <input 
-                            type="text" 
-                            placeholder="Nova região..."
-                            value={regionForm.name}
-                            onChange={e => setRegionForm({ name: e.target.value })}
-                            className="flex-1 p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
-                          />
-                          <button 
-                            onClick={handleSaveRegion}
-                            disabled={isSavingRegistry || !regionForm.name}
-                            className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-indigo-700 disabled:opacity-50"
-                          >
-                              {isSavingRegistry ? '...' : <Plus size={20} />}
-                          </button>
-                      </div>
-
-                      <div className="space-y-2 max-h-60 overflow-auto pr-2">
-                          {hotelRegions.map(reg => (
-                              <div key={reg.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100">
-                                  <span className="font-semibold text-gray-700">{reg.name}</span>
-                                  <button 
-                                    onClick={() => handleDeleteRegion(reg.id)}
-                                    className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
-                                  >
-                                      <Trash2 size={16} />
-                                  </button>
-                              </div>
-                          ))}
-                          {hotelRegions.length === 0 && (
-                              <p className="text-center text-gray-400 py-4 italic text-sm">Nenhuma região cadastrada.</p>
-                          )}
-                      </div>
-                  </div>
-                  <div className="p-6 bg-gray-50 text-right">
-                      <button 
-                        onClick={() => setIsManagingRegions(false)}
-                        className="px-6 py-2 bg-white border border-gray-300 rounded-lg font-bold text-gray-600 hover:bg-gray-100"
-                      >
-                          Fechar
-                      </button>
-                  </div>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-indigo-600 text-white">
+              <h3 className="text-xl font-bold">Gerenciar Regiões</h3>
+              <button onClick={() => setIsManagingRegions(false)} className="text-white/80 hover:text-white"><X size={24} /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Nova região..."
+                  value={regionForm.name}
+                  onChange={e => setRegionForm({ name: e.target.value })}
+                  className="flex-1 p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <button
+                  onClick={handleSaveRegion}
+                  disabled={isSavingRegistry || !regionForm.name}
+                  className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {isSavingRegistry ? '...' : <Plus size={20} />}
+                </button>
               </div>
+
+              <div className="space-y-2 max-h-60 overflow-auto pr-2">
+                {hotelRegions.map(reg => (
+                  <div key={reg.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100">
+                    <span className="font-semibold text-gray-700">{reg.name}</span>
+                    <button
+                      onClick={() => handleDeleteRegion(reg.id)}
+                      className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))}
+                {hotelRegions.length === 0 && (
+                  <p className="text-center text-gray-400 py-4 italic text-sm">Nenhuma região cadastrada.</p>
+                )}
+              </div>
+            </div>
+            <div className="p-6 bg-gray-50 text-right">
+              <button
+                onClick={() => setIsManagingRegions(false)}
+                className="px-6 py-2 bg-white border border-gray-300 rounded-lg font-bold text-gray-600 hover:bg-gray-100"
+              >
+                Fechar
+              </button>
+            </div>
           </div>
+        </div>
       )}
     </div>
   );
