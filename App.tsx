@@ -70,26 +70,7 @@ const App: React.FC = () => {
   const [realVersions, setRealVersions] = useState<BudgetVersion[]>([]);
   const [activeRealVersionId, setActiveRealVersionId] = useState<string>('');
 
-  // Sync selectedHotel when a version is selected
-  React.useEffect(() => {
-    if (activeRealVersionId) {
-      const version = realVersions.find(v => v.id === activeRealVersionId);
-      if (version) {
-        const hotelName = hotels.find(h => h.code === version.hotelId || h.id === version.hotelId)?.name || version.hotel;
-        if (hotelName) setSelectedHotel(hotelName);
-      }
-    }
-  }, [activeRealVersionId, realVersions, hotels]);
 
-  React.useEffect(() => {
-    if (activeBudgetVersionId) {
-      const version = budgetVersions.find(v => v.id === activeBudgetVersionId);
-      if (version) {
-        const hotelName = hotels.find(h => h.code === version.hotelId || h.id === version.hotelId)?.name || version.hotel;
-        if (hotelName) setSelectedHotel(hotelName);
-      }
-    }
-  }, [activeBudgetVersionId, budgetVersions, hotels]);
 
   // --- LABOR PARAMETERS STATE ---
   const defaultLaborParams: LaborParameters = {
@@ -252,6 +233,27 @@ const App: React.FC = () => {
   }, [session, loggedInProfile]);
 
   const [hotels, setHotels] = useState<Hotel[]>([]);
+
+  // Sync selectedHotel when a version is selected
+  React.useEffect(() => {
+    if (activeRealVersionId) {
+      const version = realVersions.find(v => v.id === activeRealVersionId);
+      if (version) {
+        const hotelName = hotels.find(h => h.code === version.hotelId || h.id === version.hotelId)?.name || version.hotel;
+        if (hotelName) setSelectedHotel(hotelName);
+      }
+    }
+  }, [activeRealVersionId, realVersions, hotels]);
+
+  React.useEffect(() => {
+    if (activeBudgetVersionId) {
+      const version = budgetVersions.find(v => v.id === activeBudgetVersionId);
+      if (version) {
+        const hotelName = hotels.find(h => h.code === version.hotelId || h.id === version.hotelId)?.name || version.hotel;
+        if (hotelName) setSelectedHotel(hotelName);
+      }
+    }
+  }, [activeBudgetVersionId, budgetVersions, hotels]);
   const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
   const [packages, setPackages] = useState<CostPackage[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
