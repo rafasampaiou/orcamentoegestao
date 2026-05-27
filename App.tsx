@@ -234,26 +234,9 @@ const App: React.FC = () => {
 
   const [hotels, setHotels] = useState<Hotel[]>([]);
 
-  // Sync selectedHotel when a version is selected
-  React.useEffect(() => {
-    if (activeRealVersionId) {
-      const version = realVersions.find(v => v.id === activeRealVersionId);
-      if (version) {
-        const hotelName = hotels.find(h => h.code === version.hotelId || h.id === version.hotelId)?.name || version.hotel;
-        if (hotelName) setSelectedHotel(hotelName);
-      }
-    }
-  }, [activeRealVersionId, realVersions, hotels]);
-
-  React.useEffect(() => {
-    if (activeBudgetVersionId) {
-      const version = budgetVersions.find(v => v.id === activeBudgetVersionId);
-      if (version) {
-        const hotelName = hotels.find(h => h.code === version.hotelId || h.id === version.hotelId)?.name || version.hotel;
-        if (hotelName) setSelectedHotel(hotelName);
-      }
-    }
-  }, [activeBudgetVersionId, budgetVersions, hotels]);
+  // The automatic useEffects that synced selectedHotel based on activeRealVersionId 
+  // and activeBudgetVersionId have been removed to prevent infinite loops when multiple versions exist.
+  // Synchronization is now handled explicitly in the UI handlers (onCreateVersion, onSelectVersion).
   const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
   const [packages, setPackages] = useState<CostPackage[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -525,6 +508,12 @@ const App: React.FC = () => {
       setActiveRealVersionId(realId);
       setActiveBudgetVersionId(budgetId);
 
+      // 4. Sync the selected hotel explicitly
+      const hotelName = hotels.find(h => h.code === hotelId || h.id === hotelId)?.name;
+      if (hotelName) {
+        setSelectedHotel(hotelName);
+      }
+
       toast.success(`Versões ${name} criadas com sucesso!`);
     } catch (e) {
       console.error(e);
@@ -730,6 +719,11 @@ const App: React.FC = () => {
             onSelectVersion={(id) => {
               setActiveRealVersionId(id);
               setCurrentView('dashboard');
+              const version = realVersions.find(v => v.id === id);
+              if (version) {
+                const hotelName = hotels.find(h => h.code === version.hotelId || h.id === version.hotelId)?.name;
+                if (hotelName) setSelectedHotel(hotelName);
+              }
             }}
             onToggleLock={async (id) => {
               const version = realVersions.find(v => v.id === id);

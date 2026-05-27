@@ -4400,7 +4400,14 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 title="Planejamentos (Realizado)"
                 versions={realVersions}
                 activeVersionId={activeRealVersionId}
-                onSelectVersion={setActiveRealVersionId}
+                onSelectVersion={(id) => {
+                  setActiveRealVersionId(id);
+                  const version = realVersions.find(v => v.id === id);
+                  if (version) {
+                    const hotelName = hotels.find(h => h.code === version.hotelId || h.id === version.hotelId)?.name;
+                    if (hotelName) setSelectedHotel(hotelName);
+                  }
+                }}
                 onToggleLock={(id) => handleToggleVersionLock(id, false)}
                 onDelete={(id) => handleDeleteVersion(id, false)}
                 onCreateVersion={onCreateVersion}
