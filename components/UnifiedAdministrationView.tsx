@@ -3257,8 +3257,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   };
 
   const handleDeleteVersion = async (id: string, isBudget: boolean) => {
-    if (!confirm('Tem certeza que deseja excluir esta versão? Todos os dados vinculados serão perdidos.')) return;
-
     try {
       // Find the version being deleted to identify its paired counterpart
       const deletedVersion = isBudget

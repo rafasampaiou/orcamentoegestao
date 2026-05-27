@@ -70,6 +70,25 @@ const App: React.FC = () => {
   const [realVersions, setRealVersions] = useState<BudgetVersion[]>([]);
   const [activeRealVersionId, setActiveRealVersionId] = useState<string>('');
 
+  // Sync selectedHotel when a version is selected
+  React.useEffect(() => {
+    if (activeRealVersionId) {
+      const version = realVersions.find(v => v.id === activeRealVersionId);
+      if (version && version.hotel) {
+        setSelectedHotel(version.hotel);
+      }
+    }
+  }, [activeRealVersionId, realVersions]);
+
+  React.useEffect(() => {
+    if (activeBudgetVersionId) {
+      const version = budgetVersions.find(v => v.id === activeBudgetVersionId);
+      if (version && version.hotel) {
+        setSelectedHotel(version.hotel);
+      }
+    }
+  }, [activeBudgetVersionId, budgetVersions]);
+
   // --- LABOR PARAMETERS STATE ---
   const defaultLaborParams: LaborParameters = {
     dissidioPct: 5.0,
@@ -734,7 +753,6 @@ const App: React.FC = () => {
               } catch(e) { console.error(e); }
             }}
             onDelete={async (id) => {
-              if (!confirm('Tem certeza que deseja excluir esta versão? Todos os dados vinculados serão perdidos.')) return;
               try {
                 const deletedVersion = realVersions.find(v => v.id === id);
                 await supabaseService.deleteFinancialDataByVersion(id);
