@@ -4403,8 +4403,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                   setActiveRealVersionId(id);
                   const version = realVersions.find(v => v.id === id);
                   if (version) {
-                    const hotelName = hotels.find(h => h.code === version.hotelId || h.id === version.hotelId)?.name;
-                    if (hotelName) setSelectedHotel(hotelName);
+                    // Do nothing for now
                   }
                 }}
                 onToggleLock={(id) => handleToggleVersionLock(id, false)}
@@ -4895,7 +4894,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                       <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50 sticky top-0 z-10">
                           <tr>
-                            <th className="px-4 py-2 text-left text-[10px] font-bold text-gray-500 uppercase w-28">Código</th>
+
                             <th className="px-4 py-2 text-left text-[10px] font-bold text-gray-500 uppercase">Conta Contábil</th>
                           </tr>
                         </thead>
@@ -4905,7 +4904,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                             let lastPackage = '';
                             const filtered = accounts.filter(acc =>
                               acc.name.toLowerCase().includes(accSearchTerm.toLowerCase()) ||
-                              acc.code.toLowerCase().includes(accSearchTerm.toLowerCase()) ||
                               (acc.masterPackage || '').toLowerCase().includes(accSearchTerm.toLowerCase())
                             ).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
 
@@ -4923,7 +4921,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                     key={`m-${acc.masterPackage}`}
                                     className="border-y border-slate-200 transition-colors group h-10 bg-slate-100/50"
                                   >
-                                    <td className="px-4 py-2 text-[10px] font-mono font-black">{acc.masterPackageCode || '-'}</td>
+
                                     <td className="px-4 py-2 flex items-center gap-3">
                                       <button
                                         onClick={(e) => { e.stopPropagation(); toggleMasterExpand(acc.masterPackage!); }}
@@ -4957,7 +4955,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                     key={`p-${pkgKey}`}
                                     className="border-b border-slate-100 hover:bg-slate-50 transition-colors group h-9 bg-slate-50/30"
                                   >
-                                    <td className="px-4 py-1.5 text-[10px] font-mono text-slate-400">{acc.packageCode || '-'}</td>
+
                                     <td className="px-4 py-1.5 flex items-center gap-3 pl-10 border-l-2 border-slate-200 ml-4">
                                       <button
                                         onClick={(e) => { e.stopPropagation(); togglePackageExpand(pkgKey); }}
@@ -4990,7 +4988,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                   key={acc.id}
                                   className="hover:bg-slate-50/80 transition-colors group h-8 border-b border-slate-50"
                                 >
-                                  <td className="px-4 py-1 text-[10px] font-mono text-slate-300">{acc.code}</td>
+
                                   <td className="px-4 py-1 pl-20 relative">
                                     <div className="absolute left-[52px] top-0 bottom-0 w-0.5 bg-slate-100"></div>
                                     <div className="absolute left-[52px] top-4 w-4 h-0.5 bg-slate-100"></div>
@@ -6075,7 +6073,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               </div>
               <div className="max-h-96 overflow-y-auto space-y-1 pr-2 custom-scrollbar">
                 {accounts
-                  .filter(a => a.name.toLowerCase().includes(accSearchTerm.toLowerCase()) || a.code.toLowerCase().includes(accSearchTerm.toLowerCase()))
+                  .filter(a => a.name.toLowerCase().includes(accSearchTerm.toLowerCase()))
                   .map(acc => (
                     <button
                       key={acc.id}
