@@ -535,13 +535,24 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   };
 
   const handleDeleteImportHistory = async (id: string) => {
-    if (!window.confirm('Tem certeza que deseja excluir esta importação? Todos os dados vinculados serão removidos do banco de dados.')) return;
+    console.log('[DEBUG] Botão de exclusão clicado. ID:', id);
+    if (!window.confirm('Tem certeza que deseja excluir esta importação? Todos os dados vinculados serão removidos do banco de dados.')) {
+      console.log('[DEBUG] Exclusão cancelada pelo usuário.');
+      return;
+    }
+    console.log('[DEBUG] Exclusão confirmada pelo usuário. Iniciando deleção...');
     try {
       await supabaseService.deleteImport(id);
-      setImportHistory(prev => prev.filter(h => h.id !== id));
+      console.log('[DEBUG] Deleção concluída no Supabase. Atualizando estado local...');
+      setImportHistory(prev => {
+        const next = prev.filter(h => h.id !== id);
+        console.log(`[DEBUG] Estado atualizado. Removido ID ${id}. Antes: ${prev.length}, Depois: ${next.length}`);
+        return next;
+      });
       alert('Importação excluída com sucesso.');
     } catch (e: any) {
-      alert('Erro ao excluir importação: ' + e.message);
+      console.error('[DEBUG] Catch em handleDeleteImportHistory. Erro completo:', e);
+      alert('Erro ao excluir importação: ' + (e?.message || JSON.stringify(e)));
     }
   };
 
@@ -600,8 +611,14 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-right">
                         <button
-                          onClick={() => handleDeleteImportHistory(log.id)}
-                          className="text-red-400 hover:text-red-600 p-1 hover:bg-red-50 rounded transition-colors"
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            console.log('[DEBUG] onClick nativo disparado no botão para id:', log.id);
+                            handleDeleteImportHistory(log.id);
+                          }}
+                          className="text-red-400 hover:text-red-600 p-1 hover:bg-red-50 rounded transition-colors relative z-10"
                           title="Excluir esta importação"
                         >
                           <Trash2 size={14} />

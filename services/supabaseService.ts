@@ -760,13 +760,26 @@ export const supabaseService = {
   },
 
   async deleteImport(id: string): Promise<void> {
+    console.log('[DEBUG] Executando deleteImport no supabaseService. ID:', id);
     // Due to ON DELETE CASCADE on import_id, deleting the history entry 
     // will automatically delete matching financial_data rows.
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('import_history')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .select();
     
-    if (error) throw error;
+    if (error) {
+      console.error('[DEBUG] Erro retornado pelo Supabase no deleteImport:', error);
+      throw error;
+    }
+
+    console.log('[DEBUG] Resultado do deleteImport (data):', data);
+
+    if (!data || data.length === 0) {
+      const msg = "Nenhum registro deletado. O registro pode não existir ou pode haver um bloqueio de permissão (RLS).";
+      console.error(`[DEBUG] ${msg}`);
+      throw new Error(msg);
+    }
   }
 };

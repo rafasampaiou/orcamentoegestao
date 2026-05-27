@@ -366,6 +366,7 @@ export interface BudgetVersion {
     updatedAt?: string;
     isMain?: boolean;
     hotelId?: string;
+    hotel?: string;
     occupancyData?: Record<string, number[]>;
     laborData?: Record<string, any>;
     extraRevenueData?: any[];
