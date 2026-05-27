@@ -45,7 +45,7 @@ const Header: React.FC<HeaderProps> = ({
     onLogout,
     currentView
 }) => {
-    const showFilters = !currentView.startsWith('admin');
+    const showFilters = currentView === 'dashboard' || currentView === 'occupancy_real';
 
     return (
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shrink-0 z-10 font-['Inter',sans-serif]">
@@ -182,7 +182,11 @@ const Header: React.FC<HeaderProps> = ({
                 <div className="flex items-center gap-4">
                     <div className="flex items-center gap-3 p-1.5 rounded-lg">
                         <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm">
-                            {currentUser.name.split(' ').map((n: string) => n[0]).join('')}
+                            {currentUser.name
+                                .split(/[\s.]+/)
+                                .slice(0, 2)
+                                .map((n: string) => n[0]?.toUpperCase())
+                                .join('')}
                         </div>
                         <div className="text-sm hidden sm:block">
                             <p className="font-semibold text-gray-700 leading-none">{currentUser.name}</p>
