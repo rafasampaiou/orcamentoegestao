@@ -456,6 +456,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const [importScenario, setImportScenario] = useState<'REAL' | 'BUDGET'>('REAL');
   const [importHistory, setImportHistory] = useState<any[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [importToDelete, setImportToDelete] = useState<string | null>(null);
 
   // Logs & Permissions state
   const [activeDreName, setActiveDreName] = useState<'Forecast' | 'Budget'>('Forecast');
@@ -535,12 +536,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   };
 
   const handleDeleteImportHistory = async (id: string) => {
-    console.log('[DEBUG] Botão de exclusão clicado. ID:', id);
-    if (!window.confirm('Tem certeza que deseja excluir esta importação? Todos os dados vinculados serão removidos do banco de dados.')) {
-      console.log('[DEBUG] Exclusão cancelada pelo usuário.');
-      return;
-    }
-    console.log('[DEBUG] Exclusão confirmada pelo usuário. Iniciando deleção...');
+    console.log('[DEBUG] Exclusão confirmada no modal. Iniciando deleção para o ID:', id);
     try {
       await supabaseService.deleteImport(id);
       console.log('[DEBUG] Deleção concluída no Supabase. Atualizando estado local...');
@@ -549,10 +545,12 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         console.log(`[DEBUG] Estado atualizado. Removido ID ${id}. Antes: ${prev.length}, Depois: ${next.length}`);
         return next;
       });
-      alert('Importação excluída com sucesso.');
+      toast.success('Importação excluída com sucesso.');
     } catch (e: any) {
       console.error('[DEBUG] Catch em handleDeleteImportHistory. Erro completo:', e);
-      alert('Erro ao excluir importação: ' + (e?.message || JSON.stringify(e)));
+      toast.error('Erro ao excluir importação: ' + (e?.message || JSON.stringify(e)));
+    } finally {
+      setImportToDelete(null);
     }
   };
 
@@ -615,8 +613,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            console.log('[DEBUG] onClick nativo disparado no botão para id:', log.id);
-                            handleDeleteImportHistory(log.id);
+                            console.log('[DEBUG] Abrindo modal de exclusão para id:', log.id);
+                            setImportToDelete(log.id);
                           }}
                           className="text-red-400 hover:text-red-600 p-1 hover:bg-red-50 rounded transition-colors relative z-10"
                           title="Excluir esta importação"
@@ -6199,6 +6197,40 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               >
                 Fechar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE IMPORT CONFIRMATION MODAL */}
+      {importToDelete && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-red-600 text-white">
+              <h3 className="text-xl font-bold flex items-center gap-2">
+                <Trash2 size={20} /> Confirmar Exclusão
+              </h3>
+              <button onClick={() => setImportToDelete(null)} className="text-white/80 hover:text-white"><X size={24} /></button>
+            </div>
+            <div className="p-6">
+              <p className="text-gray-700 text-sm mb-6">
+                Tem certeza que deseja excluir esta importação permanentemente? <br /><br />
+                <strong className="text-red-600">Atenção:</strong> Todos os dados financeiros vinculados a esta importação serão removidos do banco de dados (Supabase) e não poderão ser recuperados.
+              </p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setImportToDelete(null)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg font-bold text-gray-700 hover:bg-gray-50 transition-colors shadow-sm"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => handleDeleteImportHistory(importToDelete)}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition-colors shadow-md shadow-red-200 flex items-center gap-2"
+                >
+                  Sim, Excluir Importação
+                </button>
+              </div>
             </div>
           </div>
         </div>
