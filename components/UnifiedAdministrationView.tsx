@@ -128,7 +128,7 @@ const ImportPreview: React.FC<ImportPreviewProps> = ({ summaryRows, errorRows, o
               className="w-full border border-emerald-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 outline-none"
             >
               <option value="">Selecione uma versão...</option>
-              {realVersions.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+              {realVersions.map(v => <option key={v.id} value={v.id}>{v.name} - {v.hotel} ({v.year})</option>)}
             </select>
           </div>
         )}
@@ -141,7 +141,7 @@ const ImportPreview: React.FC<ImportPreviewProps> = ({ summaryRows, errorRows, o
               className="w-full border border-orange-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none"
             >
               <option value="">Selecione uma versão...</option>
-              {budgetVersions.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+              {budgetVersions.map(v => <option key={v.id} value={v.id}>{v.name} - {v.hotel} ({v.year})</option>)}
             </select>
           </div>
         )}
@@ -3516,7 +3516,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[200px]"
               >
                 <option value="">Selecione a versão...</option>
-                {realVersions.map(v => <option key={v.id} value={v.id}>{v.name} ({v.year})</option>)}
+                {realVersions.map(v => <option key={v.id} value={v.id}>{v.name} - {v.hotel} ({v.year})</option>)}
               </select>
 
               <div className="flex-1" />
@@ -3691,7 +3691,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none min-w-[240px]"
               >
                 <option value="">Selecione a versão de destino...</option>
-                {realVersions.map(v => <option key={v.id} value={v.id}>{v.name} ({v.year})</option>)}
+                {realVersions.map(v => <option key={v.id} value={v.id}>{v.name} - {v.hotel} ({v.year})</option>)}
               </select>
             </div>
 
@@ -3733,7 +3733,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[240px]"
               >
                 <option value="">Selecione a versão de destino...</option>
-                {realVersions.map(v => <option key={v.id} value={v.id}>{v.name} ({v.year})</option>)}
+                {realVersions.map(v => <option key={v.id} value={v.id}>{v.name} - {v.hotel} ({v.year})</option>)}
               </select>
             </div>
             <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
@@ -3825,7 +3825,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                     className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[240px]"
                   >
                     <option value="">Selecione a versão de destino...</option>
-                    {realVersions.map(v => <option key={v.id} value={v.id}>{v.name} ({v.year})</option>)}
+                    {realVersions.map(v => <option key={v.id} value={v.id}>{v.name} - {v.hotel} ({v.year})</option>)}
                   </select>
                 </div>
 
@@ -3868,7 +3868,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                       className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[200px]"
                     >
                       <option value="">Selecione a versão...</option>
-                      {realVersions.map(v => <option key={v.id} value={v.id}>{v.name} ({v.year})</option>)}
+                      {realVersions.map(v => <option key={v.id} value={v.id}>{v.name} - {v.hotel} ({v.year})</option>)}
                     </select>
                   </div>
                   <div className="flex-1 min-w-[24px]" />
@@ -3924,7 +3924,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
           className="border border-orange-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none min-w-[260px] bg-white"
         >
           <option value="">Selecione a versao de Budget...</option>
-          {budgetVersions.map(v => <option key={v.id} value={v.id}>{v.name} ({v.year})</option>)}
+          {budgetVersions.map(v => <option key={v.id} value={v.id}>{v.name} - {v.hotel} ({v.year})</option>)}
         </select>
       </div>
 
