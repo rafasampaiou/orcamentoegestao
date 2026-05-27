@@ -32,37 +32,36 @@ interface LocalDreSection {
 
 // --- CONSTANTS FOR STRUCTURED IMPORTS ---
 const DRE_FORECAST_ROWS = [
-  "CUSTO DE ALIMENTOS",
-  "CUSTO DE BEBIDAS",
-  "CUSTO DE PRODUTOS DIVERSOS",
-  "CUSTO DE OUTRAS RECEITAS",
-  "DESPESAS ADMINISTRATIVAS",
-  "DESPESAS ADMINISTRATIVAS GERAIS",
-  "Processamentos de dados e TI (TI)",
-  "Processamentos de dados e TI (Martech)",
-  "Processamentos de dados e TI (Outros setores)",
-  "BENEFICIOS AOS COLABORADORES",
-  "DESPESAS COM PESSOAL",
-  "ENCARGOS SOCIAIS",
-  "SERVIÇOS DE TERCEIROS",
+  "Custo de alimentos",
+  "Custo de bebidas",
+  "Custo de produtos diversos",
+  "Custos de outras receitas",
+  "Despesas com conservacao e limpeza",
+  "Despesas com manutencao",
+  "Despesas com servicos publicos",
+  "Despesas operacionais",
+  "Beneficios aos colaboradores",
+  "Despesas com pessoal",
+  "Encargos sociais",
+  "Serviços de terceiros",
   "Servicos de terceiros temporarios",
   "Serviço de terceiros recorrente",
   "Serviços contratados de prestadores PJ - MEI",
-  "DESPESAS COM VENDAS E MARKETING",
-  "Despesas com Vendas e Marketing (Martech)",
-  "Despesas com Vendas e Marketing (Marketing)",
-  "Despesas com Vendas e Marketing (Outros setores)",
-  "DESPESAS FINANCEIRAS E BANCÁRIAS",
-  "DESPESAS COM CONSERVAÇÃO E LIMPEZA",
-  "DESPESAS COM MANUTENÇÃO",
-  "DESPESAS COM SERVIÇOS PÚBLICOS",
-  "DESPESAS OPERACIONAIS",
-  "ARRENDAMENTO",
-  "DESPESA TRIBUTARIA",
-  "OUTROS IMPOSTOS",
-  "PROVISÕES GERAIS",
+  "Despesas administrativas",
+  "Despesas administrativas gerais",
+  "Processamento de dados e TI (TI)",
+  "Processamento de dados e TI (Martech)",
+  "Processamento de dados e TI (Outros)",
+  "Provisoes gerais",
   "Provisao de servicos de terceiros temporarios",
-  "Outras provisões"
+  "Outras provisões",
+  "Despesas com vendas e marketing",
+  "Marketing",
+  "Martech",
+  "Outros setores",
+  "Despesas financeiras e bancarias",
+  "Outros impostos",
+  "Arrendamento"
 ];
 
 const REVENUE_IMPORT_COLUMNS = [
@@ -2621,12 +2620,12 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
     // Mapping for virtual/drill-down rows to base account + CR
     const specialMapping: Record<string, { account: string, cr?: string }> = {
-      "Processamentos de dados e TI (TI)": { account: "Processamentos de dados e TI", cr: "ti" },
-      "Processamentos de dados e TI (Martech)": { account: "Processamentos de dados e TI", cr: "martech" },
-      "Processamentos de dados e TI (Outros setores)": { account: "Processamentos de dados e TI", cr: "" },
-      "Despesas com Vendas e Marketing (Marketing)": { account: "Despesas com vendas e marketing", cr: "marketing" },
-      "Despesas com Vendas e Marketing (Martech)": { account: "Despesas com vendas e marketing", cr: "martech" },
-      "Despesas com Vendas e Marketing (Outros setores)": { account: "Despesas com vendas e marketing", cr: "" },
+      "Processamento de dados e TI (TI)": { account: "Processamentos de dados e TI", cr: "ti" },
+      "Processamento de dados e TI (Martech)": { account: "Processamentos de dados e TI", cr: "martech" },
+      "Processamento de dados e TI (Outros)": { account: "Processamentos de dados e TI", cr: "" },
+      "Marketing": { account: "Despesas com vendas e marketing", cr: "marketing" },
+      "Martech": { account: "Despesas com vendas e marketing", cr: "martech" },
+      "Outros setores": { account: "Despesas com vendas e marketing", cr: "" },
     };
 
     const targetYear = selectedVersion.year || importTargetYear;
