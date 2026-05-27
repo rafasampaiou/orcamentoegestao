@@ -1104,6 +1104,7 @@ export const getDynamicForecastData = (
 
             const valLY = getImportedValue(pkg.name, (selectedYear || 0) - 1, 'Real');
 
+            const packageRowIndex = rows.length;
             rows.push(generateRow(
                 pkg.id,
                 '',
@@ -1114,6 +1115,7 @@ export const getDynamicForecastData = (
                 pkg.isTotal,
                 1
             ));
+            const startChildrenIndex = rows.length;
 
             // 3. Optional: Accounts within package
             const pkgAccs = currentAccounts.filter(a => a.package === pkg.name || a.packageId === pkg.id);
@@ -1296,6 +1298,27 @@ export const getDynamicForecastData = (
                     }
                 ));
             });
+
+
+            // Update package total by summing its children
+            let sumBudget = 0;
+            let sumReal = 0;
+            let sumPrevia = 0;
+            let sumLY = 0;
+
+            for (let i = startChildrenIndex; i < rows.length; i++) {
+                if (rows[i].category !== 'Spacer') {
+                    sumBudget += rows[i].budget;
+                    sumReal += rows[i].real;
+                    sumPrevia += rows[i].previa;
+                    sumLY += rows[i].lastYear;
+                }
+            }
+
+            rows[packageRowIndex].budget += sumBudget;
+            rows[packageRowIndex].real += sumReal;
+            rows[packageRowIndex].previa += sumPrevia;
+            rows[packageRowIndex].lastYear += sumLY;
         });
 
         // Add a spacer after each section
