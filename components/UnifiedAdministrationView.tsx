@@ -2622,10 +2622,10 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     const specialMapping: Record<string, { account: string, cr?: string }> = {
       "Processamento de dados e TI (TI)": { account: "Processamentos de dados e TI", cr: "ti" },
       "Processamento de dados e TI (Martech)": { account: "Processamentos de dados e TI", cr: "martech" },
-      "Processamento de dados e TI (Outros)": { account: "Processamentos de dados e TI", cr: "" },
+      "Processamento de dados e TI (Outros)": { account: "Processamentos de dados e TI", cr: "outros" },
       "Marketing": { account: "Despesas com vendas e marketing", cr: "marketing" },
       "Martech": { account: "Despesas com vendas e marketing", cr: "martech" },
-      "Outros setores": { account: "Despesas com vendas e marketing", cr: "" },
+      "Outros setores": { account: "Despesas com vendas e marketing", cr: "outros" },
     };
 
     const targetYear = selectedVersion.year || importTargetYear;

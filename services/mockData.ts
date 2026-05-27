@@ -616,19 +616,10 @@ export const getForecastData = (
 
         let total = 0;
         keysToCheck.forEach(key => {
-            if (crFilter === 'OTHER_EXCEPT_MKT_MAR') {
-                // Logic: Total (base key) - Martech - Marketing
-                const totalVal = dataIndex.get(key) || 0;
-                const martechVal = dataIndex.get(`${key}|martech`) || 0;
-                const mktVal = dataIndex.get(`${key}|marketing`) || 0;
-                total += (totalVal - martechVal - mktVal);
-            } else if (dataIndex.has(key)) {
+            if (dataIndex.has(key)) {
                 total += dataIndex.get(key) || 0;
             }
-            // REMOVED: CR fallback that was returning full account total
-            // when no CR-specific data existed, inflating sub-area values
         });
-
         return total;
     };
 
@@ -836,7 +827,7 @@ export const getForecastData = (
             const subAreas = [
                 { label: 'TI', cr: 'martech' },
                 { label: 'Martech', cr: 'marketing' },
-                { label: 'Outros setores', cr: 'OTHER_EXCEPT_MKT_MAR' }
+                { label: 'Outros setores', cr: 'outros' }
             ];
             const tiAccs = pkgAccs.filter(acc => acc.name.toLowerCase().includes(tiAccountKeyword));
             if (tiAccs.length > 0) {
@@ -867,7 +858,7 @@ export const getForecastData = (
             const subAreas = [
                 { label: 'Martech', cr: 'martech' },
                 { label: 'Marketing', cr: 'marketing' },
-                { label: 'Outros setores', cr: 'OTHER_EXCEPT_MKT_MAR' }
+                { label: 'Outros setores', cr: 'outros' }
             ];
             subAreas.forEach(sub => {
                 let subBudget = 0; let subReal = 0; let subPrevia = 0; let subLY = 0;
@@ -877,18 +868,10 @@ export const getForecastData = (
                     subReal += getImportedValue(acc.name, selectedYear, 'Forecast', sub.cr);
                     subLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real', sub.cr);
                 });
-                // Fallback if something was imported directly for the package
-                if (sub.cr === 'OTHER_EXCEPT_MKT_MAR') {
-                    subBudget += getImportedValue(pkgName, selectedYear, 'Budget');
-                    subPrevia += getImportedValue(pkgName, selectedYear, 'Previa') + getImportedValue(pkgName, selectedYear, 'Real');
-                    subReal += getImportedValue(pkgName, selectedYear, 'Forecast');
-                    subLY += getImportedValue(pkgName, (selectedYear || 0) - 1, 'Real');
-                } else {
-                    subBudget += getImportedValue(pkgName, selectedYear, 'Budget', sub.cr);
-                    subPrevia += getImportedValue(pkgName, selectedYear, 'Previa', sub.cr) + getImportedValue(pkgName, selectedYear, 'Real', sub.cr);
-                    subReal += getImportedValue(pkgName, selectedYear, 'Forecast', sub.cr);
-                    subLY += getImportedValue(pkgName, (selectedYear || 0) - 1, 'Real', sub.cr);
-                }
+                subBudget += getImportedValue(pkgName, selectedYear, 'Budget', sub.cr);
+                subPrevia += getImportedValue(pkgName, selectedYear, 'Previa', sub.cr) + getImportedValue(pkgName, selectedYear, 'Real', sub.cr);
+                subReal += getImportedValue(pkgName, selectedYear, 'Forecast', sub.cr);
+                subLY += getImportedValue(pkgName, (selectedYear || 0) - 1, 'Real', sub.cr);
 
                 rows.push(generateRow(`p-drill-${masterName}-${pkgName}-${sub.label}`, pkgCode, 'Costs', sub.label, subBudget, subReal, subLY, subPrevia, false, false, 2, undefined, { method: 'Fixed' }));
             });
@@ -1066,13 +1049,7 @@ export const getDynamicForecastData = (
         let total = 0;
         hotelsToTry.forEach(h => {
             const baseKey = `${targetYear}|${selectedMonth}|${h.trim().toUpperCase()}|${targetScenario}|${targetName}`;
-            if (targetCR === 'OTHER_EXCEPT_MKT_MAR') {
-                // Logic: Total - Martech - Marketing
-                const totalVal = dataIndex.get(baseKey) || 0;
-                const martechVal = dataIndex.get(`${baseKey}|martech`) || 0;
-                const mktVal = dataIndex.get(`${baseKey}|marketing`) || 0;
-                total += (totalVal - martechVal - mktVal);
-            } else if (targetCR) {
+            if (targetCR) {
                 total += dataIndex.get(`${baseKey}|${targetCR}`) || 0;
             } else {
                 total += dataIndex.get(baseKey) || 0;
@@ -1157,7 +1134,7 @@ export const getDynamicForecastData = (
                     const subAreas = [
                         { label: 'TI', cr: 'martech' },
                         { label: 'Martech', cr: 'marketing' },
-                        { label: 'Outros', cr: 'OTHER_EXCEPT_MKT_MAR' }
+                        { label: 'Outros', cr: 'outros' }
                     ];
                     subAreas.forEach(sub => {
                         const subLabel = `Processamento de dados e TI (${sub.label})`;
@@ -1199,7 +1176,7 @@ export const getDynamicForecastData = (
                 const subAreas = [
                     { label: 'Martech', cr: 'martech' },
                     { label: 'Marketing', cr: 'marketing' },
-                    { label: 'Outros setores', cr: 'OTHER_EXCEPT_MKT_MAR' }
+                    { label: 'Outros setores', cr: 'outros' }
                 ];
                 subAreas.forEach(sub => {
                     const subLabel = sub.label;
@@ -1221,18 +1198,10 @@ export const getDynamicForecastData = (
                         });
                     }
 
-                    // Fallback if something was imported directly for the package
-                    if (sub.cr === 'OTHER_EXCEPT_MKT_MAR') {
-                        sBudget += getImportedValue(pkg.name, selectedYear, 'Budget');
-                        sPrevia += getImportedValue(pkg.name, selectedYear, 'Previa') + getImportedValue(pkg.name, selectedYear, 'Real');
-                        sReal += getImportedValue(pkg.name, selectedYear, 'Forecast');
-                        sLY += getImportedValue(pkg.name, (selectedYear || 0) - 1, 'Real');
-                    } else {
-                        sBudget += getImportedValue(pkg.name, selectedYear, 'Budget', sub.cr);
-                        sPrevia += getImportedValue(pkg.name, selectedYear, 'Previa', sub.cr) + getImportedValue(pkg.name, selectedYear, 'Real', sub.cr);
-                        sReal += getImportedValue(pkg.name, selectedYear, 'Forecast', sub.cr);
-                        sLY += getImportedValue(pkg.name, (selectedYear || 0) - 1, 'Real', sub.cr);
-                    }
+                    sBudget += getImportedValue(pkg.name, selectedYear, 'Budget', sub.cr);
+                    sPrevia += getImportedValue(pkg.name, selectedYear, 'Previa', sub.cr) + getImportedValue(pkg.name, selectedYear, 'Real', sub.cr);
+                    sReal += getImportedValue(pkg.name, selectedYear, 'Forecast', sub.cr);
+                    sLY += getImportedValue(pkg.name, (selectedYear || 0) - 1, 'Real', sub.cr);
 
                     rows.push(generateRow(`p-drill-${pkg.id}-${sub.label}`, '', 'Account', subLabel, sBudget, sReal, sLY, sPrevia, false, false, 2, undefined, { method: 'Fixed' }));
                 });
