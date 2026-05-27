@@ -1,5 +1,19 @@
+import { Account, BudgetVersion, CostPackage, DreSection, ForecastConfig, ForecastOperator, ForecastRow, Hotel, ImportedRow, RealVersion, RevenueAccount, User, UserRole, ExpenseType, ExpenseDriver, CostCenter, GMDConfiguration, DrePackage } from '../types';
 
-import { ForecastRow, Hotel, User, UserRole, Account, CostPackage, ExpenseType, ExpenseDriver, CostCenter, GMDConfiguration, ImportedRow, ForecastConfig, DreSection, DrePackage } from '../types';
+// Helper for robust string matching (ignores accents, case, and plural suffix 's')
+export const normalizeAccountName = (str: string) => {
+    if (!str) return '';
+    return str
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") // Remove accents
+        .replace(/ões/g, "ao")
+        .replace(/oes/g, "ao")
+        .replace(/ães/g, "ao")
+        .replace(/aes/g, "ao")
+        .replace(/s\b/g, "") // Remove trailing 's'
+        .replace(/[^a-z0-9]/g, ""); // Remove spaces and special chars
+};
 
 export const mockHotels: Hotel[] = [
     { id: '1', code: 'ATB', name: 'Atibaia', type: 'Hotéis próprios', category: 'Resort', region: 'Sudeste' },
@@ -549,7 +563,7 @@ export const getForecastData = (
             if (isNaN(val)) return;
 
             // 6. Indexing
-            const normConta = row.conta.trim().toLowerCase();
+            const normConta = normalizeAccountName(row.conta);
             const normCR = (row.cr || '').trim().toLowerCase();
 
             // Index by Account only
@@ -577,7 +591,7 @@ export const getForecastData = (
     const getImportedValue = (accountName: string, targetYear: number | undefined, valueCategory: 'Real' | 'Budget' | 'Previa' | 'Forecast', crFilter?: string) => {
         if (!selectedMonth || !targetYear) return 0;
 
-        const targetName = accountName.trim().toLowerCase();
+        const targetName = normalizeAccountName(accountName);
         const targetCR = crFilter?.trim().toLowerCase();
         let targetScenario = '';
         if (valueCategory === 'Real') targetScenario = 'REAL';
@@ -871,7 +885,7 @@ export const getForecastData = (
                     subLY += getImportedValue(pkgName, (selectedYear || 0) - 1, 'Real');
                 }
 
-                rows.push(generateRow(`p-drill-${masterName}-${pkgName}-${sub.label}`, pkgCode, 'Costs', `Despesas com Vendas e Marketing (${sub.label})`, subBudget, subReal, subLY, subPrevia, false, false, 2, undefined, { method: 'Fixed' }));
+                rows.push(generateRow(`p-drill-${masterName}-${pkgName}-${sub.label}`, pkgCode, 'Costs', sub.label, subBudget, subReal, subLY, subPrevia, false, false, 2, undefined, { method: 'Fixed' }));
             });
         } else if (isServicosTerceiros) {
             rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', 'Serviços de Terceiros', 0, 0, 0, 0, true, false, 1));
@@ -1020,7 +1034,7 @@ export const getDynamicForecastData = (
             const normHotel = row.hotel.trim().toUpperCase();
             const val = parseFloat(row.valor.replace(',', '.'));
             if (isNaN(val)) return;
-            const normConta = row.conta.trim().toLowerCase();
+            const normConta = normalizeAccountName(row.conta);
             const normCR = (row.cr || '').trim().toLowerCase();
             const keyConta = `${rYear}|${rMonth}|${normHotel}|${normScenario}|${normConta}`;
             dataIndex.set(keyConta, (dataIndex.get(keyConta) || 0) + val);
@@ -1036,7 +1050,7 @@ export const getDynamicForecastData = (
 
     const getImportedValue = (accountName: string, targetYear: number | undefined, valueCategory: 'Real' | 'Budget' | 'Previa' | 'Forecast', crFilter?: string) => {
         if (!selectedMonth || !targetYear) return 0;
-        const targetName = accountName.trim().toLowerCase();
+        const targetName = normalizeAccountName(accountName);
         const targetCR = crFilter?.trim().toLowerCase();
         let targetScenario = '';
         if (valueCategory === 'Real') targetScenario = 'REAL';
@@ -1183,7 +1197,7 @@ export const getDynamicForecastData = (
                     { label: 'Outros setores', cr: 'OTHER_EXCEPT_MKT_MAR' }
                 ];
                 subAreas.forEach(sub => {
-                    const subLabel = `Despesas com Vendas e Marketing (${sub.label})`;
+                    const subLabel = sub.label;
 
                     let sBudget = 0; let sPrevia = 0; let sLY = 0; let sReal = 0;
 
