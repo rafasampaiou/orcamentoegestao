@@ -877,12 +877,17 @@ export const getForecastData = (
                     subReal += getImportedValue(acc.name, selectedYear, 'Forecast', sub.cr);
                     subLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real', sub.cr);
                 });
-                // Fallback for "Outros setores" category if something was imported directly for the package
+                // Fallback if something was imported directly for the package
                 if (sub.cr === 'OTHER_EXCEPT_MKT_MAR') {
                     subBudget += getImportedValue(pkgName, selectedYear, 'Budget');
                     subPrevia += getImportedValue(pkgName, selectedYear, 'Previa') + getImportedValue(pkgName, selectedYear, 'Real');
                     subReal += getImportedValue(pkgName, selectedYear, 'Forecast');
                     subLY += getImportedValue(pkgName, (selectedYear || 0) - 1, 'Real');
+                } else {
+                    subBudget += getImportedValue(pkgName, selectedYear, 'Budget', sub.cr);
+                    subPrevia += getImportedValue(pkgName, selectedYear, 'Previa', sub.cr) + getImportedValue(pkgName, selectedYear, 'Real', sub.cr);
+                    subReal += getImportedValue(pkgName, selectedYear, 'Forecast', sub.cr);
+                    subLY += getImportedValue(pkgName, (selectedYear || 0) - 1, 'Real', sub.cr);
                 }
 
                 rows.push(generateRow(`p-drill-${masterName}-${pkgName}-${sub.label}`, pkgCode, 'Costs', sub.label, subBudget, subReal, subLY, subPrevia, false, false, 2, undefined, { method: 'Fixed' }));
@@ -1216,12 +1221,17 @@ export const getDynamicForecastData = (
                         });
                     }
 
-                    // Fallback for "Outros setores" if something was imported directly for the package
+                    // Fallback if something was imported directly for the package
                     if (sub.cr === 'OTHER_EXCEPT_MKT_MAR') {
                         sBudget += getImportedValue(pkg.name, selectedYear, 'Budget');
                         sPrevia += getImportedValue(pkg.name, selectedYear, 'Previa') + getImportedValue(pkg.name, selectedYear, 'Real');
                         sReal += getImportedValue(pkg.name, selectedYear, 'Forecast');
                         sLY += getImportedValue(pkg.name, (selectedYear || 0) - 1, 'Real');
+                    } else {
+                        sBudget += getImportedValue(pkg.name, selectedYear, 'Budget', sub.cr);
+                        sPrevia += getImportedValue(pkg.name, selectedYear, 'Previa', sub.cr) + getImportedValue(pkg.name, selectedYear, 'Real', sub.cr);
+                        sReal += getImportedValue(pkg.name, selectedYear, 'Forecast', sub.cr);
+                        sLY += getImportedValue(pkg.name, (selectedYear || 0) - 1, 'Real', sub.cr);
                     }
 
                     rows.push(generateRow(`p-drill-${pkg.id}-${sub.label}`, '', 'Account', subLabel, sBudget, sReal, sLY, sPrevia, false, false, 2, undefined, { method: 'Fixed' }));
