@@ -1,4 +1,4 @@
-import { Account, BudgetVersion, CostPackage, DreSection, ForecastConfig, ForecastOperator, ForecastRow, Hotel, ImportedRow, RealVersion, RevenueAccount, User, UserRole, ExpenseType, ExpenseDriver, CostCenter, GMDConfiguration, DrePackage } from '../types';
+import { Account, BudgetVersion, CostPackage, DreSection, ForecastConfig, ForecastOperator, ForecastRow, Hotel, ImportedRow, User, UserRole, ExpenseType, ExpenseDriver, CostCenter, GMDConfiguration, DrePackage } from '../types';
 
 // Helper for robust string matching (ignores accents, case, and plural suffix 's')
 export const normalizeAccountName = (str: string) => {
@@ -1242,6 +1242,12 @@ export const getDynamicForecastData = (
                 oP += getImportedValue('Provisoes gerais', selectedYear, 'Previa') + getImportedValue('Provisoes gerais', selectedYear, 'Real');
                 oF += getImportedValue('Provisoes gerais', selectedYear, 'Forecast');
                 oLY += getImportedValue('Provisoes gerais', (selectedYear || 0) - 1, 'Real');
+
+                // Fallback for direct import of "Outras provisões"
+                oB += getImportedValue('Outras provisões', selectedYear, 'Budget');
+                oP += getImportedValue('Outras provisões', selectedYear, 'Previa') + getImportedValue('Outras provisões', selectedYear, 'Real');
+                oF += getImportedValue('Outras provisões', selectedYear, 'Forecast');
+                oLY += getImportedValue('Outras provisões', (selectedYear || 0) - 1, 'Real');
 
                 pkgAccs.forEach(acc => {
                     if (acc.name.toLowerCase() === keyTemp.toLowerCase()) return;
