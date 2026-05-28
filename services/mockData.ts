@@ -1279,6 +1279,16 @@ export const getDynamicForecastData = (
                 oF += getImportedValue('Outras provisões', selectedYear, 'Forecast');
                 oLY += getImportedValue('Outras provisões', (selectedYear || 0) - 1, 'Real');
 
+                pkgAccs.forEach(acc => {
+                    if (acc.name.toLowerCase() === keyTemp.toLowerCase()) return;
+                    if (acc.name.toLowerCase() === 'provisoes gerais') return;
+
+                    oB += getImportedValue(acc.name, selectedYear, 'Budget');
+                    oP += getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real');
+                    oF += getImportedValue(acc.name, selectedYear, 'Forecast');
+                    oLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
+                });
+
                 rows.push(generateRow(`p-drill-${pkg.id}-outras`, '', 'Account', 'Outras provisões', oB, oF, oLY, oP, false, false, 2, undefined, { method: 'Fixed' }));
                 return; // Skip normal accounts
             }

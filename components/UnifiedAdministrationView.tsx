@@ -5484,15 +5484,15 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                         <button
                           onClick={() => updateAccountField(rowLabel, 'expenseType', 'Fixo')}
                           className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg border transition-all ${!isVariable
-                              ? 'bg-slate-700 text-white border-slate-700 shadow-sm'
-                              : 'bg-white text-slate-400 border-slate-200 hover:border-slate-400'
+                            ? 'bg-slate-700 text-white border-slate-700 shadow-sm'
+                            : 'bg-white text-slate-400 border-slate-200 hover:border-slate-400'
                             }`}
                         >Fixo</button>
                         <button
                           onClick={() => updateAccountField(rowLabel, 'expenseType', 'Variável')}
                           className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg border transition-all ${isVariable
-                              ? 'bg-orange-500 text-white border-orange-500 shadow-sm shadow-orange-100'
-                              : 'bg-white text-slate-400 border-slate-200 hover:border-orange-300 hover:text-orange-500'
+                            ? 'bg-orange-500 text-white border-orange-500 shadow-sm shadow-orange-100'
+                            : 'bg-white text-slate-400 border-slate-200 hover:border-orange-300 hover:text-orange-500'
                             }`}
                         >Variável</button>
                       </div>
