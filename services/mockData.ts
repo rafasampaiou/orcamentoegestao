@@ -593,6 +593,24 @@ export const getForecastData = (
                     dataIndex.set(keyClass, (dataIndex.get(keyClass) || 0) + val);
                 }
             }
+
+            // 8. Index by 'pacoteMaster' if it exists (for Impostos and others)
+            if (row.pacoteMaster) {
+                const normPacoteMaster = normalizeAccountName(row.pacoteMaster);
+                if (normPacoteMaster && normPacoteMaster !== normConta && normPacoteMaster !== normalizeAccountName(row.classificacao || '')) {
+                    const keyPacoteMaster = `${rYear}|${rMonth}|${normHotel}|${normScenario}|${normPacoteMaster}`;
+                    dataIndex.set(keyPacoteMaster, (dataIndex.get(keyPacoteMaster) || 0) + val);
+                }
+            }
+
+            // 9. Index by 'pacote' if it exists
+            if (row.pacote) {
+                const normPacote = normalizeAccountName(row.pacote);
+                if (normPacote && normPacote !== normConta && normPacote !== normalizeAccountName(row.classificacao || '') && normPacote !== normalizeAccountName(row.pacoteMaster || '')) {
+                    const keyPacote = `${rYear}|${rMonth}|${normHotel}|${normScenario}|${normPacote}`;
+                    dataIndex.set(keyPacote, (dataIndex.get(keyPacote) || 0) + val);
+                }
+            }
         });
     }
 
@@ -764,7 +782,7 @@ export const getForecastData = (
     const valPreviaImp = getPreviaOrReal('Impostos', selectedYear);
     const valRealImp = 0;
     const valLYImp = getImportedValue('Impostos', (selectedYear || 0) - 1, 'Real');
-    rows.push(generateRow('REV-IMP', '1.05', 'Revenue', 'Impostos', valBudgetImp, valRealImp, valLYImp, valPreviaImp, false, false, 0));
+    rows.push(generateRow('REV-IMP', '1.05', 'Revenue', 'IMPOSTOS', valBudgetImp, valRealImp, valLYImp, valPreviaImp, true, true, 0));
 
     rows.push(generateRow('SPACER-AFTER-IMP', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
 
