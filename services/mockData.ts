@@ -867,10 +867,12 @@ export const getForecastData = (
                     
                     // Fallback for exact string imported
                     const subLabel = `Processamento de dados e TI (${sub.label})`;
-                    subBudget += getImportedValue(subLabel, selectedYear, 'Budget');
-                    subPrevia += getImportedValue(subLabel, selectedYear, 'Previa') + getImportedValue(subLabel, selectedYear, 'Real');
-                    subReal += getImportedValue(subLabel, selectedYear, 'Forecast');
-                    subLY += getImportedValue(subLabel, (selectedYear || 0) - 1, 'Real');
+                    if (subBudget === 0 && subPrevia === 0 && subReal === 0 && subLY === 0) {
+                        subBudget += getImportedValue(subLabel, selectedYear, 'Budget');
+                        subPrevia += getImportedValue(subLabel, selectedYear, 'Previa') + getImportedValue(subLabel, selectedYear, 'Real');
+                        subReal += getImportedValue(subLabel, selectedYear, 'Forecast');
+                        subLY += getImportedValue(subLabel, (selectedYear || 0) - 1, 'Real');
+                    }
                     rows.push(generateRow(`p-drill-${masterName}-${pkgName}-${sub.label}`, pkgCode, 'Costs', subLabel, subBudget, subReal, subLY, subPrevia, false, false, 2, undefined, { method: 'Fixed' }));
                 });
             }
@@ -1191,10 +1193,12 @@ export const getDynamicForecastData = (
                         });
 
                         // Fallback for exact string imported
-                        accBudget += getImportedValue(subLabel, selectedYear, 'Budget');
-                        accPrevia += getImportedValue(subLabel, selectedYear, 'Previa') + getImportedValue(subLabel, selectedYear, 'Real');
-                        accReal += getImportedValue(subLabel, selectedYear, 'Forecast');
-                        accLY += getImportedValue(subLabel, (selectedYear || 0) - 1, 'Real');
+                        if (accBudget === 0 && accPrevia === 0 && accReal === 0 && accLY === 0) {
+                            accBudget += getImportedValue(subLabel, selectedYear, 'Budget');
+                            accPrevia += getImportedValue(subLabel, selectedYear, 'Previa') + getImportedValue(subLabel, selectedYear, 'Real');
+                            accReal += getImportedValue(subLabel, selectedYear, 'Forecast');
+                            accLY += getImportedValue(subLabel, (selectedYear || 0) - 1, 'Real');
+                        }
 
                         rows.push(generateRow(`p-drill-${pkg.id}-${sub.label}`, '', 'Account', subLabel, accBudget, accReal, accLY, accPrevia, false, false, 2, undefined, { method: 'Fixed' }));
                     });
