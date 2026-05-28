@@ -632,6 +632,12 @@ export const getForecastData = (
         return total;
     };
 
+    const getPreviaOrReal = (accountName: string, targetYear: number | undefined, crFilter?: string) => {
+        const r = getImportedValue(accountName, targetYear, 'Real', crFilter);
+        const p = getImportedValue(accountName, targetYear, 'Previa', crFilter);
+        return r !== 0 ? r : p;
+    };
+
     // --- Helper to get Real Occupancy Overrides ---
     const getRealOccValue = (rowId: string) => {
         const contextKey = `${selectedHotelName}_${selectedYear}_${selectedMonth}`;
@@ -713,8 +719,7 @@ export const getForecastData = (
         const namesToTry = item.importNames || [item.label];
         namesToTry.forEach(name => {
             valBudget += getImportedValue(name, selectedYear, 'Budget', crFilter);
-            valPrevia += getImportedValue(name, selectedYear, 'Previa', crFilter);
-            valPrevia += getImportedValue(name, selectedYear, 'Real', crFilter); // Actuals go to Previa
+            valPrevia += getPreviaOrReal(name, selectedYear, crFilter);
             valReal += 0; // Forecast column starts empty
             valLY += getImportedValue(name, (selectedYear || 0) - 1, 'Real', crFilter);
         });
@@ -732,7 +737,7 @@ export const getForecastData = (
 
     revExtraItems.forEach(item => {
         const valBudget = getImportedValue(item.label, selectedYear, 'Budget');
-        const valPrevia = getImportedValue(item.label, selectedYear, 'Previa') + getImportedValue(item.label, selectedYear, 'Real');
+        const valPrevia = getPreviaOrReal(item.label, selectedYear);
         const valReal = 0; // Empty Forecast
         const valLY = getImportedValue(item.label, (selectedYear || 0) - 1, 'Real');
         rows.push(generateRow(item.id, item.code, 'Revenue', item.label, valBudget, valReal, valLY, valPrevia, false, false, 2));
@@ -740,14 +745,14 @@ export const getForecastData = (
 
     // 1.03 Cancelamento de Time Share
     const valBudgetTS = getImportedValue('Cancelamento de Time Share', selectedYear, 'Budget');
-    const valPreviaTS = getImportedValue('Cancelamento de Time Share', selectedYear, 'Previa') + getImportedValue('Cancelamento de Time Share', selectedYear, 'Real');
+    const valPreviaTS = getPreviaOrReal('Cancelamento de Time Share', selectedYear);
     const valRealTS = 0;
     const valLYTS = getImportedValue('Cancelamento de Time Share', (selectedYear || 0) - 1, 'Real');
     rows.push(generateRow('REV-TIME', '1.03', 'Revenue', 'Cancelamento de Time Share', valBudgetTS, valRealTS, valLYTS, valPreviaTS, false, false, 1));
 
     // 1.04 Receita de ISS
     const valBudgetISS = getImportedValue('Receita de ISS', selectedYear, 'Budget');
-    const valPreviaISS = getImportedValue('Receita de ISS', selectedYear, 'Previa') + getImportedValue('Receita de ISS', selectedYear, 'Real');
+    const valPreviaISS = getPreviaOrReal('Receita de ISS', selectedYear);
     const valRealISS = 0;
     const valLYISS = getImportedValue('Receita de ISS', (selectedYear || 0) - 1, 'Real');
     rows.push(generateRow('REV-ISS', '1.04', 'Revenue', 'Receita de ISS', valBudgetISS, valRealISS, valLYISS, valPreviaISS, false, false, 1));
@@ -756,7 +761,7 @@ export const getForecastData = (
 
     // 1.05 Impostos (Azul conforme Receita Líquida, recuo zero)
     const valBudgetImp = getImportedValue('Impostos', selectedYear, 'Budget');
-    const valPreviaImp = getImportedValue('Impostos', selectedYear, 'Previa') + getImportedValue('Impostos', selectedYear, 'Real');
+    const valPreviaImp = getPreviaOrReal('Impostos', selectedYear);
     const valRealImp = 0;
     const valLYImp = getImportedValue('Impostos', (selectedYear || 0) - 1, 'Real');
     rows.push(generateRow('REV-IMP', '1.05', 'Revenue', 'Impostos', valBudgetImp, valRealImp, valLYImp, valPreviaImp, false, false, 0));
@@ -806,13 +811,13 @@ export const getForecastData = (
             // STANDARD PACKAGE - Aggregate values directly
             pkgAccs.forEach(acc => {
                 pkgBudget += getImportedValue(acc.name, selectedYear, 'Budget');
-                pkgPrevia += getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real');
+                pkgPrevia += getPreviaOrReal(acc.name, selectedYear);
                 pkgReal += getImportedValue(acc.name, selectedYear, 'Forecast');
                 pkgLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
             });
             // Fallback: Also check if there's a value directly for the Package name (simplified import)
             pkgBudget += getImportedValue(pkgName, selectedYear, 'Budget');
-            pkgPrevia += getImportedValue(pkgName, selectedYear, 'Previa') + getImportedValue(pkgName, selectedYear, 'Real');
+            pkgPrevia += getPreviaOrReal(pkgName, selectedYear);
             pkgReal += getImportedValue(pkgName, selectedYear, 'Forecast');
             pkgLY += getImportedValue(pkgName, (selectedYear || 0) - 1, 'Real');
 
@@ -827,14 +832,14 @@ export const getForecastData = (
             pkgAccs.forEach(acc => {
                 if (acc.name.toLowerCase().includes(tiAccountKeyword)) return;
                 genBudget += getImportedValue(acc.name, selectedYear, 'Budget');
-                genPrevia += getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real');
+                genPrevia += getPreviaOrReal(acc.name, selectedYear);
                 genReal += getImportedValue(acc.name, selectedYear, 'Forecast');
                 genLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
             });
             
             // Fallback for explicit import
             genBudget += getImportedValue('Despesas administrativas gerais', selectedYear, 'Budget');
-            genPrevia += getImportedValue('Despesas administrativas gerais', selectedYear, 'Previa') + getImportedValue('Despesas administrativas gerais', selectedYear, 'Real');
+            genPrevia += getPreviaOrReal('Despesas administrativas gerais', selectedYear);
             genReal += getImportedValue('Despesas administrativas gerais', selectedYear, 'Forecast');
             genLY += getImportedValue('Despesas administrativas gerais', (selectedYear || 0) - 1, 'Real');
             rows.push(generateRow(`p-drill-${masterName}-${pkgName}-gerais`, pkgCode, 'Costs', 'Despesas administrativas gerais', genBudget, genReal, genLY, genPrevia, false, false, 2, undefined, { method: 'Fixed' }));
@@ -850,14 +855,14 @@ export const getForecastData = (
                     let subBudget = 0; let subPrevia = 0; let subReal = 0; let subLY = 0;
                     tiAccs.forEach(tiAcc => {
                         let sB = getImportedValue(tiAcc.name, selectedYear, 'Budget', sub.cr);
-                        let sP = getImportedValue(tiAcc.name, selectedYear, 'Previa', sub.cr) + getImportedValue(tiAcc.name, selectedYear, 'Real', sub.cr);
+                        let sP = getPreviaOrReal(tiAcc.name, selectedYear, sub.cr);
                         let sR = getImportedValue(tiAcc.name, selectedYear, 'Forecast', sub.cr);
                         let sLY = getImportedValue(tiAcc.name, (selectedYear || 0) - 1, 'Real', sub.cr);
 
                         // Fallback for "Tech" if "martech" CR is empty - try "ti"
                         if (sub.label === 'TI' && sB === 0 && sP === 0 && sR === 0) {
                             sB = getImportedValue(tiAcc.name, selectedYear, 'Budget', 'ti');
-                            sP = getImportedValue(tiAcc.name, selectedYear, 'Previa', 'ti') + getImportedValue(tiAcc.name, selectedYear, 'Real', 'ti');
+                            sP = getPreviaOrReal(tiAcc.name, selectedYear, 'ti');
                             sR = getImportedValue(tiAcc.name, selectedYear, 'Forecast', 'ti');
                             sLY = getImportedValue(tiAcc.name, (selectedYear || 0) - 1, 'Real', 'ti');
                         }
@@ -869,7 +874,7 @@ export const getForecastData = (
                     const subLabel = `Processamento de dados e TI (${sub.label})`;
                     if (subBudget === 0 && subPrevia === 0 && subReal === 0 && subLY === 0) {
                         subBudget += getImportedValue(subLabel, selectedYear, 'Budget');
-                        subPrevia += getImportedValue(subLabel, selectedYear, 'Previa') + getImportedValue(subLabel, selectedYear, 'Real');
+                        subPrevia += getPreviaOrReal(subLabel, selectedYear);
                         subReal += getImportedValue(subLabel, selectedYear, 'Forecast');
                         subLY += getImportedValue(subLabel, (selectedYear || 0) - 1, 'Real');
                     }
@@ -888,12 +893,12 @@ export const getForecastData = (
                 let subBudget = 0; let subReal = 0; let subPrevia = 0; let subLY = 0;
                 pkgAccs.forEach(acc => {
                     subBudget += getImportedValue(acc.name, selectedYear, 'Budget', sub.cr);
-                    subPrevia += getImportedValue(acc.name, selectedYear, 'Previa', sub.cr) + getImportedValue(acc.name, selectedYear, 'Real', sub.cr);
+                    subPrevia += getPreviaOrReal(acc.name, selectedYear, sub.cr);
                     subReal += getImportedValue(acc.name, selectedYear, 'Forecast', sub.cr);
                     subLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real', sub.cr);
                 });
                 subBudget += getImportedValue(pkgName, selectedYear, 'Budget', sub.cr);
-                subPrevia += getImportedValue(pkgName, selectedYear, 'Previa', sub.cr) + getImportedValue(pkgName, selectedYear, 'Real', sub.cr);
+                subPrevia += getPreviaOrReal(pkgName, selectedYear, sub.cr);
                 subReal += getImportedValue(pkgName, selectedYear, 'Forecast', sub.cr);
                 subLY += getImportedValue(pkgName, (selectedYear || 0) - 1, 'Real', sub.cr);
 
@@ -908,7 +913,7 @@ export const getForecastData = (
             ];
             subAreas.forEach(sub => {
                 const b = getImportedValue(sub.name, selectedYear, 'Budget');
-                const p = getImportedValue(sub.name, selectedYear, 'Previa') + getImportedValue(sub.name, selectedYear, 'Real');
+                const p = getPreviaOrReal(sub.name, selectedYear);
                 const f = getImportedValue(sub.name, selectedYear, 'Forecast');
                 const ly = getImportedValue(sub.name, (selectedYear || 0) - 1, 'Real');
                 rows.push(generateRow(`p-drill-${masterName}-${pkgName}-${sub.name}`, pkgCode, 'Costs', sub.label, b, f, ly, p, false, false, 2, undefined, { method: 'Fixed' }));
@@ -917,7 +922,7 @@ export const getForecastData = (
             rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', 'Provisões Gerais', 0, 0, 0, 0, true, false, 1));
             const keyTemp = 'Provisao de servicos de terceiros temporarios';
             const tB = getImportedValue(keyTemp, selectedYear, 'Budget');
-            const tP = getImportedValue(keyTemp, selectedYear, 'Previa') + getImportedValue(keyTemp, selectedYear, 'Real');
+            const tP = getPreviaOrReal(keyTemp, selectedYear);
             const tF = getImportedValue(keyTemp, selectedYear, 'Forecast');
             const tLY = getImportedValue(keyTemp, (selectedYear || 0) - 1, 'Real');
 
@@ -929,7 +934,7 @@ export const getForecastData = (
 
             // Fallback for direct import of "Outras provisões"
             oB += getImportedValue('Outras provisões', selectedYear, 'Budget');
-            oP += getImportedValue('Outras provisões', selectedYear, 'Previa') + getImportedValue('Outras provisões', selectedYear, 'Real');
+            oP += getPreviaOrReal('Outras provisões', selectedYear);
             oF += getImportedValue('Outras provisões', selectedYear, 'Forecast');
             oLY += getImportedValue('Outras provisões', (selectedYear || 0) - 1, 'Real');
 
@@ -938,7 +943,7 @@ export const getForecastData = (
                 if (acc.name.toLowerCase() === 'provisoes gerais') return;
 
                 oB += getImportedValue(acc.name, selectedYear, 'Budget');
-                oP += getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real');
+                oP += getPreviaOrReal(acc.name, selectedYear);
                 oF += getImportedValue(acc.name, selectedYear, 'Forecast');
                 oLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
             });
@@ -1111,7 +1116,7 @@ export const getDynamicForecastData = (
             }
 
             const valBudget = getImportedValue(pkg.name, selectedYear, 'Budget');
-            const valPrevia = getImportedValue(pkg.name, selectedYear, 'Previa') + getImportedValue(pkg.name, selectedYear, 'Real'); // Actuals to Previa
+            const valPrevia = getPreviaOrReal(pkg.name, selectedYear); // Actuals to Previa
             const valReal = getImportedValue(pkg.name, selectedYear, 'Forecast'); // Forecast
 
             const valLY = getImportedValue(pkg.name, (selectedYear || 0) - 1, 'Real');
@@ -1146,14 +1151,14 @@ export const getDynamicForecastData = (
                 pkgAccs.forEach(acc => {
                     if (acc.name.toLowerCase().includes(tiAccountKeyword)) return;
                     genBudget += getImportedValue(acc.name, selectedYear, 'Budget');
-                    genPrevia += getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real');
+                    genPrevia += getPreviaOrReal(acc.name, selectedYear);
                     genReal += getImportedValue(acc.name, selectedYear, 'Forecast');
                     genLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
                 });
 
                 // Fallback for explicit import
                 genBudget += getImportedValue('Despesas administrativas gerais', selectedYear, 'Budget');
-                genPrevia += getImportedValue('Despesas administrativas gerais', selectedYear, 'Previa') + getImportedValue('Despesas administrativas gerais', selectedYear, 'Real');
+                genPrevia += getPreviaOrReal('Despesas administrativas gerais', selectedYear);
                 genReal += getImportedValue('Despesas administrativas gerais', selectedYear, 'Forecast');
                 genLY += getImportedValue('Despesas administrativas gerais', (selectedYear || 0) - 1, 'Real');
                 rows.push(generateRow(`p-drill-${pkg.id}-gerais`, '', 'Account', 'Despesas administrativas gerais', genBudget, genReal, genLY, genPrevia, false, false, 2, undefined, { method: 'Fixed' }));
@@ -1187,7 +1192,7 @@ export const getDynamicForecastData = (
                             }
 
                             accBudget += b;
-                            accPrevia += (p + r);
+                            accPrevia += (r !== 0 ? r : p);
                             accReal += f;
                             accLY += ly;
                         });
@@ -1195,7 +1200,7 @@ export const getDynamicForecastData = (
                         // Fallback for exact string imported
                         if (accBudget === 0 && accPrevia === 0 && accReal === 0 && accLY === 0) {
                             accBudget += getImportedValue(subLabel, selectedYear, 'Budget');
-                            accPrevia += getImportedValue(subLabel, selectedYear, 'Previa') + getImportedValue(subLabel, selectedYear, 'Real');
+                            accPrevia += getPreviaOrReal(subLabel, selectedYear);
                             accReal += getImportedValue(subLabel, selectedYear, 'Forecast');
                             accLY += getImportedValue(subLabel, (selectedYear || 0) - 1, 'Real');
                         }
@@ -1230,20 +1235,20 @@ export const getDynamicForecastData = (
                             const ly = getImportedValue(mktAcc.name, (selectedYear || 0) - 1, 'Real', sub.cr);
 
                             sBudget += b;
-                            sPrevia += (p + r);
+                            sPrevia += (r !== 0 ? r : p);
                             sReal += f;
                             sLY += ly;
                         });
                     }
 
                     sBudget += getImportedValue(pkg.name, selectedYear, 'Budget', sub.cr);
-                    sPrevia += getImportedValue(pkg.name, selectedYear, 'Previa', sub.cr) + getImportedValue(pkg.name, selectedYear, 'Real', sub.cr);
+                    sPrevia += getPreviaOrReal(pkg.name, selectedYear, sub.cr);
                     sReal += getImportedValue(pkg.name, selectedYear, 'Forecast', sub.cr);
                     sLY += getImportedValue(pkg.name, (selectedYear || 0) - 1, 'Real', sub.cr);
 
                     // Fallback for explicit name
                     sBudget += getImportedValue(sub.label, selectedYear, 'Budget');
-                    sPrevia += getImportedValue(sub.label, selectedYear, 'Previa') + getImportedValue(sub.label, selectedYear, 'Real');
+                    sPrevia += getPreviaOrReal(sub.label, selectedYear);
                     sReal += getImportedValue(sub.label, selectedYear, 'Forecast');
                     sLY += getImportedValue(sub.label, (selectedYear || 0) - 1, 'Real');
 
@@ -1262,7 +1267,7 @@ export const getDynamicForecastData = (
 
                 subAreas.forEach(sub => {
                     const b = getImportedValue(sub.name, selectedYear, 'Budget');
-                    const p = getImportedValue(sub.name, selectedYear, 'Previa') + getImportedValue(sub.name, selectedYear, 'Real');
+                    const p = getPreviaOrReal(sub.name, selectedYear);
                     const f = getImportedValue(sub.name, selectedYear, 'Forecast');
                     const ly = getImportedValue(sub.name, (selectedYear || 0) - 1, 'Real');
                     rows.push(generateRow(`p-drill-${pkg.id}-${sub.name}`, '', 'Account', sub.label, b, f, ly, p, false, false, 2, undefined, { method: 'Fixed' }));
@@ -1274,7 +1279,7 @@ export const getDynamicForecastData = (
                 // --- SPECIAL CASE: PROVISOES GERAIS ---
                 const keyTemp = 'Provisao de servicos de terceiros temporarios';
                 const tB = getImportedValue(keyTemp, selectedYear, 'Budget');
-                const tP = getImportedValue(keyTemp, selectedYear, 'Previa') + getImportedValue(keyTemp, selectedYear, 'Real');
+                const tP = getPreviaOrReal(keyTemp, selectedYear);
                 const tF = getImportedValue(keyTemp, selectedYear, 'Forecast');
                 const tLY = getImportedValue(keyTemp, (selectedYear || 0) - 1, 'Real');
 
@@ -1286,7 +1291,7 @@ export const getDynamicForecastData = (
 
                 // Fallback for direct import of "Outras provisões"
                 oB += getImportedValue('Outras provisões', selectedYear, 'Budget');
-                oP += getImportedValue('Outras provisões', selectedYear, 'Previa') + getImportedValue('Outras provisões', selectedYear, 'Real');
+                oP += getPreviaOrReal('Outras provisões', selectedYear);
                 oF += getImportedValue('Outras provisões', selectedYear, 'Forecast');
                 oLY += getImportedValue('Outras provisões', (selectedYear || 0) - 1, 'Real');
 
@@ -1295,7 +1300,7 @@ export const getDynamicForecastData = (
                     if (acc.name.toLowerCase() === 'provisoes gerais') return;
 
                     oB += getImportedValue(acc.name, selectedYear, 'Budget');
-                    oP += getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real');
+                    oP += getPreviaOrReal(acc.name, selectedYear);
                     oF += getImportedValue(acc.name, selectedYear, 'Forecast');
                     oLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
                 });
@@ -1306,7 +1311,7 @@ export const getDynamicForecastData = (
 
             pkgAccs.forEach(acc => {
                 const accBudget = getImportedValue(acc.name, selectedYear, 'Budget');
-                const accPrevia = getImportedValue(acc.name, selectedYear, 'Previa') + getImportedValue(acc.name, selectedYear, 'Real');
+                const accPrevia = getPreviaOrReal(acc.name, selectedYear);
                 const accReal = getImportedValue(acc.name, selectedYear, 'Forecast');
                 const accLY = getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
 
