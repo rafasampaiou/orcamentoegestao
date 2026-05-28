@@ -831,12 +831,18 @@ export const getForecastData = (
                 genReal += getImportedValue(acc.name, selectedYear, 'Forecast');
                 genLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
             });
+            
+            // Fallback for explicit import
+            genBudget += getImportedValue('Despesas administrativas gerais', selectedYear, 'Budget');
+            genPrevia += getImportedValue('Despesas administrativas gerais', selectedYear, 'Previa') + getImportedValue('Despesas administrativas gerais', selectedYear, 'Real');
+            genReal += getImportedValue('Despesas administrativas gerais', selectedYear, 'Forecast');
+            genLY += getImportedValue('Despesas administrativas gerais', (selectedYear || 0) - 1, 'Real');
             rows.push(generateRow(`p-drill-${masterName}-${pkgName}-gerais`, pkgCode, 'Costs', 'Despesas administrativas gerais', genBudget, genReal, genLY, genPrevia, false, false, 2, undefined, { method: 'Fixed' }));
 
             const subAreas = [
-                { label: 'TI', cr: 'martech' },
-                { label: 'Martech', cr: 'marketing' },
-                { label: 'Outros setores', cr: 'outros' }
+                { label: 'TI', cr: 'ti' },
+                { label: 'Martech', cr: 'martech' },
+                { label: 'Outros', cr: 'outros' }
             ];
             const tiAccs = pkgAccs.filter(acc => acc.name.toLowerCase().includes(tiAccountKeyword));
             if (tiAccs.length > 0) {
@@ -858,7 +864,14 @@ export const getForecastData = (
 
                         subBudget += sB; subPrevia += sP; subReal += sR; subLY += sLY;
                     });
-                    rows.push(generateRow(`p-drill-${masterName}-${pkgName}-${sub.label}`, pkgCode, 'Costs', `Processamentos de dados e TI (${sub.label})`, subBudget, subReal, subLY, subPrevia, false, false, 2, undefined, { method: 'Fixed' }));
+                    
+                    // Fallback for exact string imported
+                    const subLabel = `Processamento de dados e TI (${sub.label})`;
+                    subBudget += getImportedValue(subLabel, selectedYear, 'Budget');
+                    subPrevia += getImportedValue(subLabel, selectedYear, 'Previa') + getImportedValue(subLabel, selectedYear, 'Real');
+                    subReal += getImportedValue(subLabel, selectedYear, 'Forecast');
+                    subLY += getImportedValue(subLabel, (selectedYear || 0) - 1, 'Real');
+                    rows.push(generateRow(`p-drill-${masterName}-${pkgName}-${sub.label}`, pkgCode, 'Costs', subLabel, subBudget, subReal, subLY, subPrevia, false, false, 2, undefined, { method: 'Fixed' }));
                 });
             }
         } else if (isSalesMkt) {
@@ -1147,8 +1160,8 @@ export const getDynamicForecastData = (
                 const tiAccounts = pkgAccs.filter(acc => acc.name.toLowerCase().includes(tiAccountKeyword));
                 if (tiAccounts.length > 0) {
                     const subAreas = [
-                        { label: 'TI', cr: 'martech' },
-                        { label: 'Martech', cr: 'marketing' },
+                        { label: 'TI', cr: 'ti' },
+                        { label: 'Martech', cr: 'martech' },
                         { label: 'Outros', cr: 'outros' }
                     ];
                     subAreas.forEach(sub => {
