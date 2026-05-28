@@ -609,7 +609,7 @@ export const getForecastData = (
         else targetScenario = 'FORECAST';
 
         const keysToCheck = new Set<string>();
-        const hotelsToTry = [selectedHotelName, activeHotelCode].filter(Boolean) as string[];
+        const hotelsToTry = Array.from(new Set([selectedHotelName, activeHotelCode].filter(Boolean) as string[]));
 
         hotelsToTry.forEach(h => {
             const baseKey = `${targetYear}|${selectedMonth}|${h.trim().toUpperCase()}|${targetScenario}|${targetName}`;
@@ -1066,7 +1066,7 @@ export const getDynamicForecastData = (
         else if (valueCategory === 'Budget') targetScenario = 'BUDGET';
         else if (valueCategory === 'Previa') targetScenario = 'PREVIA';
         else targetScenario = 'FORECAST';
-        const hotelsToTry = [selectedHotelName, activeHotelCode].filter(Boolean) as string[];
+        const hotelsToTry = Array.from(new Set([selectedHotelName, activeHotelCode].filter(Boolean) as string[]));
         let total = 0;
         hotelsToTry.forEach(h => {
             const baseKey = `${targetYear}|${selectedMonth}|${h.trim().toUpperCase()}|${targetScenario}|${targetName}`;

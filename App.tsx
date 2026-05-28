@@ -386,6 +386,7 @@ const App: React.FC = () => {
             pacoteMaster: r.master_package || '',
             diretoria: r.directorate || '',
             versionId: r.version_id || '',
+            importId: r.import_id || '',
             status: 'valid' as const,
           }));
           setImportedFinancialData(mapped);
@@ -430,6 +431,10 @@ const App: React.FC = () => {
         return [...preservedData, ...newData];
       }
     });
+  };
+
+  const handleDeleteImport = (id: string) => {
+    setImportedFinancialData(prevData => prevData.filter(row => row.importId !== id));
   };
 
   const handleMonthChange = (direction: 'prev' | 'next') => {
@@ -909,6 +914,7 @@ const App: React.FC = () => {
             setCurrentView={setCurrentView}
             onToggleMonthClosure={handleToggleMonthClosure}
             onImportData={handleImportData}
+            onDeleteImport={handleDeleteImport}
             budgetVersions={budgetVersions}
             setBudgetVersions={setBudgetVersions}
             activeBudgetVersionId={activeBudgetVersionId}

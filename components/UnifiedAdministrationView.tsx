@@ -308,6 +308,7 @@ type ModalType = 'user' | 'hotel' | 'costCenter' | 'package' | 'account' | 'gmd'
 
 interface UnifiedAdministrationViewProps {
   onImportData?: (data: ImportedRow[], mode: 'append' | 'replace') => void;
+  onDeleteImport?: (id: string) => void;
 
   // Props for Data Persistence (Passed from App)
   users: User[]; setUsers: React.Dispatch<React.SetStateAction<User[]>>;
@@ -358,6 +359,7 @@ interface UnifiedAdministrationViewProps {
 
 const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   onImportData,
+  onDeleteImport,
   users, setUsers,
   hotels, setHotels,
   costCenters, setCostCenters,
@@ -544,6 +546,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         console.log(`[DEBUG] Estado atualizado. Removido ID ${id}. Antes: ${prev.length}, Depois: ${next.length}`);
         return next;
       });
+      if (onDeleteImport) {
+        onDeleteImport(id);
+      }
       toast.success('Importação excluída com sucesso.');
     } catch (e: any) {
       console.error('[DEBUG] Catch em handleDeleteImportHistory. Erro completo:', e);

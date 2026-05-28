@@ -294,6 +294,7 @@ export interface ImportedRow {
     msg?: string;
     originalLine?: number;
     versionId?: string;
+    importId?: string;
     
     // New fields for the 12-column format
     escopo?: string; // Escopo ou Fora
