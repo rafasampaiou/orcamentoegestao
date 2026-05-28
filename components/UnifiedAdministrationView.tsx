@@ -729,6 +729,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
   // New Structured Import State
   const [importCategory, setImportCategory] = useState<'financial' | 'occupancy' | 'revenue' | 'taxes' | 'expenses'>('financial');
+  const [importProjectionType, setImportProjectionType] = useState<import('../types').ProjectionType>('Reunião de Ritmo');
   const [expenseImportMode, setExpenseImportMode] = useState<'forecast' | 'detailed'>('forecast');
   const [importHotelId, setImportHotelId] = useState<string>('');
   const [importTargetYear, setImportTargetYear] = useState<number>(new Date().getFullYear());
@@ -2284,6 +2285,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         // SMART REPLACE: Delete existing data for the same contexts (Hotel+Year+Month+Scenario+Version)
         const contexts = new Set<string>();
         finalData.forEach(row => {
+          if (row.cenario.toUpperCase() === 'REAL') row.cenario = 'PREVIA';
           const key = `${row.hotel}|${row.ano}|${row.mes}|${row.cenario}|${row.versionId || ''}`;
           contexts.add(key);
         });
@@ -2698,7 +2700,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     const versionId = scenario === 'BUDGET'
       ? (targetBudgetVersionId || activeBudgetVersionId)
       : (targetRealVersionId || activeRealVersionId);
-    const cenario = scenario === 'BUDGET' ? 'BUDGET' : 'REAL';
+    const cenario = scenario === 'BUDGET' ? 'BUDGET' : 'PREVIA';
 
     Object.entries(dataToUse).forEach(([hotelName, months]) => {
       Object.entries(months).forEach(([month, value]) => {
@@ -2713,7 +2715,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
           ano: String(importYear),
           mes: month,
           hotel: hotelName,
-          tipo: 'Imposto',
+          tipo: scenario === 'BUDGET' ? 'Imposto' : `Imposto - ${importProjectionType}`,
           cenario,
           conta: 'Impostos',
           cr: "",
@@ -2808,7 +2810,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         ano: String(targetVersion.year),
         mes: "1-12",
         hotel: targetVersion.hotelId || "Múltiplas",
-        tipo: "Ocupação Detalhada",
+        tipo: scenario === 'BUDGET' ? "Ocupação Detalhada" : `Ocupação Detalhada - ${importProjectionType}`,
         cenario: scenario,
         conta: "Métricas de Ocupação",
         cr: "",
@@ -3751,6 +3753,23 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               >
                 <option value="">Selecione a versão de destino...</option>
                 {realVersions.map(v => <option key={v.id} value={v.id}>{v.name} - {v.hotel} ({v.year})</option>)}
+              </select>
+
+              <div className="h-8 w-px bg-gray-300 mx-2"></div>
+              
+              <div className="flex items-center gap-2">
+                <LayoutList size={16} className="text-indigo-600" />
+                <label className="text-sm font-bold text-gray-700">Tipo de Projeção:</label>
+              </div>
+              <select
+                value={importProjectionType}
+                onChange={e => setImportProjectionType(e.target.value as any)}
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[200px]"
+              >
+                <option value="Reunião de Ritmo">Reunião de Ritmo</option>
+                <option value="FCA N1">FCA N1</option>
+                <option value="FCA N2">FCA N2</option>
+                <option value="Fechamento oficial">Fechamento</option>
               </select>
             </div>
             <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
