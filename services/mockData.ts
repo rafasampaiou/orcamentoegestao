@@ -910,10 +910,7 @@ export const getForecastData = (
 
             let oB = 0; let oP = 0; let oF = 0; let oLY = 0;
 
-            oB += getImportedValue('Provisoes gerais', selectedYear, 'Budget');
-            oP += getImportedValue('Provisoes gerais', selectedYear, 'Previa') + getImportedValue('Provisoes gerais', selectedYear, 'Real');
-            oF += getImportedValue('Provisoes gerais', selectedYear, 'Forecast');
-            oLY += getImportedValue('Provisoes gerais', (selectedYear || 0) - 1, 'Real');
+
 
             // Fallback for direct import of "Outras provisões"
             oB += getImportedValue('Outras provisões', selectedYear, 'Budget');
@@ -1268,10 +1265,7 @@ export const getDynamicForecastData = (
 
                 let oB = 0; let oP = 0; let oF = 0; let oLY = 0;
 
-                oB += getImportedValue('Provisoes gerais', selectedYear, 'Budget');
-                oP += getImportedValue('Provisoes gerais', selectedYear, 'Previa') + getImportedValue('Provisoes gerais', selectedYear, 'Real');
-                oF += getImportedValue('Provisoes gerais', selectedYear, 'Forecast');
-                oLY += getImportedValue('Provisoes gerais', (selectedYear || 0) - 1, 'Real');
+
 
                 // Fallback for direct import of "Outras provisões"
                 oB += getImportedValue('Outras provisões', selectedYear, 'Budget');
