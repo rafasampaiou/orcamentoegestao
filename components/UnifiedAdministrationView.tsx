@@ -3773,12 +3773,22 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               </div>
             </div>
             <SpreadsheetTable
-              rows={hotels.map(h => h.name)}
+              rows={(() => {
+                const verId = targetRealVersionId || activeRealVersionId;
+                const ver = realVersions.find(v => v.id === verId);
+                const hotel = hotels.find(h => h.id === ver?.hotelId);
+                return hotel ? [hotel.name] : hotels.map(h => h.name);
+              })()}
               data={taxesImportData}
               onCellChange={(row, month, val) => setTaxesImportData(prev => ({ ...prev, [row]: { ...(prev[row] || {}), [month]: val } }))}
               onPaste={(row, month, pasted) => {
                 const newData = { ...taxesImportData };
-                const rowLabels = hotels.map(h => h.name);
+                const rowLabels = (() => {
+                  const verId = targetRealVersionId || activeRealVersionId;
+                  const ver = realVersions.find(v => v.id === verId);
+                  const hotel = hotels.find(h => h.id === ver?.hotelId);
+                  return hotel ? [hotel.name] : hotels.map(h => h.name);
+                })();
                 const startIdx = rowLabels.indexOf(row);
                 pasted.forEach((pRow, rOffset) => {
                   const targetRow = rowLabels[startIdx + rOffset];
@@ -4097,12 +4107,22 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
             </div>
           </div>
           <SpreadsheetTable
-            rows={hotels.map(h => h.name)}
+            rows={(() => {
+              const verId = targetBudgetVersionId || activeBudgetVersionId;
+              const ver = budgetVersions.find(v => v.id === verId);
+              const hotel = hotels.find(h => h.id === ver?.hotelId);
+              return hotel ? [hotel.name] : hotels.map(h => h.name);
+            })()}
             data={taxesBudgetData}
             onCellChange={(row, month, val) => setTaxesBudgetData(prev => ({ ...prev, [row]: { ...(prev[row] || {}), [month]: val } }))}
             onPaste={(row, month, pasted) => {
               const newData = { ...taxesBudgetData };
-              const rowLabels = hotels.map(h => h.name);
+              const rowLabels = (() => {
+                const verId = targetBudgetVersionId || activeBudgetVersionId;
+                const ver = budgetVersions.find(v => v.id === verId);
+                const hotel = hotels.find(h => h.id === ver?.hotelId);
+                return hotel ? [hotel.name] : hotels.map(h => h.name);
+              })();
               const startIdx = rowLabels.indexOf(row);
               pasted.forEach((pRow, rOffset) => {
                 const targetRow = rowLabels[startIdx + rOffset];
