@@ -1135,7 +1135,15 @@ export const getDynamicForecastData = (
             const startChildrenIndex = rows.length;
 
             // 3. Optional: Accounts within package
-            const pkgAccs = currentAccounts.filter(a => a.package === pkg.name || a.packageId === pkg.id);
+            // Deduplicate accounts by normalized name to prevent double-counting if the user has duplicate accounts in the DB
+            const uniqueAccsMap = new Map<string, Account>();
+            currentAccounts.filter(a => a.package === pkg.name || a.packageId === pkg.id).forEach(a => {
+                const normName = normalizeAccountName(a.name);
+                if (!uniqueAccsMap.has(normName)) {
+                    uniqueAccsMap.set(normName, a);
+                }
+            });
+            const pkgAccs = Array.from(uniqueAccsMap.values());
 
             const isAdminPkg = pkg.name.toUpperCase() === 'DESPESAS ADMINISTRATIVAS';
             const isSalesMktPkg = pkg.name.toUpperCase() === 'DESPESAS COM VENDAS E MARKETING';
