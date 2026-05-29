@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Settings2, ChevronUp, Save, Trash2, CheckCircle } from 'lucide-react';
 import { ColumnVisibility, ImportedRow, User, UserRole } from '../types';
+import { VersionInfoBanner } from './VersionInfoBanner';
 
 // --- Types ---
 interface OccupancyViewProps {
@@ -20,6 +21,8 @@ interface OccupancyViewProps {
     // Naming & type
     activeProjectionType?: import('../types').ProjectionType;
     setActiveProjectionType?: React.Dispatch<React.SetStateAction<import('../types').ProjectionType>>;
+    activeRealVersionId?: string;
+    activeRealVersionName?: string;
     currentUser?: User;
 }
 
@@ -349,6 +352,8 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
     financialData,
     activeProjectionType,
     setActiveProjectionType,
+    activeRealVersionId,
+    activeRealVersionName,
     currentUser
 }) => {
 
@@ -631,7 +636,7 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
 
     // --- Real View ---
     if (!isBudget) {
-        const contextKey = `${selectedHotel}_${selectedYear}_${selectedMonth}`;
+        const contextKey = `${selectedHotel}_${selectedYear}_${selectedMonth}_${activeRealVersionId || ''}`;
         const currentRealData = realOccupancyData?.[contextKey] || {};
 
         const handleRealUpdate = (rowId: string, col: 'forecast' | 'previa', value: number) => {
@@ -838,6 +843,7 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             <div className="p-8 w-full">
                 <div className="mb-6 flex justify-between items-center">
                     <div>
+                        <VersionInfoBanner versionName={activeRealVersionName} />
                         <div className="flex items-center gap-3">
                             <h2 className="text-2xl font-bold text-gray-900">Comparativo de ocupação</h2>
                             {!isBudget && (

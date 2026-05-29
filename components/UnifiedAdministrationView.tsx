@@ -1,10 +1,10 @@
-
 import React, { useState, useMemo, useRef } from 'react';
 import { getForecastData } from '../services/mockData';
 import { Plus, Trash2, X, Save, Briefcase, Pencil, Calendar, PieChart, Lock, LockOpen, Settings as SettingsIcon, Users, Search, Upload, Settings, Eye, FileText, Layout, Info, ChevronUp, GripVertical, Database, BedDouble, DollarSign, Target, LayoutList } from 'lucide-react';
 import { User, UserRole, CostCenter, ImportedRow, Hotel, Account, BudgetVersion, LaborParameters, ScheduleItem, ImportedCostCenter, CostPackage, GMDConfiguration, ViewState, DreSection, HotelCategory, HotelRegion, ImportedAccount } from '../types';
 import TimelineView from './TimelineView';
 import ReplicateBudgetModal, { ReplicationOptions } from './ReplicateBudgetModal';
+import { VersionInfoBanner } from './VersionInfoBanner';
 import { supabaseService } from '../services/supabaseService';
 import { supabaseTemp } from '../services/supabaseClient';
 import { toast } from 'react-hot-toast';
@@ -5635,6 +5635,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
   return (
     <div className="p-6 max-w-[98%] mx-auto">
+      <VersionInfoBanner versionName={activeRealVersionName} />
       {/* Breadcrumb + Page Title */}
       <div className="mb-6">
         <p className="text-[11px] font-bold text-indigo-400 uppercase tracking-widest mb-1">{vt.breadcrumb}</p>

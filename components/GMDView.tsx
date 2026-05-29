@@ -1,7 +1,7 @@
-
 import React, { useMemo, useState } from 'react';
 import { Network, ChevronRight, ChevronDown, Filter, AlertTriangle, CheckCircle, FileText, ClipboardList, ShieldCheck, ShieldAlert, Calendar, DollarSign, CheckSquare, Search, X, FileEdit, ExternalLink } from 'lucide-react';
 import { GMDConfiguration, Account, CostPackage, Hotel, ImportedRow, User, Justification, CostCenter, UserRole } from '../types';
+import { VersionInfoBanner } from './VersionInfoBanner';
 
 interface FilterCardProps {
     type: string;
@@ -47,6 +47,7 @@ interface GMDViewProps {
     selectedMonth: number;
     selectedYear: number;
     initialSelectedHotel: string;
+    activeRealVersionName?: string;
     currentUser?: User;
 }
 
@@ -56,7 +57,7 @@ const formatPercent = (val: number) => `${val.toFixed(1)}%`;
 
 const GMDView: React.FC<GMDViewProps> = ({ 
     gmdConfigs, accounts, packages, hotels, financialData, users, costCenters,
-    selectedMonth, selectedYear, initialSelectedHotel, currentUser 
+    selectedMonth, selectedYear, initialSelectedHotel, activeRealVersionName, currentUser 
 }) => {
   const [activeTab, setActiveTab] = useState<'monitor' | 'justifications'>('monitor');
   const [currentHotel, setCurrentHotel] = useState(initialSelectedHotel);
@@ -476,6 +477,8 @@ const GMDView: React.FC<GMDViewProps> = ({
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 h-full overflow-hidden flex flex-col font-sans relative">
        
+       <VersionInfoBanner versionName={activeRealVersionName} />
+
        {/* HEADER */}
        <div className="p-5 border-b border-gray-200 bg-gray-50 flex justify-between items-center shrink-0">
           <div>

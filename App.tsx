@@ -825,6 +825,7 @@ const App: React.FC = () => {
               realOccupancyData={realOccupancyData}
               budgetOccupancyData={budgetOccupancyDataMap[activeBudgetVersionId] || {}}
               activeRealVersionId={activeRealVersionId}
+              activeRealVersionName={activeRealVersionName}
               activeBudgetVersionId={activeBudgetVersionId}
               activeProjectionType={activeProjectionType}
               setActiveProjectionType={setActiveProjectionType}
@@ -847,6 +848,8 @@ const App: React.FC = () => {
           financialData={importedFinancialData}
           activeProjectionType={activeProjectionType}
           setActiveProjectionType={setActiveProjectionType}
+          activeRealVersionId={activeRealVersionId}
+          activeRealVersionName={activeRealVersionName}
           currentUser={currentUser}
         />
       );
@@ -857,10 +860,12 @@ const App: React.FC = () => {
           realOccupancyData={realOccupancyData}
           setRealOccupancyData={setRealOccupancyData}
           budgetData={budgetOccupancyDataMap[activeBudgetVersionId] || {}}
+          activeRealVersionId={activeRealVersionId}
+          activeRealVersionName={activeRealVersionName}
           currentUser={currentUser}
         />
       );
-      case 'comparatives': return <ComparativesView />;
+      case 'comparatives': return <ComparativesView activeRealVersionName={activeRealVersionName} />;
       case 'gmd': return (
         <GMDView
           gmdConfigs={gmdConfigs}
@@ -873,6 +878,7 @@ const App: React.FC = () => {
           selectedMonth={selectedDate.getMonth() + 1}
           selectedYear={selectedDate.getFullYear()}
           initialSelectedHotel={selectedHotel}
+          activeRealVersionName={activeRealVersionName}
           currentUser={currentUser}
         />
       );

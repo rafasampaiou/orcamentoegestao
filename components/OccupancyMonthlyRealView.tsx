@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Save, CheckCircle } from 'lucide-react';
 import { User, UserRole } from '../types';
 import { BudgetRow, BudgetOccupancyTable, geralRows, lazerRows, eventRows } from './OccupancyView';
+import { VersionInfoBanner } from './VersionInfoBanner';
 
 interface OccupancyMonthlyRealViewProps {
     selectedYear: number;
@@ -9,6 +10,8 @@ interface OccupancyMonthlyRealViewProps {
     realOccupancyData: Record<string, Record<string, number>>;
     setRealOccupancyData: React.Dispatch<React.SetStateAction<Record<string, Record<string, number>>>>;
     budgetData: Record<string, number[]>;
+    activeRealVersionId?: string;
+    activeRealVersionName?: string;
     currentUser?: User;
     onSaveOccupancy?: () => void;
 }
@@ -19,6 +22,8 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
     realOccupancyData,
     setRealOccupancyData,
     budgetData,
+    activeRealVersionId,
+    activeRealVersionName,
     currentUser,
     onSaveOccupancy
 }) => {
@@ -145,11 +150,19 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
             result[id] = Array(12).fill(0);
         });
         
+        const getDaysInMonth = (year: number, month: number) => new Date(year, month, 0).getDate();
+
         for (let i = 0; i < 12; i++) {
-            const contextKey = `${selectedHotel}_${selectedYear}_${i + 1}`;
+            const contextKey = `${selectedHotel}_${selectedYear}_${i + 1}_${activeRealVersionId || ''}`;
             const monthData = realOccupancyData?.[contextKey] || {};
             
             allRowIds.forEach(id => {
+                if (id === 'days_month') {
+                    // Preenchido automaticamente de acordo com a quantidade de dia de cada mês do ano
+                    result[id][i] = getDaysInMonth(selectedYear, i + 1);
+                    return;
+                }
+
                 // By default, we show 'forecast'
                 const val = monthData[`${id}_forecast`];
                 if (val !== undefined) {
@@ -167,7 +180,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
         if (!setRealOccupancyData) return;
 
         const month = monthIndex + 1;
-        const contextKey = `${selectedHotel}_${selectedYear}_${month}`;
+        const contextKey = `${selectedHotel}_${selectedYear}_${month}_${activeRealVersionId || ''}`;
 
         setRealOccupancyData(prev => {
             const contextData = prev[contextKey] || {};
@@ -188,6 +201,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
 
     return (
         <div className="p-8 max-w-[1600px] mx-auto">
+            <VersionInfoBanner versionName={activeRealVersionName} />
             <div className="mb-6 flex items-start justify-between">
                 <div>
                     <div className="flex items-center gap-3">
