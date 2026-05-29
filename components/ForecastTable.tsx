@@ -4,6 +4,7 @@ import { Upload, ListFilter, LayoutList, Settings2, ChevronUp, Activity, Trendin
 import { ExpenseDriver, ImportedRow, Account, CostPackage, Hotel, ForecastRow, ForecastConfig, ForecastOperator, ColumnVisibility, UserRole } from '../types';
 import { evaluateFormula } from '../utils/formulaEngine';
 import { supabaseService } from '../services/supabaseService';
+import { VersionInfoBanner } from './VersionInfoBanner';
 
 interface ForecastTableProps {
     selectedMonth?: number;
@@ -21,6 +22,7 @@ interface ForecastTableProps {
 
     // Budget Props
     activeRealVersionId?: string;
+    activeRealVersionName?: string;
     activeBudgetVersionId?: string;
     budgetOccupancyData?: Record<string, number[]>;
 
@@ -182,6 +184,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     realOccupancyData = {},
     budgetOccupancyData = {},
     activeRealVersionId,
+    activeRealVersionName,
     activeBudgetVersionId,
     activeProjectionType,
     setActiveProjectionType,
@@ -563,6 +566,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
     return (
         <div className="flex flex-col h-full w-full">
+            <VersionInfoBanner versionName={activeRealVersionName} />
             <div className="bg-white rounded-xl shadow-lg border border-gray-200 flex flex-col h-full overflow-hidden font-sans w-full">
                 <div className="px-5 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center shrink-0 gap-8">
                     <div>

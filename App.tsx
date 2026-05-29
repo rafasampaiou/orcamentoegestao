@@ -709,6 +709,7 @@ const App: React.FC = () => {
 
   const renderContent = () => {
     const isClosed = getIsMonthClosed(selectedDate.getFullYear(), selectedDate.getMonth() + 1);
+    const activeRealVersionName = realVersions.find(v => v.id === activeRealVersionId)?.name;
 
     switch (currentView) {
       // --- REAL MODULE ---

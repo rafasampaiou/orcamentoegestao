@@ -5633,6 +5633,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   };
   const vt = viewTitles[currentView] || viewTitles.admin;
 
+  const activeRealVersionName = realVersions.find(v => v.id === activeRealVersionId)?.name;
+
   return (
     <div className="p-6 max-w-[98%] mx-auto">
       <VersionInfoBanner versionName={activeRealVersionName} />
