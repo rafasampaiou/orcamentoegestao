@@ -62,6 +62,9 @@ const GMDView: React.FC<GMDViewProps> = ({
   const [activeTab, setActiveTab] = useState<'monitor' | 'justifications'>('monitor');
   const [currentHotel, setCurrentHotel] = useState(initialSelectedHotel);
   const [expandedPackages, setExpandedPackages] = useState<string[]>([]);
+  const [localMonth, setLocalMonth] = useState(selectedMonth);
+
+  React.useEffect(() => { setLocalMonth(selectedMonth); }, [selectedMonth]);
   
   // Justifications State (Mocked local state for demo)
   const [justifications, setJustifications] = useState<Justification[]>([]);
@@ -147,117 +150,140 @@ const GMDView: React.FC<GMDViewProps> = ({
     const activeHotelObj = hotels.find(h => h.name === currentHotel);
     const activeHotelCode = activeHotelObj?.code || '';
 
-    // 2. Build Hierarchy
     // 2. Build Hierarchy with Grouping
     const groupedData = new Map<string, any>(); // key = packageId (or packageId+subArea)
 
-    hotelConfigs.forEach(config => {
-        const pkg = masterPackages.find(p => p.id === config.packageId || p.name === config.packageId);
-        const pkgName = pkg?.name || 'Pacote Desconhecido';
-        const pkgId = pkg?.id || config.packageId;
+    masterPackages.forEach(pkg => {
+        const pkgName = pkg.name || 'Pacote Desconhecido';
+        const pkgId = pkg.id;
         
-        const pkgManager = users.find(u => u.id === config.packageManagerId);
-        const accManager = users.find(u => u.id === config.accountManagerId);
-
-        const linkedAccountsData = config.linkedAccountIds.map(accId => {
-            const acc = accounts.find(a => a.id === accId);
-            if (!acc) return null;
-
-            const configCCNames = costCenters
-                .filter(cc => config.costCenterIds?.includes(cc.id))
-                .map(cc => cc.name.trim().toLowerCase());
-
-            const filterValue = (cenarioType: 'Real' | 'Budget' | 'Forecast' | 'Prévia', year: number) => {
-                const matches = financialData.filter(d => 
-                    parseInt(d.ano) === year &&
-                    parseInt(d.mes) === selectedMonth &&
-                    d.conta.trim().toLowerCase() === acc.name.trim().toLowerCase() &&
-                    d.status === 'valid' &&
-                    (d.hotel.trim().toUpperCase() === activeHotelCode || d.hotel.trim() === currentHotel) &&
-                    (configCCNames.length === 0 || configCCNames.includes((d.cr || '').trim().toLowerCase()))
-                );
-
-                const filtered = matches.filter(d => {
-                    const scenario = (d.cenario || '').trim().toLowerCase();
-                    if (cenarioType === 'Real') return scenario === 'real' || scenario === 'realizado';
-                    if (cenarioType === 'Forecast') return scenario === 'forecast' || scenario === 'previsao' || scenario === 'previsão';
-                    return scenario === 'budget' || scenario === 'meta' || scenario === 'orcamento' || scenario === 'orçamento';
-                });
-
-                return filtered.reduce((sum, item) => sum + (parseFloat(item.valor.replace(',', '.')) || 0), 0);
-            };
-
-            const real = filterValue('Real', selectedYear);
-            const budget = filterValue('Budget', selectedYear);
-            const forecast = filterValue('Forecast', selectedYear) || real;
-            let previa = filterValue('Prévia', selectedYear) || (forecast * 0.95); // Mock fallback for demo consistency
-
-            return {
-                id: acc.id,
-                name: acc.name,
-                code: acc.code,
-                meta: budget,
-                forecast: forecast,
-                previa: previa,
-                deltaVal: forecast - previa,
-                deltaPct: previa === 0 ? 0 : ((forecast - previa) / previa) * 100,
-                configId: config.id
-            };
-        }).filter(Boolean) as any[];
-
-        const totalMeta = linkedAccountsData.reduce((s, a) => s + (a.meta || 0), 0);
-        const totalForecast = linkedAccountsData.reduce((s, a) => s + (a.forecast || 0), 0);
-        const totalPrevia = linkedAccountsData.reduce((s, a) => s + (a.previa || 0), 0);
-
-        // Determine effective display name and group key
-        let groupKey = pkgName;
-        let displayName = pkgName;
-        let isTIGroup = false;
-
-        if (config.subArea) {
-            if (pkgName === 'DESPESAS ADMINISTRATIVAS') {
-                groupKey = 'Processamento de dados e TI'; // Extract from generic adm expenses
-                displayName = `Processamento de dados e TI (${config.subArea})`;
-                isTIGroup = true;
-            } else if (pkgName === 'DESPESAS COM VENDAS E MARKETING') {
-                displayName = `${config.subArea}`;
-            } else {
-                displayName = `${pkgName} (${config.subArea})`;
-            }
-        }
-
-        const row = {
-            configId: config.id,
-            packageName: displayName,
-            originalPackageName: pkgName,
-            subArea: config.subArea,
-            packageManagerName: pkgManager?.name || 'N/A',
-            accountManagerName: accManager?.name || 'N/A',
-            accounts: linkedAccountsData,
-            totalMeta,
-            totalForecast,
-            totalPrevia,
-            deltaVal: totalForecast - totalPrevia,
-            deltaPct: totalPrevia === 0 ? 0 : ((totalForecast - totalPrevia) / totalPrevia) * 100
-        };
-
-        // Group by the groupKey (which separates TI from Adm)
-        if (!groupedData.has(groupKey)) {
-            groupedData.set(groupKey, {
-                isMaster: true,
-                name: groupKey,
-                totalMeta: 0,
-                totalForecast: 0,
-                totalPrevia: 0,
-                children: []
+        // Try to find configurations for this package
+        const configsForPkg = hotelConfigs.filter(c => c.packageId === pkgId || c.packageId === pkgName);
+        
+        // If no config, create a dummy one to ensure it renders
+        if (configsForPkg.length === 0) {
+            configsForPkg.push({
+                id: `dummy-${pkgId}`,
+                hotelId: activeHotelObj?.id || '',
+                packageId: pkgId,
+                packageManagerId: '',
+                accountManagerId: '',
+                entityManagerIds: [],
+                supportUserIds: [],
+                linkedAccountIds: accounts.filter(a => a.masterPackage === pkgName || a.masterPackageCode === pkgId).map(a => a.id),
+                costCenterIds: []
             });
         }
-        
-        const group = groupedData.get(groupKey);
-        group.totalMeta += totalMeta;
-        group.totalForecast += totalForecast;
-        group.totalPrevia += totalPrevia;
-        group.children.push(row);
+
+        configsForPkg.forEach(config => {
+            const pkgManager = users.find(u => u.id === config.packageManagerId);
+            const accManager = users.find(u => u.id === config.accountManagerId);
+
+            const linkedAccountsData = config.linkedAccountIds.map(accId => {
+                const acc = accounts.find(a => a.id === accId);
+                if (!acc) return null;
+
+                const configCCNames = costCenters
+                    .filter(cc => config.costCenterIds?.includes(cc.id))
+                    .map(cc => cc.name.trim().toLowerCase());
+
+                const filterValue = (cenarioType: 'Real' | 'Budget' | 'Forecast' | 'Prévia', year: number) => {
+                    const matches = financialData.filter(d => 
+                        parseInt(d.ano) === year &&
+                        parseInt(d.mes) === localMonth &&
+                        d.conta.trim().toLowerCase() === acc.name.trim().toLowerCase() &&
+                        d.status === 'valid' &&
+                        (d.hotel.trim().toUpperCase() === activeHotelCode || d.hotel.trim() === currentHotel) &&
+                        (configCCNames.length === 0 || configCCNames.includes((d.cr || '').trim().toLowerCase()))
+                    );
+
+                    const filtered = matches.filter(d => {
+                        const scenario = (d.cenario || '').trim().toLowerCase();
+                        if (cenarioType === 'Real') return scenario === 'real' || scenario === 'realizado';
+                        if (cenarioType === 'Forecast') return scenario === 'forecast' || scenario === 'previsao' || scenario === 'previsão';
+                        return scenario === 'budget' || scenario === 'meta' || scenario === 'orcamento' || scenario === 'orçamento';
+                    });
+
+                    return filtered.reduce((sum, item) => sum + (parseFloat(item.valor.replace(',', '.')) || 0), 0);
+                };
+
+                const real = filterValue('Real', selectedYear);
+                const budget = filterValue('Budget', selectedYear);
+                const forecast = filterValue('Forecast', selectedYear) || real;
+                let previa = filterValue('Prévia', selectedYear) || (forecast * 0.95); // Mock fallback for demo consistency
+
+                // If all are zero and it's a dummy config, skip to avoid clutter
+                if (real === 0 && budget === 0 && forecast === 0 && previa === 0 && config.id.startsWith('dummy-')) {
+                   return null;
+                }
+
+                return {
+                    id: acc.id,
+                    name: acc.name,
+                    code: acc.code,
+                    meta: budget,
+                    forecast: forecast,
+                    previa: previa,
+                    deltaVal: forecast - previa,
+                    deltaPct: previa === 0 ? 0 : ((forecast - previa) / previa) * 100,
+                    configId: config.id
+                };
+            }).filter(Boolean) as any[];
+
+            if (linkedAccountsData.length === 0) return;
+
+            const totalMeta = linkedAccountsData.reduce((s, a) => s + (a.meta || 0), 0);
+            const totalForecast = linkedAccountsData.reduce((s, a) => s + (a.forecast || 0), 0);
+            const totalPrevia = linkedAccountsData.reduce((s, a) => s + (a.previa || 0), 0);
+
+            let groupKey = pkgName;
+            let displayName = pkgName;
+            let isTIGroup = false;
+
+            if (config.subArea) {
+                if (pkgName === 'DESPESAS ADMINISTRATIVAS') {
+                    groupKey = 'Processamento de dados e TI';
+                    displayName = `Processamento de dados e TI (${config.subArea})`;
+                    isTIGroup = true;
+                } else if (pkgName === 'DESPESAS COM VENDAS E MARKETING') {
+                    displayName = `${config.subArea}`;
+                } else {
+                    displayName = `${pkgName} (${config.subArea})`;
+                }
+            }
+
+            const row = {
+                configId: config.id,
+                packageName: displayName,
+                originalPackageName: pkgName,
+                subArea: config.subArea,
+                packageManagerName: pkgManager?.name || 'Não Definido',
+                accountManagerName: accManager?.name || 'Não Definido',
+                accounts: linkedAccountsData,
+                totalMeta,
+                totalForecast,
+                totalPrevia,
+                deltaVal: totalForecast - totalPrevia,
+                deltaPct: totalPrevia === 0 ? 0 : ((totalForecast - totalPrevia) / totalPrevia) * 100
+            };
+
+            if (!groupedData.has(groupKey)) {
+                groupedData.set(groupKey, {
+                    isMaster: true,
+                    name: groupKey,
+                    totalMeta: 0,
+                    totalForecast: 0,
+                    totalPrevia: 0,
+                    children: []
+                });
+            }
+            
+            const group = groupedData.get(groupKey);
+            group.totalMeta += totalMeta;
+            group.totalForecast += totalForecast;
+            group.totalPrevia += totalPrevia;
+            group.children.push(row);
+        });
     });
 
     // Flatten for rendering
@@ -297,7 +323,7 @@ const GMDView: React.FC<GMDViewProps> = ({
     });
 
     return flattened;
-  }, [gmdConfigs, currentHotel, masterPackages, accounts, users, financialData, selectedMonth, selectedYear, hotels, costCenters]);
+  }, [gmdConfigs, currentHotel, masterPackages, accounts, users, financialData, localMonth, selectedYear, hotels, costCenters]);
 
   // --- EFFECT: POPULATE JUSTIFICATIONS ---
   React.useEffect(() => {
@@ -305,17 +331,17 @@ const GMDView: React.FC<GMDViewProps> = ({
         const newDeviations: Justification[] = [];
         
         reportData.forEach(pkg => {
-            pkg.accounts.forEach(acc => {
+            pkg.accounts?.forEach((acc: any) => {
                 // Threshold for creating justification (Example: > 100 R$ deviation)
                 if (acc.deltaVal > 100) { 
-                    const existing = prev.find(j => j.accountId === acc.id && j.month === selectedMonth && j.year === selectedYear);
+                    const existing = prev.find(j => j.accountId === acc.id && j.month === localMonth && j.year === selectedYear);
                     if (!existing) {
                         newDeviations.push({
-                            id: `just-${selectedYear}-${selectedMonth}-${acc.id}`,
+                            id: `just-${selectedYear}-${localMonth}-${acc.id}`,
                             gmdConfigId: pkg.configId,
                             accountId: acc.id,
                             accountName: acc.name,
-                            month: selectedMonth,
+                            month: localMonth,
                             year: selectedYear,
                             meta: acc.meta,
                             forecast: acc.forecast,
@@ -333,7 +359,7 @@ const GMDView: React.FC<GMDViewProps> = ({
         if (newDeviations.length === 0) return prev;
         return [...prev, ...newDeviations];
     });
-  }, [reportData, selectedMonth, selectedYear]);
+  }, [reportData, localMonth, selectedYear]);
 
 
   // --- HANDLERS ---
@@ -490,6 +516,20 @@ const GMDView: React.FC<GMDViewProps> = ({
           </div>
 
           <div className="flex items-center gap-4">
+              {/* Month Filter */}
+              <div className="flex items-center bg-white px-3 py-1.5 rounded-lg border border-gray-300 shadow-sm">
+                <Calendar className="text-gray-400 mr-2" size={16} />
+                <select 
+                    value={localMonth} 
+                    onChange={(e) => setLocalMonth(parseInt(e.target.value))}
+                    className="bg-transparent text-sm font-semibold text-gray-700 focus:outline-none cursor-pointer"
+                >
+                    {Array.from({length: 12}, (_, i) => i + 1).map(m => (
+                        <option key={m} value={m}>Mês {m}</option>
+                    ))}
+                </select>
+             </div>
+
               {/* Hotel Filter */}
               <div className="flex items-center bg-white px-3 py-1.5 rounded-lg border border-gray-300 shadow-sm">
                 <Filter className="text-gray-400 mr-2" size={16} />
