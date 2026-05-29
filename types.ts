@@ -221,6 +221,7 @@ export type ViewState =
   // REAL Module
   | 'real_home'
   | 'dashboard' // Forecast
+  | 'occupancy_monthly' 
   | 'occupancy_real' 
   | 'comparatives'
   | 'gmd'

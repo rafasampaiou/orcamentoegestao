@@ -1107,6 +1107,12 @@ export const getDynamicForecastData = (
         return realOccupancyData[contextKey]?.[rowId];
     };
 
+    const getPreviaOrReal = (accountName: string, targetYear: number | undefined, crFilter?: string) => {
+        const r = getImportedValue(accountName, targetYear, 'Real', crFilter);
+        const p = getImportedValue(accountName, targetYear, 'Previa', crFilter);
+        return r !== 0 ? r : p;
+    };
+
     // --- BUILD ROWS BASED ON STRUCTURE ---
     structure.forEach(section => {
         if (section.name.toUpperCase() === 'RECEITAS' || section.name.toUpperCase() === 'IMPOSTOS') return;

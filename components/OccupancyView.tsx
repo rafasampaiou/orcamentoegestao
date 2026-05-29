@@ -23,7 +23,7 @@ interface OccupancyViewProps {
     currentUser?: User;
 }
 
-interface BudgetRow {
+export interface BudgetRow {
     id: string;
     label: string;
     isHeader?: boolean;
@@ -73,7 +73,7 @@ const formatValue = (val: number | undefined, format: 'currency' | 'percent' | '
 
 // --- Subcomponent: Isolated Cell Input ---
 // Isso resolve definitivamente o bug do número sumir. Cada célula cuida de si mesma.
-const TableInput: React.FC<TableInputProps> = ({
+export const TableInput: React.FC<TableInputProps> = ({
     value, format, decimals, onUpdate, onPaste,
     align = 'center',
     textSizeClass = 'text-xs',
@@ -127,7 +127,7 @@ const TableInput: React.FC<TableInputProps> = ({
 };
 
 // --- Budget Table Component ---
-const BudgetOccupancyTable: React.FC<{
+export const BudgetOccupancyTable: React.FC<{
     title: string,
     rows: BudgetRow[],
     data: Record<string, number[]>,
@@ -264,7 +264,7 @@ const BudgetOccupancyTable: React.FC<{
 
 
 // --- Row Definitions (Moved outside for performance) ---
-const geralRows: BudgetRow[] = [
+export const geralRows: BudgetRow[] = [
     { id: 'days_month', label: 'Dias do mês', isInput: true, format: 'integer' },
     { id: 'geral_capacity', label: 'Quartos', isInput: true, format: 'integer' },
     { id: 'geral_avail', label: 'Aptos disponíveis', isCalculated: true, format: 'integer' },
@@ -288,7 +288,7 @@ const geralRows: BudgetRow[] = [
     { id: 'geral_trevpar', label: 'TREVPAR', isCalculated: true, format: 'currency' },
 ];
 
-const lazerRows: BudgetRow[] = [
+export const lazerRows: BudgetRow[] = [
     { id: 'lazer_capacity', label: 'Quartos', isInput: true, format: 'integer' },
     { id: 'lazer_avail', label: 'Aptos disponíveis', isCalculated: true, format: 'integer' },
     { id: 'lazer_sold', label: 'Aptos vendidos', isInput: true, isManualReal: true, format: 'integer' },
@@ -311,7 +311,7 @@ const lazerRows: BudgetRow[] = [
     { id: 'lazer_trevpar', label: 'TREVPAR', isCalculated: true, format: 'currency' },
 ];
 
-const eventRows: BudgetRow[] = [
+export const eventRows: BudgetRow[] = [
     { id: 'event_capacity', label: 'Quartos', isInput: true, format: 'integer' },
     { id: 'event_avail', label: 'Aptos disponíveis', isCalculated: true, format: 'integer' },
     { id: 'event_sold', label: 'Aptos vendidos', isInput: true, isManualReal: true, format: 'integer' },
@@ -839,7 +839,7 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
                 <div className="mb-6 flex justify-between items-center">
                     <div>
                         <div className="flex items-center gap-3">
-                            <h2 className="text-2xl font-bold text-gray-900">Ocupação (Real)</h2>
+                            <h2 className="text-2xl font-bold text-gray-900">Comparativo de ocupação</h2>
                             {!isBudget && (
                                 <span className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-sm rounded-lg py-1 px-3 font-bold">
                                     Fechamento oficial

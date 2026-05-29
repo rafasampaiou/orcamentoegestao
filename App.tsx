@@ -6,6 +6,7 @@ import TimelineView from './components/TimelineView';
 import ForecastTable from './components/ForecastTable';
 import GMDView from './components/GMDView';
 import OccupancyView from './components/OccupancyView';
+import OccupancyMonthlyRealView from './components/OccupancyMonthlyRealView';
 import ComparativesView from './components/ComparativesView';
 import BudgetLaborView from './components/BudgetLaborView';
 import BudgetExtraRevView from './components/BudgetExtraRevView';
@@ -840,12 +841,22 @@ const App: React.FC = () => {
           selectedMonth={selectedDate.getMonth() + 1}
           selectedYear={selectedDate.getFullYear()}
           selectedHotel={selectedHotel}
-          budgetData={budgetOccupancyDataMap[projectedBudgetVersionId] || {}}
+          budgetData={budgetOccupancyDataMap[activeBudgetVersionId] || {}}
           realOccupancyData={realOccupancyData}
           setRealOccupancyData={setRealOccupancyData}
           financialData={importedFinancialData}
           activeProjectionType={activeProjectionType}
           setActiveProjectionType={setActiveProjectionType}
+          currentUser={currentUser}
+        />
+      );
+      case 'occupancy_monthly': return (
+        <OccupancyMonthlyRealView
+          selectedYear={selectedDate.getFullYear()}
+          selectedHotel={selectedHotel}
+          realOccupancyData={realOccupancyData}
+          setRealOccupancyData={setRealOccupancyData}
+          budgetData={budgetOccupancyDataMap[activeBudgetVersionId] || {}}
           currentUser={currentUser}
         />
       );
