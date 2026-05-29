@@ -347,16 +347,34 @@ const App: React.FC = () => {
           const newOccMap: Record<string, Record<string, number[]>> = {};
           const newLaborMap: Record<string, Record<string, any>> = {};
           const newExtraMap: Record<string, any[]> = {};
+          const newRealOccMap: Record<string, Record<string, number>> = {};
+
           remoteVersions.forEach(v => {
             if (v.id.startsWith('v')) {
               if (v.occupancyData) newOccMap[v.id] = v.occupancyData;
               if (v.laborData) newLaborMap[v.id] = v.laborData;
               if (v.extraRevenueData) newExtraMap[v.id] = v.extraRevenueData;
+            } else if (v.id.startsWith('r')) {
+              if (v.occupancyData) {
+                for (let i = 0; i < 12; i++) {
+                  const contextKey = `${v.hotelId}_${v.year}_${i + 1}_${v.id}`;
+                  const monthData: Record<string, number> = {};
+                  Object.keys(v.occupancyData).forEach(rowId => {
+                    const val = v.occupancyData![rowId][i];
+                    if (val !== undefined && val !== null) {
+                      monthData[`${rowId}_forecast`] = val;
+                      monthData[`${rowId}_previa`] = val;
+                    }
+                  });
+                  newRealOccMap[contextKey] = monthData;
+                }
+              }
             }
           });
           setBudgetOccupancyDataMap(newOccMap);
           setGlobalLaborDataMap(newLaborMap);
           setExtraRevenueDataMap(newExtraMap);
+          setRealOccupancyData(newRealOccMap);
 
           const activeBudget = remoteVersions.find(v => v.isMain && v.id.startsWith('v'));
           const activeReal = remoteVersions.find(v => v.isMain && v.id.startsWith('r'));
@@ -463,6 +481,45 @@ const App: React.FC = () => {
       });
     }
   }, [activeRealVersionId, realVersions, selectedDate]);
+
+  const handleSaveRealOccupancy = async () => {
+    const version = realVersions.find(v => v.id === activeRealVersionId);
+    if (!version) return;
+
+    const baseBudgetData = budgetOccupancyDataMap[activeBudgetVersionId] || {};
+    const occupancyDataToSave: Record<string, number[]> = {};
+
+    // Copy budget layout/base data
+    Object.keys(baseBudgetData).forEach(key => {
+      occupancyDataToSave[key] = [...baseBudgetData[key]];
+    });
+
+    // Override with realOccupancyData values
+    for (let i = 0; i < 12; i++) {
+      const contextKey = `${selectedHotel}_${selectedDate.getFullYear()}_${i + 1}_${activeRealVersionId}`;
+      const monthData = realOccupancyData[contextKey] || {};
+      
+      Object.keys(monthData).forEach(key => {
+        if (key.endsWith('_forecast')) {
+          const rowId = key.replace('_forecast', '');
+          if (!occupancyDataToSave[rowId]) occupancyDataToSave[rowId] = Array(12).fill(0);
+          occupancyDataToSave[rowId][i] = monthData[key];
+        }
+      });
+    }
+
+    const updatedVersion = {
+      ...version,
+      occupancyData: occupancyDataToSave
+    };
+
+    try {
+      await supabaseService.upsertBudgetVersion(updatedVersion);
+      setRealVersions(prev => prev.map(v => v.id === version.id ? updatedVersion : v));
+    } catch (error) {
+      console.error('Erro ao salvar ocupação real:', error);
+    }
+  };
 
   const onCreateVersion = async (year: number, month: number, name: string, hotelId: string) => {
     const timestamp = Date.now();
@@ -846,6 +903,7 @@ const App: React.FC = () => {
           budgetData={budgetOccupancyDataMap[activeBudgetVersionId] || {}}
           realOccupancyData={realOccupancyData}
           setRealOccupancyData={setRealOccupancyData}
+          onSaveOccupancy={handleSaveRealOccupancy}
           financialData={importedFinancialData}
           activeProjectionType={activeProjectionType}
           setActiveProjectionType={setActiveProjectionType}
@@ -860,6 +918,7 @@ const App: React.FC = () => {
           selectedHotel={selectedHotel}
           realOccupancyData={realOccupancyData}
           setRealOccupancyData={setRealOccupancyData}
+          onSaveOccupancy={handleSaveRealOccupancy}
           budgetData={budgetOccupancyDataMap[activeBudgetVersionId] || {}}
           activeRealVersionId={activeRealVersionId}
           activeRealVersionName={activeRealVersionName}
