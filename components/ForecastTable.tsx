@@ -1503,7 +1503,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     });
 
                                     try {
-                                        const hName = hotels?.find(h => h.id === selectedHotel)?.name || '';
+                                        const activeHotel = hotels?.find(h => h.id === selectedHotel || h.name === selectedHotel);
+                                        const hName = activeHotel?.name || selectedHotel || '';
                                         if (hName) {
                                             await supabaseService.saveForecastProjections(hName, selectedMonth || 1, selectedYear || 2026, activeRealVersionId || 'default', rowsToSave);
                                         }
