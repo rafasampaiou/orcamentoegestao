@@ -2731,6 +2731,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     try {
       const importId = await recordImportHistory(rowsToSave);
       await supabaseService.saveFinancialData(rowsToSave, importId);
+      if (onImportData) {
+        onImportData(rowsToSave, 'append');
+      }
       alert(`Impostos (${scenario === 'BUDGET' ? 'Budget' : 'Real'}) salvos com sucesso!`);
     } catch (e: any) {
       alert('Erro ao salvar impostos: ' + e.message);
@@ -2935,6 +2938,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     try {
       const importId = await recordImportHistory(rowsToSave);
       await supabaseService.saveFinancialData(rowsToSave, importId);
+      if (onImportData) {
+        onImportData(rowsToSave, 'append');
+      }
       alert(`${rowsToSave.length} registros de despesa detalhada salvos com sucesso!`);
       setImportText('');
       fetchImportHistory(); // Refresh history
@@ -3756,7 +3762,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               </select>
 
               <div className="h-8 w-px bg-gray-300 mx-2"></div>
-              
+
               <div className="flex items-center gap-2">
                 <LayoutList size={16} className="text-indigo-600" />
                 <label className="text-sm font-bold text-gray-700">Tipo de Projeção:</label>
