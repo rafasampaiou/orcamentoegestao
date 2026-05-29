@@ -649,7 +649,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-md text-base font-bold"
                             >
                                 <CheckCircle2 size={20} />
-                                {isMonthClosed ? 'Validar fechamento' : 'Validar projeção'}
+                                {isMonthClosed ? 'Validar fechamento' : 'Salvar resultados'}
                             </button>
                         )}
                         {canEditForecast && (
@@ -1409,7 +1409,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     <CheckCircle2 size={24} />
                                 </div>
                                 <div>
-                                    <h2 className="text-xl font-bold text-indigo-900">Validar Projeção</h2>
+                                    <h2 className="text-xl font-bold text-indigo-900">Salvar resultados</h2>
                                     <p className="text-sm text-indigo-700">Justifique os desvios significativos em relação à Meta.</p>
                                 </div>
                             </div>
@@ -1489,12 +1489,15 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         return;
                                     }
 
-                                    const rowsToSave: { accountName: string; costCenter?: string; value: number; scenario: 'Real' | 'Previa' }[] = [];
+                                    const rowsToSave: { accountName: string; costCenter?: string; value: number; scenario: 'Real' | 'Previa' | 'Meta' }[] = [];
                                     data.forEach(row => {
                                         if (row.category === 'Costs' || row.category === 'Indicators' || row.category === 'Revenue') {
                                             rowsToSave.push({ accountName: `override_${row.id}`, value: row.real, scenario: 'Real' });
                                             if (row.previa !== undefined) {
                                                 rowsToSave.push({ accountName: `override_${row.id}`, value: row.previa, scenario: 'Previa' });
+                                            }
+                                            if (row.budget !== undefined) {
+                                                rowsToSave.push({ accountName: `override_${row.id}`, value: row.budget, scenario: 'Meta' });
                                             }
                                         }
                                     });
@@ -1521,10 +1524,10 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             setValidations(prev => [...prev, newValidation]);
                                         }
 
-                                        const notificationMsg = `A unidade ${selectedHotel} validou a projeção de ${activeProjectionType} para ${monthName}/${selectedYear}. Dados salvos no banco.`;
+                                        const notificationMsg = `A unidade ${selectedHotel} salvou os resultados de ${activeProjectionType} para ${monthName}/${selectedYear}. Dados salvos no banco.`;
                                         console.log('Notification sent to Admin:', notificationMsg);
 
-                                        alert(`Projeção validada e dados salvos com sucesso!\n\nNotificação enviada aos administradores: "${notificationMsg}"`);
+                                        alert(`Resultados salvos com sucesso!\n\nNotificação enviada aos administradores: "${notificationMsg}"`);
                                         setShowValidationModal(false);
                                     } catch (err) {
                                         console.error('Failed to save projections:', err);
@@ -1534,7 +1537,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 className="px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-lg shadow-md hover:bg-indigo-700 transition-colors flex items-center gap-2"
                             >
                                 <CheckCircle2 size={18} />
-                                Confirmar Validação
+                                Salvar resultados
                             </button>
                         </div>
                     </div>

@@ -694,7 +694,7 @@ export const supabaseService = {
     month: number,
     year: number,
     versionId: string,
-    rows: { accountName: string, costCenter?: string, value: number, scenario: 'Real' | 'Previa' }[]
+    rows: { accountName: string, costCenter?: string, value: number, scenario: 'Real' | 'Previa' | 'Meta' }[]
   ): Promise<void> {
     // 1. Delete existing overrides for this specific context
     // We only delete Real and Previa scenarios to preserve meta/budget
@@ -705,7 +705,7 @@ export const supabaseService = {
       .eq('month', month)
       .eq('year', year)
       .eq('version_id', versionId)
-      .in('scenario', ['Real', 'Previa']);
+      .in('scenario', ['Real', 'Previa', 'Meta']);
 
     if (deleteError) throw deleteError;
 
@@ -721,7 +721,7 @@ export const supabaseService = {
       cost_center: r.costCenter || '',
       value: r.value,
       scenario: r.scenario,
-      real_meta: r.scenario === 'Real' ? 'Real' : 'Previa'
+      real_meta: r.scenario === 'Real' ? 'Real' : (r.scenario === 'Meta' ? 'Meta' : 'Previa')
     }));
 
     // 3. Batch insert
