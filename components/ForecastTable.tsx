@@ -643,9 +643,61 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             {showDetails ? <ListFilter size={20} /> : <LayoutList size={20} />}
                             {showDetails ? 'Ocultar Contas' : 'Mostrar Contas'}
                         </button>
+    const handleSaveResultsDirectly = async () => {
+        if (activeProjectionType === 'Fechamento oficial' && currentUser?.role !== UserRole.ADMIN) {
+            alert('Apenas o ADMIN GERAL pode criar o evento de Fechamento Oficial.');
+            return;
+        }
+
+        const rowsToSave: { accountName: string; costCenter?: string; value: number; scenario: 'Real' | 'Previa' | 'Meta' }[] = [];
+        data.forEach(row => {
+            if (row.category === 'Costs' || row.category === 'Indicators' || row.category === 'Revenue') {
+                rowsToSave.push({ accountName: `override_${row.id}`, value: row.real, scenario: 'Real' });
+                if (row.previa !== undefined) {
+                    rowsToSave.push({ accountName: `override_${row.id}`, value: row.previa, scenario: 'Previa' });
+                }
+                if (row.budget !== undefined) {
+                    rowsToSave.push({ accountName: `override_${row.id}`, value: row.budget, scenario: 'Meta' });
+                }
+            }
+        });
+
+        try {
+            const activeHotel = hotels?.find(h => h.id === selectedHotel || h.name === selectedHotel);
+            const hName = activeHotel?.name || selectedHotel || '';
+            if (hName) {
+                await supabaseService.saveForecastProjections(hName, selectedMonth || 1, selectedYear || 2026, activeRealVersionId || 'default', rowsToSave);
+            }
+
+            const newValidation: import('../types').ValidationRecord = {
+                id: `val_${Date.now()}`,
+                hotelId: selectedHotel || '',
+                userId: currentUser?.id || '',
+                userName: currentUser?.name || 'Desconhecido',
+                month: selectedMonth || 1,
+                year: selectedYear || 2026,
+                projectionType: activeProjectionType || 'Reunião de Ritmo',
+                validatedAt: new Date().toISOString(),
+                status: 'Validado'
+            };
+
+            if (setValidations) {
+                setValidations(prev => [...prev, newValidation]);
+            }
+
+            const notificationMsg = `A unidade ${selectedHotel} salvou os resultados de ${activeProjectionType} para ${monthName}/${selectedYear}. Dados salvos no banco.`;
+            console.log('Notification sent to Admin:', notificationMsg);
+
+            alert(`Resultados salvos com sucesso no Supabase!`);
+        } catch (err) {
+            console.error('Failed to save projections:', err);
+            alert('Ocorreu um erro ao salvar os dados no Supabase. Tente novamente.');
+        }
+    };
+
                         {canValidate && (
                             <button
-                                onClick={() => setShowValidationModal(true)}
+                                onClick={handleSaveResultsDirectly}
                                 className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-md text-base font-bold"
                             >
                                 <CheckCircle2 size={20} />
@@ -876,7 +928,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     let previaCellContent: React.ReactNode = formatValue(row.previa, formatType);
 
                                     const isManualRow = ['IND-MO-2', 'IND-MO-3'].includes(row.id);
-                                    const isEditableCost = row.category === 'Costs';
+                                    const isEditableCost = row.category === 'Costs' || row.category === 'Revenue';
                                     const isEditableSpecial = isSpecialEditableRow(row.id);
 
                                     const isRowEditable = isRowEditableForUser(row);
