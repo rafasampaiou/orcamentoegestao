@@ -455,6 +455,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   // Import Sub-tabs
   const [activeImportTab, setActiveImportTab] = useState<'financial' | 'revenue' | 'occupancy' | 'costCenters' | 'accounts' | 'history'>('financial');
   const [importScenario, setImportScenario] = useState<'REAL' | 'BUDGET'>('REAL');
+  const [importRealTarget, setImportRealTarget] = useState<'PREVIA' | 'REAL'>('PREVIA');
   const [importHistory, setImportHistory] = useState<any[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [importToDelete, setImportToDelete] = useState<string | null>(null);
@@ -2285,7 +2286,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         // SMART REPLACE: Delete existing data for the same contexts (Hotel+Year+Month+Scenario+Version)
         const contexts = new Set<string>();
         finalData.forEach(row => {
-          if (row.cenario.toUpperCase() === 'REAL') row.cenario = 'PREVIA';
+          if (row.cenario.toUpperCase() === 'REAL' && importScenario === 'REAL') row.cenario = importRealTarget;
           const key = `${row.hotel}|${row.ano}|${row.mes}|${row.cenario}|${row.versionId || ''}`;
           contexts.add(key);
         });
@@ -2637,7 +2638,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
     const targetYear = selectedVersion.year || importTargetYear;
     const dataToUse = scenario === 'BUDGET' ? dreBudgetData : dreForecastData;
-    const cenario = scenario === 'BUDGET' ? 'BUDGET' : 'PREVIA';
+    const cenario = scenario === 'BUDGET' ? 'BUDGET' : importRealTarget;
 
     Object.entries(dataToUse).forEach(([rowLabel, months]) => {
       Object.entries(months).forEach(([month, value]) => {
@@ -2700,7 +2701,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     const versionId = scenario === 'BUDGET'
       ? (targetBudgetVersionId || activeBudgetVersionId)
       : (targetRealVersionId || activeRealVersionId);
-    const cenario = scenario === 'BUDGET' ? 'BUDGET' : 'PREVIA';
+    const cenario = scenario === 'BUDGET' ? 'BUDGET' : importRealTarget;
 
     Object.entries(dataToUse).forEach(([hotelName, months]) => {
       Object.entries(months).forEach(([month, value]) => {
@@ -3499,6 +3500,18 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const renderRealImportInterface = () => {
     return (
       <div className="space-y-6">
+        <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
+          <label className="text-sm font-bold text-gray-700 whitespace-nowrap">Destino da Importação (Real):</label>
+          <select
+            value={importRealTarget}
+            onChange={e => setImportRealTarget(e.target.value as any)}
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none w-full max-w-[250px]"
+          >
+            <option value="PREVIA">Prévia (Ano Atual)</option>
+            <option value="REAL">Last Year</option>
+          </select>
+        </div>
+
         {importCategory === 'occupancy' && (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div className="flex items-center justify-between mb-2">

@@ -163,6 +163,9 @@ const App: React.FC = () => {
   const [extraRevenueDataMapRef] = [useRef(extraRevenueDataMap)];
   React.useEffect(() => { extraRevenueDataMapRef.current = extraRevenueDataMap; }, [extraRevenueDataMap]);
 
+  const realOccupancyDataRef = useRef(realOccupancyData);
+  React.useEffect(() => { realOccupancyDataRef.current = realOccupancyData; }, [realOccupancyData]);
+
   React.useEffect(() => {
     const newOccMap: Record<string, Record<string, number[]>> = {};
     const newLaborMap: Record<string, Record<string, any>> = {};
@@ -197,19 +200,51 @@ const App: React.FC = () => {
           laborData: globalLaborDataMapRef.current[activeBudgetVersionId] || {},
           extraRevenueData: extraRevenueDataMapRef.current[activeBudgetVersionId] || []
         };
-        supabaseService.upsertBudgetVersion(versionToSave).catch(e => console.error('Erro ao salvar planejamento auto-save', e));
+        supabaseService.upsertBudgetVersion(versionToSave).catch(console.error);
       }
-    }, 1500); // 1.5 seconds debounce
+    }, 2000); // 2 seconds debounce
     return () => clearTimeout(timeout);
-  }, [
-    activeBudgetVersionId,
-    budgetVersions,
-    budgetOccupancyDataMap,
-    globalLaborDataMap,
-    extraRevenueDataMap
-  ]);
+  }, [budgetOccupancyDataMap, globalLaborDataMap, extraRevenueDataMap, activeBudgetVersionId, budgetVersions]);
 
+  // Central Auto-Save Effect for Real Occupancy
+  React.useEffect(() => {
+    if (isInitialMount.current) return;
+    if (!activeRealVersionId) return;
 
+    const timeout = setTimeout(() => {
+      const version = realVersions.find(v => v.id === activeRealVersionId);
+      if (version && version.id.startsWith('r')) {
+        const baseBudgetData = budgetOccupancyDataMapRef.current[activeBudgetVersionId] || {};
+        const occupancyDataToSave: Record<string, number[]> = {};
+
+        Object.keys(baseBudgetData).forEach(key => {
+          occupancyDataToSave[key] = [...baseBudgetData[key]];
+        });
+
+        let hasData = false;
+        for (let i = 0; i < 12; i++) {
+          const contextKey = `${selectedHotel}_${selectedDate.getFullYear()}_${i + 1}_${activeRealVersionId}`;
+          const monthData = realOccupancyDataRef.current[contextKey] || {};
+          
+          Object.keys(monthData).forEach(key => {
+            if (key.endsWith('_forecast')) {
+              const baseKey = key.replace('_forecast', '');
+              if (!occupancyDataToSave[baseKey]) {
+                occupancyDataToSave[baseKey] = Array(12).fill(0);
+              }
+              occupancyDataToSave[baseKey][i] = monthData[key];
+              hasData = true;
+            }
+          });
+        }
+
+        if (hasData || Object.keys(occupancyDataToSave).length > 0) {
+          supabaseService.upsertBudgetVersion({ ...version, occupancyData: occupancyDataToSave }).catch(console.error);
+        }
+      }
+    }, 2000);
+    return () => clearTimeout(timeout);
+  }, [realOccupancyData, activeRealVersionId, selectedHotel, selectedDate, realVersions, activeBudgetVersionId]);
   const [realOccupancyData, setRealOccupancyData] = useState<Record<string, Record<string, number>>>({});
 
   // --- REGISTRY STATE (LIFTED FROM SETTINGS) ---
