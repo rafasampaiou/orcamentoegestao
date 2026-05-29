@@ -163,6 +163,7 @@ const App: React.FC = () => {
   const [extraRevenueDataMapRef] = [useRef(extraRevenueDataMap)];
   React.useEffect(() => { extraRevenueDataMapRef.current = extraRevenueDataMap; }, [extraRevenueDataMap]);
 
+  const [realOccupancyData, setRealOccupancyData] = useState<Record<string, Record<string, number>>>({});
   const realOccupancyDataRef = useRef(realOccupancyData);
   React.useEffect(() => { realOccupancyDataRef.current = realOccupancyData; }, [realOccupancyData]);
 
@@ -245,7 +246,6 @@ const App: React.FC = () => {
     }, 2000);
     return () => clearTimeout(timeout);
   }, [realOccupancyData, activeRealVersionId, selectedHotel, selectedDate, realVersions, activeBudgetVersionId]);
-  const [realOccupancyData, setRealOccupancyData] = useState<Record<string, Record<string, number>>>({});
 
   // --- REGISTRY STATE (LIFTED FROM SETTINGS) ---
   // This ensures data persists when switching tabs
