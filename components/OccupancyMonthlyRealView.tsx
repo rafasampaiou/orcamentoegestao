@@ -69,10 +69,15 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
         const suffixes = ['forecast', 'previa'];
 
         suffixes.forEach(s => {
-            const days = budgetData['days_month']?.[monthIdx] || 0;
+            const currentDays = currentData[`days_month_${s}`];
+            const days = currentDays !== undefined ? currentDays : (budgetData['days_month']?.[monthIdx] || 0);
             set(`days_month_${s}`, days);
 
-            const lzCap = budgetData['lazer_capacity']?.[monthIdx] || 0;
+            const currentCap = currentData[`geral_capacity_${s}`];
+            const baseCap = currentCap !== undefined ? currentCap : (budgetData['geral_capacity']?.[monthIdx] || budgetData['lazer_capacity']?.[monthIdx] || 0);
+            
+            // Replicate capacity
+            const lzCap = baseCap;
             set(`lazer_capacity_${s}`, lzCap);
             const lzAvail = lzCap * days;
             set(`lazer_avail_${s}`, lzAvail);
@@ -104,7 +109,8 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
             set(`lazer_dm_hosp_${s}`, lzSold > 0 ? lzRevHosp / lzSold : 0);
             set(`lazer_revpar_${s}`, lzAvail > 0 ? lzRevFap / lzAvail : 0);
 
-            const evCap = budgetData['event_capacity']?.[monthIdx] || 0;
+            // Replicate capacity
+            const evCap = baseCap;
             set(`event_capacity_${s}`, evCap);
             const evAvail = evCap * days;
             set(`event_avail_${s}`, evAvail);
@@ -135,7 +141,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
             set(`event_dm_hosp_${s}`, evSold > 0 ? evRevHosp / evSold : 0);
             set(`event_revpar_${s}`, evAvail > 0 ? evRevFap / evAvail : 0);
 
-            const gCap = budgetData['geral_capacity']?.[monthIdx] || 0;
+            const gCap = baseCap;
             set(`geral_capacity_${s}`, gCap);
             const gAvail = gCap * days;
             set(`geral_avail_${s}`, gAvail);

@@ -271,8 +271,8 @@ export const BudgetOccupancyTable: React.FC<{
 
 // --- Row Definitions (Moved outside for performance) ---
 export const geralRows: BudgetRow[] = [
-    { id: 'days_month', label: 'Dias do mês', isInput: true, format: 'integer' },
-    { id: 'geral_capacity', label: 'Quartos', isInput: true, format: 'integer' },
+    { id: 'days_month', label: 'Dias do mês', isInput: true, isManualReal: true, format: 'integer' },
+    { id: 'geral_capacity', label: 'Quartos', isInput: true, isManualReal: true, format: 'integer' },
     { id: 'geral_avail', label: 'Aptos disponíveis', isCalculated: true, format: 'integer' },
     { id: 'geral_sold', label: 'Aptos vendidos', isCalculated: true, forceWhite: true, format: 'integer' },
     { id: 'geral_occ_pct', label: '% de ocupação', isCalculated: true, format: 'percent' },
@@ -405,10 +405,14 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
         const monthIdx = (selectedMonth || 1) - 1;
 
         suffixes.forEach(s => {
-            const days = budgetData['days_month']?.[monthIdx] || 0;
+            const currentDays = currentData[`days_month_${s}`];
+            const days = currentDays !== undefined ? currentDays : (budgetData['days_month']?.[monthIdx] || 0);
             set(`days_month_${s}`, days);
 
-            const lzCap = budgetData['lazer_capacity']?.[monthIdx] || 0;
+            const currentCap = currentData[`geral_capacity_${s}`];
+            const baseCap = currentCap !== undefined ? currentCap : (budgetData['geral_capacity']?.[monthIdx] || budgetData['lazer_capacity']?.[monthIdx] || 0);
+
+            const lzCap = baseCap;
             set(`lazer_capacity_${s}`, lzCap);
             const lzAvail = lzCap * days;
             set(`lazer_avail_${s}`, lzAvail);
@@ -439,7 +443,7 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             set(`lazer_dm_hosp_${s}`, lzSold > 0 ? lzRevHosp / lzSold : 0);
             set(`lazer_revpar_${s}`, lzAvail > 0 ? lzRevFap / lzAvail : 0);
 
-            const evCap = budgetData['event_capacity']?.[monthIdx] || 0;
+            const evCap = baseCap;
             set(`event_capacity_${s}`, evCap);
             const evAvail = evCap * days;
             set(`event_avail_${s}`, evAvail);
@@ -470,7 +474,7 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             set(`event_dm_hosp_${s}`, evSold > 0 ? evRevHosp / evSold : 0);
             set(`event_revpar_${s}`, evAvail > 0 ? evRevFap / evAvail : 0);
 
-            const gCap = budgetData['geral_capacity']?.[monthIdx] || 0;
+            const gCap = baseCap;
             set(`geral_capacity_${s}`, gCap);
             const gAvail = gCap * days;
             set(`geral_avail_${s}`, gAvail);
