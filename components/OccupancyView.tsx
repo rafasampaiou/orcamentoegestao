@@ -137,8 +137,9 @@ export const BudgetOccupancyTable: React.FC<{
     onUpdate: (rowId: string, monthIndex: number, value: number) => void,
     decimalOverrides: Record<string, number>,
     onToggleDecimals: (rowId: string) => void,
-    canEdit: boolean
-}> = ({ title, rows, data, onUpdate, decimalOverrides, onToggleDecimals, canEdit }) => {
+    canEdit: boolean,
+    isRealMode?: boolean
+}> = ({ title, rows, data, onUpdate, decimalOverrides, onToggleDecimals, canEdit, isRealMode }) => {
 
     const handlePaste = (e: React.ClipboardEvent, startRowId: string, startMonthIndex: number) => {
         e.preventDefault();
@@ -157,6 +158,7 @@ export const BudgetOccupancyTable: React.FC<{
         pastedLines.forEach((rowStr, rIdx) => {
             const currentRow = rows[startRowIndex + rIdx];
             if (!currentRow || !currentRow.isInput) return;
+            if (isRealMode && !currentRow.isManualReal) return;
 
             const cells = rowStr.split('\t');
             cells.forEach((cellStr, cIdx) => {
@@ -217,7 +219,8 @@ export const BudgetOccupancyTable: React.FC<{
                             const rowValues = data[row.id] || Array(12).fill(0);
                             const total = rowValues.reduce((sum, v) => sum + (v || 0), 0);
 
-                            const isWhite = row.isInput || row.forceWhite;
+                            const isEditable = row.isInput && canEdit && (!isRealMode || row.isManualReal);
+                            const isWhite = isEditable || row.forceWhite;
                             const rowBgClass = isWhite ? 'bg-white' : 'bg-gray-200';
                             const stickyBgClass = isWhite ? 'bg-white group-hover:bg-gray-50' : 'bg-gray-200 group-hover:bg-gray-300';
 
@@ -237,7 +240,7 @@ export const BudgetOccupancyTable: React.FC<{
                                     </td>
                                     {MONTHS.map((_, idx) => (
                                         <td key={idx} className="px-1 py-1 border-r border-gray-100 text-center">
-                                            {row.isInput && canEdit ? (
+                                            {isEditable ? (
                                                 <TableInput
                                                     value={rowValues[idx]}
                                                     format={row.format}
@@ -413,11 +416,13 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             const lzSold = get(`lazer_sold_${s}`);
             const lzAd = get(`lazer_adults_${s}`);
             const lzChd = get(`lazer_chd_${s}`);
-            const lzRateAd = get(`lazer_rate_ad_${s}`);
-            const lzRateChd = get(`lazer_rate_chd_${s}`);
+            
+            const lzDmFap = budgetData['lazer_dm_fap']?.[monthIdx] || 0;
+            const lzRateAd = budgetData['lazer_rate_ad']?.[monthIdx] || 0;
+            const lzRateChd = budgetData['lazer_rate_chd']?.[monthIdx] || 0;
 
             const lzPax = lzAd + lzChd;
-            const lzRevFap = get(`lazer_rev_fap_${s}`);
+            const lzRevFap = lzSold * lzDmFap;
             const lzRevHosp = lzRevFap - (lzAd * lzRateAd) - (lzChd * lzRateChd);
 
             set(`lazer_occ_pct_${s}`, lzAvail > 0 ? (lzSold / lzAvail) * 100 : 0);
@@ -425,6 +430,9 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             set(`lazer_coef_total_${s}`, lzSold > 0 ? lzPax / lzSold : 0);
             set(`lazer_coef_ad_${s}`, lzSold > 0 ? lzAd / lzSold : 0);
             set(`lazer_coef_chd_${s}`, lzSold > 0 ? lzChd / lzSold : 0);
+            
+            set(`lazer_rate_ad_${s}`, lzRateAd);
+            set(`lazer_rate_chd_${s}`, lzRateChd);
             set(`lazer_rev_fap_${s}`, lzRevFap);
             set(`lazer_rev_hosp_${s}`, lzRevHosp);
             set(`lazer_dm_fap_${s}`, lzSold > 0 ? lzRevFap / lzSold : 0);
@@ -439,11 +447,13 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             const evSold = get(`event_sold_${s}`);
             const evAd = get(`event_adults_${s}`);
             const evChd = get(`event_chd_${s}`);
-            const evRateAd = get(`event_rate_ad_${s}`);
-            const evRateChd = get(`event_rate_chd_${s}`);
+            
+            const evDmFap = budgetData['event_dm_fap']?.[monthIdx] || 0;
+            const evRateAd = budgetData['event_rate_ad']?.[monthIdx] || 0;
+            const evRateChd = budgetData['event_rate_chd']?.[monthIdx] || 0;
 
             const evPax = evAd + evChd;
-            const evRevFap = get(`event_rev_fap_${s}`);
+            const evRevFap = evSold * evDmFap;
             const evRevHosp = evRevFap - (evAd * evRateAd) - (evChd * evRateChd);
 
             set(`event_occ_pct_${s}`, evAvail > 0 ? (evSold / evAvail) * 100 : 0);
@@ -451,6 +461,9 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             set(`event_coef_total_${s}`, evSold > 0 ? evPax / evSold : 0);
             set(`event_coef_ad_${s}`, evSold > 0 ? evAd / evSold : 0);
             set(`event_coef_chd_${s}`, evSold > 0 ? evChd / evSold : 0);
+            
+            set(`event_rate_ad_${s}`, evRateAd);
+            set(`event_rate_chd_${s}`, evRateChd);
             set(`event_rev_fap_${s}`, evRevFap);
             set(`event_rev_hosp_${s}`, evRevHosp);
             set(`event_dm_fap_${s}`, evSold > 0 ? evRevFap / evSold : 0);
@@ -478,16 +491,15 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             set(`geral_chd_${s}`, gChd);
             set(`geral_coef_chd_${s}`, gSold > 0 ? gChd / gSold : 0);
 
-            set(`geral_rate_ad_${s}`, get(`geral_rate_ad_${s}`)); 
-            set(`geral_rate_chd_${s}`, get(`geral_rate_chd_${s}`)); 
+            set(`geral_rate_ad_${s}`, budgetData['geral_rate_ad']?.[monthIdx] || 0); 
+            set(`geral_rate_chd_${s}`, budgetData['geral_rate_chd']?.[monthIdx] || 0); 
 
             set(`geral_rev_fap_${s}`, gRevFap);
             set(`geral_rev_hosp_${s}`, gRevHosp);
 
             const lzExtra = get(`lazer_extra_rev_${s}`);
             const evExtra = get(`event_extra_rev_${s}`);
-            const gExtraInput = get(`geral_extra_rev_${s}`);
-            const gExtra = gExtraInput !== 0 ? gExtraInput : (lzExtra + evExtra);
+            const gExtra = lzExtra + evExtra;
             set(`geral_extra_rev_${s}`, gExtra);
 
             set(`geral_dm_fap_${s}`, gSold > 0 ? gRevFap / gSold : 0);
