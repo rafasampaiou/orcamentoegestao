@@ -402,60 +402,72 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
         const monthIdx = (selectedMonth || 1) - 1;
 
         suffixes.forEach(s => {
-            set(`days_month_${s}`, budgetData['days_month']?.[monthIdx] || 0);
-            set(`geral_capacity_${s}`, budgetData['geral_capacity']?.[monthIdx] || 0);
-            set(`geral_avail_${s}`, budgetData['geral_avail']?.[monthIdx] || 0);
+            const days = budgetData['days_month']?.[monthIdx] || 0;
+            set(`days_month_${s}`, days);
 
-            set(`lazer_capacity_${s}`, budgetData['lazer_capacity']?.[monthIdx] || 0);
-            set(`lazer_avail_${s}`, budgetData['lazer_avail']?.[monthIdx] || 0);
-
-            set(`event_capacity_${s}`, budgetData['event_capacity']?.[monthIdx] || 0);
-            set(`event_avail_${s}`, budgetData['event_avail']?.[monthIdx] || 0);
+            const lzCap = budgetData['lazer_capacity']?.[monthIdx] || 0;
+            set(`lazer_capacity_${s}`, lzCap);
+            const lzAvail = lzCap * days;
+            set(`lazer_avail_${s}`, lzAvail);
 
             const lzSold = get(`lazer_sold_${s}`);
-            const lzAvail = get(`lazer_avail_${s}`);
             const lzAd = get(`lazer_adults_${s}`);
             const lzChd = get(`lazer_chd_${s}`);
-            const lzDmFap = get(`lazer_dm_fap_${s}`);
+            const lzRateAd = get(`lazer_rate_ad_${s}`);
+            const lzRateChd = get(`lazer_rate_chd_${s}`);
 
             const lzPax = lzAd + lzChd;
-            const lzRevFap = lzDmFap * lzSold;
+            const lzRevFap = get(`lazer_rev_fap_${s}`);
+            const lzRevHosp = lzRevFap - (lzAd * lzRateAd) - (lzChd * lzRateChd);
 
-            set(`lazer_pax_${s}`, lzPax);
             set(`lazer_occ_pct_${s}`, lzAvail > 0 ? (lzSold / lzAvail) * 100 : 0);
+            set(`lazer_pax_${s}`, lzPax);
             set(`lazer_coef_total_${s}`, lzSold > 0 ? lzPax / lzSold : 0);
             set(`lazer_coef_ad_${s}`, lzSold > 0 ? lzAd / lzSold : 0);
             set(`lazer_coef_chd_${s}`, lzSold > 0 ? lzChd / lzSold : 0);
             set(`lazer_rev_fap_${s}`, lzRevFap);
+            set(`lazer_rev_hosp_${s}`, lzRevHosp);
+            set(`lazer_dm_fap_${s}`, lzSold > 0 ? lzRevFap / lzSold : 0);
+            set(`lazer_dm_hosp_${s}`, lzSold > 0 ? lzRevHosp / lzSold : 0);
             set(`lazer_revpar_${s}`, lzAvail > 0 ? lzRevFap / lzAvail : 0);
 
+            const evCap = budgetData['event_capacity']?.[monthIdx] || 0;
+            set(`event_capacity_${s}`, evCap);
+            const evAvail = evCap * days;
+            set(`event_avail_${s}`, evAvail);
+
             const evSold = get(`event_sold_${s}`);
-            const evAvail = get(`event_avail_${s}`);
             const evAd = get(`event_adults_${s}`);
             const evChd = get(`event_chd_${s}`);
-            const evDmFap = get(`event_dm_fap_${s}`);
+            const evRateAd = get(`event_rate_ad_${s}`);
+            const evRateChd = get(`event_rate_chd_${s}`);
 
             const evPax = evAd + evChd;
-            const evRevFap = evDmFap * evSold;
-            const evExtra = get(`event_extra_rev_${s}`);
+            const evRevFap = get(`event_rev_fap_${s}`);
+            const evRevHosp = evRevFap - (evAd * evRateAd) - (evChd * evRateChd);
 
-            set(`event_pax_${s}`, evPax);
             set(`event_occ_pct_${s}`, evAvail > 0 ? (evSold / evAvail) * 100 : 0);
+            set(`event_pax_${s}`, evPax);
             set(`event_coef_total_${s}`, evSold > 0 ? evPax / evSold : 0);
             set(`event_coef_ad_${s}`, evSold > 0 ? evAd / evSold : 0);
             set(`event_coef_chd_${s}`, evSold > 0 ? evChd / evSold : 0);
             set(`event_rev_fap_${s}`, evRevFap);
+            set(`event_rev_hosp_${s}`, evRevHosp);
+            set(`event_dm_fap_${s}`, evSold > 0 ? evRevFap / evSold : 0);
+            set(`event_dm_hosp_${s}`, evSold > 0 ? evRevHosp / evSold : 0);
             set(`event_revpar_${s}`, evAvail > 0 ? evRevFap / evAvail : 0);
 
-            const lzExtra = get(`lazer_extra_rev_${s}`);
-            const gExtra = lzExtra + evExtra;
+            const gCap = budgetData['geral_capacity']?.[monthIdx] || 0;
+            set(`geral_capacity_${s}`, gCap);
+            const gAvail = gCap * days;
+            set(`geral_avail_${s}`, gAvail);
 
             const gSold = lzSold + evSold;
             const gAd = lzAd + evAd;
             const gChd = lzChd + evChd;
             const gPax = gAd + gChd;
             const gRevFap = lzRevFap + evRevFap;
-            const gAvail = get(`geral_avail_${s}`);
+            const gRevHosp = lzRevHosp + evRevHosp;
 
             set(`geral_sold_${s}`, gSold);
             set(`geral_occ_pct_${s}`, gAvail > 0 ? (gSold / gAvail) * 100 : 0);
@@ -465,10 +477,30 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             set(`geral_coef_ad_${s}`, gSold > 0 ? gAd / gSold : 0);
             set(`geral_chd_${s}`, gChd);
             set(`geral_coef_chd_${s}`, gSold > 0 ? gChd / gSold : 0);
+
+            set(`geral_rate_ad_${s}`, get(`geral_rate_ad_${s}`)); 
+            set(`geral_rate_chd_${s}`, get(`geral_rate_chd_${s}`)); 
+
             set(`geral_rev_fap_${s}`, gRevFap);
-            set(`geral_dm_fap_${s}`, gSold > 0 ? gRevFap / gSold : 0);
-            set(`geral_revpar_${s}`, gAvail > 0 ? gRevFap / gAvail : 0);
+            set(`geral_rev_hosp_${s}`, gRevHosp);
+
+            const lzExtra = get(`lazer_extra_rev_${s}`);
+            const evExtra = get(`event_extra_rev_${s}`);
+            const gExtraInput = get(`geral_extra_rev_${s}`);
+            const gExtra = gExtraInput !== 0 ? gExtraInput : (lzExtra + evExtra);
             set(`geral_extra_rev_${s}`, gExtra);
+
+            set(`geral_dm_fap_${s}`, gSold > 0 ? gRevFap / gSold : 0);
+            set(`geral_dm_hosp_${s}`, gSold > 0 ? gRevHosp / gSold : 0);
+            set(`geral_revpar_${s}`, gAvail > 0 ? gRevFap / gAvail : 0);
+            set(`geral_trevpor_${s}`, gSold > 0 ? (gRevFap + gExtra) / gSold : 0);
+            set(`geral_trevpar_${s}`, gAvail > 0 ? (gRevFap + gExtra) / gAvail : 0);
+
+            set(`lazer_trevpor_${s}`, lzSold > 0 ? (lzRevFap + lzExtra) / lzSold : 0);
+            set(`lazer_trevpar_${s}`, lzAvail > 0 ? (lzRevFap + lzExtra) / lzAvail : 0);
+
+            set(`event_trevpor_${s}`, evSold > 0 ? (evRevFap + evExtra) / evSold : 0);
+            set(`event_trevpar_${s}`, evAvail > 0 ? (evRevFap + evExtra) / evAvail : 0);
         });
 
         return newData;
