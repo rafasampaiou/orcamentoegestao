@@ -308,7 +308,7 @@ export const lazerRows: BudgetRow[] = [
     { id: 'lazer_rate_ad', label: 'Valor FAP Adulto', isInput: true, format: 'currency' },
     { id: 'lazer_rate_chd', label: 'Valor FAP Criança', isInput: true, format: 'currency' },
     { id: 'lazer_rev_fap', label: 'Receita COM rateios', isInput: true, format: 'currency' },
-    { id: 'lazer_rev_hosp', label: 'Receita SEM rateios', isCalculated: true, format: 'currency' },
+    { id: 'lazer_rev_hosp', label: 'Receita SEM rateios', isInput: true, format: 'currency' },
     { id: 'lazer_extra_rev', label: 'Receitas Extras', isInput: true, isManualReal: true, format: 'currency' },
     { id: 'lazer_dm_fap', label: 'DM bruta (sem iss)', isCalculated: true, format: 'currency' },
     { id: 'lazer_dm_hosp', label: 'DM líquida (sem iss)', isCalculated: true, format: 'currency' },
@@ -331,7 +331,7 @@ export const eventRows: BudgetRow[] = [
     { id: 'event_rate_ad', label: 'Valor FAP Adulto', isInput: true, format: 'currency' },
     { id: 'event_rate_chd', label: 'Valor FAP Criança', isInput: true, format: 'currency' },
     { id: 'event_rev_fap', label: 'Receita COM rateios', isInput: true, format: 'currency' },
-    { id: 'event_rev_hosp', label: 'Receita SEM rateios', isCalculated: true, format: 'currency' },
+    { id: 'event_rev_hosp', label: 'Receita SEM rateios', isInput: true, format: 'currency' },
     { id: 'event_extra_rev', label: 'Receitas Extras', isInput: true, isManualReal: true, format: 'currency' },
     { id: 'event_dm_fap', label: 'DM bruta (sem iss)', isCalculated: true, format: 'currency' },
     { id: 'event_dm_hosp', label: 'DM líquida (sem iss)', isCalculated: true, format: 'currency' },
@@ -602,7 +602,10 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
 
             const lzPax = lzAd + lzChd;
             const lzRevFap = get('lazer_rev_fap', i);
-            const lzRevHosp = lzRevFap - (lzAd * lzRateAd) - (lzChd * lzRateChd);
+            let lzRevHosp = get('lazer_rev_hosp', i);
+            if (!lzRevHosp && lzRevHosp !== 0) {
+                lzRevHosp = lzRevFap - (lzAd * lzRateAd) - (lzChd * lzRateChd);
+            }
 
             set('lazer_occ_pct', i, lzAvail > 0 ? (lzSold / lzAvail) * 100 : 0);
             set('lazer_pax', i, lzPax);
@@ -628,7 +631,10 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
 
             const evPax = evAd + evChd;
             const evRevFap = get('event_rev_fap', i);
-            const evRevHosp = evRevFap - (evAd * evRateAd) - (evChd * evRateChd);
+            let evRevHosp = get('event_rev_hosp', i);
+            if (!evRevHosp && evRevHosp !== 0) {
+                evRevHosp = evRevFap - (evAd * evRateAd) - (evChd * evRateChd);
+            }
 
             set('event_occ_pct', i, evAvail > 0 ? (evSold / evAvail) * 100 : 0);
             set('event_pax', i, evPax);
