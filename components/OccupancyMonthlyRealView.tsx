@@ -204,10 +204,30 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
             const contextKey = `${selectedHotel}_${selectedYear}_${i + 1}_${activeRealVersionId || ''}`;
             const monthData = realOccupancyData?.[contextKey] || {};
             
+            const daysInMonth = getDaysInMonth(selectedYear, i + 1);
+            let baseCap = 0;
+            if (monthData['geral_capacity_forecast'] !== undefined) {
+                baseCap = monthData['geral_capacity_forecast'];
+            } else if (budgetData && budgetData['geral_capacity'] && budgetData['geral_capacity'][i] !== undefined) {
+                baseCap = budgetData['geral_capacity'][i];
+            } else if (budgetData && budgetData['lazer_capacity'] && budgetData['lazer_capacity'][i] !== undefined) {
+                baseCap = budgetData['lazer_capacity'][i];
+            }
+
             allRowIds.forEach(id => {
                 if (id === 'days_month') {
                     // Preenchido automaticamente de acordo com a quantidade de dia de cada mês do ano
-                    result[id][i] = getDaysInMonth(selectedYear, i + 1);
+                    result[id][i] = daysInMonth;
+                    return;
+                }
+
+                if (id === 'lazer_capacity' || id === 'event_capacity' || id === 'geral_capacity') {
+                    result[id][i] = baseCap;
+                    return;
+                }
+
+                if (id === 'lazer_avail' || id === 'event_avail' || id === 'geral_avail') {
+                    result[id][i] = baseCap * daysInMonth;
                     return;
                 }
 

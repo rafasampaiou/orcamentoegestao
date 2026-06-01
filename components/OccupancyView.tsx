@@ -295,7 +295,7 @@ export const geralRows: BudgetRow[] = [
 ];
 
 export const lazerRows: BudgetRow[] = [
-    { id: 'lazer_capacity', label: 'Quartos', isInput: true, format: 'integer' },
+    { id: 'lazer_capacity', label: 'Quartos', isCalculated: true, format: 'integer' },
     { id: 'lazer_avail', label: 'Aptos disponíveis', isCalculated: true, format: 'integer' },
     { id: 'lazer_sold', label: 'Aptos vendidos', isInput: true, isManualReal: true, format: 'integer' },
     { id: 'lazer_occ_pct', label: '% de ocupação', isCalculated: true, format: 'percent' },
@@ -318,7 +318,7 @@ export const lazerRows: BudgetRow[] = [
 ];
 
 export const eventRows: BudgetRow[] = [
-    { id: 'event_capacity', label: 'Quartos', isInput: true, format: 'integer' },
+    { id: 'event_capacity', label: 'Quartos', isCalculated: true, format: 'integer' },
     { id: 'event_avail', label: 'Aptos disponíveis', isCalculated: true, format: 'integer' },
     { id: 'event_sold', label: 'Aptos vendidos', isInput: true, isManualReal: true, format: 'integer' },
     { id: 'event_occ_pct', label: '% de ocupação', isCalculated: true, format: 'percent' },
@@ -581,9 +581,11 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
 
         months.forEach(i => {
             const days = get('days_month', i);
+            const gCap = get('geral_capacity', i);
 
-            const lzCap = get('lazer_capacity', i);
+            const lzCap = gCap;
             const lzAvail = lzCap * days;
+            set('lazer_capacity', i, lzCap);
             set('lazer_avail', i, lzAvail);
 
             const lzSold = get('lazer_sold', i);
@@ -607,8 +609,9 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             set('lazer_dm_hosp', i, lzSold > 0 ? lzRevHosp / lzSold : 0);
             set('lazer_revpar', i, lzAvail > 0 ? lzRevFap / lzAvail : 0);
 
-            const evCap = get('event_capacity', i);
+            const evCap = gCap;
             const evAvail = evCap * days;
+            set('event_capacity', i, evCap);
             set('event_avail', i, evAvail);
 
             const evSold = get('event_sold', i);
@@ -722,7 +725,13 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
 
         const getRowData = (rowId: string) => {
             const monthIdx = (selectedMonth || 1) - 1;
-            const meta = budgetData?.[rowId]?.[monthIdx] || 0;
+            let meta = budgetData?.[rowId]?.[monthIdx] || 0;
+            
+            if (rowId === 'lazer_capacity' || rowId === 'event_capacity') {
+                meta = budgetData?.['geral_capacity']?.[monthIdx] || 0;
+            } else if (rowId === 'lazer_avail' || rowId === 'event_avail') {
+                meta = budgetData?.['geral_avail']?.[monthIdx] || 0;
+            }
 
             const fixedFields = ['days_month', 'geral_capacity', 'lazer_capacity', 'event_capacity', 'geral_avail', 'lazer_avail', 'event_avail'];
 
