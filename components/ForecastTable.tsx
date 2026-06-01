@@ -1701,16 +1701,14 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
         // REV-EXTRA = Extra Lazer + Extra Eventos + OR Extras
         sumAndSet('REV-EXTRA', [{ id: 'REV-EXTRA-LAZER' }, { id: 'REV-EXTRA-EVENTOS' }, { id: 'REV-EXTRA-OR' }], field);
 
-        // REV-TOTAL = REV-APT + REV-EXTRA
-        sumAndSet('REV-TOTAL', [{ id: 'REV-APT' }, { id: 'REV-EXTRA' }], field);
+        // REV-TOTAL = REV-APT + REV-EXTRA + REV-TIME + REV-ISS
+        sumAndSet('REV-TOTAL', [{ id: 'REV-APT' }, { id: 'REV-EXTRA' }, { id: 'REV-TIME' }, { id: 'REV-ISS' }], field);
 
-        // REV-NET = REV-TOTAL - REV-TIME - REV-ISS - REV-IMP
+        // REV-NET = REV-TOTAL - REV-IMP
         const revTotal = rowMap.get('REV-TOTAL')?.[field] || 0;
-        const revTime = rowMap.get('REV-TIME')?.[field] || 0;
-        const revIss = rowMap.get('REV-ISS')?.[field] || 0;
         const revImp = rowMap.get('REV-IMP')?.[field] || 0;
         const revNet = rowMap.get('REV-NET');
-        if (revNet) revNet[field] = revTotal - revTime - revIss - revImp;
+        if (revNet) revNet[field] = revTotal - revImp;
 
         // KPI: DM e RevPAR (Real time updates)
         const avail = rowMap.get('IND-1')?.[field] || 0;
