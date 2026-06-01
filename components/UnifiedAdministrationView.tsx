@@ -479,7 +479,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   };
 
   const recordImportHistory = async (rows: ImportedRow[]) => {
-    const groups = new Map<string, { months: Set<string>, total: number, versionId: string | null }>();
+    const groups = new Map<string, { hotel: string, tipo: string, ano: string, months: Set<string>, total: number, versionId: string | null }>();
 
     rows.forEach(r => {
       let tipoNormalized = 'Despesa';
@@ -489,10 +489,18 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       else if (r.tipo?.toLowerCase().includes('meta')) tipoNormalized = 'Meta';
 
       const yearStr = String(r.ano || new Date().getFullYear());
-      const key = `${r.hotel}|${tipoNormalized}|${yearStr}|${r.versionId || ''}`;
+      // Use a safe key for grouping
+      const key = `${r.hotel}_${tipoNormalized}_${yearStr}_${r.versionId || ''}`;
 
       if (!groups.has(key)) {
-        groups.set(key, { months: new Set(), total: 0, versionId: r.versionId || null });
+        groups.set(key, { 
+          hotel: r.hotel || 'Desconhecido', 
+          tipo: tipoNormalized, 
+          ano: yearStr, 
+          months: new Set(), 
+          total: 0, 
+          versionId: r.versionId || null 
+        });
       }
 
       const group = groups.get(key)!;
@@ -503,8 +511,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       group.total += valParsed;
     });
 
-    const entries = Array.from(groups.entries()).map(([key, data]) => {
-      const [hotel, tipo, ano] = key.split('|');
+    const entries = Array.from(groups.values()).map((data) => {
       const sortedMonths = Array.from(data.months)
         .map(Number)
         .filter(m => !isNaN(m))
@@ -517,9 +524,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       }).join(', ');
 
       return {
-        hotel,
-        tipo,
-        ano: ano,
+        hotel: data.hotel,
+        tipo: data.tipo,
+        ano: parseInt(data.ano) || new Date().getFullYear(),
         meses: monthNames || "1-12",
         version_id: data.versionId,
         user_id: null,
