@@ -1695,11 +1695,11 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
     ['real', 'budget', 'lastYear', 'previa'].forEach(f => {
         const field = f as 'real' | 'budget' | 'lastYear' | 'previa';
 
-        // REV-APT = Lazer + Eventos + Inclusas
-        sumAndSet('REV-APT', [{ id: 'REV-APT-LAZER' }, { id: 'REV-APT-EVENTOS' }, { id: 'REV-APT-INCLUSAS' }], field);
+        // REV-APT = Lazer + Eventos + Inclusas + OR
+        sumAndSet('REV-APT', [{ id: 'REV-APT-LAZER' }, { id: 'REV-APT-EVENTOS' }, { id: 'REV-APT-INCLUSAS' }, { id: 'REV-APT-OR' }], field);
 
-        // REV-EXTRA = Extra Lazer + Extra Eventos
-        sumAndSet('REV-EXTRA', [{ id: 'REV-EXTRA-LAZER' }, { id: 'REV-EXTRA-EVENTOS' }], field);
+        // REV-EXTRA = Extra Lazer + Extra Eventos + OR Extras
+        sumAndSet('REV-EXTRA', [{ id: 'REV-EXTRA-LAZER' }, { id: 'REV-EXTRA-EVENTOS' }, { id: 'REV-EXTRA-OR' }], field);
 
         // REV-TOTAL = REV-APT + REV-EXTRA
         sumAndSet('REV-TOTAL', [{ id: 'REV-APT' }, { id: 'REV-EXTRA' }], field);

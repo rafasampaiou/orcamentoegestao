@@ -744,9 +744,7 @@ export const getForecastData = (
     const revExtraItems = [
         { id: 'REV-EXTRA-LAZER', code: '1.02.01', label: 'Lazer', sourceId: 'lazer_extra_rev' },
         { id: 'REV-EXTRA-EVENTOS', code: '1.02.02', label: 'Eventos', sourceId: 'event_extra_rev' },
-        { id: 'REV-EXTRA-OR', code: '1.02.03', label: 'OR Extras', sourceId: 'geral_or_extras' },
-        { id: 'REV-EXTRA-TIME', code: '1.02.04', label: 'Cancelamento de Time Share', sourceId: 'geral_cancel_ts' },
-        { id: 'REV-EXTRA-ISS', code: '1.02.05', label: 'Receita de ISS', sourceId: 'geral_iss_rev' }
+        { id: 'REV-EXTRA-OR', code: '1.02.03', label: 'OR Extras', sourceId: 'geral_or_extras' }
     ];
 
     revExtraItems.forEach(item => {
@@ -760,6 +758,20 @@ export const getForecastData = (
 
         rows.push(generateRow(item.id, item.code, 'Revenue', item.label, valBudget, valReal, valLY, valPrevia, false, false, 2));
     });
+
+    // 1.03 Cancelamento de Time Share
+    const valBudgetTS = budgetOccupancyData['geral_cancel_ts'] ? budgetOccupancyData['geral_cancel_ts'][monthIdx] : 0;
+    const valRealTS = getRealOccValue('geral_cancel_ts_forecast') || 0;
+    const valPreviaTS = getRealOccValue('geral_cancel_ts_previa') || 0;
+    const valLYTS = getImportedValue('Cancelamento de Time Share', (selectedYear || 0) - 1, 'Real');
+    rows.push(generateRow('REV-TIME', '1.03', 'Revenue', 'CANCELAMENTO DE TIME SHARE', valBudgetTS, valRealTS, valLYTS, valPreviaTS, true, false, 1));
+
+    // 1.04 Receita de ISS
+    const valBudgetISS = budgetOccupancyData['geral_iss_rev'] ? budgetOccupancyData['geral_iss_rev'][monthIdx] : 0;
+    const valRealISS = getRealOccValue('geral_iss_rev_forecast') || 0;
+    const valPreviaISS = getRealOccValue('geral_iss_rev_previa') || 0;
+    const valLYISS = getImportedValue('Receita de ISS', (selectedYear || 0) - 1, 'Real');
+    rows.push(generateRow('REV-ISS', '1.04', 'Revenue', 'RECEITA DE ISS', valBudgetISS, valRealISS, valLYISS, valPreviaISS, true, false, 1));
 
     rows.push(generateRow('SPACER-BEFORE-IMP', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
 
