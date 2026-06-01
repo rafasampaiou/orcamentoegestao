@@ -720,26 +720,20 @@ export const getForecastData = (
     rows.push(generateRow('REV-APT', '1.01', 'Revenue', 'Receita de Apartamentos', 0, 0, 0, 0, true, false, 1));
 
     const revAptItems = [
-        { id: 'REV-APT-LAZER', code: '1.01.01', label: 'Lazer', importNames: ['Lazer', 'Receita de Apartamentos'] },
-        { id: 'REV-APT-EVENTOS', code: '1.01.02', label: 'Eventos', importNames: ['Eventos', 'Receita de Apartamentos'] },
+        { id: 'REV-APT-LAZER', code: '1.01.01', label: 'Lazer', sourceId: 'lazer_rev_fap' },
+        { id: 'REV-APT-EVENTOS', code: '1.01.02', label: 'Eventos', sourceId: 'event_rev_fap' },
+        { id: 'REV-APT-OR', code: '1.01.03', label: 'OR de hospedagem', sourceId: 'geral_or_hosp' }
     ];
 
     revAptItems.forEach(item => {
-        let valBudget = 0;
-        let valReal = 0;
-        let valPrevia = 0;
+        const valBudget = budgetOccupancyData[item.sourceId] ? budgetOccupancyData[item.sourceId][monthIdx] : 0;
+        const valReal = getRealOccValue(`${item.sourceId}_forecast`) || 0;
+        const valPrevia = getRealOccValue(`${item.sourceId}_previa`) || 0;
+        
         let valLY = 0;
-
-        // Special logic for Lazer/Eventos: if label matches 'Receita de Apartamentos', we MUST filter by CR
-        const crFilter = (item.label === 'Lazer' || item.label === 'Eventos') ? item.label : undefined;
-
-        const namesToTry = item.importNames || [item.label];
-        namesToTry.forEach(name => {
-            valBudget += getImportedValue(name, selectedYear, 'Budget', crFilter);
-            valPrevia += getPreviaOrReal(name, selectedYear, crFilter);
-            valReal += 0; // Forecast column starts empty
-            valLY += getImportedValue(name, (selectedYear || 0) - 1, 'Real', crFilter);
-        });
+        if (item.label === 'Lazer') valLY = getImportedValue('Lazer', (selectedYear || 0) - 1, 'Real', 'Lazer');
+        else if (item.label === 'Eventos') valLY = getImportedValue('Eventos', (selectedYear || 0) - 1, 'Real', 'Eventos');
+        else valLY = getImportedValue(item.label, (selectedYear || 0) - 1, 'Real');
 
         rows.push(generateRow(item.id, item.code, 'Revenue', item.label, valBudget, valReal, valLY, valPrevia, false, false, 2));
     });
@@ -748,31 +742,24 @@ export const getForecastData = (
     rows.push(generateRow('REV-EXTRA', '1.02', 'Revenue', 'Receitas Extras', 0, 0, 0, 0, true, false, 1));
 
     const revExtraItems = [
-        { id: 'REV-EXTRA-LAZER', code: '1.02.01', label: 'Lazer', importName: 'Extra Lazer' },
-        { id: 'REV-EXTRA-EVENTOS', code: '1.02.02', label: 'Eventos', importName: 'Extra Eventos' },
+        { id: 'REV-EXTRA-LAZER', code: '1.02.01', label: 'Lazer', sourceId: 'lazer_extra_rev' },
+        { id: 'REV-EXTRA-EVENTOS', code: '1.02.02', label: 'Eventos', sourceId: 'event_extra_rev' },
+        { id: 'REV-EXTRA-OR', code: '1.02.03', label: 'OR Extras', sourceId: 'geral_or_extras' },
+        { id: 'REV-EXTRA-TIME', code: '1.02.04', label: 'Cancelamento de Time Share', sourceId: 'geral_cancel_ts' },
+        { id: 'REV-EXTRA-ISS', code: '1.02.05', label: 'Receita de ISS', sourceId: 'geral_iss_rev' }
     ];
 
     revExtraItems.forEach(item => {
-        const valBudget = getImportedValue(item.label, selectedYear, 'Budget');
-        const valPrevia = getPreviaOrReal(item.label, selectedYear);
-        const valReal = 0; // Empty Forecast
-        const valLY = getImportedValue(item.label, (selectedYear || 0) - 1, 'Real');
+        const valBudget = budgetOccupancyData[item.sourceId] ? budgetOccupancyData[item.sourceId][monthIdx] : 0;
+        const valReal = getRealOccValue(`${item.sourceId}_forecast`) || 0;
+        const valPrevia = getRealOccValue(`${item.sourceId}_previa`) || 0;
+        
+        let valLY = getImportedValue(item.label, (selectedYear || 0) - 1, 'Real');
+        if (item.label === 'Lazer') valLY = getImportedValue('Extra Lazer', (selectedYear || 0) - 1, 'Real');
+        if (item.label === 'Eventos') valLY = getImportedValue('Extra Eventos', (selectedYear || 0) - 1, 'Real');
+
         rows.push(generateRow(item.id, item.code, 'Revenue', item.label, valBudget, valReal, valLY, valPrevia, false, false, 2));
     });
-
-    // 1.03 Cancelamento de Time Share
-    const valBudgetTS = getImportedValue('Cancelamento de Time Share', selectedYear, 'Budget');
-    const valPreviaTS = getPreviaOrReal('Cancelamento de Time Share', selectedYear);
-    const valRealTS = 0;
-    const valLYTS = getImportedValue('Cancelamento de Time Share', (selectedYear || 0) - 1, 'Real');
-    rows.push(generateRow('REV-TIME', '1.03', 'Revenue', 'Cancelamento de Time Share', valBudgetTS, valRealTS, valLYTS, valPreviaTS, false, false, 1));
-
-    // 1.04 Receita de ISS
-    const valBudgetISS = getImportedValue('Receita de ISS', selectedYear, 'Budget');
-    const valPreviaISS = getPreviaOrReal('Receita de ISS', selectedYear);
-    const valRealISS = 0;
-    const valLYISS = getImportedValue('Receita de ISS', (selectedYear || 0) - 1, 'Real');
-    rows.push(generateRow('REV-ISS', '1.04', 'Revenue', 'Receita de ISS', valBudgetISS, valRealISS, valLYISS, valPreviaISS, false, false, 1));
 
     rows.push(generateRow('SPACER-BEFORE-IMP', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
 
