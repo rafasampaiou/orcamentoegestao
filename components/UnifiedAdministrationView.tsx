@@ -493,13 +493,13 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       const key = `${r.hotel}_${tipoNormalized}_${yearStr}_${r.versionId || ''}`;
 
       if (!groups.has(key)) {
-        groups.set(key, { 
-          hotel: r.hotel || 'Desconhecido', 
-          tipo: tipoNormalized, 
-          ano: yearStr, 
-          months: new Set(), 
-          total: 0, 
-          versionId: r.versionId || null 
+        groups.set(key, {
+          hotel: r.hotel || 'Desconhecido',
+          tipo: tipoNormalized,
+          ano: yearStr,
+          months: new Set(),
+          total: 0,
+          versionId: r.versionId || null
         });
       }
 
