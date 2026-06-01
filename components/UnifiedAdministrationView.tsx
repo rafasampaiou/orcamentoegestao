@@ -2782,7 +2782,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
     const metrics = [
       "Quartos", "Aptos vendidos", "N° de hóspedes", "Adultos", "CHD",
-      "Valor FAP Adulto", "Valor FAP Criança", "Receita COM rateios", "Receita Extras"
+      "Valor FAP Adulto", "Valor FAP Criança", "Valor FAP Crianca", "Receita COM rateios", "Receita SEM rateios", "Receita Extras"
     ];
 
     segments.forEach(seg => {
@@ -3631,11 +3631,15 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                   newTable["Coef. Occ CHD"][m] = coefChd.toFixed(2);
 
                   const recCom = parseVal(newTable["Receita COM rateios"]?.[m]);
-                  const fapAdu = parseVal(newTable["Valor FAP Adulto"]?.[m]);
-                  const fapChd = parseVal(newTable["Valor FAP Criança"]?.[m]);
-                  const recSem = recCom - (adu * fapAdu) - (chd * fapChd);
-                  if (!newTable["Receita SEM rateios"]) newTable["Receita SEM rateios"] = {};
-                  newTable["Receita SEM rateios"][m] = recSem.toLocaleString('pt-BR');
+                  const recSem = parseVal(newTable["Receita SEM rateios"]?.[m]);
+                  
+                  const fapAdu = adu > 0 ? (recCom - recSem) / adu : 0;
+                  if (!newTable["Valor FAP Adulto"]) newTable["Valor FAP Adulto"] = {};
+                  newTable["Valor FAP Adulto"][m] = fapAdu.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                  
+                  const fapChd = chd > 0 ? (recCom - recSem) / chd : 0;
+                  if (!newTable["Valor FAP Criança"]) newTable["Valor FAP Criança"] = {};
+                  newTable["Valor FAP Criança"][m] = fapChd.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
                   const extra = parseVal(newTable["Receita Extras"]?.[m]);
                   const dmB = sold > 0 ? recCom / sold : 0;
@@ -3690,7 +3694,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                   onCellChange={(row, month, val) => {
                     setData(prev => ({ ...prev, [row]: { ...(prev[row] || {}), [month]: val } }));
                   }}
-                  readOnlyRows={["Dias do mês", "Aptos disponíveis", "% de ocupação", "Coef. Occ Geral", "Coef. Occ Adultos", "Coef. Occ CHD", "Receita SEM rateios", "DM bruta (sem iss)", "DM líquida (sem iss)", "REVPAR", "TREVPOR", "TREVPAR"]}
+                  readOnlyRows={["Dias do mês", "Aptos disponíveis", "% de ocupação", "Coef. Occ Geral", "Coef. Occ Adultos", "Coef. Occ CHD", "Valor FAP Adulto", "Valor FAP Criança", "DM bruta (sem iss)", "DM líquida (sem iss)", "REVPAR", "TREVPOR", "TREVPAR"]}
                   onPaste={(row, mIdx, pasted) => {
                     const newData = { ...currentData };
                     const startIdx = OCC_ROWS.indexOf(row);
@@ -4063,8 +4067,98 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               "Receita SEM rateios", "Receita Extras", "DM bruta (sem iss)", "DM liquida (sem iss)",
               "REVPAR", "TREVPOR", "TREVPAR"
             ];
-            const currentData = budgetOccupancySubTab === 'geral' ? occupancyBudgetData :
-              budgetOccupancySubTab === 'leisure' ? leisureBudgetData : eventsBudgetData;
+            const parseVal = (v: any) => {
+              if (!v) return 0;
+              return parseFloat(String(v).replace(/\./g, '').replace(',', '.').replace('%', '')) || 0;
+            };
+
+            const calculateTable = (data: Record<string, Record<number, string>>) => {
+              const newTable = { ...data };
+              const months = Array.from({ length: 12 }, (_, i) => i + 1);
+              const targetYear = budgetVersions.find(v => v.id === (targetBudgetVersionId || activeBudgetVersionId))?.year || new Date().getFullYear();
+              months.forEach(m => {
+                const days = new Date(targetYear, m, 0).getDate();
+                if (!newTable["Dias do mes"]) newTable["Dias do mes"] = {};
+                newTable["Dias do mes"][m] = String(days);
+
+                const qts = parseVal(newTable["Quartos"]?.[m]);
+                const available = days * qts;
+                if (!newTable["Aptos disponiveis"]) newTable["Aptos disponiveis"] = {};
+                newTable["Aptos disponiveis"][m] = available.toLocaleString('pt-BR');
+
+                const sold = parseVal(newTable["Aptos vendidos"]?.[m]);
+                const occ = available > 0 ? (sold / available) * 100 : 0;
+                if (!newTable["% de ocupacao"]) newTable["% de ocupacao"] = {};
+                newTable["% de ocupacao"][m] = occ.toFixed(1) + "%";
+
+                const hsp = parseVal(newTable["N de hospedes"]?.[m]);
+                const coefGeral = sold > 0 ? hsp / sold : 0;
+                if (!newTable["Coef. Occ Geral"]) newTable["Coef. Occ Geral"] = {};
+                newTable["Coef. Occ Geral"][m] = coefGeral.toFixed(2);
+
+                const adu = parseVal(newTable["Adultos"]?.[m]);
+                const coefAdu = sold > 0 ? adu / sold : 0;
+                if (!newTable["Coef. Occ Adultos"]) newTable["Coef. Occ Adultos"] = {};
+                newTable["Coef. Occ Adultos"][m] = coefAdu.toFixed(2);
+
+                const chd = parseVal(newTable["CHD"]?.[m]);
+                const coefChd = sold > 0 ? chd / sold : 0;
+                if (!newTable["Coef. Occ CHD"]) newTable["Coef. Occ CHD"] = {};
+                newTable["Coef. Occ CHD"][m] = coefChd.toFixed(2);
+
+                const recCom = parseVal(newTable["Receita COM rateios"]?.[m]);
+                const recSem = parseVal(newTable["Receita SEM rateios"]?.[m]);
+                
+                const fapAdu = adu > 0 ? (recCom - recSem) / adu : 0;
+                if (!newTable["Valor FAP Adulto"]) newTable["Valor FAP Adulto"] = {};
+                newTable["Valor FAP Adulto"][m] = fapAdu.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                
+                const fapChd = chd > 0 ? (recCom - recSem) / chd : 0;
+                if (!newTable["Valor FAP Crianca"]) newTable["Valor FAP Crianca"] = {};
+                newTable["Valor FAP Crianca"][m] = fapChd.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+                const extra = parseVal(newTable["Receita Extras"]?.[m]);
+                const dmB = sold > 0 ? recCom / sold : 0;
+                if (!newTable["DM bruta (sem iss)"]) newTable["DM bruta (sem iss)"] = {};
+                newTable["DM bruta (sem iss)"][m] = dmB.toLocaleString('pt-BR');
+
+                const dmL = sold > 0 ? recSem / sold : 0;
+                if (!newTable["DM liquida (sem iss)"]) newTable["DM liquida (sem iss)"] = {};
+                newTable["DM liquida (sem iss)"][m] = dmL.toLocaleString('pt-BR');
+
+                const revpar = available > 0 ? recCom / available : 0;
+                if (!newTable["REVPAR"]) newTable["REVPAR"] = {};
+                newTable["REVPAR"][m] = revpar.toLocaleString('pt-BR');
+
+                const trevpor = sold > 0 ? (recCom + extra) / sold : 0;
+                if (!newTable["TREVPOR"]) newTable["TREVPOR"] = {};
+                newTable["TREVPOR"][m] = trevpor.toLocaleString('pt-BR');
+
+                const trevpar = available > 0 ? (recCom + extra) / available : 0;
+                if (!newTable["TREVPAR"]) newTable["TREVPAR"] = {};
+                newTable["TREVPAR"][m] = trevpar.toLocaleString('pt-BR');
+              });
+              return newTable;
+            };
+
+            const aggregateGeral = () => {
+              const geral = { ...occupancyBudgetData };
+              const rowsToSum = ["Aptos vendidos", "N de hospedes", "Adultos", "CHD", "Receita COM rateios", "Receita Extras"];
+              const months = Array.from({ length: 12 }, (_, i) => i + 1);
+              months.forEach(m => {
+                rowsToSum.forEach(row => {
+                  const val = parseVal(leisureBudgetData[row]?.[m]) + parseVal(eventsBudgetData[row]?.[m]);
+                  if (!geral[row]) geral[row] = {};
+                  geral[row][m] = val.toLocaleString('pt-BR');
+                });
+              });
+              return calculateTable(geral);
+            };
+
+            const rawData = budgetOccupancySubTab === 'geral' ? aggregateGeral() :
+              budgetOccupancySubTab === 'leisure' ? calculateTable(leisureBudgetData) : calculateTable(eventsBudgetData);
+            const currentData = rawData;
+            
             const setData = budgetOccupancySubTab === 'geral' ? setOccupancyBudgetData :
               budgetOccupancySubTab === 'leisure' ? setLeisureBudgetData : setEventsBudgetData;
             return (
@@ -4072,7 +4166,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 rows={OCC_ROWS}
                 data={currentData}
                 onCellChange={(row, month, val) => setData(prev => ({ ...prev, [row]: { ...(prev[row] || {}), [month]: val } }))}
-                readOnlyRows={["Dias do mes", "Aptos disponiveis", "% de ocupacao", "Coef. Occ Geral", "Coef. Occ Adultos", "Coef. Occ CHD", "Receita SEM rateios", "DM bruta (sem iss)", "DM liquida (sem iss)", "REVPAR", "TREVPOR", "TREVPAR"]}
+                readOnlyRows={["Dias do mes", "Aptos disponiveis", "% de ocupacao", "Coef. Occ Geral", "Coef. Occ Adultos", "Coef. Occ CHD", "Valor FAP Adulto", "Valor FAP Crianca", "DM bruta (sem iss)", "DM liquida (sem iss)", "REVPAR", "TREVPOR", "TREVPAR"]}
                 onPaste={(row, mIdx, pasted) => {
                   const newData = { ...currentData };
                   const startIdx = OCC_ROWS.indexOf(row);

@@ -421,13 +421,13 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             const lzAd = get(`lazer_adults_${s}`);
             const lzChd = get(`lazer_chd_${s}`);
             
-            const lzDmFap = budgetData['lazer_dm_fap']?.[monthIdx] || 0;
-            const lzRateAd = budgetData['lazer_rate_ad']?.[monthIdx] || 0;
-            const lzRateChd = budgetData['lazer_rate_chd']?.[monthIdx] || 0;
-
             const lzPax = lzAd + lzChd;
-            const lzRevFap = lzSold * lzDmFap;
-            const lzRevHosp = lzRevFap - (lzAd * lzRateAd) - (lzChd * lzRateChd);
+            const lzRevFap = get(`lazer_rev_fap_${s}`);
+            let lzRevHosp = get(`lazer_rev_hosp_${s}`);
+            if (!lzRevHosp && lzRevHosp !== 0) lzRevHosp = 0;
+            
+            const lzRateAd = lzAd > 0 ? (lzRevFap - lzRevHosp) / lzAd : 0;
+            const lzRateChd = lzChd > 0 ? (lzRevFap - lzRevHosp) / lzChd : 0;
 
             set(`lazer_occ_pct_${s}`, lzAvail > 0 ? (lzSold / lzAvail) * 100 : 0);
             set(`lazer_pax_${s}`, lzPax);
@@ -452,13 +452,13 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             const evAd = get(`event_adults_${s}`);
             const evChd = get(`event_chd_${s}`);
             
-            const evDmFap = budgetData['event_dm_fap']?.[monthIdx] || 0;
-            const evRateAd = budgetData['event_rate_ad']?.[monthIdx] || 0;
-            const evRateChd = budgetData['event_rate_chd']?.[monthIdx] || 0;
-
             const evPax = evAd + evChd;
-            const evRevFap = evSold * evDmFap;
-            const evRevHosp = evRevFap - (evAd * evRateAd) - (evChd * evRateChd);
+            const evRevFap = get(`event_rev_fap_${s}`);
+            let evRevHosp = get(`event_rev_hosp_${s}`);
+            if (!evRevHosp && evRevHosp !== 0) evRevHosp = 0;
+            
+            const evRateAd = evAd > 0 ? (evRevFap - evRevHosp) / evAd : 0;
+            const evRateChd = evChd > 0 ? (evRevFap - evRevHosp) / evChd : 0;
 
             set(`event_occ_pct_${s}`, evAvail > 0 ? (evSold / evAvail) * 100 : 0);
             set(`event_pax_${s}`, evPax);
@@ -495,8 +495,8 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             set(`geral_chd_${s}`, gChd);
             set(`geral_coef_chd_${s}`, gSold > 0 ? gChd / gSold : 0);
 
-            set(`geral_rate_ad_${s}`, budgetData['geral_rate_ad']?.[monthIdx] || 0); 
-            set(`geral_rate_chd_${s}`, budgetData['geral_rate_chd']?.[monthIdx] || 0); 
+            set(`geral_rate_ad_${s}`, gAd > 0 ? (gRevFap - gRevHosp) / gAd : 0); 
+            set(`geral_rate_chd_${s}`, gChd > 0 ? (gRevFap - gRevHosp) / gChd : 0); 
 
             set(`geral_rev_fap_${s}`, gRevFap);
             set(`geral_rev_hosp_${s}`, gRevHosp);
@@ -598,14 +598,14 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             const lzAd = get('lazer_adults', i);
             const lzChd = get('lazer_chd', i);
             const lzRevFap = get('lazer_rev_fap', i);
-            const lzRateAd = lzAd > 0 ? lzRevFap / lzAd : 0;
-            const lzRateChd = lzChd > 0 ? lzRevFap / lzChd : 0;
-
             const lzPax = lzAd + lzChd;
             let lzRevHosp = get('lazer_rev_hosp', i);
             if (!lzRevHosp && lzRevHosp !== 0) {
                 lzRevHosp = 0;
             }
+            
+            const lzRateAd = lzAd > 0 ? (lzRevFap - lzRevHosp) / lzAd : 0;
+            const lzRateChd = lzChd > 0 ? (lzRevFap - lzRevHosp) / lzChd : 0;
 
             set('lazer_occ_pct', i, lzAvail > 0 ? (lzSold / lzAvail) * 100 : 0);
             set('lazer_pax', i, lzPax);
@@ -629,14 +629,14 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             const evAd = get('event_adults', i);
             const evChd = get('event_chd', i);
             const evRevFap = get('event_rev_fap', i);
-            const evRateAd = evAd > 0 ? evRevFap / evAd : 0;
-            const evRateChd = evChd > 0 ? evRevFap / evChd : 0;
-
             const evPax = evAd + evChd;
             let evRevHosp = get('event_rev_hosp', i);
             if (!evRevHosp && evRevHosp !== 0) {
                 evRevHosp = 0;
             }
+            
+            const evRateAd = evAd > 0 ? (evRevFap - evRevHosp) / evAd : 0;
+            const evRateChd = evChd > 0 ? (evRevFap - evRevHosp) / evChd : 0;
 
             set('event_occ_pct', i, evAvail > 0 ? (evSold / evAvail) * 100 : 0);
             set('event_pax', i, evPax);
@@ -671,8 +671,8 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             set('geral_chd', i, gChd);
             set('geral_coef_chd', i, gSold > 0 ? gChd / gSold : 0);
 
-            set('geral_rate_ad', i, get('geral_rate_ad', i)); 
-            set('geral_rate_chd', i, get('geral_rate_chd', i)); 
+            set('geral_rate_ad', i, gAd > 0 ? (gRevFap - gRevHosp) / gAd : 0); 
+            set('geral_rate_chd', i, gChd > 0 ? (gRevFap - gRevHosp) / gChd : 0); 
 
             set('geral_rev_fap', i, gRevFap);
             set('geral_rev_hosp', i, gRevHosp);
