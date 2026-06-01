@@ -91,16 +91,16 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
             
             // For Real, DM and Rates come from the Budget
             const lzDmFap = budgetData['lazer_dm_fap']?.[monthIdx] || 0;
-            const lzRateAd = budgetData['lazer_rate_ad']?.[monthIdx] || 0;
-            const lzRateChd = budgetData['lazer_rate_chd']?.[monthIdx] || 0;
-
             const lzPax = lzAd + lzChd;
             let lzRevFap = get(`lazer_rev_fap_${s}`);
             if (!lzRevFap) lzRevFap = lzSold * lzDmFap;
 
+            const lzRateAd = lzAd > 0 ? lzRevFap / lzAd : 0;
+            const lzRateChd = lzChd > 0 ? lzRevFap / lzChd : 0;
+
             let lzRevHosp = get(`lazer_rev_hosp_${s}`);
             if (!lzRevHosp && lzRevHosp !== 0) {
-                 lzRevHosp = lzRevFap - (lzAd * lzRateAd) - (lzChd * lzRateChd);
+                 lzRevHosp = 0;
             }
 
             set(`lazer_occ_pct_${s}`, lzAvail > 0 ? (lzSold / lzAvail) * 100 : 0);
@@ -128,16 +128,16 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
             const evChd = get(`event_chd_${s}`);
             
             const evDmFap = budgetData['event_dm_fap']?.[monthIdx] || 0;
-            const evRateAd = budgetData['event_rate_ad']?.[monthIdx] || 0;
-            const evRateChd = budgetData['event_rate_chd']?.[monthIdx] || 0;
-
             const evPax = evAd + evChd;
             let evRevFap = get(`event_rev_fap_${s}`);
             if (!evRevFap) evRevFap = evSold * evDmFap;
 
+            const evRateAd = evAd > 0 ? evRevFap / evAd : 0;
+            const evRateChd = evChd > 0 ? evRevFap / evChd : 0;
+
             let evRevHosp = get(`event_rev_hosp_${s}`);
             if (!evRevHosp && evRevHosp !== 0) {
-                 evRevHosp = evRevFap - (evAd * evRateAd) - (evChd * evRateChd);
+                 evRevHosp = 0;
             }
 
             set(`event_occ_pct_${s}`, evAvail > 0 ? (evSold / evAvail) * 100 : 0);
