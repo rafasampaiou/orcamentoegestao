@@ -656,9 +656,8 @@ export const getForecastData = (
         return r !== 0 ? r : p;
     };
 
-    // --- Helper to get Real Occupancy Overrides ---
     const getRealOccValue = (rowId: string) => {
-        const contextKey = `${selectedHotelName}_${selectedYear}_${selectedMonth}`;
+        const contextKey = `${selectedHotelName}_${selectedYear}_${selectedMonth}_${activeRealVersionId || ''}`;
         return realOccupancyData[contextKey]?.[rowId];
     };
 
@@ -1103,7 +1102,7 @@ export const getDynamicForecastData = (
     };
 
     const getRealOccValue = (rowId: string) => {
-        const contextKey = `${selectedHotelName}_${selectedYear}_${selectedMonth}`;
+        const contextKey = `${selectedHotelName}_${selectedYear}_${selectedMonth}_${activeRealVersionId || ''}`;
         return realOccupancyData[contextKey]?.[rowId];
     };
 

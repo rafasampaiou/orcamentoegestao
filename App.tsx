@@ -392,7 +392,9 @@ const App: React.FC = () => {
             } else if (v.id.startsWith('r')) {
               if (v.occupancyData) {
                 for (let i = 0; i < 12; i++) {
-                  const contextKey = `${v.hotelId}_${v.year}_${i + 1}_${v.id}`;
+                  // Resolve hotel name from hotelId to match how the UI accesses it via selectedHotel (which stores the name)
+                  const hotelName = remoteHotels.find(h => h.code === v.hotelId || h.id === v.hotelId)?.name || v.hotelId;
+                  const contextKey = `${hotelName}_${v.year}_${i + 1}_${v.id}`;
                   const monthData: Record<string, number> = {};
                   Object.keys(v.occupancyData).forEach(rowId => {
                     const val = v.occupancyData![rowId][i];
