@@ -65,12 +65,15 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
         const get = (key: string) => newData[key] || 0;
         const set = (key: string, val: number) => { newData[key] = val; };
 
+        const getDaysInMonth = (year: number, month: number) => new Date(year, month, 0).getDate();
+
         // For Monthly View, we update both forecast and previa if they edit it manually
         const suffixes = ['forecast', 'previa'];
 
         suffixes.forEach(s => {
             const currentDays = currentData[`days_month_${s}`];
-            const days = currentDays !== undefined ? currentDays : (budgetData['days_month']?.[monthIdx] || 0);
+            let days = currentDays !== undefined && currentDays > 0 ? currentDays : (budgetData['days_month']?.[monthIdx] || 0);
+            if (days === 0) days = getDaysInMonth(selectedYear, monthIdx + 1);
             set(`days_month_${s}`, days);
 
             const currentCap = currentData[`geral_capacity_${s}`];

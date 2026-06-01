@@ -579,8 +579,14 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             newData[key][idx] = val;
         };
 
+        const getDaysInMonth = (year: number, month: number) => new Date(year, month, 0).getDate();
+
         months.forEach(i => {
-            const days = get('days_month', i);
+            const currentDays = get('days_month', i);
+            const days = currentDays > 0 ? currentDays : getDaysInMonth(selectedYear, i + 1);
+            if (currentDays === 0) {
+                set('days_month', i, days);
+            }
             const gCap = get('geral_capacity', i);
 
             const lzCap = gCap;
@@ -636,7 +642,6 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             set('event_dm_hosp', i, evSold > 0 ? evRevHosp / evSold : 0);
             set('event_revpar', i, evAvail > 0 ? evRevFap / evAvail : 0);
 
-            const gCap = get('geral_capacity', i);
             const gAvail = gCap * days;
             set('geral_avail', i, gAvail);
 
