@@ -356,12 +356,113 @@ export const USALI_STRUCTURE = [
     { code: '', name: 'ISS', package: 'IMPOSTOS', master: 'IMPOSTOS' },
 ];
 
+export const defaultAccountConfigs: Record<string, { expenseType: ExpenseType, expenseDriver?: ExpenseDriver }> = {
+    // CUSTO DE ALIMENTOS E BEBIDAS
+    'Carnes / Aves / Peixes': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Condimentos / Conservas': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Embutidos / Massas': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Frios': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Guloseimas': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Hortifrutigranjeiros': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Laticinios': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Outros custos': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Paes / Biscoitos': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Secos': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Bebidas alcoolicas': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Bebidas nao alcoolicas': { expenseType: 'Variável', expenseDriver: 'PAX' },
+
+    // CUSTO DE PRODUTOS DIVERSOS
+    'Cigarros': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Custos Descartaveis': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Custos Diversos': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Diversos A&B': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Produtos diversos lojinha': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Vestuario': { expenseType: 'Variável', expenseDriver: 'PAX' },
+
+    // CUSTOS DE OUTRAS RECEITAS
+    'Custo com entretenimento': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Custo de aluguel de equipamentos': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Custo de estacionamento': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Custo de internet': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Custo de lavanderia hospedes': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Custo de servico de fotografia': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Custo de servico de massagens': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Custo de telefonia': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Custo de transporte de clientes': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Outros custos de servicos prestados': { expenseType: 'Variável', expenseDriver: 'PAX' },
+
+    // DESPESAS COM CONSERVACAO E LIMPEZA
+    'Material de limpeza': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Produtos de limpeza': { expenseType: 'Variável', expenseDriver: 'PAX' },
+
+    // DESPESAS COM MANUTENCAO
+    'Reparos e materiais - Ar condicionado': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Reparos e materiais - Caldeira': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Reparos e materiais - Elevador': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Reparos e materiais - Equipamentos de TI': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Reparos e materiais - Estrutura predial': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Reparos e materiais - Instalacao eletrica': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Reparos e materiais - Instalacao hidraulica': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Reparos e materiais - Instrumentacao / automacao': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Reparos e materiais - Jardins / Quadras / Animais': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Reparos e materiais - Maquinas e equipamentos': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Reparos e materiais - Material de consumo': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Reparos e materiais - Moveis e utensilios': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Reparos e materiais - Piscina': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Reparos e materiais - Restauracao': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Reparos e materiais - Telefonia': { expenseType: 'Variável', expenseDriver: 'PAX' },
+
+    // DESPESAS COM SERVICOS PUBLICOS
+    'Agua': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Combustiveis para Geradores': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Combustiveis para veiculos': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Energia eletrica': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Gas': { expenseType: 'Variável', expenseDriver: 'PAX' },
+
+    // DESPESAS OPERACIONAIS
+    'Amenidades / Suprimentos pra hospedes': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Danos e perdas': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Despesas com descartaveis': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Despesas de Taxa de Reservas': { expenseType: 'Variável', expenseDriver: 'Receita' },
+    'Falhas de Hospedagem / Overbook': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Indenizacao ao hospede': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Lavanderia enxoval': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Lavanderia uniformes': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Reposição de enxovais': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Reposição de materiais, moveis e utensílios': { expenseType: 'Variável', expenseDriver: 'PAX' },
+    'Suprimentos impressos e folheteria': { expenseType: 'Variável', expenseDriver: 'PAX' },
+
+    // DESPESAS COM VENDAS E MARKETING
+    'Marketing': { expenseType: 'Variável', expenseDriver: 'Receita' },
+    'Martech': { expenseType: 'Variável', expenseDriver: 'Receita' },
+    'Outros setores': { expenseType: 'Variável', expenseDriver: 'Receita' },
+    'Comissoes - Agencias': { expenseType: 'Variável', expenseDriver: 'Receita' },
+    'Comissoes - Cartoes de credito': { expenseType: 'Variável', expenseDriver: 'Receita' },
+    'Comissoes - OTAS': { expenseType: 'Variável', expenseDriver: 'Receita' },
+    'Comissoes - Representantes': { expenseType: 'Variável', expenseDriver: 'Receita' },
+
+    // DESPESAS COM MAO DE OBRA
+    'Comissoes vendedoras / executivas': { expenseType: 'Variável', expenseDriver: 'Receita' },
+    'Estagiarios': { expenseType: 'Variável', expenseDriver: 'Emocionadores' },
+    'Horas extras': { expenseType: 'Variável', expenseDriver: 'Emocionadores (CLT)' },
+    'Salarios e ordenados': { expenseType: 'Variável', expenseDriver: 'Emocionadores (CLT)' },
+    'Contribuicao sindical e assistencial': { expenseType: 'Variável', expenseDriver: 'Emocionadores (CLT)' },
+    'FGTS': { expenseType: 'Variável', expenseDriver: 'Emocionadores (CLT)' },
+    'INSS': { expenseType: 'Variável', expenseDriver: 'Emocionadores (CLT)' },
+    'PIS sobre folha': { expenseType: 'Variável', expenseDriver: 'Emocionadores (CLT)' },
+    'Seguro de Acidentes de Trabalho - SAT': { expenseType: 'Variável', expenseDriver: 'Emocionadores (CLT)' },
+    'Taxa de Servico': { expenseType: 'Variável', expenseDriver: 'Receita' },
+
+    // DESPESAS ADMINISTRATIVAS
+    'Processamento de dados e TI': { expenseType: 'Variável', expenseDriver: 'Receita' },
+    'TI': { expenseType: 'Variável', expenseDriver: 'Receita' },
+    'Outros': { expenseType: 'Variável', expenseDriver: 'Receita' }
+};
+
 const generateMockData = () => {
     const packages: CostPackage[] = [];
     const accounts: Account[] = [];
     const managers = ['u1', 'u2', 'u3', 'u4', 'u5', 'u6'];
-
-    const defaultAccountConfigs: Record<string, { expenseType: ExpenseType, expenseDriver?: ExpenseDriver }> = {
         // CUSTO DE ALIMENTOS E BEBIDAS
         'Carnes / Aves / Peixes': { expenseType: 'Variável', expenseDriver: 'PAX' },
         'Condimentos / Conservas': { expenseType: 'Variável', expenseDriver: 'PAX' },
@@ -580,7 +681,7 @@ const generateMockData = () => {
         const config = defaultAccountConfigs[item.name];
 
         accounts.push({
-            id: `acc-${index + 1}`,
+            id: `acc-${idCounter++}`,
             code: item.code,
             name: item.name,
             packageId: pkgId,
@@ -1022,7 +1123,11 @@ export const getForecastData = (
 
     sortedPackageKeys.forEach(key => {
         const [masterName, pkgName] = key.split('|');
-        const pkgAccs = expenseAccounts.filter(a => a.masterPackage === masterName && a.package === pkgName);
+        const pkgAccs = expenseAccounts.filter(a => a.masterPackage === masterName && a.package === pkgName).map(a => ({
+            ...a,
+            expenseType: defaultAccountConfigs[a.id]?.expenseType,
+            expenseDriver: defaultAccountConfigs[a.id]?.expenseDriver
+        }));
         const pkgCode = pkgAccs[0]?.packageCode || '';
 
         // Check for special drill-down cases
@@ -1239,6 +1344,19 @@ export const getDynamicForecastData = (
     currentPackages: CostPackage[] = mockPackages,
     budgetOccupancyData: Record<string, number[]> = {}
 ): ForecastRow[] => {
+    // Merge factory configs to ensure Variable settings are always respected
+    const activeAccounts = currentAccounts.map(acc => {
+        const factoryConfig = defaultAccountConfigs[acc.name];
+        if (factoryConfig) {
+            return {
+                ...acc,
+                expenseType: factoryConfig.expenseType || acc.expenseType,
+                expenseDriver: factoryConfig.expenseDriver || acc.expenseDriver
+            };
+        }
+        return acc;
+    });
+
     const rows: ForecastRow[] = [];
 
     // --- REUSE INDEXING LOGIC FROM getForecastData (Internal implementation) ---
