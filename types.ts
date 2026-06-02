@@ -256,7 +256,7 @@ export type ViewState =
   | 'admin_geral_gmd'
   | 'admin_geral_permissions'
   | 'admin_geral_import'
-  | 'admin_geral_forecast'
+
 
   // Legacy (redirect targets)
   | 'admin_geral'
