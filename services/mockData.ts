@@ -664,11 +664,17 @@ export const getForecastData = (
     // 1. INDICATORS
 
     // Section: GERAIS
-    const gAvailReal = getRealOccValue('geral_avail') ?? 100;
-    const gOccReal = getRealOccValue('geral_sold') ?? 75;
-    const gPaxReal = getRealOccValue('geral_pax') ?? 210;
-    const gAdultsReal = getRealOccValue('geral_adults') ?? 150;
-    const gChdReal = getRealOccValue('geral_chd') ?? 60;
+    const gAvailReal = getRealOccValue('geral_avail_forecast') ?? 100;
+    const gOccReal = getRealOccValue('geral_sold_forecast') ?? 75;
+    const gPaxReal = getRealOccValue('geral_pax_forecast') ?? 210;
+    const gAdultsReal = getRealOccValue('geral_adults_forecast') ?? 150;
+    const gChdReal = getRealOccValue('geral_chd_forecast') ?? 60;
+    
+    const gAvailPrevia = getRealOccValue('geral_avail_previa') ?? 0;
+    const gOccPrevia = getRealOccValue('geral_sold_previa') ?? 0;
+    const gPaxPrevia = getRealOccValue('geral_pax_previa') ?? 0;
+    const gAdultsPrevia = getRealOccValue('geral_adults_previa') ?? 0;
+    const gChdPrevia = getRealOccValue('geral_chd_previa') ?? 0;
 
     // Retrieve budget values from budgetOccupancyData based on the selectedMonth (0-indexed)
     const monthIdx = selectedMonth ? selectedMonth - 1 : 0;
@@ -695,15 +701,15 @@ export const getForecastData = (
     const trevporBudget = gOccBudget > 0 ? (revAptBudget + revExtraTotalBudget) / gOccBudget : 0;
     const trevparBudget = gAvailBudget > 0 ? (revAptBudget + revExtraTotalBudget) / gAvailBudget : 0;
 
-    rows.push(generateRow('IND-1', '', 'Indicators', 'UH Disponível', gAvailBudget, gAvailReal, 100, 0, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
-    rows.push(generateRow('IND-2', '', 'Indicators', 'UH Ocupada', gOccBudget, gOccReal, 70, 0, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
-    rows.push(generateRow('IND-3', '', 'Indicators', '% de Ocupação', gOccPctBudget, gAvailReal > 0 ? (gOccReal / gAvailReal) * 100 : 0, 70, 0, false, false, 0, undefined, { format: 'percent' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-1', '', 'Indicators', 'UH Disponível', gAvailBudget, gAvailReal, 100, gAvailPrevia, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-2', '', 'Indicators', 'UH Ocupada', gOccBudget, gOccReal, 70, gOccPrevia, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-3', '', 'Indicators', '% de Ocupação', gOccPctBudget, gAvailReal > 0 ? (gOccReal / gAvailReal) * 100 : 0, 70, gAvailPrevia > 0 ? (gOccPrevia / gAvailPrevia) * 100 : 0, false, false, 0, undefined, { format: 'percent' }, 'INDICADORES GERAIS'));
     rows.push(generateRow('IND-4', '', 'Indicators', 'DM Bruta', dmBudget, 850, 800, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
-    rows.push(generateRow('IND-5', '', 'Indicators', 'PAX', gPaxBudget, gPaxReal, 190, 0, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
-    rows.push(generateRow('IND-ADULTOS', '', 'Indicators', 'Adultos', gAdultsBudget, gAdultsReal, 140, 0, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
-    rows.push(generateRow('IND-CHD', '', 'Indicators', 'CHD', gChdBudget, gChdReal, 50, 0, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
-    rows.push(generateRow('IND-COEF-ADULTOS', '', 'Indicators', 'Coef. Adultos', gOccBudget > 0 ? gAdultsBudget / gOccBudget : 0, gOccReal > 0 ? gAdultsReal / gOccReal : 0, 2, 0, false, false, 0, undefined, { format: 'decimal' }, 'INDICADORES GERAIS'));
-    rows.push(generateRow('IND-COEF-CHD', '', 'Indicators', 'Coef. CHD', gOccBudget > 0 ? gChdBudget / gOccBudget : 0, gOccReal > 0 ? gChdReal / gOccReal : 0, 0.7, 0, false, false, 0, undefined, { format: 'decimal' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-5', '', 'Indicators', 'PAX', gPaxBudget, gPaxReal, 190, gPaxPrevia, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-ADULTOS', '', 'Indicators', 'Adultos', gAdultsBudget, gAdultsReal, 140, gAdultsPrevia, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-CHD', '', 'Indicators', 'CHD', gChdBudget, gChdReal, 50, gChdPrevia, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-COEF-ADULTOS', '', 'Indicators', 'Coef. Adultos', gOccBudget > 0 ? gAdultsBudget / gOccBudget : 0, gOccReal > 0 ? gAdultsReal / gOccReal : 0, 2, gOccPrevia > 0 ? gAdultsPrevia / gOccPrevia : 0, false, false, 0, undefined, { format: 'decimal' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-COEF-CHD', '', 'Indicators', 'Coef. CHD', gOccBudget > 0 ? gChdBudget / gOccBudget : 0, gOccReal > 0 ? gChdReal / gOccReal : 0, 0.7, gOccPrevia > 0 ? gChdPrevia / gOccPrevia : 0, false, false, 0, undefined, { format: 'decimal' }, 'INDICADORES GERAIS'));
     rows.push(generateRow('IND-6', '', 'Indicators', 'REVPAR', revparBudget, 637.5, 560, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
     rows.push(generateRow('IND-TREVPOR', '', 'Indicators', 'TREVPOR', trevporBudget, 0, 0, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
     rows.push(generateRow('IND-TREVPAR', '', 'Indicators', 'TREVPAR', trevparBudget, 0, 0, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
@@ -778,7 +784,7 @@ export const getForecastData = (
     // 1.05 Impostos (Azul conforme Receita Líquida, recuo zero)
     const valBudgetImp = getImportedValue('Impostos', selectedYear, 'Budget');
     const valPreviaImp = getPreviaOrReal('Impostos', selectedYear);
-    const valRealImp = 0;
+    const valRealImp = getImportedValue('Impostos', selectedYear, 'Forecast');
     const valLYImp = getImportedValue('Impostos', (selectedYear || 0) - 1, 'Real');
     rows.push(generateRow('REV-IMP', '1.05', 'Revenue', 'IMPOSTOS', valBudgetImp, valRealImp, valLYImp, valPreviaImp, true, true, 0));
 

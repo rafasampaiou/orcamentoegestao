@@ -445,7 +445,12 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             const newData = prevData.map(row => {
                 if (row.id !== rowId) return row;
 
-                if (field === 'previa' && (row.id === 'IND-1' || row.id === 'IND-2')) {
+                const isOccupancy = row.id.startsWith('IND-');
+                const isRevenue = row.id.startsWith('REV-APT-') || row.id.startsWith('REV-EXTRA-') || row.id === 'REV-TIME' || row.id === 'REV-ISS' || row.id === 'REV-TOTAL' || row.id === 'REV-NET' || row.id === 'REV-APT' || row.id === 'REV-EXTRA';
+                const isTaxes = row.id === 'REV-IMP';
+                const replicateToReal = isOccupancy || isRevenue || isTaxes;
+
+                if (field === 'previa' && replicateToReal) {
                     return { ...row, previa: value, real: value, isManualPreviaOverride: true, isManualOverride: true };
                 }
 
@@ -514,6 +519,14 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 row.previaConfig = { ...(row.previaConfig || { method: 'Fixed' }), method: 'Fixed', manualValue: val };
                                 row.previa = val;
                                 row.isManualPreviaOverride = true;
+                                const isOccupancy = row.id.startsWith('IND-');
+                                const isRevenue = row.id.startsWith('REV-APT-') || row.id.startsWith('REV-EXTRA-') || row.id === 'REV-TIME' || row.id === 'REV-ISS';
+                                const isTaxes = row.id === 'REV-IMP';
+                                if (isOccupancy || isRevenue || isTaxes) {
+                                    row.forecastConfig = { ...row.forecastConfig, method: 'Fixed', manualValue: val };
+                                    row.real = val;
+                                    row.isManualOverride = true;
+                                }
                             }
                         } else {
                             if (isManualRow) {
@@ -523,6 +536,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 } else {
                                     row.previa = val;
                                     row.isManualPreviaOverride = true;
+                                    row.real = val;
+                                    row.isManualOverride = true;
                                 }
                             } else {
                                 if (field === 'real') {
@@ -533,6 +548,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     row.previaConfig = { ...(row.previaConfig || { method: 'Fixed' }), method: 'Fixed', manualValue: val };
                                     row.previa = val;
                                     row.isManualPreviaOverride = true;
+                                    row.forecastConfig = { ...row.forecastConfig, method: 'Fixed', manualValue: val };
+                                    row.real = val;
+                                    row.isManualOverride = true;
                                 }
                             }
                         }

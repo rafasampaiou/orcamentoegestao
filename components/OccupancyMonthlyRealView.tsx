@@ -28,8 +28,8 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
     onSaveOccupancy
 }) => {
     const canEditOccupancy = currentUser?.role === UserRole.ADMIN ||
-                            currentUser?.role === UserRole.ENTITY_MANAGER ||
-                            currentUser?.role === UserRole.COST_ANALYST;
+        currentUser?.role === UserRole.ENTITY_MANAGER ||
+        currentUser?.role === UserRole.COST_ANALYST;
 
     const [decimalOverrides, setDecimalOverrides] = useState<Record<string, number>>({});
     const [savedIndicator, setSavedIndicator] = useState(false);
@@ -78,7 +78,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
 
             const currentCap = currentData[`geral_capacity_${s}`];
             const baseCap = currentCap !== undefined ? currentCap : (budgetData['geral_capacity']?.[monthIdx] || budgetData['lazer_capacity']?.[monthIdx] || 0);
-            
+
             // Replicate capacity
             const lzCap = baseCap;
             set(`lazer_capacity_${s}`, lzCap);
@@ -88,7 +88,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
             const lzSold = get(`lazer_sold_${s}`);
             const lzAd = get(`lazer_adults_${s}`);
             const lzChd = get(`lazer_chd_${s}`);
-            
+
             const lzDmFap = budgetData['lazer_dm_fap']?.[monthIdx] || 0;
             const lzPax = lzAd + lzChd;
             let lzRevFap = get(`lazer_rev_fap_${s}`);
@@ -111,7 +111,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
             set(`lazer_coef_total_${s}`, lzSold > 0 ? lzPax / lzSold : 0);
             set(`lazer_coef_ad_${s}`, lzSold > 0 ? lzAd / lzSold : 0);
             set(`lazer_coef_chd_${s}`, lzSold > 0 ? lzChd / lzSold : 0);
-            
+
             set(`lazer_rev_fap_${s}`, lzRevFap);
             set(`lazer_rev_hosp_${s}`, lzRevHosp);
             set(`lazer_dm_fap_${s}`, lzSold > 0 ? lzRevFap / lzSold : 0);
@@ -127,7 +127,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
             const evSold = get(`event_sold_${s}`);
             const evAd = get(`event_adults_${s}`);
             const evChd = get(`event_chd_${s}`);
-            
+
             const evDmFap = budgetData['event_dm_fap']?.[monthIdx] || 0;
             const evPax = evAd + evChd;
             let evRevFap = get(`event_rev_fap_${s}`);
@@ -150,7 +150,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
             set(`event_coef_total_${s}`, evSold > 0 ? evPax / evSold : 0);
             set(`event_coef_ad_${s}`, evSold > 0 ? evAd / evSold : 0);
             set(`event_coef_chd_${s}`, evSold > 0 ? evChd / evSold : 0);
-            
+
             set(`event_rev_fap_${s}`, evRevFap);
             set(`event_rev_hosp_${s}`, evRevHosp);
             set(`event_dm_fap_${s}`, evSold > 0 ? evRevFap / evSold : 0);
@@ -179,8 +179,8 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
             set(`geral_coef_chd_${s}`, gSold > 0 ? gChd / gSold : 0);
 
             const diferencaReceitaGeral = gRevFap - gRevHosp;
-            set(`geral_rate_ad_${s}`, gAd > 0 ? diferencaReceitaGeral / gAd : 0); 
-            set(`geral_rate_chd_${s}`, gChd > 0 ? diferencaReceitaGeral / gChd : 0); 
+            set(`geral_rate_ad_${s}`, gAd > 0 ? diferencaReceitaGeral / gAd : 0);
+            set(`geral_rate_chd_${s}`, gChd > 0 ? diferencaReceitaGeral / gChd : 0);
 
             set(`geral_rev_fap_${s}`, gRevFap);
             set(`geral_rev_hosp_${s}`, gRevHosp);
@@ -210,18 +210,18 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
     const tableData: Record<string, number[]> = useMemo(() => {
         const result: Record<string, number[]> = {};
         const allRowIds = [...geralRows, ...lazerRows, ...eventRows].map(r => r.id);
-        
+
         allRowIds.forEach(id => {
             result[id] = Array(12).fill(0);
         });
-        
+
         const getDaysInMonth = (year: number, month: number) => new Date(year, month, 0).getDate();
 
         for (let i = 0; i < 12; i++) {
             const contextKey = `${selectedHotel}_${selectedYear}_${i + 1}_${activeRealVersionId || ''}`;
             const rawMonthData = realOccupancyData?.[contextKey] || {};
             const monthData = recalculateRealForMonth(rawMonthData, i);
-            
+
             const daysInMonth = getDaysInMonth(selectedYear, i + 1);
             let baseCap = 0;
             if (monthData['geral_capacity_forecast'] !== undefined) {
@@ -271,13 +271,13 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
         setRealOccupancyData(prev => {
             const contextData = prev[contextKey] || {};
             // Update both forecast and previa since this is a manual entry
-            const newData = { 
-                ...contextData, 
+            const newData = {
+                ...contextData,
                 [`${rowId}_forecast`]: value,
-                [`${rowId}_previa`]: value 
+                [`${rowId}_previa`]: value
             };
             const recalculated = recalculateRealForMonth(newData, monthIndex);
-            
+
             return {
                 ...prev,
                 [contextKey]: recalculated
@@ -314,33 +314,33 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
                 )}
             </div>
 
-            <BudgetOccupancyTable 
-                title="Geral" 
-                rows={geralRows} 
-                data={tableData} 
-                onUpdate={handleUpdate} 
-                decimalOverrides={decimalOverrides} 
-                onToggleDecimals={toggleDecimals} 
+            <BudgetOccupancyTable
+                title="Geral"
+                rows={geralRows}
+                data={tableData}
+                onUpdate={handleUpdate}
+                decimalOverrides={decimalOverrides}
+                onToggleDecimals={toggleDecimals}
                 canEdit={canEditOccupancy}
                 isRealMode={true}
             />
-            <BudgetOccupancyTable 
-                title="Lazer" 
-                rows={lazerRows} 
-                data={tableData} 
-                onUpdate={handleUpdate} 
-                decimalOverrides={decimalOverrides} 
-                onToggleDecimals={toggleDecimals} 
+            <BudgetOccupancyTable
+                title="Lazer"
+                rows={lazerRows}
+                data={tableData}
+                onUpdate={handleUpdate}
+                decimalOverrides={decimalOverrides}
+                onToggleDecimals={toggleDecimals}
                 canEdit={canEditOccupancy}
                 isRealMode={true}
             />
-            <BudgetOccupancyTable 
-                title="Eventos Corporativos" 
-                rows={eventRows} 
-                data={tableData} 
-                onUpdate={handleUpdate} 
-                decimalOverrides={decimalOverrides} 
-                onToggleDecimals={toggleDecimals} 
+            <BudgetOccupancyTable
+                title="Eventos Corporativos"
+                rows={eventRows}
+                data={tableData}
+                onUpdate={handleUpdate}
+                decimalOverrides={decimalOverrides}
+                onToggleDecimals={toggleDecimals}
                 canEdit={canEditOccupancy}
                 isRealMode={true}
             />
