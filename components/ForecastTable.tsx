@@ -425,7 +425,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 };
 
                 if (updates.method === 'Variable' || (currentConfig.method === 'Variable' && !updates.method)) {
-                    const calculated = calculateRowValue(newConfig, prevData, calculationBase);
+                    const calculated = calculateRowValue(row, newConfig, prevData, calculationBase);
                     if (calculationBase === 'forecast') updatedRow.real = calculated;
                     else updatedRow.previa = calculated;
                 } else {
@@ -1658,17 +1658,29 @@ function getDriverValue(driver: ExpenseDriver | undefined, allRows: ForecastRow[
     }
 
     const row = allRows.find(r => r.id === targetRowId);
-    return row ? (base === 'forecast' ? row.real : row.previa) : 0;
+    if (!row) return 0;
+    if (base === 'forecast') return row.real;
+    if (base === 'previa') return row.previa;
+    if (base === 'budget') return row.budget;
+    return 0;
 }
 
-function calculateRowValue(config: ForecastConfig, allRows: ForecastRow[], base: 'forecast' | 'previa'): number {
+function calculateRowValue(row: ForecastRow | null, config: ForecastConfig, allRows: ForecastRow[], base: 'forecast' | 'previa'): number {
     if (!config) return 0;
 
     if (config.method === 'Fixed') {
         return config.manualValue || 0;
     } else {
         const driverValue = getDriverValue(config.driver, allRows, base);
-        const factor = config.factor || 0;
+        
+        let factor = config.factor || 0;
+        
+        if (factor === 0 && row && row.budget) {
+            const driverBudget = getDriverValue(config.driver, allRows, 'budget');
+            if (driverBudget && driverBudget > 0) {
+                 factor = row.budget / driverBudget;
+            }
+        }
 
         if (config.operator === 'divide' && factor !== 0) {
             return driverValue / factor;
@@ -1776,10 +1788,10 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
     const updatedRows = Array.from(rowMap.values());
     updatedRows.forEach(row => {
         if (row.forecastConfig.method === 'Variable') {
-            row.real = calculateRowValue(row.forecastConfig, updatedRows, 'forecast');
+            row.real = calculateRowValue(row, row.forecastConfig, updatedRows, 'forecast');
         }
         if (row.previaConfig?.method === 'Variable') {
-            row.previa = calculateRowValue(row.previaConfig, updatedRows, 'previa');
+            row.previa = calculateRowValue(row, row.previaConfig, updatedRows, 'previa');
         }
     });
 
