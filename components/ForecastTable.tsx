@@ -245,6 +245,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     });
 
     const [showColumnSettings, setShowColumnSettings] = useState(false);
+    const [showAlertModal, setShowAlertModal] = useState(false);
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
 
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
         description: 300,
@@ -582,10 +585,12 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
     const monthName = new Date(selectedYear || 2024, (selectedMonth || 1) - 1).toLocaleString('pt-BR', { month: 'long' });
 
-    const handleSaveResultsDirectly = async () => {
-        if (!window.confirm('Tem certeza que deseja Salvar os resultados?')) {
-            return;
-        }
+    const handleSaveResultsDirectly = () => {
+        setShowConfirmModal(true);
+    };
+
+    const confirmSaveResults = async () => {
+        setIsSaving(true);
 
         if (activeProjectionType === 'Fechamento oficial' && currentUser?.role !== UserRole.ADMIN) {
             alert('Apenas o ADMIN GERAL pode criar o evento de Fechamento Oficial.');
@@ -631,17 +636,20 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             const notificationMsg = `A unidade ${selectedHotel} salvou os resultados de ${activeProjectionType} para ${monthName}/${selectedYear}. Dados salvos no banco.`;
             console.log('Notification sent to Admin:', notificationMsg);
 
-            alert(`Resultados salvos com sucesso no Supabase!`);
+            toast.success(`Resultados salvos com sucesso no banco de dados!`);
             setShowDetails(false);
         } catch (err) {
             console.error('Failed to save projections:', err);
-            alert('Ocorreu um erro ao salvar os dados no Supabase. Tente novamente.');
+            toast.error('Ocorreu um erro ao salvar os dados no Supabase. Tente novamente.');
+        } finally {
+            setIsSaving(false);
+            setShowConfirmModal(false);
         }
     };
 
     const handleCalcularForecast = () => {
-        alert("Insira as despesas fixas na DRE e as linhas contábeis da DRE que são baseadas em Fixo nos respectivos pacotes contábeis.");
         setShowDetails(true);
+        setShowAlertModal(true);
     };
 
     return (
@@ -1621,6 +1629,80 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             >
                                 <CheckCircle2 size={18} />
                                 Salvar resultados
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Custom Modals */}
+            {showAlertModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col scale-in-center">
+                        <div className="p-6 bg-gradient-to-r from-emerald-500 to-teal-500 text-white flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                                <Activity size={24} className="text-white" />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-black">Cálculo Concluído</h3>
+                                <p className="text-sm text-emerald-100 font-medium">As variáveis foram atualizadas!</p>
+                            </div>
+                        </div>
+                        <div className="p-6 bg-slate-50">
+                            <p className="text-slate-700 text-base leading-relaxed text-center">
+                                Insira as despesas <strong>fixas</strong> na DRE e as linhas contábeis da DRE que são baseadas em <strong>Fixo</strong> nos respectivos pacotes contábeis.
+                            </p>
+                        </div>
+                        <div className="p-4 border-t border-gray-100 flex justify-end bg-white">
+                            <button
+                                onClick={() => setShowAlertModal(false)}
+                                className="px-6 py-2.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors shadow-md shadow-emerald-200 active:scale-95"
+                            >
+                                Entendi
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showConfirmModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col scale-in-center">
+                        <div className="p-6 bg-gradient-to-r from-indigo-600 to-blue-600 text-white flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                                <CheckCircle2 size={24} className="text-white" />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-black">Salvar Resultados</h3>
+                                <p className="text-sm text-indigo-100 font-medium">Atenção para esta ação</p>
+                            </div>
+                        </div>
+                        <div className="p-6 bg-slate-50">
+                            <p className="text-slate-700 text-base text-center font-medium">
+                                Tem certeza que deseja salvar os resultados?
+                            </p>
+                            <p className="text-xs text-slate-500 text-center mt-2">
+                                Após salvar, as linhas fixas serão ocultadas e os dados ficarão registrados no sistema.
+                            </p>
+                        </div>
+                        <div className="p-4 border-t border-gray-100 flex justify-end gap-3 bg-white">
+                            <button
+                                onClick={() => setShowConfirmModal(false)}
+                                disabled={isSaving}
+                                className="px-5 py-2.5 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors disabled:opacity-50"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={confirmSaveResults}
+                                disabled={isSaving}
+                                className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-200 disabled:opacity-50 active:scale-95"
+                            >
+                                {isSaving ? (
+                                    <><span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin"></span> Salvando...</>
+                                ) : (
+                                    'Sim, Salvar'
+                                )}
                             </button>
                         </div>
                     </div>
