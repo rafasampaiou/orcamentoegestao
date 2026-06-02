@@ -192,7 +192,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <NavItem depth={1} label="Logs"             icon={FileText}        active={currentView === 'admin_geral_logs'}        onClick={() => go('admin_geral_logs')} />
                 <NavItem depth={1} label="Permissões"       icon={ShieldCheck}     active={currentView === 'admin_geral_permissions'} onClick={() => go('admin_geral_permissions')} />
                 <NavItem depth={1} label="Importação"       icon={Upload}          active={currentView === 'admin_geral_import'}      onClick={() => go('admin_geral_import')} />
-                <NavItem depth={1} label="Forecast (Drivers)" icon={TrendingUp}    active={currentView === 'admin_geral_forecast'}    onClick={() => go('admin_geral_forecast')} />
+
               </div>
             )}
           </div>
