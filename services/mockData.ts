@@ -361,6 +361,207 @@ const generateMockData = () => {
     const accounts: Account[] = [];
     const managers = ['u1', 'u2', 'u3', 'u4', 'u5', 'u6'];
 
+    const defaultAccountConfigs: Record<string, { expenseType: ExpenseType, expenseDriver?: ExpenseDriver }> = {
+        // CUSTO DE ALIMENTOS E BEBIDAS
+        'Carnes / Aves / Peixes': { expenseType: 'Variável', expenseDriver: 'PAX' },
+        'Condimentos / Conservas': { expenseType: 'Variável', expenseDriver: 'PAX' },
+        'Embutidos / Massas': { expenseType: 'Variável', expenseDriver: 'PAX' },
+        'Frios': { expenseType: 'Variável', expenseDriver: 'PAX' },
+        'Guloseimas': { expenseType: 'Variável', expenseDriver: 'PAX' },
+        'Hortifrutigranjeiros': { expenseType: 'Variável', expenseDriver: 'PAX' },
+        'Laticinios': { expenseType: 'Variável', expenseDriver: 'PAX' },
+        'Outros custos': { expenseType: 'Variável', expenseDriver: 'PAX' },
+        'Paes / Biscoitos': { expenseType: 'Variável', expenseDriver: 'PAX' },
+        'Secos': { expenseType: 'Variável', expenseDriver: 'PAX' },
+        'Bebidas alcoolicas': { expenseType: 'Variável', expenseDriver: 'PAX' },
+        'Bebidas nao alcoolicas': { expenseType: 'Variável', expenseDriver: 'PAX' },
+
+        // CUSTO DE PRODUTOS DIVERSOS
+        'Cigarros': { expenseType: 'Variável', expenseDriver: 'PAX' },
+        'Custos Descartaveis': { expenseType: 'Variável', expenseDriver: 'PAX' },
+        'Custos Diversos': { expenseType: 'Variável', expenseDriver: 'PAX' },
+        'Diversos A&B': { expenseType: 'Variável', expenseDriver: 'PAX' },
+        'Produtos diversos lojinha': { expenseType: 'Variável', expenseDriver: 'PAX' },
+        'Vestuario': { expenseType: 'Variável', expenseDriver: 'PAX' },
+
+        // CUSTOS DE OUTRAS RECEITAS
+        'Custo com entretenimento': { expenseType: 'Variável', expenseDriver: 'PAX' },
+        'Custo de aluguel de equipamentos': { expenseType: 'Variável', expenseDriver: 'PAX' },
+        'Custo de estacionamento': { expenseType: 'Variável', expenseDriver: 'PAX' },
+        'Custo de internet': { expenseType: 'Variável', expenseDriver: 'PAX' },
+        'Custo de lavanderia hospedes': { expenseType: 'Variável', expenseDriver: 'PAX' },
+        'Custo de servico de fotografia': { expenseType: 'Variável', expenseDriver: 'PAX' },
+        'Custo de servico de massagens': { expenseType: 'Variável', expenseDriver: 'PAX' },
+        'Custo de telefonia': { expenseType: 'Variável', expenseDriver: 'PAX' },
+        'Custo de transporte de clientes': { expenseType: 'Variável', expenseDriver: 'PAX' },
+        'Outros custos de servicos prestados': { expenseType: 'Variável', expenseDriver: 'PAX' },
+
+        // DESPESAS COM CONSERVACAO E LIMPEZA
+        'Material de limpeza': { expenseType: 'Variável', expenseDriver: 'PAX' },
+        'Produtos de limpeza': { expenseType: 'Variável', expenseDriver: 'PAX' },
+        'Servicos de limpeza': { expenseType: 'Fixo' },
+        'Limpeza de carpetes': { expenseType: 'Fixo' },
+
+        // DESPESAS COM MANUTENCAO
+        'Contratos de manutencao': { expenseType: 'Fixo' },
+        'Reparos e materiais - Ar condicionado': { expenseType: 'Fixo' },
+        'Reparos e materiais - Caldeira': { expenseType: 'Fixo' },
+        'Reparos e materiais - Elevador': { expenseType: 'Fixo' },
+        'Reparos e materiais - Equipamentos de TI': { expenseType: 'Fixo' },
+        'Reparos e materiais - Estrutura predial': { expenseType: 'Fixo' },
+        'Reparos e materiais - Instalacao eletrica': { expenseType: 'Fixo' },
+        'Reparos e materiais - Instalacao hidraulica': { expenseType: 'Fixo' },
+        'Reparos e materiais - Instrumentacao / automacao': { expenseType: 'Fixo' },
+        'Reparos e materiais - Jardins / Quadras / Animais': { expenseType: 'Fixo' },
+        'Reparos e materiais - Maquinas e equipamentos': { expenseType: 'Fixo' },
+        'Reparos e materiais - Material de consumo': { expenseType: 'Fixo' },
+        'Reparos e materiais - Moveis e utensilios': { expenseType: 'Fixo' },
+        'Reparos e materiais - Piscina': { expenseType: 'Fixo' },
+        'Reparos e materiais - Restauracao': { expenseType: 'Fixo' },
+        'Reparos e materiais - Telefonia': { expenseType: 'Fixo' },
+        'Reparos e materiais - Veiculo': { expenseType: 'Fixo' },
+        'Servico de dedetizacao': { expenseType: 'Fixo' },
+        'Servicos de remocao de lixo e entulho': { expenseType: 'Fixo' },
+
+        // DESPESAS COM SERVICOS PUBLICOS
+        'Agua': { expenseType: 'Variável', expenseDriver: 'UH Ocupada' },
+        'Combustiveis para Geradores': { expenseType: 'Variável', expenseDriver: 'UH Ocupada' },
+        'Combustiveis para veiculos': { expenseType: 'Variável', expenseDriver: 'UH Ocupada' },
+        'Energia eletrica': { expenseType: 'Variável', expenseDriver: 'UH Ocupada' },
+        'Gas': { expenseType: 'Variável', expenseDriver: 'UH Ocupada' },
+
+        // DESPESAS OPERACIONAIS
+        'Amenidades / Suprimentos pra hospedes': { expenseType: 'Variável', expenseDriver: 'PAX' },
+        'Assinatura de TV a cabo': { expenseType: 'Fixo' },
+        'Danos e perdas': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Decoração e ornamentos': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Despesas com descartaveis': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Despesas de Taxa de Reservas': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Falhas de Hospedagem / Overbook': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Frete': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'ICMS - Diferencial de aliquota': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Indenizacao ao hospede': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Jornais / livros / revistas': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Lavanderia enxoval': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Lavanderia uniformes': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Locacao de moveis, utensílios e equipamentos': { expenseType: 'Fixo' },
+        'Material de esporte e lazer': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Material de estetica': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Musica, entretenimento e bem estar': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Reposição de enxovais': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Reposição de materiais, moveis e utensílios': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Room tax (taxa de turismo)': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Seguranca / Salva vidas': { expenseType: 'Fixo' },
+        'Servicos prestados por terceiros': { expenseType: 'Fixo' },
+        'Suprimentos impressos e folheteria': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Telefonia fixa': { expenseType: 'Fixo' },
+        'Telefonia móvel': { expenseType: 'Fixo' },
+
+        // BENEFICIOS AOS COLABORADORES
+        'Assiduidade': { expenseType: 'Variável', expenseDriver: 'Emocionadores (CLT)' },
+        'Ajuda de custos': { expenseType: 'Fixo' },
+        'Alojamento e casa de praia': { expenseType: 'Fixo' },
+        'Assistencia medica e odontologica': { expenseType: 'Variável', expenseDriver: 'Emocionadores (CLT)' },
+        'Atividades desportivas e sociais': { expenseType: 'Variável', expenseDriver: 'Emocionadores' },
+        'Brigada de incendio': { expenseType: 'Variável', expenseDriver: 'Emocionadores (CLT)' },
+        'Cesta basica': { expenseType: 'Variável', expenseDriver: 'Emocionadores (CLT)' },
+        'Consumo interno': { expenseType: 'Variável', expenseDriver: 'Emocionadores' },
+        'Cursos e treinamentos': { expenseType: 'Variável', expenseDriver: 'Emocionadores (CLT)' },
+        'PPRA e PCMSO': { expenseType: 'Variável', expenseDriver: 'Emocionadores (CLT)' },
+        'Produtividade / Premiacao': { expenseType: 'Fixo' },
+        'Refeicao (PAT)': { expenseType: 'Variável', expenseDriver: 'Emocionadores' },
+        'Seguro de vida': { expenseType: 'Variável', expenseDriver: 'Emocionadores (CLT)' },
+        'Ticket alimentacao': { expenseType: 'Fixo' },
+        'Vale Transporte': { expenseType: 'Variável', expenseDriver: 'Emocionadores' },
+
+        // DESPESAS COM PESSOAL
+        'Acordo judicial trabalhista': { expenseType: 'Fixo' },
+        'Adicional noturno': { expenseType: 'Fixo' },
+        'Aviso Previo Indenizado': { expenseType: 'Fixo' },
+        'Comissoes vendedoras / executivas': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Decimo terceiro salario': { expenseType: 'Variável', expenseDriver: 'Emocionadores (CLT)' },
+        'Estagiarios': { expenseType: 'Fixo' },
+        'Ferias': { expenseType: 'Variável', expenseDriver: 'Emocionadores (CLT)' },
+        'Gratificacao': { expenseType: 'Fixo' },
+        'Horas extras': { expenseType: 'Variável', expenseDriver: 'Emocionadores (CLT)' },
+        'Indenizacoes trabalhistas': { expenseType: 'Fixo' },
+        'Participacao nos Lucros e Resultados - PLR': { expenseType: 'Variável', expenseDriver: 'Emocionadores (CLT)' },
+        'Pro labore': { expenseType: 'Fixo' },
+        'Salario maternidade': { expenseType: 'Variável', expenseDriver: 'Emocionadores (CLT)' },
+        'Salarios e ordenados': { expenseType: 'Variável', expenseDriver: 'Emocionadores (CLT)' },
+        'Uniformes e fantasias': { expenseType: 'Variável', expenseDriver: 'Emocionadores (CLT)' },
+        'EPI e EPC': { expenseType: 'Variável', expenseDriver: 'Emocionadores' },
+
+        // ENCARGOS SOCIAIS
+        'Contribuicao sindical e assistencial': { expenseType: 'Fixo' },
+        'FGTS': { expenseType: 'Variável', expenseDriver: 'Emocionadores (CLT)' },
+        'FGTS Rescisorio': { expenseType: 'Fixo' },
+        'INSS': { expenseType: 'Variável', expenseDriver: 'Emocionadores' },
+        'PIS s/ folha de pagamento': { expenseType: 'Variável', expenseDriver: 'Emocionadores (CLT)' },
+
+        // SERVIÇOS DE TERCEIROS
+        'Servicos de terceiros temporarios': { expenseType: 'Variável', expenseDriver: 'KPI de produtividade' },
+        'Servicos de terceiros longo prazo': { expenseType: 'Fixo' },
+        'Serviços contratados de prestadores PJ - MEI': { expenseType: 'Variável', expenseDriver: 'KPI de produtividade' },
+
+        // DESPESAS ADMINISTRATIVAS
+        'Assessoria contabil': { expenseType: 'Fixo' },
+        'Assessoria e perdas com cobranca': { expenseType: 'Fixo' },
+        'Assessoria jurídica e advocaticia': { expenseType: 'Fixo' },
+        'Associacao de classe': { expenseType: 'Fixo' },
+        'Auditoria externa': { expenseType: 'Fixo' },
+        'Comissao cartao Amex': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Comissao cartao Diners': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Comissao cartao MasterCard': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Comissao cartao Visa': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Comissao Elo/ Cabal/ Hipercard/ Alelo/ Discover': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Comissoes de agencias': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Conducao, alimentacao e quilometragem': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Consultas a SERASA e SPC': { expenseType: 'Fixo' },
+        'Consultoria / Assessoria': { expenseType: 'Fixo' },
+        'Correio / Malote / Motoboy': { expenseType: 'Fixo' },
+        'Despesas com Internet': { expenseType: 'Fixo' },
+        'Despesas com veiculos': { expenseType: 'Fixo' },
+        'Despesas com viagens e estadas': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Despesas de Taxa de Administracao': { expenseType: 'Variável', expenseDriver: 'Definido Manualmente' },
+        'Despesas Nao Dedutiveis terceiros': { expenseType: 'Variável', expenseDriver: 'Definido Manualmente' },
+        'Despesas Nao Dedutiveis pequenas despesas': { expenseType: 'Variável', expenseDriver: 'Definido Manualmente' },
+        'Direito Autoral e de Imagem': { expenseType: 'Variável', expenseDriver: 'PAX' },
+        'Doacao/Donativos': { expenseType: 'Variável', expenseDriver: 'Definido Manualmente' },
+        'Indenizacoes e acordo judicial civil': { expenseType: 'Fixo' },
+        'Licença de uso e marca': { expenseType: 'Variável', expenseDriver: 'Definido Manualmente' },
+        'Material de escritorio': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Multas e autuações diversas': { expenseType: 'Variável', expenseDriver: 'Definido Manualmente' },
+        'Processamentos de dados e TI': { expenseType: 'Fixo' },
+        'Provisão Devedores Duvidosos - PDD': { expenseType: 'Variável', expenseDriver: 'Definido Manualmente' },
+        'Recrutamento e selecao': { expenseType: 'Fixo' },
+        'Seguros': { expenseType: 'Variável', expenseDriver: 'Definido Manualmente' },
+        'Servicos de cartorio, autenticacoes e copias': { expenseType: 'Variável', expenseDriver: 'Definido Manualmente' },
+        'Suprimentos de informatica': { expenseType: 'Fixo' },
+        'Taxa de condominio e aluguel de imoveis': { expenseType: 'Variável', expenseDriver: 'Definido Manualmente' },
+        'Taxas fiscais e legais': { expenseType: 'Fixo' },
+        'Projetos Sustentáveis': { expenseType: 'Fixo' },
+        'Licença de plataforma TI': { expenseType: 'Variável', expenseDriver: 'Definido Manualmente' },
+
+        // DESPESAS COM VENDAS E MARKETING
+        'Assessoria de imprensa': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Cortesias': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Despesas com fidelizacao de clientes': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Despesas de Taxa de Marketing': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Despesas de Taxa de Uso da Marca': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Divulgacao, anuncio e publicacao': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Eventos, feiras e promocoes': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+        'Material promocional': { expenseType: 'Variável', expenseDriver: 'Receita Bruta' },
+
+        // DESPESAS FINANCEIRAS E BANCARIAS
+        'Tarifas e despesas bancarias diversas': { expenseType: 'Fixo' },
+
+        // OUTROS IMPOSTOS
+        'Funrural': { expenseType: 'Fixo' },
+        'IPVA': { expenseType: 'Fixo' },
+        'ITBI e ITR': { expenseType: 'Fixo' }
+    };
+
     const packageMap = new Map<string, string>(); // Name -> ID
 
     USALI_STRUCTURE.forEach((item, index) => {
@@ -376,6 +577,8 @@ const generateMockData = () => {
             });
         }
 
+        const config = defaultAccountConfigs[item.name];
+
         accounts.push({
             id: `acc-${index + 1}`,
             code: item.code,
@@ -385,7 +588,9 @@ const generateMockData = () => {
             packageCode: '',
             masterPackage: item.master,
             masterPackageCode: '',
-            type: 'Fixed'
+            type: 'Fixed',
+            expenseType: config?.expenseType,
+            expenseDriver: config?.expenseDriver
         });
     });
 
