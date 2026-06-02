@@ -784,7 +784,7 @@ export const getForecastData = (
     // 1.05 Impostos (Azul conforme Receita Líquida, recuo zero)
     const valBudgetImp = getImportedValue('Impostos', selectedYear, 'Budget');
     const valPreviaImp = getPreviaOrReal('Impostos', selectedYear);
-    const valRealImp = getImportedValue('Impostos', selectedYear, 'Forecast');
+    const valRealImp = valPreviaImp;
     const valLYImp = getImportedValue('Impostos', (selectedYear || 0) - 1, 'Real');
     rows.push(generateRow('REV-IMP', '1.05', 'Revenue', 'IMPOSTOS', valBudgetImp, valRealImp, valLYImp, valPreviaImp, true, true, 0));
 
