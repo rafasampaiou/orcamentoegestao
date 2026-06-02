@@ -349,7 +349,24 @@ const App: React.FC = () => {
         if (remoteCostCenters && isMounted) setCostCenters(remoteCostCenters);
 
         const remoteAccounts = await supabaseService.getAccounts();
-        if (remoteAccounts && isMounted) setAccounts(remoteAccounts);
+        if (remoteAccounts && isMounted) {
+          setAccounts(remoteAccounts);
+          // Auto-migration for factory account configurations
+          if (!localStorage.getItem('accounts_migrated_v4')) {
+            const merged = remoteAccounts.map(rAcc => {
+              const mAcc = mockAccounts.find(m => m.name === rAcc.name);
+              if (mAcc) {
+                return { ...rAcc, expenseType: mAcc.expenseType, expenseDriver: mAcc.expenseDriver };
+              }
+              return rAcc;
+            });
+            supabaseService.upsertAccounts(merged).then(() => {
+              setAccounts(merged);
+              localStorage.setItem('accounts_migrated_v4', 'true');
+              console.log('Migrated accounts successfully to factory defaults.');
+            }).catch(console.error);
+          }
+        }
 
         const remoteProfiles = await supabaseService.getProfiles();
         if (remoteProfiles && isMounted) setUsers(remoteProfiles);
