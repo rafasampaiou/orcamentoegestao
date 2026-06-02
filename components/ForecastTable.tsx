@@ -583,6 +583,10 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     const monthName = new Date(selectedYear || 2024, (selectedMonth || 1) - 1).toLocaleString('pt-BR', { month: 'long' });
 
     const handleSaveResultsDirectly = async () => {
+        if (!window.confirm('Tem certeza que deseja Salvar os resultados?')) {
+            return;
+        }
+
         if (activeProjectionType === 'Fechamento oficial' && currentUser?.role !== UserRole.ADMIN) {
             alert('Apenas o ADMIN GERAL pode criar o evento de Fechamento Oficial.');
             return;
@@ -628,10 +632,16 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             console.log('Notification sent to Admin:', notificationMsg);
 
             alert(`Resultados salvos com sucesso no Supabase!`);
+            setShowDetails(false);
         } catch (err) {
             console.error('Failed to save projections:', err);
             alert('Ocorreu um erro ao salvar os dados no Supabase. Tente novamente.');
         }
+    };
+
+    const handleCalcularForecast = () => {
+        alert("Insira as despesas fixas na DRE e as linhas contábeis da DRE que são baseadas em Fixo nos respectivos pacotes contábeis.");
+        setShowDetails(true);
     };
 
     return (
@@ -726,11 +736,11 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                         )}
                         {canEditForecast && (
                             <button
-                                onClick={() => { setImportText(''); setImportResult(null); setShowImportModal(true); }}
+                                onClick={handleCalcularForecast}
                                 className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-md text-base font-bold"
                             >
-                                <Upload size={20} />
-                                Importar do Excel
+                                <Activity size={20} />
+                                Calcular Forecast
                             </button>
                         )}
                     </div>
