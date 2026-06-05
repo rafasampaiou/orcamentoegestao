@@ -923,8 +923,8 @@ const App: React.FC = () => {
         </div>
       );
       case 'dashboard': return (
-        <div className="max-w-[98%] mx-auto px-4 py-6">
-          <div className="bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-2">
+        <div className="max-w-[98%] mx-auto px-4 py-6 h-[calc(100vh-5rem)]">
+          <div className="bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-2 h-full flex flex-col overflow-hidden">
             <ForecastTable
               selectedMonth={selectedDate.getMonth() + 1}
               selectedYear={selectedDate.getFullYear()}

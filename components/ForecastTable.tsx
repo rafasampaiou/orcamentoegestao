@@ -263,9 +263,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         lastYear: 120,
         deltaLY: 120,
         deltaLYPct: 120,
-        driverPrevia: 100,
-        driverForecast: 100,
-        driverBudget: 100,
+        driverPrevia: 70,
+        driverForecast: 70,
+        driverBudget: 70,
     });
 
     const [resizingColumn, setResizingColumn] = useState<string | null>(null);
@@ -922,12 +922,16 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     </th>
                                 )}
 
+                                {(columnVisibility.driverPrevia || columnVisibility.driverForecast || columnVisibility.driverBudget) && (
+                                    <th className="w-2 bg-transparent border-none p-0"></th>
+                                )}
+
                                 {columnVisibility.driverPrevia && (
                                     <th
                                         style={{ width: columnWidths.driverPrevia }}
                                         className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 border-l border-sky-200 group relative text-xs"
                                     >
-                                        INDICADOR<br />(PRÉVIA)
+                                        KPI<br />(PRÉVIA)
                                         <div
                                             onMouseDown={(e) => handleResizeStart(e, 'driverPrevia')}
                                             className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
@@ -940,7 +944,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         style={{ width: columnWidths.driverForecast }}
                                         className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 group relative text-xs"
                                     >
-                                        INDICADOR<br />(FORECAST)
+                                        KPI<br />(FORECAST)
                                         <div
                                             onMouseDown={(e) => handleResizeStart(e, 'driverForecast')}
                                             className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
@@ -951,9 +955,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 {columnVisibility.driverBudget && (
                                     <th
                                         style={{ width: columnWidths.driverBudget }}
-                                        className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 group relative text-xs"
+                                        className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 border-r border-sky-200 group relative text-xs"
                                     >
-                                        INDICADOR<br />(META)
+                                        KPI<br />(META)
                                         <div
                                             onMouseDown={(e) => handleResizeStart(e, 'driverBudget')}
                                             className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
@@ -1162,6 +1166,10 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                                 <td className={`px-2 py-1 text-right tabular-nums ${previaLYColor} ${isBlueHighlight ? 'bg-sky-100' : 'bg-orange-50/10'} truncate`}>
                                                     {formatPercentDiff(previaLYPct)}
                                                 </td>
+                                            )}
+
+                                            {(columnVisibility.driverPrevia || columnVisibility.driverForecast || columnVisibility.driverBudget) && (
+                                                <td className="w-2 bg-transparent border-none p-0"></td>
                                             )}
 
                                             {columnVisibility.driverPrevia && (
