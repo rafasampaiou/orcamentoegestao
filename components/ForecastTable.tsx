@@ -450,6 +450,29 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         });
     };
 
+    const handleKpiFactorChange = (rowId: string, base: 'forecast' | 'previa', newFactor: number) => {
+        setData(prevData => {
+            const newData = prevData.map(row => {
+                if (row.id !== rowId) return row;
+
+                const currentConfig = base === 'forecast' ? row.forecastConfig : (row.previaConfig || { method: 'Fixed' });
+                const newConfig = { ...currentConfig, factor: newFactor, method: 'Variable' as const };
+
+                const updatedRow = {
+                    ...row,
+                    [base === 'forecast' ? 'forecastConfig' : 'previaConfig']: newConfig
+                };
+
+                const calculated = calculateRowValue(updatedRow, newConfig, prevData, base);
+                if (base === 'forecast') updatedRow.real = calculated;
+                else updatedRow.previa = calculated;
+
+                return updatedRow;
+            });
+            return recalculateTotals(newData, packages, accounts);
+        });
+    };
+
     const handleManualValueChange = (rowId: string, field: 'real' | 'previa', value: number) => {
         setData(prevData => {
             const newData = prevData.map(row => {
@@ -1003,7 +1026,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 if (row.category === 'Spacer') {
                                     return (
                                         <tr key={row.id} className="bg-transparent border-none">
-                                            <td colSpan={visibleBaseCols} className="h-6 border-y border-gray-200 bg-gray-100/50"></td>
+                                            <td colSpan={visibleBaseCols} className="h-6 bg-white border-y-2 border-white"></td>
                                             {(columnVisibility.driverPrevia || columnVisibility.driverForecast || columnVisibility.driverBudget) && (
                                                 <td className="w-4 bg-white border-y-2 border-white p-0 relative"></td>
                                             )}
@@ -1187,25 +1210,41 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             )}
 
                                             {columnVisibility.driverPrevia && (
-                                                <td className={`px-2 py-1 text-center tabular-nums text-xs truncate ${hideKpi ? 'bg-white border-y-2 border-l-2 border-white text-transparent' : 'border-l border-b border-slate-200 text-slate-500 bg-slate-50'}`}>
+                                                <td className={`px-1 text-center tabular-nums text-xs truncate ${hideKpi ? 'bg-white border border-white text-transparent' : 'border border-slate-200 text-slate-500 bg-slate-50'}`}>
                                                     {!hideKpi && row.category === 'Costs' && row.rowConfig?.expenseType === 'Variável' && row.rowConfig?.expenseDriver
-                                                        ? formatValue(getDriverValue(row.rowConfig.expenseDriver, data, 'previa'), 'decimal')
+                                                        ? (canEditForecast && !isMonthClosed && isRowEditableForUser(row) ? (
+                                                            <FormattedInput
+                                                                inputRef={(el: any) => { inputRefs.current[`input-kpi-previa-${row.id}`] = el; }}
+                                                                className="w-full text-center bg-transparent border border-transparent hover:bg-white focus:bg-white focus:border-indigo-300 focus:ring-1 focus:ring-indigo-100 rounded outline-none py-1"
+                                                                value={row.previaConfig?.factor ?? 0}
+                                                                formatType="decimal"
+                                                                onChange={(val: number) => handleKpiFactorChange(row.id, 'previa', val)}
+                                                            />
+                                                        ) : formatValue(row.previaConfig?.factor ?? 0, 'decimal'))
                                                         : ''}
                                                 </td>
                                             )}
 
                                             {columnVisibility.driverForecast && (
-                                                <td className={`px-2 py-1 text-center tabular-nums text-xs truncate ${hideKpi ? 'bg-white border-y-2 border-l-2 border-white text-transparent' : 'border-l border-b border-slate-200 text-slate-500 bg-slate-50'}`}>
+                                                <td className={`px-1 text-center tabular-nums text-xs truncate ${hideKpi ? 'bg-white border border-white text-transparent' : 'border border-slate-200 text-slate-500 bg-slate-50'}`}>
                                                     {!hideKpi && row.category === 'Costs' && row.rowConfig?.expenseType === 'Variável' && row.rowConfig?.expenseDriver
-                                                        ? formatValue(getDriverValue(row.rowConfig.expenseDriver, data, 'forecast'), 'decimal')
+                                                        ? (canEditForecast && !isMonthClosed && isRowEditableForUser(row) ? (
+                                                            <FormattedInput
+                                                                inputRef={(el: any) => { inputRefs.current[`input-kpi-forecast-${row.id}`] = el; }}
+                                                                className="w-full text-center bg-transparent border border-transparent hover:bg-white focus:bg-white focus:border-indigo-300 focus:ring-1 focus:ring-indigo-100 rounded outline-none py-1"
+                                                                value={row.forecastConfig?.factor ?? 0}
+                                                                formatType="decimal"
+                                                                onChange={(val: number) => handleKpiFactorChange(row.id, 'forecast', val)}
+                                                            />
+                                                        ) : formatValue(row.forecastConfig?.factor ?? 0, 'decimal'))
                                                         : ''}
                                                 </td>
                                             )}
 
                                             {columnVisibility.driverBudget && (
-                                                <td className={`px-2 py-1 text-center tabular-nums text-xs truncate ${hideKpi ? 'bg-white border-y-2 border-x-2 border-white text-transparent' : 'border-l border-r border-b border-slate-200 text-slate-500 bg-slate-50'}`}>
+                                                <td className={`px-2 py-1 text-center tabular-nums text-xs truncate ${hideKpi ? 'bg-white border border-white text-transparent' : 'border border-slate-200 text-slate-500 bg-slate-50'}`}>
                                                     {!hideKpi && row.category === 'Costs' && row.rowConfig?.expenseType === 'Variável' && row.rowConfig?.expenseDriver
-                                                        ? formatValue(getDriverValue(row.rowConfig.expenseDriver, data, 'budget'), 'decimal')
+                                                        ? formatValue((row.budget || 0) / (getDriverValue(row.rowConfig.expenseDriver, data, 'budget') || 1), 'decimal')
                                                         : ''}
                                                 </td>
                                             )}
