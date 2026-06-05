@@ -272,13 +272,16 @@ export interface ColumnVisibility {
   previa: boolean;
   real: boolean;
   budget: boolean;
-  deltaBudget: boolean;
-  deltaBudgetPct: boolean;
   deltaPreviaBudget: boolean;
   deltaPreviaBudgetPct: boolean;
+  deltaBudget: boolean;
+  deltaBudgetPct: boolean;
   lastYear: boolean;
   deltaLY: boolean;
   deltaLYPct: boolean;
+  driverPrevia: boolean;
+  driverForecast: boolean;
+  driverBudget: boolean;
 }
 
 export interface ImportedRow {

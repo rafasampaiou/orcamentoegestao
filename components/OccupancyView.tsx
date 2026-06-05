@@ -379,6 +379,9 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
         lastYear: true,
         deltaLY: true,
         deltaLYPct: true,
+        driverPrevia: false,
+        driverForecast: false,
+        driverBudget: false,
     });
     const [showColumnSettings, setShowColumnSettings] = useState(false);
     const [decimalOverrides, setDecimalOverrides] = useState<Record<string, number>>({});
