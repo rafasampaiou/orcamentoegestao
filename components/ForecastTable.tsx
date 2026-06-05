@@ -1025,7 +1025,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     const isEditableSpecial = isSpecialEditableRow(row.id);
 
                                     const isRowEditable = isRowEditableForUser(row);
-                                    if (canEditForecast && isRowEditable && !isIndicator && (!isHeaderOrTotal || isEditableCost || isEditableSpecial)) {
+                                    const isVariableExpense = row.category === 'Costs' && row.rowConfig?.expenseType === 'Variável';
+
+                                    if (canEditForecast && isRowEditable && !isIndicator && !isVariableExpense && (!isHeaderOrTotal || isEditableCost || isEditableSpecial)) {
                                         realCellContent = (
                                             <FormattedInput
                                                 inputRef={(el: any) => { inputRefs.current[`input-real-${row.id}`] = el; }}
@@ -1165,7 +1167,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             {columnVisibility.driverPrevia && (
                                                 <td className={`px-2 py-1 text-center border-l border-sky-100 tabular-nums text-xs text-slate-400 truncate bg-sky-50/20`}>
                                                     {!isHeaderOrTotal && row.category === 'Costs' && row.rowConfig?.expenseType === 'Variável' && row.rowConfig?.expenseDriver
-                                                        ? formatValue(getDriverValue(row.rowConfig.expenseDriver, data, 'previa'), 'integer')
+                                                        ? formatValue(getDriverValue(row.rowConfig.expenseDriver, data, 'previa'), 'decimal')
                                                         : ''}
                                                 </td>
                                             )}
@@ -1173,7 +1175,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             {columnVisibility.driverForecast && (
                                                 <td className={`px-2 py-1 text-center border-l border-sky-100 tabular-nums text-xs text-slate-400 truncate bg-sky-50/20`}>
                                                     {!isHeaderOrTotal && row.category === 'Costs' && row.rowConfig?.expenseType === 'Variável' && row.rowConfig?.expenseDriver
-                                                        ? formatValue(getDriverValue(row.rowConfig.expenseDriver, data, 'forecast'), 'integer')
+                                                        ? formatValue(getDriverValue(row.rowConfig.expenseDriver, data, 'forecast'), 'decimal')
                                                         : ''}
                                                 </td>
                                             )}
@@ -1181,7 +1183,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             {columnVisibility.driverBudget && (
                                                 <td className={`px-2 py-1 text-center border-l border-r border-sky-100 tabular-nums text-xs text-slate-400 truncate bg-sky-50/20`}>
                                                     {!isHeaderOrTotal && row.category === 'Costs' && row.rowConfig?.expenseType === 'Variável' && row.rowConfig?.expenseDriver
-                                                        ? formatValue(getDriverValue(row.rowConfig.expenseDriver, data, 'budget'), 'integer')
+                                                        ? formatValue(getDriverValue(row.rowConfig.expenseDriver, data, 'budget'), 'decimal')
                                                         : ''}
                                                 </td>
                                             )}
