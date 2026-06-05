@@ -608,10 +608,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             if (row.isHeader) return true;
             if (!row.isHeader) {
                 if (showDetails) {
-                    // If the user wants to see the accounts, we ONLY show the "Fixo" ones for manual input.
-                    if (row.category === 'Costs' && row.rowConfig?.expenseType === 'Variável') {
-                        return false;
-                    }
                     return true;
                 }
             }
@@ -1210,7 +1206,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             )}
 
                                             {columnVisibility.driverPrevia && (
-                                                <td className={`px-1 text-center tabular-nums text-xs truncate ${hideKpi ? 'bg-white border border-white text-transparent' : 'border border-slate-200 text-slate-500 bg-slate-50'}`}>
+                                                <td className={`px-1 text-center tabular-nums text-xs truncate ${hideKpi || row.rowConfig?.expenseType !== 'Variável' ? 'bg-transparent border-b border-gray-100 text-transparent' : 'border border-slate-200 text-slate-500 bg-slate-50 shadow-sm'}`}>
                                                     {!hideKpi && row.category === 'Costs' && row.rowConfig?.expenseType === 'Variável' && row.rowConfig?.expenseDriver
                                                         ? (canEditForecast && !isMonthClosed && isRowEditableForUser(row) ? (
                                                             <FormattedInput
@@ -1226,7 +1222,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             )}
 
                                             {columnVisibility.driverForecast && (
-                                                <td className={`px-1 text-center tabular-nums text-xs truncate ${hideKpi ? 'bg-white border border-white text-transparent' : 'border border-slate-200 text-slate-500 bg-slate-50'}`}>
+                                                <td className={`px-1 text-center tabular-nums text-xs truncate ${hideKpi || row.rowConfig?.expenseType !== 'Variável' ? 'bg-transparent border-b border-gray-100 text-transparent' : 'border border-slate-200 text-slate-500 bg-slate-50 shadow-sm'}`}>
                                                     {!hideKpi && row.category === 'Costs' && row.rowConfig?.expenseType === 'Variável' && row.rowConfig?.expenseDriver
                                                         ? (canEditForecast && !isMonthClosed && isRowEditableForUser(row) ? (
                                                             <FormattedInput
@@ -1242,7 +1238,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             )}
 
                                             {columnVisibility.driverBudget && (
-                                                <td className={`px-2 py-1 text-center tabular-nums text-xs truncate ${hideKpi ? 'bg-white border border-white text-transparent' : 'border border-slate-200 text-slate-500 bg-slate-50'}`}>
+                                                <td className={`px-2 py-1 text-center tabular-nums text-xs truncate ${hideKpi || row.rowConfig?.expenseType !== 'Variável' ? 'bg-transparent border-b border-gray-100 text-transparent' : 'border border-slate-200 text-slate-500 bg-slate-50 shadow-sm'}`}>
                                                     {!hideKpi && row.category === 'Costs' && row.rowConfig?.expenseType === 'Variável' && row.rowConfig?.expenseDriver
                                                         ? formatValue((row.budget || 0) / (getDriverValue(row.rowConfig.expenseDriver, data, 'budget') || 1), 'decimal')
                                                         : ''}
