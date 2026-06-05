@@ -5542,7 +5542,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               )}
             </div>
           )}
-          {activeGeralTab === 'forecast' && renderForecastVariability()}
+
         </div>
       </div>
     );

@@ -5,6 +5,7 @@ import { ExpenseDriver, ImportedRow, Account, CostPackage, Hotel, ForecastRow, F
 import { evaluateFormula } from '../utils/formulaEngine';
 import { supabaseService } from '../services/supabaseService';
 import { VersionInfoBanner } from './VersionInfoBanner';
+import toast from 'react-hot-toast';
 
 interface ForecastTableProps {
     selectedMonth?: number;
@@ -577,7 +578,13 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             }
             if (row.isHeader) return true;
             if (!row.isHeader) {
-                if (showDetails) return true;
+                if (showDetails) {
+                    // If the user wants to see the accounts, we ONLY show the "Fixo" ones for manual input.
+                    if (row.category === 'Costs' && row.rowConfig?.expenseType === 'Variável') {
+                        return false;
+                    }
+                    return true;
+                }
             }
             return false;
         });
@@ -1714,7 +1721,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
 export default ForecastTable;
 
-function getDriverValue(driver: ExpenseDriver | undefined, allRows: ForecastRow[], base: 'forecast' | 'previa' = 'forecast'): number {
+
+
+function getDriverValue(driver: string | undefined, allRows: ForecastRow[], base: 'forecast' | 'previa' | 'budget'): number {
     if (!driver) return 0;
 
     let targetRowId = '';
