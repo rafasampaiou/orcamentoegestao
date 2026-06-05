@@ -1023,7 +1023,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 const isSpecialRevenue = ['REV-HOSP', 'REV-EXTRA', 'REV-ISS', 'REV-APT', 'REV-TIME'].includes(row.id);
                                 const formatType = row.rowConfig?.format || 'currency';
 
-                                const hideKpi = isSectionHeader || isBlueHighlight || isTotal;
+                                const hideKpi = isSectionHeader || isBlueHighlight || isTotal || row.category === 'Indicators' || row.category === 'Revenue';
 
                                 const renderFinancialCells = (isHeaderOrTotal = false, customBg = "") => {
                                     const effectiveBg = row.bgColor || (isBlueHighlight ? 'bg-sky-100 border-sky-200' : (customBg || 'bg-blue-50/20 border-r border-blue-50'));
@@ -1187,7 +1187,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             )}
 
                                             {columnVisibility.driverPrevia && (
-                                                <td className={`px-2 py-1 text-center tabular-nums text-xs truncate ${hideKpi ? 'bg-white border-y-2 border-l-2 border-white text-transparent' : 'border-l border-slate-200 text-slate-500 bg-slate-50'}`}>
+                                                <td className={`px-2 py-1 text-center tabular-nums text-xs truncate ${hideKpi ? 'bg-white border-y-2 border-l-2 border-white text-transparent' : 'border-l border-b border-slate-200 text-slate-500 bg-slate-50'}`}>
                                                     {!hideKpi && row.category === 'Costs' && row.rowConfig?.expenseType === 'Variável' && row.rowConfig?.expenseDriver
                                                         ? formatValue(getDriverValue(row.rowConfig.expenseDriver, data, 'previa'), 'decimal')
                                                         : ''}
@@ -1195,7 +1195,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             )}
 
                                             {columnVisibility.driverForecast && (
-                                                <td className={`px-2 py-1 text-center tabular-nums text-xs truncate ${hideKpi ? 'bg-white border-y-2 border-l-2 border-white text-transparent' : 'border-l border-slate-200 text-slate-500 bg-slate-50'}`}>
+                                                <td className={`px-2 py-1 text-center tabular-nums text-xs truncate ${hideKpi ? 'bg-white border-y-2 border-l-2 border-white text-transparent' : 'border-l border-b border-slate-200 text-slate-500 bg-slate-50'}`}>
                                                     {!hideKpi && row.category === 'Costs' && row.rowConfig?.expenseType === 'Variável' && row.rowConfig?.expenseDriver
                                                         ? formatValue(getDriverValue(row.rowConfig.expenseDriver, data, 'forecast'), 'decimal')
                                                         : ''}
@@ -1203,7 +1203,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             )}
 
                                             {columnVisibility.driverBudget && (
-                                                <td className={`px-2 py-1 text-center tabular-nums text-xs truncate ${hideKpi ? 'bg-white border-y-2 border-x-2 border-white text-transparent' : 'border-l border-r border-slate-200 text-slate-500 bg-slate-50'}`}>
+                                                <td className={`px-2 py-1 text-center tabular-nums text-xs truncate ${hideKpi ? 'bg-white border-y-2 border-x-2 border-white text-transparent' : 'border-l border-r border-b border-slate-200 text-slate-500 bg-slate-50'}`}>
                                                     {!hideKpi && row.category === 'Costs' && row.rowConfig?.expenseType === 'Variável' && row.rowConfig?.expenseDriver
                                                         ? formatValue(getDriverValue(row.rowConfig.expenseDriver, data, 'budget'), 'decimal')
                                                         : ''}
@@ -1283,7 +1283,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     <tr
                                         key={row.id}
                                         style={{ backgroundColor: row.bgColor || undefined }}
-                                        className={`transition-colors text-slate-700 hover:bg-indigo-50/30 ${isTotal ? 'bg-indigo-50 font-bold border-y-2 border-gray-300 text-indigo-900' : 'border-b border-gray-50'} ${row.id === 'REV-IMP' ? 'bg-sky-100 border-y-2 border-sky-300 font-bold text-sky-950 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.5)]' : ''}`}
+                                        className={`transition-colors text-slate-700 hover:bg-indigo-50/30 ${isTotal ? 'bg-indigo-50 font-bold border-y-2 border-gray-300 text-indigo-900' : 'border-b border-gray-100'} ${row.id === 'REV-IMP' ? 'bg-sky-100 border-y-2 border-sky-300 font-bold text-sky-950 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.5)]' : ''}`}
                                     >
                                         <td
                                             style={rowTextStyle}
