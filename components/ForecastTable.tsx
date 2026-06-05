@@ -665,6 +665,12 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         setShowAlertModal(true);
     };
 
+    const visibleBaseCols = 1 + [
+        columnVisibility.previa, columnVisibility.real, columnVisibility.budget,
+        columnVisibility.deltaPreviaBudget, columnVisibility.deltaPreviaBudgetPct,
+        columnVisibility.lastYear, columnVisibility.deltaLY, columnVisibility.deltaLYPct
+    ].filter(Boolean).length;
+
     return (
         <div className="flex flex-col h-full w-full">
             <VersionInfoBanner versionName={activeRealVersionName} />
@@ -996,8 +1002,14 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
                                 if (row.category === 'Spacer') {
                                     return (
-                                        <tr key={row.id} className="bg-gray-100/50">
-                                            <td colSpan={12} className="h-6 border-y border-gray-200"></td>
+                                        <tr key={row.id} className="bg-transparent border-none">
+                                            <td colSpan={visibleBaseCols} className="h-6 border-y border-gray-200 bg-gray-100/50"></td>
+                                            {(columnVisibility.driverPrevia || columnVisibility.driverForecast || columnVisibility.driverBudget) && (
+                                                <td className="w-4 bg-white border-y-2 border-white p-0 relative"></td>
+                                            )}
+                                            {columnVisibility.driverPrevia && <td className="bg-white border-y-2 border-white border-l-2"></td>}
+                                            {columnVisibility.driverForecast && <td className="bg-white border-y-2 border-white border-l-2"></td>}
+                                            {columnVisibility.driverBudget && <td className="bg-white border-y-2 border-white border-x-2"></td>}
                                         </tr>
                                     );
                                 }
@@ -1010,6 +1022,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 const isBlueHighlight = blueRowIds.includes(row.id);
                                 const isSpecialRevenue = ['REV-HOSP', 'REV-EXTRA', 'REV-ISS', 'REV-APT', 'REV-TIME'].includes(row.id);
                                 const formatType = row.rowConfig?.format || 'currency';
+
+                                const hideKpi = isSectionHeader || isBlueHighlight || isTotal;
 
                                 const renderFinancialCells = (isHeaderOrTotal = false, customBg = "") => {
                                     const effectiveBg = row.bgColor || (isBlueHighlight ? 'bg-sky-100 border-sky-200' : (customBg || 'bg-blue-50/20 border-r border-blue-50'));
@@ -1173,24 +1187,24 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             )}
 
                                             {columnVisibility.driverPrevia && (
-                                                <td className={`px-2 py-1 text-center border-l tabular-nums text-xs truncate ${isHeaderOrTotal ? 'bg-white border-white text-transparent' : 'border-slate-100 text-slate-500 bg-slate-50'}`}>
-                                                    {!isHeaderOrTotal && row.category === 'Costs' && row.rowConfig?.expenseType === 'Variável' && row.rowConfig?.expenseDriver
+                                                <td className={`px-2 py-1 text-center tabular-nums text-xs truncate ${hideKpi ? 'bg-white border-y-2 border-l-2 border-white text-transparent' : 'border-l border-slate-200 text-slate-500 bg-slate-50'}`}>
+                                                    {!hideKpi && row.category === 'Costs' && row.rowConfig?.expenseType === 'Variável' && row.rowConfig?.expenseDriver
                                                         ? formatValue(getDriverValue(row.rowConfig.expenseDriver, data, 'previa'), 'decimal')
                                                         : ''}
                                                 </td>
                                             )}
 
                                             {columnVisibility.driverForecast && (
-                                                <td className={`px-2 py-1 text-center border-l tabular-nums text-xs truncate ${isHeaderOrTotal ? 'bg-white border-white text-transparent' : 'border-slate-100 text-slate-500 bg-slate-50'}`}>
-                                                    {!isHeaderOrTotal && row.category === 'Costs' && row.rowConfig?.expenseType === 'Variável' && row.rowConfig?.expenseDriver
+                                                <td className={`px-2 py-1 text-center tabular-nums text-xs truncate ${hideKpi ? 'bg-white border-y-2 border-l-2 border-white text-transparent' : 'border-l border-slate-200 text-slate-500 bg-slate-50'}`}>
+                                                    {!hideKpi && row.category === 'Costs' && row.rowConfig?.expenseType === 'Variável' && row.rowConfig?.expenseDriver
                                                         ? formatValue(getDriverValue(row.rowConfig.expenseDriver, data, 'forecast'), 'decimal')
                                                         : ''}
                                                 </td>
                                             )}
 
                                             {columnVisibility.driverBudget && (
-                                                <td className={`px-2 py-1 text-center border-l border-r tabular-nums text-xs truncate ${isHeaderOrTotal ? 'bg-white border-white text-transparent' : 'border-slate-100 text-slate-500 bg-slate-50'}`}>
-                                                    {!isHeaderOrTotal && row.category === 'Costs' && row.rowConfig?.expenseType === 'Variável' && row.rowConfig?.expenseDriver
+                                                <td className={`px-2 py-1 text-center tabular-nums text-xs truncate ${hideKpi ? 'bg-white border-y-2 border-x-2 border-white text-transparent' : 'border-l border-r border-slate-200 text-slate-500 bg-slate-50'}`}>
+                                                    {!hideKpi && row.category === 'Costs' && row.rowConfig?.expenseType === 'Variável' && row.rowConfig?.expenseDriver
                                                         ? formatValue(getDriverValue(row.rowConfig.expenseDriver, data, 'budget'), 'decimal')
                                                         : ''}
                                                 </td>
