@@ -805,7 +805,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                     )}
 
                     <table className="text-base text-left border-collapse table-fixed w-max">
-                        <thead className="bg-sky-100 sticky top-0 z-30 shadow-sm font-bold text-sky-900 uppercase tracking-tight text-sm">
+                        <thead className="bg-white sticky top-0 z-30 shadow-sm font-bold text-sky-900 uppercase tracking-tight text-sm">
                             <tr>
                                 <th
                                     style={{ width: columnWidths.description }}
@@ -923,18 +923,18 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 )}
 
                                 {(columnVisibility.driverPrevia || columnVisibility.driverForecast || columnVisibility.driverBudget) && (
-                                    <th className="w-2 bg-transparent border-none p-0"></th>
+                                    <th className="w-4 bg-white border-2 border-white p-0 relative"></th>
                                 )}
 
                                 {columnVisibility.driverPrevia && (
                                     <th
                                         style={{ width: columnWidths.driverPrevia }}
-                                        className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 border-l border-sky-200 group relative text-xs"
+                                        className="px-2 py-3 text-center bg-slate-50 text-slate-700 border-b border-slate-200 border-l border-slate-200 group relative text-xs"
                                     >
                                         KPI<br />(PRÉVIA)
                                         <div
                                             onMouseDown={(e) => handleResizeStart(e, 'driverPrevia')}
-                                            className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
+                                            className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-slate-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
                                         />
                                     </th>
                                 )}
@@ -942,12 +942,12 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 {columnVisibility.driverForecast && (
                                     <th
                                         style={{ width: columnWidths.driverForecast }}
-                                        className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 group relative text-xs"
+                                        className="px-2 py-3 text-center bg-slate-50 text-slate-700 border-b border-slate-200 group relative text-xs"
                                     >
                                         KPI<br />(FORECAST)
                                         <div
                                             onMouseDown={(e) => handleResizeStart(e, 'driverForecast')}
-                                            className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
+                                            className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-slate-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
                                         />
                                     </th>
                                 )}
@@ -955,12 +955,12 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 {columnVisibility.driverBudget && (
                                     <th
                                         style={{ width: columnWidths.driverBudget }}
-                                        className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 border-r border-sky-200 group relative text-xs"
+                                        className="px-2 py-3 text-center bg-slate-50 text-slate-700 border-b border-slate-200 border-r border-slate-200 group relative text-xs"
                                     >
                                         KPI<br />(META)
                                         <div
                                             onMouseDown={(e) => handleResizeStart(e, 'driverBudget')}
-                                            className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
+                                            className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-slate-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
                                         />
                                     </th>
                                 )}
@@ -1169,11 +1169,11 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             )}
 
                                             {(columnVisibility.driverPrevia || columnVisibility.driverForecast || columnVisibility.driverBudget) && (
-                                                <td className="w-2 bg-transparent border-none p-0"></td>
+                                                <td className="w-4 bg-white border-2 border-white p-0 relative"></td>
                                             )}
 
                                             {columnVisibility.driverPrevia && (
-                                                <td className={`px-2 py-1 text-center border-l border-sky-100 tabular-nums text-xs text-slate-400 truncate bg-sky-50/20`}>
+                                                <td className={`px-2 py-1 text-center border-l border-slate-100 tabular-nums text-xs text-slate-500 truncate bg-slate-50`}>
                                                     {!isHeaderOrTotal && row.category === 'Costs' && row.rowConfig?.expenseType === 'Variável' && row.rowConfig?.expenseDriver
                                                         ? formatValue(getDriverValue(row.rowConfig.expenseDriver, data, 'previa'), 'decimal')
                                                         : ''}
@@ -1181,7 +1181,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             )}
 
                                             {columnVisibility.driverForecast && (
-                                                <td className={`px-2 py-1 text-center border-l border-sky-100 tabular-nums text-xs text-slate-400 truncate bg-sky-50/20`}>
+                                                <td className={`px-2 py-1 text-center border-l border-slate-100 tabular-nums text-xs text-slate-500 truncate bg-slate-50`}>
                                                     {!isHeaderOrTotal && row.category === 'Costs' && row.rowConfig?.expenseType === 'Variável' && row.rowConfig?.expenseDriver
                                                         ? formatValue(getDriverValue(row.rowConfig.expenseDriver, data, 'forecast'), 'decimal')
                                                         : ''}
@@ -1189,7 +1189,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             )}
 
                                             {columnVisibility.driverBudget && (
-                                                <td className={`px-2 py-1 text-center border-l border-r border-sky-100 tabular-nums text-xs text-slate-400 truncate bg-sky-50/20`}>
+                                                <td className={`px-2 py-1 text-center border-l border-r border-slate-100 tabular-nums text-xs text-slate-500 truncate bg-slate-50`}>
                                                     {!isHeaderOrTotal && row.category === 'Costs' && row.rowConfig?.expenseType === 'Variável' && row.rowConfig?.expenseDriver
                                                         ? formatValue(getDriverValue(row.rowConfig.expenseDriver, data, 'budget'), 'decimal')
                                                         : ''}
