@@ -33,6 +33,8 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
 
     const [decimalOverrides, setDecimalOverrides] = useState<Record<string, number>>({});
     const [savedIndicator, setSavedIndicator] = useState(false);
+    const [visibleMonthsFilter, setVisibleMonthsFilter] = useState<number[]>([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
     const toggleDecimals = (rowId: string) => {
         setDecimalOverrides(prev => {
@@ -314,6 +316,33 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
                 )}
             </div>
 
+            <div className="flex flex-wrap gap-1 mt-4 mb-6 items-center">
+                <span className="text-sm font-bold text-gray-700 mr-2">Filtrar Meses:</span>
+                {MONTHS.map((m, idx) => (
+                    <button
+                        key={m}
+                        onClick={() => {
+                            setVisibleMonthsFilter(prev =>
+                                prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx].sort((a, b) => a - b)
+                            );
+                        }}
+                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                            visibleMonthsFilter.includes(idx)
+                                ? 'bg-indigo-100 text-indigo-700 border border-indigo-200 shadow-sm'
+                                : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'
+                        }`}
+                    >
+                        {m}
+                    </button>
+                ))}
+                <button
+                    onClick={() => setVisibleMonthsFilter(visibleMonthsFilter.length === 12 ? [] : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])}
+                    className="px-3 py-1 text-xs font-bold rounded-md transition-all bg-gray-100 text-gray-600 hover:bg-gray-200 ml-2 border border-gray-200"
+                >
+                    {visibleMonthsFilter.length === 12 ? 'Deselecionar Todos' : 'Selecionar Todos'}
+                </button>
+            </div>
+
             <BudgetOccupancyTable
                 title="Geral"
                 rows={geralRows}
@@ -323,6 +352,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
                 onToggleDecimals={toggleDecimals}
                 canEdit={canEditOccupancy}
                 isRealMode={true}
+                visibleMonths={visibleMonthsFilter}
             />
             <BudgetOccupancyTable
                 title="Lazer"
@@ -333,6 +363,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
                 onToggleDecimals={toggleDecimals}
                 canEdit={canEditOccupancy}
                 isRealMode={true}
+                visibleMonths={visibleMonthsFilter}
             />
             <BudgetOccupancyTable
                 title="Eventos Corporativos"
@@ -343,6 +374,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
                 onToggleDecimals={toggleDecimals}
                 canEdit={canEditOccupancy}
                 isRealMode={true}
+                visibleMonths={visibleMonthsFilter}
             />
         </div>
     );
