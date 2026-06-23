@@ -217,7 +217,66 @@ export const BudgetOccupancyTable: React.FC<{
                             }
 
                             const rowValues = data[row.id] || Array(12).fill(0);
-                            const total = rowValues.reduce((sum, v) => sum + (v || 0), 0);
+                            
+                            let total = rowValues.reduce((sum, v) => sum + (v || 0), 0);
+                            const getSum = (id: string) => (data[id] || []).reduce((sum, v) => sum + (v || 0), 0);
+                            
+                            const parts = row.id.split('_');
+                            const prefix = parts[0]; // geral, lazer, event
+                            
+                            if (row.id.endsWith('_occ_pct')) {
+                                const avail = getSum(`${prefix}_avail`);
+                                const sold = getSum(`${prefix}_sold`);
+                                total = avail > 0 ? (sold / avail) * 100 : 0;
+                            } else if (row.id.endsWith('_coef_total')) {
+                                const pax = getSum(`${prefix}_pax`);
+                                const sold = getSum(`${prefix}_sold`);
+                                total = sold > 0 ? (pax / sold) : 0;
+                            } else if (row.id.endsWith('_coef_ad')) {
+                                const ad = getSum(`${prefix}_adults`);
+                                const sold = getSum(`${prefix}_sold`);
+                                total = sold > 0 ? (ad / sold) : 0;
+                            } else if (row.id.endsWith('_coef_chd')) {
+                                const chd = getSum(`${prefix}_chd`);
+                                const sold = getSum(`${prefix}_sold`);
+                                total = sold > 0 ? (chd / sold) : 0;
+                            } else if (row.id.endsWith('_rate_ad')) {
+                                const fap = getSum(`${prefix}_rev_fap`);
+                                const hosp = getSum(`${prefix}_rev_hosp`);
+                                const ad = getSum(`${prefix}_adults`);
+                                total = ad > 0 ? (fap - hosp) / ad : 0;
+                            } else if (row.id.endsWith('_rate_chd')) {
+                                const fap = getSum(`${prefix}_rev_fap`);
+                                const hosp = getSum(`${prefix}_rev_hosp`);
+                                const chd = getSum(`${prefix}_chd`);
+                                total = chd > 0 ? (fap - hosp) / chd : 0;
+                            } else if (row.id.endsWith('_dm_fap')) {
+                                const fap = getSum(`${prefix}_rev_fap`);
+                                const sold = getSum(`${prefix}_sold`);
+                                total = sold > 0 ? (fap / sold) : 0;
+                            } else if (row.id.endsWith('_dm_hosp')) {
+                                const hosp = getSum(`${prefix}_rev_hosp`);
+                                const sold = getSum(`${prefix}_sold`);
+                                total = sold > 0 ? (hosp / sold) : 0;
+                            } else if (row.id.endsWith('_revpar')) {
+                                const fap = getSum(`${prefix}_rev_fap`);
+                                const avail = getSum(`${prefix}_avail`);
+                                total = avail > 0 ? (fap / avail) : 0;
+                            } else if (row.id.endsWith('_trevpor')) {
+                                const fap = getSum(`${prefix}_rev_fap`);
+                                const extra = getSum(`${prefix}_extra_rev`);
+                                const orExtras = prefix === 'geral' ? getSum('geral_or_extras') : 0;
+                                const orHosp = prefix === 'geral' ? getSum('geral_or_hosp') : 0;
+                                const sold = getSum(`${prefix}_sold`);
+                                total = sold > 0 ? (fap + extra + orExtras + orHosp) / sold : 0;
+                            } else if (row.id.endsWith('_trevpar')) {
+                                const fap = getSum(`${prefix}_rev_fap`);
+                                const extra = getSum(`${prefix}_extra_rev`);
+                                const orExtras = prefix === 'geral' ? getSum('geral_or_extras') : 0;
+                                const orHosp = prefix === 'geral' ? getSum('geral_or_hosp') : 0;
+                                const avail = getSum(`${prefix}_avail`);
+                                total = avail > 0 ? (fap + extra + orExtras + orHosp) / avail : 0;
+                            }
 
                             const isEditable = row.isInput && canEdit && (!isRealMode || row.isManualReal);
                             const isWhite = isEditable || row.forceWhite;
@@ -513,11 +572,14 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             const gExtra = lzExtra + evExtra;
             set(`geral_extra_rev_${s}`, gExtra);
 
+            const gOrExtras = get(`geral_or_extras_${s}`);
+            const gOrHosp = get(`geral_or_hosp_${s}`);
+
             set(`geral_dm_fap_${s}`, gSold > 0 ? gRevFap / gSold : 0);
             set(`geral_dm_hosp_${s}`, gSold > 0 ? gRevHosp / gSold : 0);
             set(`geral_revpar_${s}`, gAvail > 0 ? gRevFap / gAvail : 0);
-            set(`geral_trevpor_${s}`, gSold > 0 ? (gRevFap + gExtra) / gSold : 0);
-            set(`geral_trevpar_${s}`, gAvail > 0 ? (gRevFap + gExtra) / gAvail : 0);
+            set(`geral_trevpor_${s}`, gSold > 0 ? (gRevFap + gExtra + gOrExtras + gOrHosp) / gSold : 0);
+            set(`geral_trevpar_${s}`, gAvail > 0 ? (gRevFap + gExtra + gOrExtras + gOrHosp) / gAvail : 0);
 
             set(`lazer_trevpor_${s}`, lzSold > 0 ? (lzRevFap + lzExtra) / lzSold : 0);
             set(`lazer_trevpar_${s}`, lzAvail > 0 ? (lzRevFap + lzExtra) / lzAvail : 0);
@@ -691,11 +753,14 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             const gExtra = gExtraInput !== 0 ? gExtraInput : (lzExtra + evExtra);
             set('geral_extra_rev', i, gExtra);
 
+            const gOrExtras = get('geral_or_extras', i);
+            const gOrHosp = get('geral_or_hosp', i);
+
             set('geral_dm_fap', i, gSold > 0 ? gRevFap / gSold : 0);
             set('geral_dm_hosp', i, gSold > 0 ? gRevHosp / gSold : 0);
             set('geral_revpar', i, gAvail > 0 ? gRevFap / gAvail : 0);
-            set('geral_trevpor', i, gSold > 0 ? (gRevFap + gExtra) / gSold : 0);
-            set('geral_trevpar', i, gAvail > 0 ? (gRevFap + gExtra) / gAvail : 0);
+            set('geral_trevpor', i, gSold > 0 ? (gRevFap + gExtra + gOrExtras + gOrHosp) / gSold : 0);
+            set('geral_trevpar', i, gAvail > 0 ? (gRevFap + gExtra + gOrExtras + gOrHosp) / gAvail : 0);
 
             set('lazer_trevpor', i, lzSold > 0 ? (lzRevFap + lzExtra) / lzSold : 0);
             set('lazer_trevpar', i, lzAvail > 0 ? (lzRevFap + lzExtra) / lzAvail : 0);

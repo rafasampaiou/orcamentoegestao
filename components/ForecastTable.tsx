@@ -195,13 +195,13 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     dreConfigs
 }) => {
     const canEditForecast = currentUser?.role === UserRole.ADMIN ||
-                            currentUser?.role === UserRole.ENTITY_MANAGER ||
-                            currentUser?.role === UserRole.COST_ANALYST ||
-                            currentUser?.role === UserRole.PACKAGE_MANAGER;
+        currentUser?.role === UserRole.ENTITY_MANAGER ||
+        currentUser?.role === UserRole.COST_ANALYST ||
+        currentUser?.role === UserRole.PACKAGE_MANAGER;
 
     const canValidate = currentUser?.role === UserRole.ADMIN ||
-                        currentUser?.role === UserRole.ENTITY_MANAGER ||
-                        currentUser?.role === UserRole.COST_ANALYST;
+        currentUser?.role === UserRole.ENTITY_MANAGER ||
+        currentUser?.role === UserRole.COST_ANALYST;
 
     const [data, setData] = useState<ForecastRow[]>(() => {
         const forecastStructure = dreConfigs?.['Forecast'] || [];
@@ -362,12 +362,12 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
     const isRowEditableForUser = (row: ForecastRow) => {
         if (!currentUser) return false;
-        
+
         // ADMIN Geral, Gerente de Entidade, and Analista de Custos have full edit access
         if ([UserRole.ADMIN, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST].includes(currentUser.role as any)) {
             return true;
         }
-        
+
         // Gerente de Pacotes can only edit their assigned packages and revenues
         if (currentUser.role === UserRole.PACKAGE_MANAGER) {
             if (row.category === 'Costs') {
@@ -382,12 +382,12 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                     return currentUser.responsiblePackages?.includes(acc.package) || false;
                 }
                 // Fallback checking label or indicatorSection
-                return currentUser.responsiblePackages?.some(p => 
-                    row.label.toLowerCase().includes(p.toLowerCase()) || 
+                return currentUser.responsiblePackages?.some(p =>
+                    row.label.toLowerCase().includes(p.toLowerCase()) ||
                     (row.indicatorSection && row.indicatorSection.toLowerCase().includes(p.toLowerCase()))
                 ) || false;
             }
-            
+
             if (isSpecialEditableRow(row.id)) {
                 const revenueMap: Record<string, string> = {
                     'REV-APT-LAZER': 'Receita de Apartamentos (Lazer)',
@@ -401,7 +401,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 }
             }
         }
-        
+
         return false;
     };
 
@@ -1365,9 +1365,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             {/* Format example */}
                             <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-xs text-blue-800 font-mono leading-relaxed">
                                 <span className="font-bold text-blue-900 block mb-1">Formato esperado (colunas separadas por Tab):</span>
-                                Descrição{"\t"}Prévia{"\t"}Forecast{"\t"}Meta{"\t"}Last Year<br/>
-                                UH Disponível{"\t"}100{"\t"}110{"\t"}105{"\t"}95<br/>
-                                UH Ocupada{"\t"}75{"\t"}80{"\t"}78{"\t"}70<br/>
+                                Descrição{"\t"}Prévia{"\t"}Forecast{"\t"}Meta{"\t"}Last Year<br />
+                                UH Disponível{"\t"}100{"\t"}110{"\t"}105{"\t"}95<br />
+                                UH Ocupada{"\t"}75{"\t"}80{"\t"}78{"\t"}70<br />
                                 <span className="text-blue-500 italic">... (outras linhas)</span>
                             </div>
 
@@ -1379,7 +1379,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     className="w-full flex items-center justify-between px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 transition-colors text-emerald-800 font-semibold text-xs"
                                 >
                                     <span className="flex items-center gap-2">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /></svg>
                                         Ver linhas que podem ser importadas
                                     </span>
                                     <svg
@@ -1387,7 +1387,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
                                         className={`transition-transform duration-200 ${showImportLines ? 'rotate-180' : ''}`}
                                     >
-                                        <polyline points="6 9 12 15 18 9"/>
+                                        <polyline points="6 9 12 15 18 9" />
                                     </svg>
                                 </button>
 
@@ -1505,15 +1505,14 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                         {/* Result feedback */}
                         {importResult && (
                             <div className="px-6 pb-3">
-                                <div className={`rounded-lg p-3 flex items-start gap-3 text-sm ${
-                                    importResult.success > 0 ? 'bg-emerald-50 border border-emerald-200' : 'bg-amber-50 border border-amber-200'
-                                }`}>
+                                <div className={`rounded-lg p-3 flex items-start gap-3 text-sm ${importResult.success > 0 ? 'bg-emerald-50 border border-emerald-200' : 'bg-amber-50 border border-amber-200'
+                                    }`}>
                                     {importResult.success > 0
                                         ? <CheckCircle size={18} className="text-emerald-600 mt-0.5 shrink-0" />
                                         : <AlertCircle size={18} className="text-amber-600 mt-0.5 shrink-0" />
                                     }
                                     <div>
-                                        <span className={`font-bold ${ importResult.success > 0 ? 'text-emerald-800' : 'text-amber-800'}`}>
+                                        <span className={`font-bold ${importResult.success > 0 ? 'text-emerald-800' : 'text-amber-800'}`}>
                                             {importResult.success > 0
                                                 ? `${importResult.success} linha(s) importada(s) com sucesso!`
                                                 : 'Nenhuma linha reconhecida.'}
@@ -1580,14 +1579,14 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         const rawLabel = cols[0].trim();
                                         if (!rawLabel) return;
 
-                                        const normLabel    = rawLabel.toLowerCase();
-                                        const normLabelNA  = stripAccents(normLabel);
+                                        const normLabel = rawLabel.toLowerCase();
+                                        const normLabelNA = stripAccents(normLabel);
 
                                         // Values: cols[1]=Prévia, cols[2]=Forecast, cols[3]=Meta, cols[4]=LastYear
-                                        const valPrevia   = parseNum(cols[1] || '');
+                                        const valPrevia = parseNum(cols[1] || '');
                                         const valForecast = parseNum(cols[2] || '');
-                                        const valMeta     = parseNum(cols[3] || '');
-                                        const valLY       = parseNum(cols[4] || '');
+                                        const valMeta = parseNum(cols[3] || '');
+                                        const valLY = parseNum(cols[4] || '');
 
                                         // 1. Direct ID mapping (with accents)
                                         let mappedId = IMPORT_LABEL_MAP[normLabel];
@@ -1604,12 +1603,12 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         if (!targetRow) targetRow = labelMapNA.get(normLabelNA);
 
                                         if (targetRow) {
-                                            if (valPrevia   !== 0) { targetRow.previa = valPrevia; targetRow.isManualPreviaOverride = true; if (targetRow.previaConfig) targetRow.previaConfig.manualValue = valPrevia; }
+                                            if (valPrevia !== 0) { targetRow.previa = valPrevia; targetRow.isManualPreviaOverride = true; if (targetRow.previaConfig) targetRow.previaConfig.manualValue = valPrevia; }
                                             if (valForecast !== 0) { targetRow.real = valForecast; targetRow.isManualOverride = true; if (targetRow.forecastConfig) { targetRow.forecastConfig.method = 'Fixed'; targetRow.forecastConfig.manualValue = valForecast; } }
-                                            if (valMeta     !== 0) { targetRow.budget = valMeta; }
-                                            if (valLY       !== 0) { targetRow.lastYear = valLY; }
+                                            if (valMeta !== 0) { targetRow.budget = valMeta; }
+                                            if (valLY !== 0) { targetRow.lastYear = valLY; }
                                             success.push(rawLabel);
-                                        } else if (normLabel && !['descrição','descricao','descriçao','description'].includes(normLabel)) {
+                                        } else if (normLabel && !['descrição', 'descricao', 'descriçao', 'description'].includes(normLabel)) {
                                             skipped.push(rawLabel);
                                         }
                                     });
@@ -1894,13 +1893,13 @@ function calculateRowValue(row: ForecastRow | null, config: ForecastConfig, allR
         return config.manualValue || 0;
     } else {
         const driverValue = getDriverValue(config.driver, allRows, base);
-        
+
         let factor = config.factor || 0;
-        
+
         if (factor === 0 && row && row.budget) {
             const driverBudget = getDriverValue(config.driver, allRows, 'budget');
             if (driverBudget && driverBudget > 0) {
-                 factor = row.budget / driverBudget;
+                factor = row.budget / driverBudget;
             }
         }
 
