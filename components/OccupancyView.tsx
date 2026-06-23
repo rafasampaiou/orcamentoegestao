@@ -138,8 +138,9 @@ export const BudgetOccupancyTable: React.FC<{
     decimalOverrides: Record<string, number>,
     onToggleDecimals: (rowId: string) => void,
     canEdit: boolean,
-    isRealMode?: boolean
-}> = ({ title, rows, data, onUpdate, decimalOverrides, onToggleDecimals, canEdit, isRealMode }) => {
+    isRealMode?: boolean,
+    visibleMonths?: number[]
+}> = ({ title, rows, data, onUpdate, decimalOverrides, onToggleDecimals, canEdit, isRealMode, visibleMonths }) => {
 
     const handlePaste = (e: React.ClipboardEvent, startRowId: string, startMonthIndex: number) => {
         e.preventDefault();
@@ -196,9 +197,10 @@ export const BudgetOccupancyTable: React.FC<{
                     <thead className="bg-gray-50 text-gray-600 font-semibold border-b border-gray-200">
                         <tr>
                             <th className="px-4 py-3 w-64 sticky left-0 bg-gray-50 z-10 border-r border-gray-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">Indicador</th>
-                            {MONTHS.map(m => (
-                                <th key={m} className="px-2 py-3 text-center min-w-[80px] border-r border-gray-100">{m}</th>
-                            ))}
+                            {MONTHS.map((m, idx) => {
+                                if (visibleMonths && !visibleMonths.includes(idx)) return null;
+                                return <th key={m} className="px-2 py-3 text-center min-w-[80px] border-r border-gray-100">{m}</th>
+                            })}
                             <th className="px-2 py-3 text-center min-w-[80px] bg-gray-100 font-bold text-gray-800">Total</th>
                         </tr>
                     </thead>
@@ -218,8 +220,8 @@ export const BudgetOccupancyTable: React.FC<{
 
                             const rowValues = data[row.id] || Array(12).fill(0);
                             
-                            let total = rowValues.reduce((sum, v) => sum + (v || 0), 0);
-                            const getSum = (id: string) => (data[id] || []).reduce((sum, v) => sum + (v || 0), 0);
+                            let total = rowValues.reduce((sum, v, idx) => sum + ((!visibleMonths || visibleMonths.includes(idx)) ? (v || 0) : 0), 0);
+                            const getSum = (id: string) => (data[id] || []).reduce((sum, v, idx) => sum + ((!visibleMonths || visibleMonths.includes(idx)) ? (v || 0) : 0), 0);
                             
                             const parts = row.id.split('_');
                             const prefix = parts[0]; // geral, lazer, event
@@ -297,7 +299,9 @@ export const BudgetOccupancyTable: React.FC<{
                                             .{decimalOverrides[row.id] ?? (row.format === 'integer' ? 0 : 2)}
                                         </button>
                                     </td>
-                                    {MONTHS.map((_, idx) => (
+                                    {MONTHS.map((_, idx) => {
+                                        if (visibleMonths && !visibleMonths.includes(idx)) return null;
+                                        return (
                                         <td key={idx} className="px-1 py-1 border-r border-gray-100 text-center">
                                             {isEditable ? (
                                                 <TableInput
@@ -313,7 +317,8 @@ export const BudgetOccupancyTable: React.FC<{
                                                 </span>
                                             )}
                                         </td>
-                                    ))}
+                                        );
+                                    })}
                                     <td className="px-2 py-2 text-center bg-gray-50 font-bold text-gray-800 text-xs border-l border-gray-200">
                                         {formatValue(total, row.format, decimalOverrides[row.id])}
                                     </td>
@@ -444,6 +449,7 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
     });
     const [showColumnSettings, setShowColumnSettings] = useState(false);
     const [decimalOverrides, setDecimalOverrides] = useState<Record<string, number>>({});
+    const [visibleMonthsFilter, setVisibleMonthsFilter] = useState<number[]>([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
 
     const toggleDecimals = (rowId: string) => {
         setDecimalOverrides(prev => {
@@ -1133,11 +1139,40 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
                 </div>
             )}
 
-            <BudgetOccupancyTable title="Geral" rows={geralRows} data={budgetData} onUpdate={handleUpdate} decimalOverrides={decimalOverrides} onToggleDecimals={toggleDecimals} canEdit={canEditOccupancy} />
-            <BudgetOccupancyTable title="Lazer" rows={lazerRows} data={budgetData} onUpdate={handleUpdate} decimalOverrides={decimalOverrides} onToggleDecimals={toggleDecimals} canEdit={canEditOccupancy} />
-            <BudgetOccupancyTable title="Eventos" rows={eventRows} data={budgetData} onUpdate={handleUpdate} decimalOverrides={decimalOverrides} onToggleDecimals={toggleDecimals} canEdit={canEditOccupancy} />
+            <div className="flex flex-wrap gap-1 mt-4 mb-6 items-center">
+                <span className="text-sm font-bold text-gray-700 mr-2">Filtrar Meses:</span>
+                {MONTHS.map((m, idx) => (
+                    <button
+                        key={m}
+                        onClick={() => {
+                            setVisibleMonthsFilter(prev =>
+                                prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx].sort((a, b) => a - b)
+                            );
+                        }}
+                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                            visibleMonthsFilter.includes(idx)
+                                ? 'bg-indigo-100 text-indigo-700 border border-indigo-200 shadow-sm'
+                                : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'
+                        }`}
+                    >
+                        {m}
+                    </button>
+                ))}
+                <button
+                    onClick={() => setVisibleMonthsFilter(visibleMonthsFilter.length === 12 ? [] : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])}
+                    className="px-3 py-1 text-xs font-bold rounded-md transition-all bg-gray-100 text-gray-600 hover:bg-gray-200 ml-2 border border-gray-200"
+                >
+                    {visibleMonthsFilter.length === 12 ? 'Deselecionar Todos' : 'Selecionar Todos'}
+                </button>
+            </div>
+
+            <div className="space-y-6">
+                <BudgetOccupancyTable title="Geral" rows={geralRows} data={budgetData} onUpdate={handleUpdate} decimalOverrides={decimalOverrides} onToggleDecimals={toggleDecimals} canEdit={canEditOccupancy} visibleMonths={visibleMonthsFilter} />
+                <BudgetOccupancyTable title="Lazer" rows={lazerRows} data={budgetData} onUpdate={handleUpdate} decimalOverrides={decimalOverrides} onToggleDecimals={toggleDecimals} canEdit={canEditOccupancy} visibleMonths={visibleMonthsFilter} />
+                <BudgetOccupancyTable title="Eventos" rows={eventRows} data={budgetData} onUpdate={handleUpdate} decimalOverrides={decimalOverrides} onToggleDecimals={toggleDecimals} canEdit={canEditOccupancy} visibleMonths={visibleMonthsFilter} />
+            </div>
         </div>
     );
 };
 
-export default OccupancyView; 
+export default OccupancyView;
