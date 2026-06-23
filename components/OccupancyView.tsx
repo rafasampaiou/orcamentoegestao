@@ -193,7 +193,7 @@ export const BudgetOccupancyTable: React.FC<{
                 <h3 className="text-lg font-bold text-gray-800">{title}</h3>
             </div>
             <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left border-collapse">
+                <table className="w-max text-sm text-left border-collapse bg-white">
                     <thead className="bg-gray-50 text-gray-600 font-semibold border-b border-gray-200">
                         <tr>
                             <th className="px-4 py-3 w-64 sticky left-0 bg-gray-50 z-10 border-r border-gray-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">Indicador</th>
@@ -202,13 +202,12 @@ export const BudgetOccupancyTable: React.FC<{
                                 return <th key={m} className="px-2 py-3 text-center min-w-[80px] w-[80px] border-r border-gray-100">{m}</th>
                             })}
                             <th className="px-2 py-3 text-center min-w-[80px] w-[80px] bg-gray-100 font-bold text-gray-800">Total</th>
-                            <th className="w-full bg-transparent border-none"></th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                         {rows.map((row) => {
                             const visibleCount = visibleMonths ? visibleMonths.length : 12;
-                            const totalCols = 1 + visibleCount + 1 + 1; // Indicador + months + Total + Filler
+                            const totalCols = 1 + visibleCount + 1; // Indicador + months + Total
 
                             if (row.isSpacer) {
                                 return <tr key={row.id} className="h-4 bg-gray-50/50"><td colSpan={totalCols}></td></tr>;
@@ -326,7 +325,6 @@ export const BudgetOccupancyTable: React.FC<{
                                     <td className="px-2 py-2 text-center bg-gray-50 font-bold text-gray-800 text-xs border-l border-gray-200">
                                         {formatValue(total, row.format, decimalOverrides[row.id])}
                                     </td>
-                                    <td className="w-full border-none bg-transparent"></td>
                                 </tr>
                             );
                         })}
