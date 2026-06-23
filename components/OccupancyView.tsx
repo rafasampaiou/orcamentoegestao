@@ -199,21 +199,25 @@ export const BudgetOccupancyTable: React.FC<{
                             <th className="px-4 py-3 w-64 sticky left-0 bg-gray-50 z-10 border-r border-gray-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">Indicador</th>
                             {MONTHS.map((m, idx) => {
                                 if (visibleMonths && !visibleMonths.includes(idx)) return null;
-                                return <th key={m} className="px-2 py-3 text-center min-w-[80px] border-r border-gray-100">{m}</th>
+                                return <th key={m} className="px-2 py-3 text-center min-w-[80px] w-[80px] border-r border-gray-100">{m}</th>
                             })}
-                            <th className="px-2 py-3 text-center min-w-[80px] bg-gray-100 font-bold text-gray-800">Total</th>
+                            <th className="px-2 py-3 text-center min-w-[80px] w-[80px] bg-gray-100 font-bold text-gray-800">Total</th>
+                            <th className="w-full bg-transparent border-none"></th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                         {rows.map((row) => {
+                            const visibleCount = visibleMonths ? visibleMonths.length : 12;
+                            const totalCols = 1 + visibleCount + 1 + 1; // Indicador + months + Total + Filler
+
                             if (row.isSpacer) {
-                                return <tr key={row.id} className="h-4 bg-gray-50/50"><td colSpan={14}></td></tr>;
+                                return <tr key={row.id} className="h-4 bg-gray-50/50"><td colSpan={totalCols}></td></tr>;
                             }
                             if (row.isHeader) {
                                 return (
                                     <tr key={row.id} className="bg-gray-50 font-bold text-gray-800">
                                         <td className="px-4 py-2 sticky left-0 bg-gray-50 z-10 border-r border-gray-200">{row.label}</td>
-                                        <td colSpan={13}></td>
+                                        <td colSpan={totalCols - 1}></td>
                                     </tr>
                                 );
                             }
@@ -322,6 +326,7 @@ export const BudgetOccupancyTable: React.FC<{
                                     <td className="px-2 py-2 text-center bg-gray-50 font-bold text-gray-800 text-xs border-l border-gray-200">
                                         {formatValue(total, row.format, decimalOverrides[row.id])}
                                     </td>
+                                    <td className="w-full border-none bg-transparent"></td>
                                 </tr>
                             );
                         })}
