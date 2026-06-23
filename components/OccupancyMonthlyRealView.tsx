@@ -291,7 +291,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
             <div className="mb-6 flex items-start justify-between">
                 <div>
                     <div className="flex items-center gap-3">
-                        <h2 className="text-2xl font-bold text-gray-900">Ocupação Mensal</h2>
+                        <h2 className="text-2xl font-bold text-gray-900">Ocupação mensal</h2>
                         <span className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-sm rounded-lg py-1 px-3 font-bold">
                             Fechamento oficial
                         </span>
