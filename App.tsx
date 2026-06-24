@@ -297,41 +297,51 @@ const App: React.FC = () => {
   }, [currentUser, hotels, selectedHotel]);
 
   React.useEffect(() => {
-    // We want to update the active budget version whenever the hotel changes,
-    // even in REAL mode, so that indicators (Meta) can be retrieved correctly.
+    // We want to update the active budget and real versions whenever the hotel changes
     if (budgetVersions.length === 0 || hotels.length === 0) return;
 
     const selectedHotelObj = hotels.find(h => h.name === selectedHotel);
     const hotelCode = selectedHotelObj?.code || selectedHotel;
 
-    const currentActiveVersion = budgetVersions.find(v => v.id === activeBudgetVersionId);
-    const isCurrentValid = currentActiveVersion && (currentActiveVersion.hotelId === hotelCode || currentActiveVersion.hotelId === selectedHotel || !currentActiveVersion.hotelId);
+    // --- BUDGET VERSION SYNC ---
+    const currentActiveBudget = budgetVersions.find(v => v.id === activeBudgetVersionId);
+    const isCurrentBudgetValid = currentActiveBudget && (currentActiveBudget.hotelId === hotelCode || currentActiveBudget.hotelId === selectedHotel || !currentActiveBudget.hotelId);
 
-    // If the currently selected version is valid for the current hotel, don't force an override.
-    if (isCurrentValid && activeBudgetVersionId !== '') {
-      return;
-    }
+    if (!isCurrentBudgetValid || activeBudgetVersionId === '') {
+      const matchingBudget =
+        budgetVersions.find(v => (v.hotelId === hotelCode || v.hotelId === selectedHotel) && v.isMain) ||
+        budgetVersions.find(v => v.hotelId === hotelCode || v.hotelId === selectedHotel) ||
+        budgetVersions.find(v => !v.hotelId && v.isMain) ||
+        budgetVersions.find(v => !v.hotelId);
 
-    // Matching logic:
-    // 1. Version matches hotel and is main
-    // 2. Version matches hotel
-    // 3. Main version with null hotelId (Global main)
-    // 4. Any version with null hotelId
-    const matchingVersion =
-      budgetVersions.find(v => (v.hotelId === hotelCode || v.hotelId === selectedHotel) && v.isMain) ||
-      budgetVersions.find(v => v.hotelId === hotelCode || v.hotelId === selectedHotel) ||
-      budgetVersions.find(v => !v.hotelId && v.isMain) ||
-      budgetVersions.find(v => !v.hotelId);
-
-    if (matchingVersion) {
-      if (matchingVersion.id !== activeBudgetVersionId) {
-        setActiveBudgetVersionId(matchingVersion.id);
+      if (matchingBudget && matchingBudget.id !== activeBudgetVersionId) {
+        setActiveBudgetVersionId(matchingBudget.id);
+      } else if (!matchingBudget && activeBudgetVersionId) {
+        setActiveBudgetVersionId('');
       }
-    } else if (activeBudgetVersionId) {
-      // Clear version if found mismatch/fallback
-      setActiveBudgetVersionId('');
     }
-  }, [selectedHotel, budgetVersions, hotels, activeBudgetVersionId, currentModule]);
+
+    // --- REAL VERSION SYNC ---
+    if (realVersions.length > 0) {
+      const currentActiveReal = realVersions.find(v => v.id === activeRealVersionId);
+      const isCurrentRealValid = currentActiveReal && (currentActiveReal.hotelId === hotelCode || currentActiveReal.hotelId === selectedHotel || !currentActiveReal.hotelId);
+
+      if (!isCurrentRealValid || activeRealVersionId === '') {
+        const matchingReal =
+          realVersions.find(v => (v.hotelId === hotelCode || v.hotelId === selectedHotel) && v.isMain) ||
+          realVersions.find(v => v.hotelId === hotelCode || v.hotelId === selectedHotel) ||
+          realVersions.find(v => !v.hotelId && v.isMain) ||
+          realVersions.find(v => !v.hotelId);
+
+        if (matchingReal && matchingReal.id !== activeRealVersionId) {
+          setActiveRealVersionId(matchingReal.id);
+        } else if (!matchingReal && activeRealVersionId) {
+          setActiveRealVersionId('');
+        }
+      }
+    }
+
+  }, [selectedHotel, budgetVersions, realVersions, hotels, activeBudgetVersionId, activeRealVersionId, currentModule]);
   // -- SUPABASE INTEGRATION: Fetch Real Data on Auth --
   React.useEffect(() => {
     if (!session) return;
