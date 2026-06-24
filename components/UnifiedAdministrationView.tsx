@@ -734,7 +734,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const [importYear, setImportYear] = useState<number>(new Date().getFullYear());
 
   // New Structured Import State
-  const [importCategory, setImportCategory] = useState<'financial' | 'occupancy' | 'revenue' | 'taxes' | 'expenses'>('financial');
+  const [importCategory, setImportCategory] = useState<'financial' | 'revenue' | 'expenses'>('financial');
   const [importProjectionType, setImportProjectionType] = useState<import('../types').ProjectionType>('Reunião de Ritmo');
   const [expenseImportMode, setExpenseImportMode] = useState<'forecast' | 'detailed'>('forecast');
   const [importHotelId, setImportHotelId] = useState<string>('');
@@ -754,7 +754,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const [eventsImportData, setEventsImportData] = useState<Record<string, Record<number, string>>>({});
   const [eventsBudgetData, setEventsBudgetData] = useState<Record<string, Record<number, string>>>({});
   const [occupancySubTab, setOccupancySubTab] = useState<'geral' | 'leisure' | 'events'>('geral');
-  const [budgetImportCategory, setBudgetImportCategory] = useState<'occupancy' | 'revenue' | 'taxes' | 'expenses'>('occupancy');
+  const [budgetImportCategory, setBudgetImportCategory] = useState<'revenue' | 'expenses'>('revenue');
   const [budgetImportHotelId, setBudgetImportHotelId] = useState<string>('');
   const [budgetFinancialImportText, setBudgetFinancialImportText] = useState<string>('');
   const [budgetOccupancySubTab, setBudgetOccupancySubTab] = useState<'geral' | 'leisure' | 'events'>('geral');
@@ -4005,11 +4005,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       {/* Sub-category tabs for Budget */}
       <div className="flex gap-2 overflow-x-auto pb-2">
         {([
-          { id: 'occupancy', label: 'Ocupacao', icon: BedDouble },
           { id: 'revenue', label: 'Receitas', icon: DollarSign },
-          { id: 'taxes', label: 'Impostos', icon: PieChart },
           { id: 'expenses', label: 'Despesas', icon: Briefcase }
-        ] as { id: 'occupancy' | 'revenue' | 'taxes' | 'expenses', label: string, icon: any }[]).map(cat => (
+        ] as { id: 'revenue' | 'expenses', label: string, icon: any }[]).map(cat => (
           <button
             key={cat.id}
             onClick={() => setBudgetImportCategory(cat.id)}
@@ -5510,9 +5508,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               {importScenario === 'REAL' && activeImportTab !== 'costCenters' && activeImportTab !== 'accounts' && activeImportTab !== 'history' && (
                 <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                   {[
-                    { id: 'occupancy', label: 'Ocupação', icon: BedDouble },
                     { id: 'revenue', label: 'Receitas', icon: DollarSign },
-                    { id: 'taxes', label: 'Impostos', icon: PieChart },
                     { id: 'expenses', label: 'Despesas', icon: Briefcase }
                   ].map(cat => (
                     <button
