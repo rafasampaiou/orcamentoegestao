@@ -1125,6 +1125,9 @@ const App: React.FC = () => {
           }}
           onLogout={handleLogout}
           currentView={currentView}
+          versions={(currentModule as string) === 'BUDGET' ? budgetVersions : realVersions}
+          activeVersionId={(currentModule as string) === 'BUDGET' ? activeBudgetVersionId : activeRealVersionId}
+          setActiveVersionId={(currentModule as string) === 'BUDGET' ? setActiveBudgetVersionId : setActiveRealVersionId}
         />
 
         {/* Main Scrollable Content */}

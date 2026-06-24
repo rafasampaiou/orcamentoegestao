@@ -1,6 +1,6 @@
 import React from 'react';
 import { Layers, Building2 as Building2Icon, ArrowLeft, ArrowRight, Calendar, LogOut } from 'lucide-react';
-import { User, Hotel, ModuleType, UserRole, ViewState } from '../types';
+import { User, Hotel, ModuleType, UserRole, ViewState, BudgetVersion } from '../types';
 
 interface HeaderProps {
     sidebarCollapsed: boolean;
@@ -22,6 +22,9 @@ interface HeaderProps {
     currentUser: User;
     onLogout: () => void;
     currentView: ViewState;
+    versions?: BudgetVersion[];
+    activeVersionId?: string;
+    setActiveVersionId?: (id: string) => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -43,9 +46,17 @@ const Header: React.FC<HeaderProps> = ({
     formattedDate,
     currentUser,
     onLogout,
-    currentView
+    currentView,
+    versions,
+    activeVersionId,
+    setActiveVersionId
 }) => {
     const showFilters = currentView === 'dashboard' || currentView === 'occupancy_real';
+    const selectedHotelObj = hotels.find(h => h.name === selectedHotel);
+    const hotelCode = selectedHotelObj?.code || selectedHotel;
+    const availableVersionsForHotel = versions?.filter(v => 
+        v.hotelId === hotelCode || v.hotelId === selectedHotel || !v.hotelId
+    ) || [];
 
     return (
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shrink-0 z-10 font-['Inter',sans-serif]">
@@ -156,6 +167,22 @@ const Header: React.FC<HeaderProps> = ({
                                 }
                             </select>
                         </div>
+
+                        {/* Version Context Selector */}
+                        {availableVersionsForHotel.length > 0 && (
+                            <div className="flex items-center bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 ml-2">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase mr-2">Versão</span>
+                                <select 
+                                    value={activeVersionId || ''} 
+                                    onChange={(e) => setActiveVersionId?.(e.target.value)}
+                                    className="bg-transparent text-xs font-bold text-gray-700 focus:outline-none cursor-pointer"
+                                >
+                                    {availableVersionsForHotel.map(v => (
+                                        <option key={v.id} value={v.id}>{v.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
                     </>
                 )}
             </div>
