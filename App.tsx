@@ -237,6 +237,20 @@ const App: React.FC = () => {
               hasData = true;
             }
           });
+
+          const contextKeyLY = `${selectedHotel}_${selectedDate.getFullYear() - 1}_${i + 1}_${activeRealVersionId}`;
+          const monthDataLY = realOccupancyDataRef.current[contextKeyLY] || {};
+
+          Object.keys(monthDataLY).forEach(key => {
+            if (key.endsWith('_forecast')) {
+              const baseKey = key.replace('_forecast', '') + '_LY';
+              if (!occupancyDataToSave[baseKey]) {
+                occupancyDataToSave[baseKey] = Array(12).fill(0);
+              }
+              occupancyDataToSave[baseKey][i] = monthDataLY[key];
+              hasData = true;
+            }
+          });
         }
 
         if (hasData || Object.keys(occupancyDataToSave).length > 0) {
@@ -423,14 +437,26 @@ const App: React.FC = () => {
                   const hotelName = remoteHotels.find(h => h.code === v.hotelId || h.id === v.hotelId)?.name || v.hotelId;
                   const contextKey = `${hotelName}_${v.year}_${i + 1}_${v.id}`;
                   const monthData: Record<string, number> = {};
+                  const contextKeyLY = `${hotelName}_${v.year - 1}_${i + 1}_${v.id}`;
+                  const monthDataLY: Record<string, number> = {};
                   Object.keys(v.occupancyData).forEach(rowId => {
-                    const val = v.occupancyData![rowId][i];
-                    if (val !== undefined && val !== null) {
-                      monthData[`${rowId}_forecast`] = val;
-                      monthData[`${rowId}_previa`] = val;
+                    if (rowId.endsWith('_LY')) {
+                      const val = v.occupancyData![rowId][i];
+                      if (val !== undefined && val !== null) {
+                        const baseId = rowId.replace('_LY', '');
+                        monthDataLY[`${baseId}_forecast`] = val;
+                        monthDataLY[`${baseId}_previa`] = val;
+                      }
+                    } else {
+                      const val = v.occupancyData![rowId][i];
+                      if (val !== undefined && val !== null) {
+                        monthData[`${rowId}_forecast`] = val;
+                        monthData[`${rowId}_previa`] = val;
+                      }
                     }
                   });
                   newRealOccMap[contextKey] = monthData;
+                  newRealOccMap[contextKeyLY] = monthDataLY;
                 }
               }
             }
@@ -568,6 +594,17 @@ const App: React.FC = () => {
           const rowId = key.replace('_forecast', '');
           if (!occupancyDataToSave[rowId]) occupancyDataToSave[rowId] = Array(12).fill(0);
           occupancyDataToSave[rowId][i] = monthData[key];
+        }
+      });
+
+      const contextKeyLY = `${selectedHotel}_${selectedDate.getFullYear() - 1}_${i + 1}_${activeRealVersionId}`;
+      const monthDataLY = realOccupancyData[contextKeyLY] || {};
+
+      Object.keys(monthDataLY).forEach(key => {
+        if (key.endsWith('_forecast')) {
+          const rowId = key.replace('_forecast', '') + '_LY';
+          if (!occupancyDataToSave[rowId]) occupancyDataToSave[rowId] = Array(12).fill(0);
+          occupancyDataToSave[rowId][i] = monthDataLY[key];
         }
       });
     }
