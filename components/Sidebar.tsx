@@ -156,7 +156,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         {exp.real && (
           <div className="space-y-0.5 pb-1">
             <NavItem depth={1} label="Versões"        icon={Database}      active={currentView === 'real_home'}       onClick={() => go('real_home', 'REAL')} />
-            <NavItem depth={1} label="Ocupação mensal"    icon={Calendar}      active={currentView === 'occupancy_monthly'} onClick={() => go('occupancy_monthly', 'REAL')} />
+            <NavItem depth={1} label="Ocupação"           icon={Calendar}      active={currentView === 'occupancy_monthly'} onClick={() => go('occupancy_monthly', 'REAL')} />
             <NavItem depth={1} label="Comparativo de ocupação" icon={BedDouble}     active={currentView === 'occupancy_real'}  onClick={() => go('occupancy_real', 'REAL')} />
             <NavItem depth={1} label="DRE Forecast"   icon={BarChart2}     active={currentView === 'dashboard'}       onClick={() => go('dashboard', 'REAL')} />
             <NavItem depth={1} label="Comparativos"   icon={PieChart}      active={currentView === 'comparatives'}    onClick={() => go('comparatives', 'REAL')} />

@@ -10,6 +10,8 @@ interface OccupancyMonthlyRealViewProps {
     realOccupancyData: Record<string, Record<string, number>>;
     setRealOccupancyData: React.Dispatch<React.SetStateAction<Record<string, Record<string, number>>>>;
     budgetData: Record<string, number[]>;
+    setBudgetOccupancyDataMap?: React.Dispatch<React.SetStateAction<Record<string, Record<string, number[]>>>>;
+    activeBudgetVersionId?: string;
     activeRealVersionId?: string;
     activeRealVersionName?: string;
     currentUser?: User;
@@ -22,6 +24,8 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
     realOccupancyData,
     setRealOccupancyData,
     budgetData,
+    setBudgetOccupancyDataMap,
+    activeBudgetVersionId,
     activeRealVersionId,
     activeRealVersionName,
     currentUser,
@@ -34,6 +38,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
     const [decimalOverrides, setDecimalOverrides] = useState<Record<string, number>>({});
     const [savedIndicator, setSavedIndicator] = useState(false);
     const [visibleMonthsFilter, setVisibleMonthsFilter] = useState<number[]>([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    const [period, setPeriod] = useState<'Realizado' | 'Meta' | 'Ano anterior'>('Realizado');
     const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
     const toggleDecimals = (rowId: string) => {
@@ -208,8 +213,12 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
         return newData;
     };
 
-    // Transform realOccupancyData into a 12-month array format for BudgetOccupancyTable
+    // Transform data into a 12-month array format for BudgetOccupancyTable
     const tableData: Record<string, number[]> = useMemo(() => {
+        if (period === 'Meta') {
+            return budgetData || {};
+        }
+
         const result: Record<string, number[]> = {};
         const allRowIds = [...geralRows, ...lazerRows, ...eventRows].map(r => r.id);
 
@@ -217,14 +226,15 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
             result[id] = Array(12).fill(0);
         });
 
+        const targetYear = period === 'Ano anterior' ? selectedYear - 1 : selectedYear;
         const getDaysInMonth = (year: number, month: number) => new Date(year, month, 0).getDate();
 
         for (let i = 0; i < 12; i++) {
-            const contextKey = `${selectedHotel}_${selectedYear}_${i + 1}_${activeRealVersionId || ''}`;
+            const contextKey = `${selectedHotel}_${targetYear}_${i + 1}_${activeRealVersionId || ''}`;
             const rawMonthData = realOccupancyData?.[contextKey] || {};
             const monthData = recalculateRealForMonth(rawMonthData, i);
 
-            const daysInMonth = getDaysInMonth(selectedYear, i + 1);
+            const daysInMonth = getDaysInMonth(targetYear, i + 1);
             let baseCap = 0;
             if (monthData['geral_capacity_forecast'] !== undefined) {
                 baseCap = monthData['geral_capacity_forecast'];
@@ -236,7 +246,6 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
 
             allRowIds.forEach(id => {
                 if (id === 'days_month') {
-                    // Preenchido automaticamente de acordo com a quantidade de dia de cada mês do ano
                     result[id][i] = daysInMonth;
                     return;
                 }
@@ -251,28 +260,169 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
                     return;
                 }
 
-                // By default, we show 'forecast'
                 const val = monthData[`${id}_forecast`];
                 if (val !== undefined) {
                     result[id][i] = val;
                 } else if (budgetData && budgetData[id] && budgetData[id][i] !== undefined) {
-                    // Fallback to budget data for base values like capacity, if available
                     result[id][i] = budgetData[id][i];
                 }
             });
         }
         return result;
-    }, [realOccupancyData, selectedHotel, selectedYear, budgetData]);
+    }, [realOccupancyData, selectedHotel, selectedYear, budgetData, period, activeRealVersionId]);
+
+    const recalculateBudget = (data: Record<string, number[]>) => {
+        const newData = { ...data };
+        const months = Array.from({ length: 12 }, (_, i) => i);
+        const get = (key: string, idx: number) => newData[key]?.[idx] || 0;
+        const set = (key: string, idx: number, val: number) => {
+            if (!newData[key]) newData[key] = Array(12).fill(0);
+            else if (newData[key] === data[key]) newData[key] = [...newData[key]];
+            newData[key][idx] = val;
+        };
+        const getDaysInMonth = (year: number, month: number) => new Date(year, month, 0).getDate();
+
+        months.forEach(i => {
+            const currentDays = get('days_month', i);
+            const days = currentDays > 0 ? currentDays : getDaysInMonth(selectedYear, i + 1);
+            if (currentDays === 0) set('days_month', i, days);
+            const gCap = get('geral_capacity', i);
+
+            const lzCap = gCap;
+            const lzAvail = lzCap * days;
+            set('lazer_capacity', i, lzCap);
+            set('lazer_avail', i, lzAvail);
+
+            const lzSold = get('lazer_sold', i);
+            const lzAd = get('lazer_adults', i);
+            const lzChd = get('lazer_chd', i);
+            const lzRevFap = get('lazer_rev_fap', i);
+            const lzPax = lzAd + lzChd;
+            let lzRevHosp = get('lazer_rev_hosp', i);
+            if (!lzRevHosp && lzRevHosp !== 0) lzRevHosp = 0;
+            
+            const lzRateAd = lzAd > 0 ? (lzRevFap - lzRevHosp) / lzAd : 0;
+            const lzRateChd = lzChd > 0 ? (lzRevFap - lzRevHosp) / lzChd : 0;
+
+            set('lazer_occ_pct', i, lzAvail > 0 ? (lzSold / lzAvail) * 100 : 0);
+            set('lazer_pax', i, lzPax);
+            set('lazer_coef_total', i, lzSold > 0 ? lzPax / lzSold : 0);
+            set('lazer_coef_ad', i, lzSold > 0 ? lzAd / lzSold : 0);
+            set('lazer_coef_chd', i, lzSold > 0 ? lzChd / lzSold : 0);
+            set('lazer_rev_fap', i, lzRevFap);
+            set('lazer_rev_hosp', i, lzRevHosp);
+            set('lazer_dm_fap', i, lzSold > 0 ? lzRevFap / lzSold : 0);
+            set('lazer_dm_hosp', i, lzSold > 0 ? lzRevHosp / lzSold : 0);
+            set('lazer_revpar', i, lzAvail > 0 ? lzRevFap / lzAvail : 0);
+            set('lazer_rate_ad', i, lzRateAd);
+            set('lazer_rate_chd', i, lzRateChd);
+
+            const evCap = gCap;
+            const evAvail = evCap * days;
+            set('event_capacity', i, evCap);
+            set('event_avail', i, evAvail);
+
+            const evSold = get('event_sold', i);
+            const evAd = get('event_adults', i);
+            const evChd = get('event_chd', i);
+            const evRevFap = get('event_rev_fap', i);
+            const evPax = evAd + evChd;
+            let evRevHosp = get('event_rev_hosp', i);
+            if (!evRevHosp && evRevHosp !== 0) evRevHosp = 0;
+            
+            const evRateAd = evAd > 0 ? (evRevFap - evRevHosp) / evAd : 0;
+            const evRateChd = evChd > 0 ? (evRevFap - evRevHosp) / evChd : 0;
+
+            set('event_occ_pct', i, evAvail > 0 ? (evSold / evAvail) * 100 : 0);
+            set('event_pax', i, evPax);
+            set('event_coef_total', i, evSold > 0 ? evPax / evSold : 0);
+            set('event_pax', i, evPax);
+            set('event_coef_ad', i, evSold > 0 ? evAd / evSold : 0);
+            set('event_coef_chd', i, evSold > 0 ? evChd / evSold : 0);
+            set('event_rev_fap', i, evRevFap);
+            set('event_rev_hosp', i, evRevHosp);
+            set('event_dm_fap', i, evSold > 0 ? evRevFap / evSold : 0);
+            set('event_dm_hosp', i, evSold > 0 ? evRevHosp / evSold : 0);
+            set('event_revpar', i, evAvail > 0 ? evRevFap / evAvail : 0);
+            set('event_rate_ad', i, evRateAd);
+            set('event_rate_chd', i, evRateChd);
+
+            const gAvail = gCap * days;
+            set('geral_avail', i, gAvail);
+
+            const gSold = lzSold + evSold;
+            const gAd = lzAd + evAd;
+            const gChd = lzChd + evChd;
+            const gPax = gAd + gChd;
+            const gRevFap = lzRevFap + evRevFap;
+            const gRevHosp = lzRevHosp + evRevHosp;
+
+            set('geral_sold', i, gSold);
+            set('geral_occ_pct', i, gAvail > 0 ? (gSold / gAvail) * 100 : 0);
+            set('geral_pax', i, gPax);
+            set('geral_coef_total', i, gSold > 0 ? gPax / gSold : 0);
+            set('geral_adults', i, gAd);
+            set('geral_coef_ad', i, gSold > 0 ? gAd / gSold : 0);
+            set('geral_chd', i, gChd);
+            set('geral_coef_chd', i, gSold > 0 ? gChd / gSold : 0);
+
+            set('geral_rate_ad', i, gAd > 0 ? (gRevFap - gRevHosp) / gAd : 0); 
+            set('geral_rate_chd', i, gChd > 0 ? (gRevFap - gRevHosp) / gChd : 0); 
+
+            set('geral_rev_fap', i, gRevFap);
+            set('geral_rev_hosp', i, gRevHosp);
+
+            const lzExtra = get('lazer_extra_rev', i);
+            const evExtra = get('event_extra_rev', i);
+            const gExtraInput = get('geral_extra_rev', i);
+            const gExtra = gExtraInput !== 0 ? gExtraInput : (lzExtra + evExtra);
+            set('geral_extra_rev', i, gExtra);
+
+            const gOrExtras = get('geral_or_extras', i);
+            const gOrHosp = get('geral_or_hosp', i);
+
+            set('geral_dm_fap', i, gSold > 0 ? gRevFap / gSold : 0);
+            set('geral_dm_hosp', i, gSold > 0 ? gRevHosp / gSold : 0);
+            set('geral_revpar', i, gAvail > 0 ? gRevFap / gAvail : 0);
+            set('geral_trevpor', i, gSold > 0 ? (gRevFap + gExtra + gOrExtras + gOrHosp) / gSold : 0);
+            set('geral_trevpar', i, gAvail > 0 ? (gRevFap + gExtra + gOrExtras + gOrHosp) / gAvail : 0);
+
+            set('lazer_trevpor', i, lzSold > 0 ? (lzRevFap + lzExtra) / lzSold : 0);
+            set('lazer_trevpar', i, lzAvail > 0 ? (lzRevFap + lzExtra) / lzAvail : 0);
+
+            set('event_trevpor', i, evSold > 0 ? (evRevFap + evExtra) / evSold : 0);
+            set('event_trevpar', i, evAvail > 0 ? (evRevFap + evExtra) / evAvail : 0);
+        });
+
+        return newData;
+    };
 
     const handleUpdate = (rowId: string, monthIndex: number, value: number) => {
+        if (period === 'Meta') {
+            if (setBudgetOccupancyDataMap && activeBudgetVersionId) {
+                setBudgetOccupancyDataMap(prev => {
+                    const versionData = prev[activeBudgetVersionId] || {};
+                    const newRowData = [...(versionData[rowId] || Array(12).fill(0))];
+                    newRowData[monthIndex] = value;
+                    const newData = { ...versionData, [rowId]: newRowData };
+                    const recalculated = recalculateBudget(newData);
+                    return {
+                        ...prev,
+                        [activeBudgetVersionId]: recalculated
+                    };
+                });
+            }
+            return;
+        }
+
         if (!setRealOccupancyData) return;
 
+        const targetYear = period === 'Ano anterior' ? selectedYear - 1 : selectedYear;
         const month = monthIndex + 1;
-        const contextKey = `${selectedHotel}_${selectedYear}_${month}_${activeRealVersionId || ''}`;
+        const contextKey = `${selectedHotel}_${targetYear}_${month}_${activeRealVersionId || ''}`;
 
         setRealOccupancyData(prev => {
             const contextData = prev[contextKey] || {};
-            // Update both forecast and previa since this is a manual entry
             const newData = {
                 ...contextData,
                 [`${rowId}_forecast`]: value,
@@ -293,12 +443,12 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
             <div className="mb-6 flex items-start justify-between">
                 <div>
                     <div className="flex items-center gap-3">
-                        <h2 className="text-2xl font-bold text-gray-900">Ocupação mensal</h2>
+                        <h2 className="text-2xl font-bold text-gray-900">Ocupação</h2>
                         <span className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-sm rounded-lg py-1 px-3 font-bold">
-                            Fechamento oficial
+                            {period === 'Realizado' ? 'Realizado' : period === 'Meta' ? 'Meta' : 'Ano Anterior'}
                         </span>
                     </div>
-                    <p className="text-gray-500 mt-1">Visão anual de ocupação do realizado e forecast. As alterações aqui refletem na aba Comparativo e no DRE.</p>
+                    <p className="text-gray-500 mt-1">Visão anual de ocupação. As alterações feitas aqui alimentam automaticamente as colunas correspondentes no DRE Forecast.</p>
                 </div>
                 {canEditOccupancy && (
                     <div className="flex items-center gap-3">
@@ -316,31 +466,51 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
                 )}
             </div>
 
-            <div className="flex flex-wrap gap-1 mt-4 mb-6 items-center">
-                <span className="text-sm font-bold text-gray-700 mr-2">Filtrar Meses:</span>
-                {MONTHS.map((m, idx) => (
+            <div className="flex flex-wrap gap-4 mt-4 mb-6 items-center">
+                <div className="flex items-center bg-gray-100 p-1 rounded-lg">
+                    {['Realizado', 'Meta', 'Ano anterior'].map(p => (
+                        <button
+                            key={p}
+                            onClick={() => setPeriod(p as any)}
+                            className={`px-4 py-1.5 text-sm font-bold rounded-md transition-all ${
+                                period === p
+                                    ? 'bg-white text-indigo-600 shadow-sm border border-gray-200'
+                                    : 'text-gray-500 hover:text-gray-700'
+                            }`}
+                        >
+                            {p}
+                        </button>
+                    ))}
+                </div>
+                
+                <div className="h-6 w-px bg-gray-300"></div>
+                
+                <div className="flex items-center flex-wrap gap-1">
+                    <span className="text-sm font-bold text-gray-700 mr-2">Filtrar Meses:</span>
+                    {MONTHS.map((m, idx) => (
+                        <button
+                            key={m}
+                            onClick={() => {
+                                setVisibleMonthsFilter(prev =>
+                                    prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx].sort((a, b) => a - b)
+                                );
+                            }}
+                            className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                                visibleMonthsFilter.includes(idx)
+                                    ? 'bg-indigo-100 text-indigo-700 border border-indigo-200 shadow-sm'
+                                    : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'
+                            }`}
+                        >
+                            {m}
+                        </button>
+                    ))}
                     <button
-                        key={m}
-                        onClick={() => {
-                            setVisibleMonthsFilter(prev =>
-                                prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx].sort((a, b) => a - b)
-                            );
-                        }}
-                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
-                            visibleMonthsFilter.includes(idx)
-                                ? 'bg-indigo-100 text-indigo-700 border border-indigo-200 shadow-sm'
-                                : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'
-                        }`}
+                        onClick={() => setVisibleMonthsFilter(visibleMonthsFilter.length === 12 ? [] : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])}
+                        className="px-3 py-1 text-xs font-bold rounded-md transition-all bg-gray-100 text-gray-600 hover:bg-gray-200 ml-2 border border-gray-200"
                     >
-                        {m}
+                        {visibleMonthsFilter.length === 12 ? 'Deselecionar Todos' : 'Selecionar Todos'}
                     </button>
-                ))}
-                <button
-                    onClick={() => setVisibleMonthsFilter(visibleMonthsFilter.length === 12 ? [] : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])}
-                    className="px-3 py-1 text-xs font-bold rounded-md transition-all bg-gray-100 text-gray-600 hover:bg-gray-200 ml-2 border border-gray-200"
-                >
-                    {visibleMonthsFilter.length === 12 ? 'Deselecionar Todos' : 'Selecionar Todos'}
-                </button>
+                </div>
             </div>
 
             <BudgetOccupancyTable

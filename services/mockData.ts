@@ -769,14 +769,30 @@ export const getForecastData = (
         return realOccupancyData[contextKey]?.[rowId];
     };
 
+    const getLYOccValue = (rowId: string) => {
+        if (!selectedYear) return 0;
+        const targetYear = selectedYear - 1;
+        const contextKey = `${selectedHotelName}_${targetYear}_${selectedMonth}_${activeRealVersionId || ''}`;
+        return realOccupancyData[contextKey]?.[rowId];
+    };
+
     // 1. INDICATORS
 
     // Section: GERAIS
-    const gAvailReal = getRealOccValue('geral_avail_forecast') ?? 100;
-    const gOccReal = getRealOccValue('geral_sold_forecast') ?? 75;
-    const gPaxReal = getRealOccValue('geral_pax_forecast') ?? 210;
-    const gAdultsReal = getRealOccValue('geral_adults_forecast') ?? 150;
-    const gChdReal = getRealOccValue('geral_chd_forecast') ?? 60;
+    const gAvailReal = getRealOccValue('geral_avail_forecast') ?? 0;
+    const gAvailLY = getLYOccValue('geral_avail_forecast') ?? 0;
+    
+    const gOccReal = getRealOccValue('geral_sold_forecast') ?? 0;
+    const gOccLY = getLYOccValue('geral_sold_forecast') ?? 0;
+    
+    const gPaxReal = getRealOccValue('geral_pax_forecast') ?? 0;
+    const gPaxLY = getLYOccValue('geral_pax_forecast') ?? 0;
+    
+    const gAdultsReal = getRealOccValue('geral_adults_forecast') ?? 0;
+    const gAdultsLY = getLYOccValue('geral_adults_forecast') ?? 0;
+    
+    const gChdReal = getRealOccValue('geral_chd_forecast') ?? 0;
+    const gChdLY = getLYOccValue('geral_chd_forecast') ?? 0;
     
     const gAvailPrevia = getRealOccValue('geral_avail_previa') ?? 0;
     const gOccPrevia = getRealOccValue('geral_sold_previa') ?? 0;
@@ -809,19 +825,31 @@ export const getForecastData = (
     const trevporBudget = gOccBudget > 0 ? (revAptBudget + revExtraTotalBudget) / gOccBudget : 0;
     const trevparBudget = gAvailBudget > 0 ? (revAptBudget + revExtraTotalBudget) / gAvailBudget : 0;
 
-    rows.push(generateRow('IND-1', '', 'Indicators', 'UH Disponível', gAvailBudget, gAvailReal, 100, gAvailPrevia, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
-    rows.push(generateRow('IND-2', '', 'Indicators', 'UH Ocupada', gOccBudget, gOccReal, 70, gOccPrevia, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
-    rows.push(generateRow('IND-3', '', 'Indicators', '% de Ocupação', gOccPctBudget, gAvailReal > 0 ? (gOccReal / gAvailReal) * 100 : 0, 70, gAvailPrevia > 0 ? (gOccPrevia / gAvailPrevia) * 100 : 0, false, false, 0, undefined, { format: 'percent' }, 'INDICADORES GERAIS'));
-    rows.push(generateRow('IND-4', '', 'Indicators', 'DM Bruta', dmBudget, 850, 800, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
-    rows.push(generateRow('IND-5', '', 'Indicators', 'PAX', gPaxBudget, gPaxReal, 190, gPaxPrevia, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
-    rows.push(generateRow('IND-ADULTOS', '', 'Indicators', 'Adultos', gAdultsBudget, gAdultsReal, 140, gAdultsPrevia, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
-    rows.push(generateRow('IND-CHD', '', 'Indicators', 'CHD', gChdBudget, gChdReal, 50, gChdPrevia, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
-    rows.push(generateRow('IND-COEF-ADULTOS', '', 'Indicators', 'Coef. Adultos', gOccBudget > 0 ? gAdultsBudget / gOccBudget : 0, gOccReal > 0 ? gAdultsReal / gOccReal : 0, 2, gOccPrevia > 0 ? gAdultsPrevia / gOccPrevia : 0, false, false, 0, undefined, { format: 'decimal' }, 'INDICADORES GERAIS'));
-    rows.push(generateRow('IND-COEF-CHD', '', 'Indicators', 'Coef. CHD', gOccBudget > 0 ? gChdBudget / gOccBudget : 0, gOccReal > 0 ? gChdReal / gOccReal : 0, 0.7, gOccPrevia > 0 ? gChdPrevia / gOccPrevia : 0, false, false, 0, undefined, { format: 'decimal' }, 'INDICADORES GERAIS'));
-    rows.push(generateRow('IND-6', '', 'Indicators', 'REVPAR', revparBudget, 637.5, 560, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
-    rows.push(generateRow('IND-TREVPOR', '', 'Indicators', 'TREVPOR', trevporBudget, 0, 0, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
-    rows.push(generateRow('IND-TREVPAR', '', 'Indicators', 'TREVPAR', trevparBudget, 0, 0, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
-    rows.push(generateRow('IND-KPI', '', 'Indicators', 'KPI de produtividade', 0, 1.5, 1.4, 0, false, false, 0, undefined, { format: 'decimal' }, 'INDICADORES GERAIS'));
+    const dmReal = getRealOccValue('geral_dm_fap_forecast') ?? 0;
+    const dmLY = getLYOccValue('geral_dm_fap_forecast') ?? 0;
+    
+    const revparReal = getRealOccValue('geral_revpar_forecast') ?? 0;
+    const revparLY = getLYOccValue('geral_revpar_forecast') ?? 0;
+    
+    const trevporReal = getRealOccValue('geral_trevpor_forecast') ?? 0;
+    const trevporLY = getLYOccValue('geral_trevpor_forecast') ?? 0;
+    
+    const trevparReal = getRealOccValue('geral_trevpar_forecast') ?? 0;
+    const trevparLY = getLYOccValue('geral_trevpar_forecast') ?? 0;
+
+    rows.push(generateRow('IND-1', '', 'Indicators', 'UH Disponível', gAvailBudget, gAvailReal, gAvailLY, gAvailPrevia, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-2', '', 'Indicators', 'UH Ocupada', gOccBudget, gOccReal, gOccLY, gOccPrevia, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-3', '', 'Indicators', '% de Ocupação', gOccPctBudget, gAvailReal > 0 ? (gOccReal / gAvailReal) * 100 : 0, gAvailLY > 0 ? (gOccLY / gAvailLY) * 100 : 0, gAvailPrevia > 0 ? (gOccPrevia / gAvailPrevia) * 100 : 0, false, false, 0, undefined, { format: 'percent' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-4', '', 'Indicators', 'DM Bruta', dmBudget, dmReal, dmLY, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-5', '', 'Indicators', 'PAX', gPaxBudget, gPaxReal, gPaxLY, gPaxPrevia, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-ADULTOS', '', 'Indicators', 'Adultos', gAdultsBudget, gAdultsReal, gAdultsLY, gAdultsPrevia, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-CHD', '', 'Indicators', 'CHD', gChdBudget, gChdReal, gChdLY, gChdPrevia, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-COEF-ADULTOS', '', 'Indicators', 'Coef. Adultos', gOccBudget > 0 ? gAdultsBudget / gOccBudget : 0, gOccReal > 0 ? gAdultsReal / gOccReal : 0, gOccLY > 0 ? gAdultsLY / gOccLY : 0, gOccPrevia > 0 ? gAdultsPrevia / gOccPrevia : 0, false, false, 0, undefined, { format: 'decimal' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-COEF-CHD', '', 'Indicators', 'Coef. CHD', gOccBudget > 0 ? gChdBudget / gOccBudget : 0, gOccReal > 0 ? gChdReal / gOccReal : 0, gOccLY > 0 ? gChdLY / gOccLY : 0, gOccPrevia > 0 ? gChdPrevia / gOccPrevia : 0, false, false, 0, undefined, { format: 'decimal' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-6', '', 'Indicators', 'REVPAR', revparBudget, revparReal, revparLY, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-TREVPOR', '', 'Indicators', 'TREVPOR', trevporBudget, trevporReal, trevporLY, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-TREVPAR', '', 'Indicators', 'TREVPAR', trevparBudget, trevparReal, trevparLY, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-KPI', '', 'Indicators', 'KPI de produtividade', 0, 0, 0, 0, false, false, 0, undefined, { format: 'decimal' }, 'INDICADORES GERAIS'));
 
     rows.push(generateRow('SPACER-IND-REV', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
 

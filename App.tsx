@@ -984,6 +984,8 @@ const App: React.FC = () => {
           setRealOccupancyData={setRealOccupancyData}
           onSaveOccupancy={handleSaveRealOccupancy}
           budgetData={budgetOccupancyDataMap[activeBudgetVersionId] || {}}
+          setBudgetOccupancyDataMap={setBudgetOccupancyDataMap}
+          activeBudgetVersionId={activeBudgetVersionId}
           activeRealVersionId={activeRealVersionId}
           activeRealVersionName={activeRealVersionName}
           currentUser={currentUser}
