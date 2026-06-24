@@ -808,9 +808,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     { key: 'budget', label: 'Meta (Budget)' },
                                     { key: 'deltaPreviaBudget', label: 'Δ Prévia - Meta R$' },
                                     { key: 'deltaPreviaBudgetPct', label: 'Δ Prévia - Meta %' },
-                                    { key: 'lastYear', label: 'Last Year' },
-                                    { key: 'deltaLY', label: 'Δ 2026 x Last Year R$' },
-                                    { key: 'deltaLYPct', label: 'Δ 2026 x Last Year %' },
+                                    { key: 'lastYear', label: 'Ano anterior' },
+                                    { key: 'deltaLY', label: `Δ ${selectedYear} x Ano anterior R$` },
+                                    { key: 'deltaLYPct', label: `Δ ${selectedYear} x Ano anterior %` },
                                     { key: 'driverPrevia', label: 'Driver (Prévia)' },
                                     { key: 'driverForecast', label: 'Driver (Forecast)' },
                                     { key: 'driverBudget', label: 'Driver (Meta)' },
@@ -913,7 +913,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         style={{ width: columnWidths.lastYear }}
                                         className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 group relative"
                                     >
-                                        Last Year
+                                        Ano anterior
                                         <div
                                             onMouseDown={(e) => handleResizeStart(e, 'lastYear')}
                                             className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
@@ -1365,7 +1365,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             {/* Format example */}
                             <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-xs text-blue-800 font-mono leading-relaxed">
                                 <span className="font-bold text-blue-900 block mb-1">Formato esperado (colunas separadas por Tab):</span>
-                                Descrição{"\t"}Prévia{"\t"}Forecast{"\t"}Meta{"\t"}Last Year<br />
+                                Descrição{"\t"}Prévia{"\t"}Forecast{"\t"}Meta{"\t"}Ano anterior<br />
                                 UH Disponível{"\t"}100{"\t"}110{"\t"}105{"\t"}95<br />
                                 UH Ocupada{"\t"}75{"\t"}80{"\t"}78{"\t"}70<br />
                                 <span className="text-blue-500 italic">... (outras linhas)</span>
