@@ -918,10 +918,10 @@ export const getForecastData = (
     rows.push(generateRow('SPACER-BEFORE-IMP', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
 
     // 1.05 Impostos (Azul conforme Receita Líquida, recuo zero)
-    const valBudgetImp = getImportedValue('Impostos', selectedYear, 'Budget');
-    const valPreviaImp = getPreviaOrReal('Impostos', selectedYear);
-    const valRealImp = valPreviaImp;
-    const valLYImp = getImportedValue('Impostos', (selectedYear || 0) - 1, 'Real');
+    const valBudgetImp = budgetOccupancyData['geral_impostos'] ? budgetOccupancyData['geral_impostos'][monthIdx] : 0;
+    const valRealImp = getRealOccValue('geral_impostos_forecast') || 0;
+    const valPreviaImp = getRealOccValue('geral_impostos_previa') || 0;
+    const valLYImp = getLYOccValue('geral_impostos_forecast') || 0;
     rows.push(generateRow('REV-IMP', '1.05', 'Revenue', 'IMPOSTOS', valBudgetImp, valRealImp, valLYImp, valPreviaImp, true, true, 0));
 
     rows.push(generateRow('SPACER-AFTER-IMP', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));

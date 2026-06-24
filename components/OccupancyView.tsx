@@ -356,6 +356,7 @@ export const geralRows: BudgetRow[] = [
     { id: 'geral_extra_rev', label: 'Receitas Extras', isCalculated: true, format: 'integer' },
     { id: 'geral_iss_rev', label: 'Receita de ISS', isInput: true, isManualReal: true, format: 'integer' },
     { id: 'geral_cancel_ts', label: 'Cancelamento de Time Share', isInput: true, isManualReal: true, format: 'integer' },
+    { id: 'geral_impostos', label: 'Impostos', isInput: true, isManualReal: true, format: 'integer' },
     { id: 'geral_or_extras', label: 'OR Extras', isInput: true, isManualReal: true, format: 'integer' },
     { id: 'geral_or_hosp', label: 'OR de Hospedagem', isInput: true, isManualReal: true, format: 'integer' },
     { id: 'geral_dm_fap', label: 'DM bruta (sem iss)', isCalculated: true, format: 'currency' },
