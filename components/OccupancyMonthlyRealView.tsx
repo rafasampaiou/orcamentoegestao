@@ -374,8 +374,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
 
             const lzExtra = get('lazer_extra_rev', i);
             const evExtra = get('event_extra_rev', i);
-            const gExtraInput = get('geral_extra_rev', i);
-            const gExtra = gExtraInput !== 0 ? gExtraInput : (lzExtra + evExtra);
+            const gExtra = lzExtra + evExtra;
             set('geral_extra_rev', i, gExtra);
 
             const gOrExtras = get('geral_or_extras', i);

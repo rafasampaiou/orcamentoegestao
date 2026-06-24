@@ -353,7 +353,7 @@ export const geralRows: BudgetRow[] = [
     { id: 'geral_rate_chd', label: 'Valor FAP Criança', isCalculated: true, format: 'currency' },
     { id: 'geral_rev_fap', label: 'Receita COM rateios', isCalculated: true, format: 'integer' },
     { id: 'geral_rev_hosp', label: 'Receita SEM rateios', isCalculated: true, format: 'integer' },
-    { id: 'geral_extra_rev', label: 'Receitas Extras', isInput: true, format: 'integer' },
+    { id: 'geral_extra_rev', label: 'Receitas Extras', isCalculated: true, format: 'integer' },
     { id: 'geral_iss_rev', label: 'Receita de ISS', isInput: true, isManualReal: true, format: 'integer' },
     { id: 'geral_cancel_ts', label: 'Cancelamento de Time Share', isInput: true, isManualReal: true, format: 'integer' },
     { id: 'geral_or_extras', label: 'OR Extras', isInput: true, isManualReal: true, format: 'integer' },
@@ -757,9 +757,7 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
 
             const lzExtra = get('lazer_extra_rev', i);
             const evExtra = get('event_extra_rev', i);
-            const gExtraInput = get('geral_extra_rev', i);
-            // If user entered something in Geral, use it, otherwise use sum
-            const gExtra = gExtraInput !== 0 ? gExtraInput : (lzExtra + evExtra);
+            const gExtra = lzExtra + evExtra;
             set('geral_extra_rev', i, gExtra);
 
             const gOrExtras = get('geral_or_extras', i);
