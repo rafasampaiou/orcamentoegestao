@@ -1127,7 +1127,23 @@ const App: React.FC = () => {
           currentView={currentView}
           versions={(currentModule as string) === 'BUDGET' ? budgetVersions : realVersions}
           activeVersionId={(currentModule as string) === 'BUDGET' ? activeBudgetVersionId : activeRealVersionId}
-          setActiveVersionId={(currentModule as string) === 'BUDGET' ? setActiveBudgetVersionId : setActiveRealVersionId}
+          setActiveVersionId={(id) => {
+            const isBudget = (currentModule as string) === 'BUDGET';
+            const selectedV = (isBudget ? budgetVersions : realVersions).find(v => v.id === id);
+            if (isBudget) {
+              setActiveBudgetVersionId(id);
+              if (selectedV) {
+                const pairedReal = realVersions.find(r => r.name === selectedV.name && r.year === selectedV.year && (r.hotelId === selectedV.hotelId || (!r.hotelId && !selectedV.hotelId)));
+                if (pairedReal) setActiveRealVersionId(pairedReal.id);
+              }
+            } else {
+              setActiveRealVersionId(id);
+              if (selectedV) {
+                const pairedBudget = budgetVersions.find(b => b.name === selectedV.name && b.year === selectedV.year && (b.hotelId === selectedV.hotelId || (!b.hotelId && !selectedV.hotelId)));
+                if (pairedBudget) setActiveBudgetVersionId(pairedBudget.id);
+              }
+            }
+          }}
         />
 
         {/* Main Scrollable Content */}
