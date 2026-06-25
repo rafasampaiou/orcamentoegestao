@@ -872,10 +872,7 @@ export const getForecastData = (
         const valReal = getRealOccValue(`${item.sourceId}_forecast`) || 0;
         const valPrevia = getRealOccValue(`${item.sourceId}_previa`) || 0;
         
-        let valLY = 0;
-        if (item.label === 'Lazer') valLY = getImportedValue('Lazer', (selectedYear || 0) - 1, 'Real', 'Lazer');
-        else if (item.label === 'Eventos') valLY = getImportedValue('Eventos', (selectedYear || 0) - 1, 'Real', 'Eventos');
-        else valLY = getImportedValue(item.label, (selectedYear || 0) - 1, 'Real');
+        let valLY = getLYOccValue(`${item.sourceId}_forecast`) || 0;
 
         rows.push(generateRow(item.id, item.code, 'Revenue', item.label, valBudget, valReal, valLY, valPrevia, false, false, 2));
     });
@@ -894,9 +891,7 @@ export const getForecastData = (
         const valReal = getRealOccValue(`${item.sourceId}_forecast`) || 0;
         const valPrevia = getRealOccValue(`${item.sourceId}_previa`) || 0;
         
-        let valLY = getImportedValue(item.label, (selectedYear || 0) - 1, 'Real');
-        if (item.label === 'Lazer') valLY = getImportedValue('Extra Lazer', (selectedYear || 0) - 1, 'Real');
-        if (item.label === 'Eventos') valLY = getImportedValue('Extra Eventos', (selectedYear || 0) - 1, 'Real');
+        let valLY = getLYOccValue(`${item.sourceId}_forecast`) || 0;
 
         rows.push(generateRow(item.id, item.code, 'Revenue', item.label, valBudget, valReal, valLY, valPrevia, false, false, 2));
     });
@@ -905,14 +900,14 @@ export const getForecastData = (
     const valBudgetTS = budgetOccupancyData['geral_cancel_ts'] ? budgetOccupancyData['geral_cancel_ts'][monthIdx] : 0;
     const valRealTS = getRealOccValue('geral_cancel_ts_forecast') || 0;
     const valPreviaTS = getRealOccValue('geral_cancel_ts_previa') || 0;
-    const valLYTS = getImportedValue('Cancelamento de Time Share', (selectedYear || 0) - 1, 'Real');
+    const valLYTS = getLYOccValue('geral_cancel_ts_forecast') || 0;
     rows.push(generateRow('REV-TIME', '1.03', 'Revenue', 'CANCELAMENTO DE TIME SHARE', valBudgetTS, valRealTS, valLYTS, valPreviaTS, true, false, 1));
 
     // 1.04 Receita de ISS
     const valBudgetISS = budgetOccupancyData['geral_iss_rev'] ? budgetOccupancyData['geral_iss_rev'][monthIdx] : 0;
     const valRealISS = getRealOccValue('geral_iss_rev_forecast') || 0;
     const valPreviaISS = getRealOccValue('geral_iss_rev_previa') || 0;
-    const valLYISS = getImportedValue('Receita de ISS', (selectedYear || 0) - 1, 'Real');
+    const valLYISS = getLYOccValue('geral_iss_rev_forecast') || 0;
     rows.push(generateRow('REV-ISS', '1.04', 'Revenue', 'RECEITA DE ISS', valBudgetISS, valRealISS, valLYISS, valPreviaISS, true, false, 1));
 
     rows.push(generateRow('SPACER-BEFORE-IMP', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
