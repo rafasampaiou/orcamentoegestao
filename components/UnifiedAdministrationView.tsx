@@ -3856,22 +3856,13 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 </div>
                 <div className="flex flex-wrap items-end gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Destino</label>
-                    <select
-                      value={importRealTarget}
-                      onChange={e => setImportRealTarget(e.target.value as any)}
-                      className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[200px]"
-                    >
-                      <option value="PREVIA">Prévia (Fechamento)</option>
-                      <option value="META">Meta</option>
-                      <option value="ANO_ANTERIOR">Ano Anterior</option>
-                    </select>
-                  </div>
-                  <div className="flex flex-col gap-1">
                     <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Hotel</label>
                     <select
                       value={importHotelId}
-                      onChange={e => setImportHotelId(e.target.value)}
+                      onChange={e => {
+                        setImportHotelId(e.target.value);
+                        setTargetRealVersionId('');
+                      }}
                       className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[200px]"
                     >
                       <option value="">Selecione...</option>
@@ -3886,7 +3877,21 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                       className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[200px]"
                     >
                       <option value="">Selecione a versão...</option>
-                      {realVersions.map(v => <option key={v.id} value={v.id}>{v.name} - {v.hotel} ({v.year})</option>)}
+                      {realVersions
+                        .filter(v => !importHotelId || v.hotelId === importHotelId)
+                        .map(v => <option key={v.id} value={v.id}>{v.name} - {v.hotel} ({v.year})</option>)}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Destino</label>
+                    <select
+                      value={importRealTarget}
+                      onChange={e => setImportRealTarget(e.target.value as any)}
+                      className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[200px]"
+                    >
+                      <option value="PREVIA">Prévia (Fechamento)</option>
+                      <option value="META">Meta</option>
+                      <option value="ANO_ANTERIOR">Ano Anterior</option>
                     </select>
                   </div>
                   <div className="flex-1 min-w-[24px]" />
@@ -5398,28 +5403,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
           )}
           {activeGeralTab === 'import' && (
             <div className="space-y-6">
-              {/* Scenario Selector */}
-              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <span className="text-sm font-black text-gray-700 uppercase tracking-widest">Cenário para Importação:</span>
-                  <div className="flex bg-white p-1 rounded-xl shadow-sm border border-gray-200">
-                    <button
-                      onClick={() => setImportScenario('REAL')}
-                      className={`px-6 py-2 rounded-lg text-xs font-black uppercase transition-all flex items-center gap-2 ${importScenario === 'REAL' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                    >
-                      <Database size={14} /> Tauá Real (Forecast)
-                    </button>
-                    <button
-                      onClick={() => setImportScenario('BUDGET')}
-                      className={`px-6 py-2 rounded-lg text-xs font-black uppercase transition-all flex items-center gap-2 ${importScenario === 'BUDGET' ? 'bg-orange-600 text-white shadow-lg' : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                    >
-                      <Target size={14} /> Tauá Budget (Meta)
-                    </button>
-                  </div>
-                </div>
-
+              {/* Import Tabs */}
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 flex items-center justify-end">
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => { setActiveImportTab('financial'); }}
