@@ -2079,10 +2079,10 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
         const cstHeadVal = rowMap.get('CST-HEAD')?.[field] || 0;
 
         const resOpSemImp = rowMap.get('RES-OP-SEM-IMP');
-        if (resOpSemImp) resOpSemImp[field] = revTotal - revIss - cstHeadVal;
+        if (resOpSemImp) resOpSemImp[field] = revTotal - cstHeadVal;
 
         const resOpComImp = rowMap.get('RES-OP-COM-IMP');
-        if (resOpComImp) resOpComImp[field] = revTotal - revIss - revImp - cstHeadVal;
+        if (resOpComImp) resOpComImp[field] = revTotal - revImp - cstHeadVal;
     });
 
     // --- DELTAS CALCULATIONS ---
