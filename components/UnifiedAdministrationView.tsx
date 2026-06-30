@@ -453,7 +453,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   // Import Sub-tabs
   const [activeImportTab, setActiveImportTab] = useState<'financial' | 'revenue' | 'occupancy' | 'costCenters' | 'accounts' | 'history'>('financial');
   const [importScenario, setImportScenario] = useState<'REAL' | 'BUDGET'>('REAL');
-  const [importRealTarget, setImportRealTarget] = useState<'PREVIA' | 'REAL'>('PREVIA');
+  const [importRealTarget, setImportRealTarget] = useState<'PREVIA' | 'META' | 'ANO_ANTERIOR'>('PREVIA');
   const [importHistory, setImportHistory] = useState<any[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [importToDelete, setImportToDelete] = useState<string | null>(null);
@@ -734,7 +734,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const [importYear, setImportYear] = useState<number>(new Date().getFullYear());
 
   // New Structured Import State
-  const [importCategory, setImportCategory] = useState<'financial' | 'revenue' | 'expenses'>('financial');
+  const [importCategory, setImportCategory] = useState<'financial' | 'revenue' | 'expenses' | 'occupancy' | 'taxes'>('expenses');
   const [importProjectionType, setImportProjectionType] = useState<import('../types').ProjectionType>('Reunião de Ritmo');
   const [expenseImportMode, setExpenseImportMode] = useState<'forecast' | 'detailed'>('forecast');
   const [importHotelId, setImportHotelId] = useState<string>('');
@@ -754,7 +754,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const [eventsImportData, setEventsImportData] = useState<Record<string, Record<number, string>>>({});
   const [eventsBudgetData, setEventsBudgetData] = useState<Record<string, Record<number, string>>>({});
   const [occupancySubTab, setOccupancySubTab] = useState<'geral' | 'leisure' | 'events'>('geral');
-  const [budgetImportCategory, setBudgetImportCategory] = useState<'revenue' | 'expenses'>('revenue');
+  const [budgetImportCategory, setBudgetImportCategory] = useState<'revenue' | 'expenses' | 'occupancy' | 'taxes'>('revenue');
   const [budgetImportHotelId, setBudgetImportHotelId] = useState<string>('');
   const [budgetFinancialImportText, setBudgetFinancialImportText] = useState<string>('');
   const [budgetOccupancySubTab, setBudgetOccupancySubTab] = useState<'geral' | 'leisure' | 'events'>('geral');
@@ -3505,18 +3505,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const renderRealImportInterface = () => {
     return (
       <div className="space-y-6">
-        <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
-          <label className="text-sm font-bold text-gray-700 whitespace-nowrap">Destino da Importação (Real):</label>
-          <select
-            value={importRealTarget}
-            onChange={e => setImportRealTarget(e.target.value as any)}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none w-full max-w-[250px]"
-          >
-            <option value="PREVIA">Prévia (Ano Atual)</option>
-            <option value="REAL">Last Year</option>
-          </select>
-        </div>
-
         {importCategory === 'occupancy' && (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div className="flex items-center justify-between mb-2">
@@ -3860,69 +3848,25 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 <Briefcase className="text-indigo-600" size={20} />
                 Importação das Despesas
               </div>
-              <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
-                <button
-                  onClick={() => setExpenseImportMode('forecast')}
-                  className={`px-3 py-1.5 rounded-md text-[10px] font-black tracking-wider uppercase transition-all ${expenseImportMode === 'forecast' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                >
-                  DRE Forecast
-                </button>
-                <button
-                  onClick={() => setExpenseImportMode('detailed')}
-                  className={`px-3 py-1.5 rounded-md text-[10px] font-black tracking-wider uppercase transition-all ${expenseImportMode === 'detailed' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                >
-                  Orç. Geral (Detalhado)
-                </button>
-              </div>
             </div>
 
-            {expenseImportMode === 'detailed' ? (
-              <div className="space-y-4">
-                <div className="bg-amber-50 border border-amber-100 p-4 rounded-xl text-xs text-amber-800">
-                  <p className="font-bold mb-1">Importação Detalhada (USALI):</p>
-                  <p>Cole os dados do Excel com as colunas seguintes:</p>
-                  <code className="block bg-white/50 p-2 rounded border border-amber-200 mt-1">
-                    {DETAILED_EXPENSE_COLUMNS.join(" | ")}
-                  </code>
-                </div>
-
-                <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-sm">
-                  <div className="flex items-center gap-2">
-                    <Database size={16} className="text-indigo-600" />
-                    <label className="text-sm font-bold text-gray-700">Versão de Realizado:</label>
-                  </div>
-                  <select
-                    value={targetRealVersionId || activeRealVersionId}
-                    onChange={e => setTargetRealVersionId(e.target.value)}
-                    className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[240px]"
-                  >
-                    <option value="">Selecione a versão de destino...</option>
-                    {realVersions.map(v => <option key={v.id} value={v.id}>{v.name} - {v.hotel} ({v.year})</option>)}
-                  </select>
-                </div>
-
-                <textarea
-                  className="w-full h-64 p-4 border border-gray-300 rounded-lg font-mono text-[10px] focus:ring-2 focus:ring-indigo-500 outline-none mt-4"
-                  placeholder="Cole os dados detalhados aqui..."
-                  value={importText}
-                  onChange={e => setImportText(e.target.value)}
-                />
-                <button
-                  onClick={handleProcessDetailedExpenses}
-                  disabled={isSavingDre || !importText.trim() || (!targetRealVersionId && !activeRealVersionId)}
-                  className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 flex items-center gap-2 disabled:opacity-50 transition-all font-bold text-sm"
-                >
-                  {isSavingDre ? <><Settings className="animate-spin" size={16} /> Processando...</> : <><FileText size={16} /> Processar e Salvar Despesas</>}
-                </button>
-              </div>
-            ) : (
               <div className="space-y-4">
                 <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl text-sm text-indigo-800">
-                  <p>Importação simplificada para o **DRE Forecast**. Escolha o hotel e cole os valores mensais por pacote.</p>
+                  <p>Importação das Despesas. Escolha o destino, o hotel e a versão e cole os valores mensais.</p>
                 </div>
                 <div className="flex flex-wrap items-end gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Destino</label>
+                    <select
+                      value={importRealTarget}
+                      onChange={e => setImportRealTarget(e.target.value as any)}
+                      className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[200px]"
+                    >
+                      <option value="PREVIA">Prévia (Fechamento)</option>
+                      <option value="META">Meta</option>
+                      <option value="ANO_ANTERIOR">Ano Anterior</option>
+                    </select>
+                  </div>
                   <div className="flex flex-col gap-1">
                     <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Hotel</label>
                     <select
@@ -3975,7 +3919,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                   }}
                 />
               </div>
-            )}
           </div>
         )}
         {renderImportHistoryTable()}
@@ -5506,22 +5449,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               </div>
 
               {importScenario === 'REAL' && activeImportTab !== 'costCenters' && activeImportTab !== 'accounts' && activeImportTab !== 'history' && (
-                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                  {[
-                    { id: 'revenue', label: 'Receitas', icon: DollarSign },
-                    { id: 'expenses', label: 'Despesas', icon: Briefcase }
-                  ].map(cat => (
-                    <button
-                      key={cat.id}
-                      onClick={() => setImportCategory(cat.id as any)}
-                      className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase transition-all whitespace-nowrap border ${importCategory === cat.id
-                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-100 translate-y-[-2px]'
-                        : 'bg-white text-gray-500 border-gray-200 hover:border-indigo-300 hover:text-indigo-600 shadow-sm'
-                        }`}
-                    >
-                      <cat.icon size={16} /> {cat.label}
-                    </button>
-                  ))}
+                <div className="hidden">
+                  {/* Categorias simplificadas - default para expenses */}
                 </div>
               )}
 
