@@ -5160,6 +5160,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                           <button onClick={(e) => handleMoveItem(e, 'master', acc.masterPackage!, 'down')} title="Mover para Baixo" className="p-1 text-slate-400 hover:text-indigo-600 border border-slate-200 rounded bg-white shadow-sm"><ArrowDown size={12} /></button>
                                           <button onClick={() => openNewAccount(acc.masterPackage, undefined, acc.sortOrder)} title="Adicionar Pacote neste Master" className="p-1 text-slate-400 hover:text-indigo-600 border border-slate-200 rounded bg-white shadow-sm"><FileText size={12} /></button>
                                           <button onClick={() => openNewAccount(undefined, undefined, acc.sortOrder)} title="Adicionar Novo Master Abaixo" className="p-1 text-slate-400 hover:text-indigo-600 border border-slate-200 rounded bg-white shadow-sm"><Layout size={12} /></button>
+                                          <button onClick={() => handleDeleteAccountRow(acc.id, 'master', acc.masterPackage)} title="Excluir este Master" className="p-1 text-slate-300 hover:text-red-500 border border-slate-200 rounded bg-white shadow-sm"><Trash2 size={12} /></button>
                                         </div>
                                       </div>
                                     </td>
@@ -5196,6 +5197,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                           <button onClick={(e) => handleMoveItem(e, 'pkg', pkgKey, 'down')} title="Mover para Baixo" className="p-1 text-slate-400 hover:text-indigo-600 border border-slate-200 rounded bg-white shadow-sm"><ArrowDown size={12} /></button>
                                           <button onClick={() => openNewAccount(acc.masterPackage, acc.package, acc.sortOrder)} title="Adicionar Conta neste Pacote" className="p-1 text-slate-400 hover:text-indigo-600 border border-slate-200 rounded bg-white shadow-sm"><Plus size={12} /></button>
                                           <button onClick={() => openNewAccount(acc.masterPackage, undefined, acc.sortOrder)} title="Adicionar Novo Pacote Abaixo" className="p-1 text-slate-400 hover:text-indigo-600 border border-slate-200 rounded bg-white shadow-sm"><FileText size={12} /></button>
+                                          <button onClick={() => handleDeleteAccountRow(acc.id, 'pkg', acc.package)} title="Excluir este Pacote" className="p-1 text-slate-300 hover:text-red-500 border border-slate-200 rounded bg-white shadow-sm"><Trash2 size={12} /></button>
                                         </div>
                                       </div>
                                     </td>
