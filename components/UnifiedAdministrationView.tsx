@@ -1867,7 +1867,10 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     if (type === 'master') {
       toDeleteIds = accounts.filter(a => a.masterPackage === name).map(a => a.id);
     } else if (type === 'pkg') {
-      toDeleteIds = accounts.filter(a => a.package === name).map(a => a.id);
+      const targetAcc = accounts.find(a => a.id === id);
+      if (targetAcc) {
+        toDeleteIds = accounts.filter(a => a.masterPackage === targetAcc.masterPackage && a.package === targetAcc.package).map(a => a.id);
+      }
     } else {
       toDeleteIds = [id];
     }
