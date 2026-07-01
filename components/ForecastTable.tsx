@@ -680,6 +680,53 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     };
 
     const handleCalcularForecast = () => {
+        setData(prevData => {
+            const newData = prevData.map(row => {
+                if (row.isHeader || row.isTotal || row.category === 'Spacer' || row.category === 'Indicators') {
+                    return row;
+                }
+                
+                const account = accounts.find(a => a.id === row.id || (a.code && a.code === row.accountCode));
+                
+                if (account) {
+                    const currentConfig = calculationBase === 'forecast' ? row.forecastConfig : (row.previaConfig || { method: 'Fixed' });
+                    
+                    if (account.expenseType === 'Variável' && account.expenseDriver) {
+                        const newConfig = {
+                            ...currentConfig,
+                            method: 'Variable' as const,
+                            driver: account.expenseDriver,
+                            factor: account.expenseFactor || 0
+                        };
+                        
+                        const updatedRow = {
+                            ...row,
+                            [calculationBase === 'forecast' ? 'forecastConfig' : 'previaConfig']: newConfig
+                        };
+                        
+                        const calculated = calculateRowValue(updatedRow, newConfig, prevData, calculationBase);
+                        if (calculationBase === 'forecast') updatedRow.real = calculated;
+                        else updatedRow.previa = calculated;
+                        
+                        return updatedRow;
+                    } else if (account.expenseType === 'Fixo') {
+                        const newConfig = {
+                            ...currentConfig,
+                            method: 'Fixed' as const
+                        };
+                        return {
+                            ...row,
+                            [calculationBase === 'forecast' ? 'forecastConfig' : 'previaConfig']: newConfig
+                        };
+                    }
+                }
+                
+                return row;
+            });
+            
+            return recalculateTotals(newData, packages, accounts);
+        });
+
         setShowDetails(true);
         setShowAlertModal(true);
     };

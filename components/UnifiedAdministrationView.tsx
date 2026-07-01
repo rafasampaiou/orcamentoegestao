@@ -3618,11 +3618,11 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
                   const recCom = parseVal(newTable["Receita COM rateios"]?.[m]);
                   const recSem = parseVal(newTable["Receita SEM rateios"]?.[m]);
-                  
+
                   const fapAdu = adu > 0 ? (recCom - recSem) / adu : 0;
                   if (!newTable["Valor FAP Adulto"]) newTable["Valor FAP Adulto"] = {};
                   newTable["Valor FAP Adulto"][m] = fapAdu.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                  
+
                   const fapChd = chd > 0 ? (recCom - recSem) / chd : 0;
                   if (!newTable["Valor FAP Criança"]) newTable["Valor FAP Criança"] = {};
                   newTable["Valor FAP Criança"][m] = fapChd.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -3850,80 +3850,80 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               </div>
             </div>
 
-              <div className="space-y-4">
-                <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl text-sm text-indigo-800">
-                  <p>Importação das Despesas. Escolha o destino, o hotel e a versão e cole os valores mensais.</p>
-                </div>
-                <div className="flex flex-wrap items-end gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Hotel</label>
-                    <select
-                      value={importHotelId}
-                      onChange={e => {
-                        setImportHotelId(e.target.value);
-                        setTargetRealVersionId('');
-                      }}
-                      className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[200px]"
-                    >
-                      <option value="">Selecione...</option>
-                      {hotels.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
-                    </select>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Versão de Destino</label>
-                    <select
-                      value={targetRealVersionId || activeRealVersionId}
-                      onChange={e => setTargetRealVersionId(e.target.value)}
-                      className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[200px]"
-                    >
-                      <option value="">Selecione a versão...</option>
-                      {realVersions
-                        .filter(v => !importHotelId || v.hotelId === importHotelId)
-                        .map(v => <option key={v.id} value={v.id}>{v.name} - {v.hotel} ({v.year})</option>)}
-                    </select>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Destino</label>
-                    <select
-                      value={importRealTarget}
-                      onChange={e => setImportRealTarget(e.target.value as any)}
-                      className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[200px]"
-                    >
-                      <option value="PREVIA">Prévia (Fechamento)</option>
-                      <option value="META">Meta</option>
-                      <option value="ANO_ANTERIOR">Ano Anterior</option>
-                    </select>
-                  </div>
-                  <div className="flex-1 min-w-[24px]" />
-                  <button
-                    onClick={() => handleSaveExpensesForecast('REAL')}
-                    disabled={isSavingDre || !importHotelId || (!targetRealVersionId && !activeRealVersionId)}
-                    className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all flex items-center gap-2 disabled:opacity-50"
-                  >
-                    {isSavingDre ? 'Salvando...' : <><Save size={16} /> Salvar Despesas Forecast</>}
-                  </button>
-                </div>
-                <SpreadsheetTable
-                  rows={DRE_FORECAST_ROWS}
-                  data={dreForecastData}
-                  onCellChange={(row, month, val) => setDreForecastData(prev => ({ ...prev, [row]: { ...(prev[row] || {}), [month]: val } }))}
-                  onPaste={(row, month, pasted) => {
-                    const newData = { ...dreForecastData };
-                    const startIdx = DRE_FORECAST_ROWS.indexOf(row);
-                    pasted.forEach((pRow, rOffset) => {
-                      const targetRow = DRE_FORECAST_ROWS[startIdx + rOffset];
-                      if (targetRow) {
-                        if (!newData[targetRow]) newData[targetRow] = {};
-                        pRow.forEach((val, cOffset) => {
-                          const targetCol = month + cOffset;
-                          if (targetCol <= 12) newData[targetRow][targetCol] = val;
-                        });
-                      }
-                    });
-                    setDreForecastData(newData);
-                  }}
-                />
+            <div className="space-y-4">
+              <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl text-sm text-indigo-800">
+                <p>Importação das Despesas. Escolha o destino, o hotel e a versão e cole os valores mensais.</p>
               </div>
+              <div className="flex flex-wrap items-end gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Hotel</label>
+                  <select
+                    value={importHotelId}
+                    onChange={e => {
+                      setImportHotelId(e.target.value);
+                      setTargetRealVersionId('');
+                    }}
+                    className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[200px]"
+                  >
+                    <option value="">Selecione...</option>
+                    {hotels.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Versão de Destino</label>
+                  <select
+                    value={targetRealVersionId || activeRealVersionId}
+                    onChange={e => setTargetRealVersionId(e.target.value)}
+                    className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[200px]"
+                  >
+                    <option value="">Selecione a versão...</option>
+                    {realVersions
+                      .filter(v => !importHotelId || v.hotelId === importHotelId)
+                      .map(v => <option key={v.id} value={v.id}>{v.name} - {v.hotel} ({v.year})</option>)}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Destino</label>
+                  <select
+                    value={importRealTarget}
+                    onChange={e => setImportRealTarget(e.target.value as any)}
+                    className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[200px]"
+                  >
+                    <option value="PREVIA">Prévia (Fechamento)</option>
+                    <option value="META">Meta</option>
+                    <option value="ANO_ANTERIOR">Ano Anterior</option>
+                  </select>
+                </div>
+                <div className="flex-1 min-w-[24px]" />
+                <button
+                  onClick={() => handleSaveExpensesForecast('REAL')}
+                  disabled={isSavingDre || !importHotelId || (!targetRealVersionId && !activeRealVersionId)}
+                  className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all flex items-center gap-2 disabled:opacity-50"
+                >
+                  {isSavingDre ? 'Salvando...' : <><Save size={16} /> Salvar Despesas Forecast</>}
+                </button>
+              </div>
+              <SpreadsheetTable
+                rows={DRE_FORECAST_ROWS}
+                data={dreForecastData}
+                onCellChange={(row, month, val) => setDreForecastData(prev => ({ ...prev, [row]: { ...(prev[row] || {}), [month]: val } }))}
+                onPaste={(row, month, pasted) => {
+                  const newData = { ...dreForecastData };
+                  const startIdx = DRE_FORECAST_ROWS.indexOf(row);
+                  pasted.forEach((pRow, rOffset) => {
+                    const targetRow = DRE_FORECAST_ROWS[startIdx + rOffset];
+                    if (targetRow) {
+                      if (!newData[targetRow]) newData[targetRow] = {};
+                      pRow.forEach((val, cOffset) => {
+                        const targetCol = month + cOffset;
+                        if (targetCol <= 12) newData[targetRow][targetCol] = val;
+                      });
+                    }
+                  });
+                  setDreForecastData(newData);
+                }}
+              />
+            </div>
           </div>
         )}
         {renderImportHistoryTable()}
@@ -4052,11 +4052,11 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
                 const recCom = parseVal(newTable["Receita COM rateios"]?.[m]);
                 const recSem = parseVal(newTable["Receita SEM rateios"]?.[m]);
-                
+
                 const fapAdu = adu > 0 ? (recCom - recSem) / adu : 0;
                 if (!newTable["Valor FAP Adulto"]) newTable["Valor FAP Adulto"] = {};
                 newTable["Valor FAP Adulto"][m] = fapAdu.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                
+
                 const fapChd = chd > 0 ? (recCom - recSem) / chd : 0;
                 if (!newTable["Valor FAP Crianca"]) newTable["Valor FAP Crianca"] = {};
                 newTable["Valor FAP Crianca"][m] = fapChd.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -4102,7 +4102,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
             const rawData = budgetOccupancySubTab === 'geral' ? aggregateGeral() :
               budgetOccupancySubTab === 'leisure' ? calculateTable(leisureBudgetData) : calculateTable(eventsBudgetData);
             const currentData = rawData;
-            
+
             const setData = budgetOccupancySubTab === 'geral' ? setOccupancyBudgetData :
               budgetOccupancySubTab === 'leisure' ? setLeisureBudgetData : setEventsBudgetData;
             return (
