@@ -493,7 +493,8 @@ const generateMockData = () => {
             masterPackageCode: '',
             type: 'Fixed',
             expenseType: config?.expenseType,
-            expenseDriver: config?.expenseDriver
+            expenseDriver: config?.expenseDriver,
+            sortOrder: index + 1
         });
     });
 
