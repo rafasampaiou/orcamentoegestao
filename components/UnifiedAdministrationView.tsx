@@ -1856,11 +1856,15 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   };
 
   const handleDeleteAccountRow = async (id: string, type: 'account' | 'pkg' | 'master' = 'account', name?: string) => {
+    console.log('[DEBUG] handleDeleteAccountRow chamado:', { id, type, name });
     const msg = type === 'master' ? `Excluir o Pacote Master "${name}" e TODAS as suas contas?` :
       type === 'pkg' ? `Excluir o Pacote "${name}" e TODAS as suas contas?` :
         "Tem certeza que deseja excluir esta conta?";
 
-    if (!confirm(msg)) return;
+    if (!window.confirm(msg)) {
+      console.log('[DEBUG] Exclusão cancelada pelo usuário.');
+      return;
+    }
 
     let toDeleteIds: string[] = [];
 
@@ -1875,14 +1879,23 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       toDeleteIds = [id];
     }
 
+    console.log('[DEBUG] IDs a deletar:', toDeleteIds);
+
+    if (toDeleteIds.length === 0) {
+      toast.error('Nenhuma conta encontrada para excluir.');
+      return;
+    }
+
     setAccounts(prev => prev.filter(a => !toDeleteIds.includes(a.id)));
 
     try {
       for (const tid of toDeleteIds) {
         await supabaseService.deleteAccount(tid);
       }
-    } catch (e) {
-      console.error(e);
+      toast.success('Excluído com sucesso do banco de dados!');
+    } catch (e: any) {
+      console.error('[DEBUG] Erro ao excluir do Supabase:', e);
+      toast.error('Erro ao excluir do banco: ' + e.message);
     }
   };
 
