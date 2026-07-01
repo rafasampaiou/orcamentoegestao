@@ -1857,14 +1857,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
   const handleDeleteAccountRow = async (id: string, type: 'account' | 'pkg' | 'master' = 'account', name?: string) => {
     console.log('[DEBUG] handleDeleteAccountRow chamado:', { id, type, name });
-    const msg = type === 'master' ? `Excluir o Pacote Master "${name}" e TODAS as suas contas?` :
-      type === 'pkg' ? `Excluir o Pacote "${name}" e TODAS as suas contas?` :
-        "Tem certeza que deseja excluir esta conta?";
-
-    if (!window.confirm(msg)) {
-      console.log('[DEBUG] Exclusão cancelada pelo usuário.');
-      return;
-    }
+    // Removido window.confirm() pois o iframe/sandbox bloqueia modais nativos.
 
     let toDeleteIds: string[] = [];
 
