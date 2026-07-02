@@ -1745,113 +1745,93 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   };
 
   const saveReorderedAccounts = async (reordered: Account[]) => {
-      const finalAccounts = reordered.map((acc, idx) => ({ ...acc, sortOrder: idx + 1 }));
-      setAccounts(finalAccounts);
-      try {
-        await supabaseService.upsertAccounts(finalAccounts);
-        toast.success('Ordem atualizada com sucesso!');
-      } catch (err: any) {
-        console.error("Save order failed:", err);
-        toast.error(`Erro ao salvar ordem: ${err.message}`);
-      }
+    const finalAccounts = reordered.map((acc, idx) => ({ ...acc, sortOrder: idx + 1 }));
+    setAccounts(finalAccounts);
+    try {
+      await supabaseService.upsertAccounts(finalAccounts);
+      toast.success('Ordem atualizada com sucesso!');
+    } catch (err: any) {
+      console.error("Save order failed:", err);
+      toast.error(`Erro ao salvar ordem: ${err.message}`);
+    }
   };
 
   const handleMoveItem = async (e: React.MouseEvent, type: 'account' | 'pkg' | 'master', id: string, direction: 'up' | 'down') => {
     e.stopPropagation();
-    
+
     // Sort all accounts to ensure we're working with the current visual order
     const sorted = [...accounts].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
-    
+
     if (type === 'master') {
-       // id is masterPackage name
-       const masters = Array.from(new Set(sorted.map(a => a.masterPackage).filter(Boolean)));
-       const idx = masters.indexOf(id);
-       if (idx < 0 || (direction === 'up' && idx === 0) || (direction === 'down' && idx === masters.length - 1)) return;
-       
-       const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
-       [masters[idx], masters[swapIdx]] = [masters[swapIdx], masters[idx]];
-       
-       const newAccounts = [];
-       const noMaster = sorted.filter(a => !a.masterPackage);
-       
-       for (const m of masters) {
-          newAccounts.push(...sorted.filter(a => a.masterPackage === m));
-       }
-       newAccounts.push(...noMaster);
-       
-       saveReorderedAccounts(newAccounts);
-    } 
+      // id is masterPackage name
+      const masters = Array.from(new Set(sorted.map(a => a.masterPackage).filter(Boolean)));
+      const idx = masters.indexOf(id);
+      if (idx < 0 || (direction === 'up' && idx === 0) || (direction === 'down' && idx === masters.length - 1)) return;
+
+      const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+      [masters[idx], masters[swapIdx]] = [masters[swapIdx], masters[idx]];
+
+      const newAccounts = [];
+      const noMaster = sorted.filter(a => !a.masterPackage);
+
+      for (const m of masters) {
+        newAccounts.push(...sorted.filter(a => a.masterPackage === m));
+      }
+      newAccounts.push(...noMaster);
+
+      saveReorderedAccounts(newAccounts);
+    }
     else if (type === 'pkg') {
-       // id is "masterPackage|package"
-       const [master, pkg] = id.split('|');
-       const accountsInMaster = sorted.filter(a => a.masterPackage === master);
-       const pkgs = Array.from(new Set(accountsInMaster.map(a => a.package).filter(Boolean)));
-       const idx = pkgs.indexOf(pkg);
-       
-       if (idx < 0 || (direction === 'up' && idx === 0) || (direction === 'down' && idx === pkgs.length - 1)) return;
-       
-       const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
-       [pkgs[idx], pkgs[swapIdx]] = [pkgs[swapIdx], pkgs[idx]];
-       
-       const beforeMaster = [];
-       const afterMaster = [];
-       let inMaster = false;
-       for (let i = 0; i < sorted.length; i++) {
-           const acc = sorted[i];
-           // We identify the boundaries of the master block by observing contiguous items
-           if (acc.masterPackage === master) {
-               inMaster = true;
-           } else {
-               // If we were inside the master and now we see something else, we are after
-               if (inMaster && accountsInMaster.includes(sorted[i - 1])) {
-                   afterMaster.push(...sorted.slice(i));
-                   break;
-               } else if (!inMaster) {
-                   beforeMaster.push(acc);
-               }
-           }
-       }
-       
-       const reorderedMaster = [];
-       for (const p of pkgs) {
-           reorderedMaster.push(...accountsInMaster.filter(a => a.package === p));
-       }
-       reorderedMaster.push(...accountsInMaster.filter(a => !a.package));
-       
-       saveReorderedAccounts([...beforeMaster, ...reorderedMaster, ...afterMaster]);
+      // id is "masterPackage|package"
+      const [master, pkg] = id.split('|');
+      const accountsInMaster = sorted.filter(a => a.masterPackage === master);
+      const pkgs = Array.from(new Set(accountsInMaster.map(a => a.package).filter(Boolean)));
+      const idx = pkgs.indexOf(pkg);
+
+      if (idx < 0 || (direction === 'up' && idx === 0) || (direction === 'down' && idx === pkgs.length - 1)) return;
+
+      const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+      [pkgs[idx], pkgs[swapIdx]] = [pkgs[swapIdx], pkgs[idx]];
+
+      const reorderedMaster = [];
+      for (const p of pkgs) {
+        reorderedMaster.push(...accountsInMaster.filter(a => a.package === p));
+      }
+      reorderedMaster.push(...accountsInMaster.filter(a => !a.package));
+
+      let masterCounter = 0;
+      const newAccounts = sorted.map(a => {
+        if (a.masterPackage === master) {
+          return reorderedMaster[masterCounter++];
+        }
+        return a;
+      });
+
+      saveReorderedAccounts(newAccounts);
     }
     else if (type === 'account') {
-       // id is account id
-       const acc = sorted.find(a => a.id === id);
-       if (!acc) return;
-       
-       const siblings = sorted.filter(a => a.masterPackage === acc.masterPackage && a.package === acc.package);
-       const idx = siblings.findIndex(a => a.id === id);
-       
-       if (idx < 0 || (direction === 'up' && idx === 0) || (direction === 'down' && idx === siblings.length - 1)) return;
-       
-       const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
-       [siblings[idx], siblings[swapIdx]] = [siblings[swapIdx], siblings[idx]];
-       
-       const before = [];
-       const after = [];
-       let inSiblingGroup = false;
-       for (let i = 0; i < sorted.length; i++) {
-           const a = sorted[i];
-           const isSibling = a.masterPackage === acc.masterPackage && a.package === acc.package;
-           if (isSibling) {
-               inSiblingGroup = true;
-           } else {
-               if (inSiblingGroup && siblings.some(s => s.id === sorted[i - 1]?.id)) {
-                   after.push(...sorted.slice(i));
-                   break;
-               } else if (!inSiblingGroup) {
-                   before.push(a);
-               }
-           }
-       }
-       
-       saveReorderedAccounts([...before, ...siblings, ...after]);
+      // id is account id
+      const acc = sorted.find(a => a.id === id);
+      if (!acc) return;
+
+      const siblings = sorted.filter(a => a.masterPackage === acc.masterPackage && a.package === acc.package);
+      const idx = siblings.findIndex(a => a.id === id);
+
+      if (idx < 0 || (direction === 'up' && idx === 0) || (direction === 'down' && idx === siblings.length - 1)) return;
+
+      const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+      [siblings[idx], siblings[swapIdx]] = [siblings[swapIdx], siblings[idx]];
+
+      let siblingCounter = 0;
+      const newAccounts = sorted.map(a => {
+        const isSibling = a.masterPackage === acc.masterPackage && a.package === acc.package;
+        if (isSibling) {
+          return siblings[siblingCounter++];
+        }
+        return a;
+      });
+
+      saveReorderedAccounts(newAccounts);
     }
   };
 
