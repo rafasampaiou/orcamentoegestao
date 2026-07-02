@@ -1689,7 +1689,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   };
 
   const handleSaveAccount = async () => {
-    if (!accountForm.name || (accountForm.level === 'account' && !accountForm.id)) return;
+    if (!accountForm.name) return;
 
     let updated: Account[] = [...accounts];
 
@@ -1725,12 +1725,30 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       }
     }
 
-    // Always re-sort and re-index to maintain integrity
-    updated.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+    // Calculate min sort order for groups to keep them contiguous
+    const masterMinSort = new Map<string, number>();
+    const pkgMinSort = new Map<string, number>();
+    updated.forEach(a => {
+      const m = (a.masterPackage || '').trim();
+      const p = (a.package || '').trim();
+      const pKey = m + '|' + p;
+      if (!masterMinSort.has(m) || (a.sortOrder || 0) < masterMinSort.get(m)!) masterMinSort.set(m, a.sortOrder || 0);
+      if (!pkgMinSort.has(pKey) || (a.sortOrder || 0) < pkgMinSort.get(pKey)!) pkgMinSort.set(pKey, a.sortOrder || 0);
+    });
 
-    // Ensure the current one takes precedence if sortOrder is equal
-    // This is a simple trick to handle "insert after"
-    const finalAccounts = updated.map((acc, idx) => ({ ...acc, sortOrder: idx }));
+    updated.sort((a, b) => {
+      const ma = (a.masterPackage || '').trim();
+      const mb = (b.masterPackage || '').trim();
+      if (ma !== mb) return (masterMinSort.get(ma) || 0) - (masterMinSort.get(mb) || 0) || ma.localeCompare(mb);
+      
+      const pa = ma + '|' + (a.package || '').trim();
+      const pb = mb + '|' + (b.package || '').trim();
+      if (pa !== pb) return (pkgMinSort.get(pa) || 0) - (pkgMinSort.get(pb) || 0) || pa.localeCompare(pb);
+      
+      return (a.sortOrder || 0) - (b.sortOrder || 0);
+    });
+
+    const finalAccounts = updated.map((acc, idx) => ({ ...acc, sortOrder: idx + 1 }));
 
     setAccounts(finalAccounts);
     try {
@@ -5110,10 +5128,30 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                           {(() => {
                             let lastMaster = '';
                             let lastPackage = '';
+                            const masterMinSort = new Map<string, number>();
+                            const pkgMinSort = new Map<string, number>();
+                            accounts.forEach(a => {
+                              const m = (a.masterPackage || '').trim();
+                              const p = (a.package || '').trim();
+                              const pKey = m + '|' + p;
+                              if (!masterMinSort.has(m) || (a.sortOrder || 0) < masterMinSort.get(m)!) masterMinSort.set(m, a.sortOrder || 0);
+                              if (!pkgMinSort.has(pKey) || (a.sortOrder || 0) < pkgMinSort.get(pKey)!) pkgMinSort.set(pKey, a.sortOrder || 0);
+                            });
+
                             const filtered = accounts.filter(acc =>
                               acc.name.toLowerCase().includes(accSearchTerm.toLowerCase()) ||
                               (acc.masterPackage || '').toLowerCase().includes(accSearchTerm.toLowerCase())
-                            ).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+                            ).sort((a, b) => {
+                              const ma = (a.masterPackage || '').trim();
+                              const mb = (b.masterPackage || '').trim();
+                              if (ma !== mb) return (masterMinSort.get(ma) || 0) - (masterMinSort.get(mb) || 0) || ma.localeCompare(mb);
+                              
+                              const pa = ma + '|' + (a.package || '').trim();
+                              const pb = mb + '|' + (b.package || '').trim();
+                              if (pa !== pb) return (pkgMinSort.get(pa) || 0) - (pkgMinSort.get(pb) || 0) || pa.localeCompare(pb);
+                              
+                              return (a.sortOrder || 0) - (b.sortOrder || 0);
+                            });
 
                             const rows: React.ReactNode[] = [];
                             filtered.forEach(acc => {
