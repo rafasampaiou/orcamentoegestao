@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { getForecastData } from '../services/mockData';
-import { Plus, Trash2, X, Save, Briefcase, Pencil, Calendar, PieChart, Lock, LockOpen, Settings as SettingsIcon, Users, Search, Upload, Settings, Eye, FileText, Layout, Info, ChevronUp, GripVertical, Database, BedDouble, DollarSign, Target, LayoutList, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Trash2, X, Save, Briefcase, Pencil, Calendar, PieChart, Lock, LockOpen, Settings as SettingsIcon, Users, Search, Upload, Settings, Eye, FileText, Layout, Info, ChevronUp, GripVertical, Database, BedDouble, DollarSign, Target, LayoutList, ArrowUp, ArrowDown, Copy } from 'lucide-react';
 import { User, UserRole, CostCenter, ImportedRow, Hotel, Account, BudgetVersion, LaborParameters, ScheduleItem, ImportedCostCenter, CostPackage, GMDConfiguration, ViewState, DreSection, HotelCategory, HotelRegion, ImportedAccount } from '../types';
 import TimelineView from './TimelineView';
 import ReplicateBudgetModal, { ReplicationOptions } from './ReplicateBudgetModal';
@@ -1490,6 +1490,23 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       classification: 'Revenue',
       allocationRules: [],
       budgetSource: ''
+    });
+    setActiveModal(null);
+    setShowAccountEditor(true);
+  };
+
+  const handleDuplicateAccount = (id: string) => {
+    const acc = accounts.find(i => i.id === id);
+    if (!acc) return;
+    
+    setEditingId(null);
+    setAccountForm({
+      ...acc,
+      id: '',
+      code: '',
+      name: `${acc.name} (Cópia)`,
+      sortOrder: (acc.sortOrder || 0) + 1,
+      level: 'account'
     });
     setActiveModal(null);
     setShowAccountEditor(true);
@@ -5255,6 +5272,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                         <button onClick={(e) => handleMoveItem(e, 'account', acc.id, 'up')} title="Mover para Cima" className="p-1 text-slate-300 hover:text-indigo-600"><ArrowUp size={12} /></button>
                                         <button onClick={(e) => handleMoveItem(e, 'account', acc.id, 'down')} title="Mover para Baixo" className="p-1 text-slate-300 hover:text-indigo-600"><ArrowDown size={12} /></button>
                                         <button onClick={(e) => { e.stopPropagation(); openNewAccount(acc.masterPackage, acc.package, acc.sortOrder); }} title="Adicionar Conta Abaixo" className="p-1 text-slate-300 hover:text-indigo-600"><Plus size={12} /></button>
+                                        <button onClick={(e) => { e.stopPropagation(); handleDuplicateAccount(acc.id); }} title="Duplicar Conta" className="p-1 text-slate-300 hover:text-indigo-600"><Copy size={12} /></button>
                                         <button onClick={(e) => { e.stopPropagation(); openEditAccount(acc.id); }} className="p-1 text-slate-300 hover:text-indigo-600"><Pencil size={12} /></button>
                                         <button onClick={(e) => { e.stopPropagation(); handleDeleteAccountRow(acc.id); }} className="p-1 text-slate-300 hover:text-red-500"><Trash2 size={12} /></button>
                                       </div>
