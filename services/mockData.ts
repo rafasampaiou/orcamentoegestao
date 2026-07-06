@@ -931,7 +931,12 @@ export const getForecastData = (
     rows.push(generateRow('CST-HEAD', '3.00', 'Costs', 'CUSTOS E DESPESAS OPERACIONAIS', 0, 0, 0, 0, true, true, 0));
 
     // Get unique Package identifiers (Master + Package name) for Expense accounts
-    const expenseAccounts = activeAccounts.filter(a => a.classification === 'Expense');
+    const expenseAccounts = activeAccounts.filter(a => {
+        const m = (a.masterPackage || '').toUpperCase();
+        if (m === 'RECEITAS' || m === 'DEDUCOES DA RECEITA BRUTA' || m === 'IMPOSTOS' || m.includes('RESULTADO')) return false;
+        if (a.classification === 'Revenue' || a.classification === 'Tax' || a.classification === 'Indicator' || a.classification === 'GOP') return false;
+        return true;
+    });
 
     // Create unique keys for each Package to avoid name collisions across Masters
     const packageKeys = Array.from(new Set(expenseAccounts.map(a => `${a.masterPackage || ''}|${a.package || ''}`))).filter(k => k.split('|')[1]);
@@ -1211,15 +1216,7 @@ export const getDynamicForecastData = (
             const startChildrenIndex = rows.length;
 
             // 3. Optional: Accounts within package
-            // Deduplicate accounts by normalized name to prevent double-counting if the user has duplicate accounts in the DB
-            const uniqueAccsMap = new Map<string, Account>();
-            currentAccounts.filter(a => a.package === pkg.name || a.packageId === pkg.id).forEach(a => {
-                const normName = normalizeAccountName(a.name);
-                if (!uniqueAccsMap.has(normName)) {
-                    uniqueAccsMap.set(normName, a);
-                }
-            });
-            const pkgAccs = Array.from(uniqueAccsMap.values());
+            const pkgAccs = currentAccounts.filter(a => a.package === pkg.name || a.packageId === pkg.id);
 
 
 
