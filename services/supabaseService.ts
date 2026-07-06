@@ -578,12 +578,32 @@ export const supabaseService = {
   },
 
   async getFinancialDataByVersion(versionId: string): Promise<ImportedRow[]> {
-    const { data, error } = await supabase
-      .from('financial_data')
-      .select('*')
-      .eq('version_id', versionId);
-    if (error) throw error;
-    return (data || []).map(r => ({
+    let allData: any[] = [];
+    let from = 0;
+    const limit = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from('financial_data')
+        .select('*')
+        .eq('version_id', versionId)
+        .range(from, from + limit - 1);
+
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        allData = [...allData, ...data];
+      }
+
+      if (!data || data.length < limit) {
+        hasMore = false;
+      } else {
+        from += limit;
+      }
+    }
+
+    return allData.map(r => ({
       ano:          String(r.year),
       cenario:      r.scenario,
       tipo:         r.type || '',
