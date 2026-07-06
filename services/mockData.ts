@@ -954,7 +954,7 @@ export const getForecastData = (
 
     sortedPackageKeys.forEach(key => {
         const [masterName, pkgName] = key.split('|');
-        const pkgAccs = expenseAccounts.filter(a => a.masterPackage === masterName && a.package === pkgName).map(a => ({
+        const pkgAccs = expenseAccounts.filter(a => (a.masterPackage || '').toLowerCase() === (masterName || '').toLowerCase() && (a.package || '').toLowerCase() === (pkgName || '').toLowerCase()).map(a => ({
             ...a,
             expenseType: defaultAccountConfigs[a.id]?.expenseType,
             expenseDriver: defaultAccountConfigs[a.id]?.expenseDriver
