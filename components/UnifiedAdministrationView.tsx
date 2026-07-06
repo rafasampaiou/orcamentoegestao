@@ -41,6 +41,21 @@ const DETAILED_EXPENSE_COLUMNS = [
   "Ano", "Escopo ou Fora", "Mês", "Classe Gerencial Nome", "Centro de Resultado Nome", "Valor Ajustado", "Filial", "Departamento", "Pacote", "Pacote Master", "Diretoria"
 ];
 
+// --- UTILITIES ---
+export const parseFinanceValue = (v: any): number => {
+  if (v === undefined || v === null || v === '') return 0;
+  let str = String(v).trim();
+  const isAccountingNegative = str.startsWith('(') && str.endsWith(')');
+  if (isAccountingNegative) {
+    str = str.slice(1, -1);
+  }
+  str = str.replace(/[R$\s%]/g, '');
+  str = str.replace(/\./g, '').replace(',', '.');
+  const num = parseFloat(str);
+  if (isNaN(num)) return 0;
+  return isAccountingNegative ? -num : num;
+};
+
 // --- IMPORT PREVIEW COMPONENT ---
 interface ImportPreviewProps {
   summaryRows: {
@@ -2333,16 +2348,12 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       const cenario = 'REAL';
       const tipo = 'Revenue'; // Valor padrão para tipo/natureza se omitido
 
-      let finalVal = '';
-      if (valor) {
-        // Remove dots (thousands separator) and replace comma with dot
-        const cleanValStr = valor.replace(/\./g, '').replace(',', '.').trim();
-        const valNum = parseFloat(cleanValStr);
-        if (!isNaN(valNum)) {
-          // Ensure integer as requested
-          finalVal = Math.round(valNum).toString();
-        }
+      const valNum = parseFinanceValue(valor);
+      if (isNaN(valNum)) {
+        status = 'error';
+        msgParts.push(`Valor inválido: '${valor}'`);
       }
+      const finalVal = Math.round(valNum).toString();
 
       // Format Account Code if it is a 5-digit number (e.g. 64104 -> 64.104)
       let formattedContaName = contaName;
@@ -2355,10 +2366,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         if (isNaN(Number(mes.trim())) || Number(mes.trim()) < 1 || Number(mes.trim()) > 12) {
           status = 'error';
           msgParts.push(`Mês inválido: '${mes}'`);
-        }
-        if (finalVal === '' || valor.trim() === '') {
-          status = 'error';
-          msgParts.push(`Valor inválido: '${valor}'`);
         }
       }
 
@@ -2649,15 +2656,12 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       }
 
       // Validate & clean value
-      const cleanVal = (valorRaw || '').replace(/\./g, '').replace(',', '.').trim();
-      const valNum = parseFloat(cleanVal);
-      let finalValor = '';
+      const valNum = parseFinanceValue(valorRaw);
       if (isNaN(valNum)) {
         status = 'error';
         msgParts.push(`Valor inválido: '${valorRaw}'`);
-      } else {
-        finalValor = Math.round(valNum).toString();
       }
+      const finalValor = Math.round(valNum).toString();
 
       // Match account by name or code (flexible)
       const descLower = (descConta || '').trim().toLowerCase();
@@ -2792,8 +2796,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       Object.entries(months).forEach(([month, value]) => {
         if (value === undefined || value === '') return;
 
-        const cleanVal = value.toString().replace(/\./g, '').replace(',', '.').trim();
-        const numVal = parseFloat(cleanVal);
+        const numVal = parseFinanceValue(value);
         if (isNaN(numVal)) return;
 
         const mapping = specialMapping[rowLabel];
@@ -2855,8 +2858,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       Object.entries(months).forEach(([month, value]) => {
         if (value === undefined || value === '') return;
 
-        const cleanVal = value.toString().replace(/\./g, '').replace(',', '.').trim();
-        const numVal = parseFloat(cleanVal);
+        const numVal = parseFinanceValue(value);
         if (isNaN(numVal)) return;
 
         rowsToSave.push({
@@ -2931,7 +2933,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         const monthValues = Array(12).fill(0);
         for (let m = 1; m <= 12; m++) {
           const valStr = seg.data[metric]?.[m] || '0';
-          const val = parseFloat(valStr.toString().replace(/\./g, '').replace(',', '.')) || 0;
+          const val = parseFinanceValue(valStr) || 0;
           monthValues[m - 1] = val;
         }
         occupancy_data[`${seg.label}:${metric}`] = monthValues;
@@ -3003,8 +3005,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
       const [empresa, mes, , , , pdv_nome, classe, valorStr] = cols;
 
-      const cleanValStr = (valorStr || "0").replace(/\./g, '').replace(',', '.').trim();
-      const finalVal = parseFloat(cleanValStr) || 0;
+      const finalVal = parseFinanceValue(valorStr) || 0;
 
       rowsToSave.push({
         versionId,
@@ -3059,8 +3060,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       // Columns: Ano, Escopo ou Fora, Mês, Classe Gerencial Nome, Centro de Resultado Nome, Valor Ajustado, Filial, Departamento, Pacote, Pacote Master, Diretoria
       const [ano, escopo, mes, classe, cr, valorStr, filial, departamento, pacote, pacoteMaster, diretoria] = cols;
 
-      const cleanValStr = (valorStr || "0").replace(/\./g, '').replace(',', '.').trim();
-      const finalVal = parseFloat(cleanValStr) || 0;
+      const finalVal = parseFinanceValue(valorStr) || 0;
 
       rowsToSave.push({
         ano: ano?.trim() || String(importYear),
@@ -3720,8 +3720,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               ];
 
               const parseVal = (v: any) => {
-                if (!v) return 0;
-                return parseFloat(String(v).replace(/\./g, '').replace(',', '.').replace('%', '')) || 0;
+                return parseFinanceValue(v);
               };
 
               const targetYear = realVersions.find(v => v.id === targetRealVersionId)?.year || new Date().getFullYear();
@@ -4155,8 +4154,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               "REVPAR", "TREVPOR", "TREVPAR"
             ];
             const parseVal = (v: any) => {
-              if (!v) return 0;
-              return parseFloat(String(v).replace(/\./g, '').replace(',', '.').replace('%', '')) || 0;
+              return parseFinanceValue(v);
             };
 
             const calculateTable = (data: Record<string, Record<number, string>>) => {
