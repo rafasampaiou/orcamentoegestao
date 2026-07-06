@@ -1196,11 +1196,21 @@ export const getDynamicForecastData = (
                 // (Simplified for this version)
             }
 
-            const valBudget = getImportedValue(pkg.name, selectedYear, 'Budget');
-            const valPrevia = getPreviaOrReal(pkg.name, selectedYear); // Actuals to Previa
-            const valReal = getImportedValue(pkg.name, selectedYear, 'Forecast'); // Forecast
+            const pkgAccs = currentAccounts.filter(a => a.package === pkg.name || a.packageId === pkg.id);
 
-            const valLY = getImportedValue(pkg.name, (selectedYear || 0) - 1, 'Real');
+            let valBudget = 0;
+            let valPrevia = 0;
+            let valReal = 0;
+            let valLY = 0;
+
+            // Se o pacote tem contas filhas, ele não deve puxar valores importados para o seu próprio nome,
+            // senão ele vai puxar o valor (ex: "Custo de outras receitas") e DEPOIS somar a conta (que tem o mesmo nome), duplicando.
+            if (pkgAccs.length === 0) {
+                valBudget = getImportedValue(pkg.name, selectedYear, 'Budget');
+                valPrevia = getPreviaOrReal(pkg.name, selectedYear); // Actuals to Previa
+                valReal = getImportedValue(pkg.name, selectedYear, 'Forecast'); // Forecast
+                valLY = getImportedValue(pkg.name, (selectedYear || 0) - 1, 'Real');
+            }
 
             const packageRowIndex = rows.length;
             rows.push(generateRow(
@@ -1214,9 +1224,6 @@ export const getDynamicForecastData = (
                 1
             ));
             const startChildrenIndex = rows.length;
-
-            // 3. Optional: Accounts within package
-            const pkgAccs = currentAccounts.filter(a => a.package === pkg.name || a.packageId === pkg.id);
 
 
 
