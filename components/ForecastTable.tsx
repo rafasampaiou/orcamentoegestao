@@ -2129,7 +2129,7 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
                 acc = accounts.find(a => a.id === originalAccId);
             }
             if (!acc) return false;
-            return acc.package === pkgName || acc.packageId === pkgId;
+            return (acc.package || '').toLowerCase() === (pkgName || '').toLowerCase() || acc.packageId === pkgId;
         });
 
         if (children.length > 0) {

@@ -1198,7 +1198,7 @@ export const getDynamicForecastData = (
                 // (Simplified for this version)
             }
 
-            const pkgAccs = currentAccounts.filter(a => a.package === pkg.name || a.packageId === pkg.id);
+            const pkgAccs = currentAccounts.filter(a => (a.package || '').toLowerCase() === (pkg.name || '').toLowerCase() || a.packageId === pkg.id);
 
             let valBudget = 0;
             let valPrevia = 0;
