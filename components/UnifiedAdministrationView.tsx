@@ -1177,26 +1177,42 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const dynamicExpenseRows = useMemo(() => {
     if (!accounts || accounts.length === 0) return [];
     
-    return accounts
+    const expenseAccounts = accounts
       .filter(a => {
-        // We only want actual accounts (not master or package headers)
-        if (a.level && a.level !== 'account') return false;
-        
         // Filter out Revenues and Taxes
         const m = (a.masterPackage || '').toUpperCase();
         if (m === 'RECEITAS' || m === 'DEDUCOES DA RECEITA BRUTA' || m === 'IMPOSTOS' || m.includes('RESULTADO')) {
             return false;
         }
         
-        // Optionally, if classification exists and is explicitly Revenue or Tax, exclude it
         if (a.classification === 'Revenue' || a.classification === 'Tax' || a.classification === 'Indicator' || a.classification === 'GOP') {
             return false;
         }
 
         return true;
       })
-      .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
-      .map(a => a.name);
+      .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+
+    const rows: string[] = [];
+    const masterPackagesList = Array.from(new Set(expenseAccounts.map(a => a.masterPackage).filter(Boolean)));
+    
+    masterPackagesList.forEach(masterName => {
+        if (masterName) rows.push(masterName);
+        
+        const accountsInMaster = expenseAccounts.filter(a => a.masterPackage === masterName);
+        const pkgsInMaster = Array.from(new Set(accountsInMaster.map(a => a.package).filter(Boolean)));
+        
+        pkgsInMaster.forEach(pkgName => {
+            if (pkgName) rows.push(pkgName);
+            
+            const pkgAccs = accountsInMaster.filter(a => a.package === pkgName);
+            pkgAccs.forEach(acc => {
+                rows.push(acc.name);
+            });
+        });
+    });
+
+    return rows;
   }, [accounts]);
 
   const handleSaveDreConfig = async () => {
