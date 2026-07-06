@@ -1175,22 +1175,29 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   }, [activeDreName, dreConfigs]);
 
   const dynamicExpenseRows = useMemo(() => {
-    const rows: string[] = [];
-    dreStructure.forEach(section => {
-      if (section.type === 'section') {
-        const nameUpper = section.name.toUpperCase();
-        if (nameUpper === 'RECEITAS' || nameUpper === 'DEDUCOES DA RECEITA BRUTA' || nameUpper === 'IMPOSTOS') return;
-        if (nameUpper.includes('RESULTADO')) return;
+    if (!accounts || accounts.length === 0) return [];
+    
+    return accounts
+      .filter(a => {
+        // We only want actual accounts (not master or package headers)
+        if (a.level && a.level !== 'account') return false;
         
-        section.items?.forEach(pkg => {
-          pkg.accounts?.forEach(acc => {
-            rows.push(acc.name);
-          });
-        });
-      }
-    });
-    return rows;
-  }, [dreStructure]);
+        // Filter out Revenues and Taxes
+        const m = (a.masterPackage || '').toUpperCase();
+        if (m === 'RECEITAS' || m === 'DEDUCOES DA RECEITA BRUTA' || m === 'IMPOSTOS' || m.includes('RESULTADO')) {
+            return false;
+        }
+        
+        // Optionally, if classification exists and is explicitly Revenue or Tax, exclude it
+        if (a.classification === 'Revenue' || a.classification === 'Tax' || a.classification === 'Indicator' || a.classification === 'GOP') {
+            return false;
+        }
+
+        return true;
+      })
+      .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+      .map(a => a.name);
+  }, [accounts]);
 
   const handleSaveDreConfig = async () => {
     setIsSavingDre(true);
