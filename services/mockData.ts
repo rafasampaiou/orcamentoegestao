@@ -981,7 +981,7 @@ export const getForecastData = (
         pkgReal += getImportedValue(pkgName, selectedYear, 'Forecast');
         pkgLY += getImportedValue(pkgName, (selectedYear || 0) - 1, 'Real');
 
-        rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', pkgName, pkgBudget, pkgReal, pkgLY, pkgPrevia, true, false, 1));
+        rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Package', pkgName, pkgBudget, pkgReal, pkgLY, pkgPrevia, true, false, 1));
 
         // Add individual accounts
         pkgAccs.forEach(acc => {
