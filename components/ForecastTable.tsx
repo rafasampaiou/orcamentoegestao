@@ -620,15 +620,12 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 return true;
             }
             if (row.isHeader && row.category === 'Package') {
-                currentPackageExpanded = expandedPackages.has(row.id) || showDetails;
+                currentPackageExpanded = expandedPackages.has(row.id);
                 return true;
             }
             if (row.isHeader) return true;
             
             if (!row.isHeader) {
-                if (showDetails) {
-                    return true;
-                }
                 return currentPackageExpanded;
             }
             return false;
@@ -827,8 +824,14 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                         </button>
                         <button
                             onClick={() => {
-                                setShowDetails(!showDetails);
-                                setExpandedPackages(new Set());
+                                if (showDetails) {
+                                    setShowDetails(false);
+                                    setExpandedPackages(new Set());
+                                } else {
+                                    setShowDetails(true);
+                                    const allPkgIds = new Set(data.filter(r => r.category === 'Package').map(r => r.id));
+                                    setExpandedPackages(allPkgIds);
+                                }
                             }}
                             className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-base font-bold transition-colors border ${!showDetails
                                 ? 'bg-indigo-100 text-indigo-700 border-indigo-200'
@@ -1359,7 +1362,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                                             onClick={(e) => { e.stopPropagation(); togglePackage(row.id); }}
                                                             className="text-gray-500 hover:text-indigo-600 focus:outline-none flex-shrink-0"
                                                         >
-                                                            {expandedPackages.has(row.id) || showDetails ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                                                            {expandedPackages.has(row.id) ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                                                         </button>
                                                     )}
                                                     {row.label}
