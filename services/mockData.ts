@@ -981,10 +981,12 @@ export const getForecastData = (
             pkgLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
         });
         // Fallback: Also check if there's a value directly for the Package name (simplified import)
-        pkgBudget += getImportedValue(pkgName, selectedYear, 'Budget');
-        pkgPrevia += getPreviaOrReal(pkgName, selectedYear);
-        pkgReal += getImportedValue(pkgName, selectedYear, 'Forecast');
-        pkgLY += getImportedValue(pkgName, (selectedYear || 0) - 1, 'Real');
+        if (pkgAccs.length === 0) {
+            pkgBudget += getImportedValue(pkgName, selectedYear, 'Budget');
+            pkgPrevia += getPreviaOrReal(pkgName, selectedYear);
+            pkgReal += getImportedValue(pkgName, selectedYear, 'Forecast');
+            pkgLY += getImportedValue(pkgName, (selectedYear || 0) - 1, 'Real');
+        }
 
         rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Package', pkgName, pkgBudget, pkgReal, pkgLY, pkgPrevia, true, false, 1));
 

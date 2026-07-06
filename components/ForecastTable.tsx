@@ -2123,8 +2123,11 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
             }
 
             // Match regular account rows via the accounts registry
-            const originalAccId = r.id.split('-')[0];
-            const acc = accounts.find(a => a.id === originalAccId);
+            let acc = accounts.find(a => a.id === r.id);
+            if (!acc) {
+                const originalAccId = r.id.split('-')[0];
+                acc = accounts.find(a => a.id === originalAccId);
+            }
             if (!acc) return false;
             return acc.package === pkgName || acc.packageId === pkgId;
         });
