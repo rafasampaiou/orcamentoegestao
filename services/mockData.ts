@@ -986,8 +986,8 @@ export const getForecastData = (
             const accLY = getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
 
             rows.push(generateRow(
-                acc.id,
-                acc.code,
+                acc.id || `acc-${masterName}-${pkgName}-${normalizeAccountName(acc.name)}`,
+                acc.code || '',
                 'Account',
                 acc.name,
                 accBudget, accReal, accLY, accPrevia,
