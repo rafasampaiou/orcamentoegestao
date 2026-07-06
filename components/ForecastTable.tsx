@@ -2134,12 +2134,19 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
 
         if (children.length > 0) {
             if (!pkgRow.isManualOverride) {
-                pkgRow.real = children.reduce((sum, c) => sum + c.real, 0);
+                const cReal = children.reduce((sum, c) => sum + c.real, 0);
+                if (cReal !== 0 || pkgRow.real === 0) pkgRow.real = cReal;
             }
-            pkgRow.budget = children.reduce((sum, c) => sum + c.budget, 0);
-            pkgRow.lastYear = children.reduce((sum, c) => sum + c.lastYear, 0);
+            
+            const cBudget = children.reduce((sum, c) => sum + c.budget, 0);
+            if (cBudget !== 0 || pkgRow.budget === 0) pkgRow.budget = cBudget;
+            
+            const cLy = children.reduce((sum, c) => sum + c.lastYear, 0);
+            if (cLy !== 0 || pkgRow.lastYear === 0) pkgRow.lastYear = cLy;
+            
             if (!pkgRow.isManualPreviaOverride) {
-                pkgRow.previa = children.reduce((sum, c) => sum + (c.previa || 0), 0);
+                const cPrevia = children.reduce((sum, c) => sum + (c.previa || 0), 0);
+                if (cPrevia !== 0 || pkgRow.previa === 0) pkgRow.previa = cPrevia;
             }
         }
     });

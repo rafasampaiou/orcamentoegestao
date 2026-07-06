@@ -980,13 +980,11 @@ export const getForecastData = (
             pkgReal += getImportedValue(acc.name, selectedYear, 'Forecast');
             pkgLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
         });
-        // Fallback: Also check if there's a value directly for the Package name (simplified import)
-        if (pkgAccs.length === 0) {
-            pkgBudget += getImportedValue(pkgName, selectedYear, 'Budget');
-            pkgPrevia += getPreviaOrReal(pkgName, selectedYear);
-            pkgReal += getImportedValue(pkgName, selectedYear, 'Forecast');
-            pkgLY += getImportedValue(pkgName, (selectedYear || 0) - 1, 'Real');
-        }
+        // Fallback: If no granular values were found in the accounts, check if the package was imported directly
+        if (pkgBudget === 0) pkgBudget = getImportedValue(pkgName, selectedYear, 'Budget');
+        if (pkgPrevia === 0) pkgPrevia = getPreviaOrReal(pkgName, selectedYear);
+        if (pkgReal === 0) pkgReal = getImportedValue(pkgName, selectedYear, 'Forecast');
+        if (pkgLY === 0) pkgLY = getImportedValue(pkgName, (selectedYear || 0) - 1, 'Real');
 
         rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Package', pkgName, pkgBudget, pkgReal, pkgLY, pkgPrevia, true, false, 1));
 
@@ -1200,19 +1198,10 @@ export const getDynamicForecastData = (
 
             const pkgAccs = currentAccounts.filter(a => (a.package || '').toLowerCase() === (pkg.name || '').toLowerCase() || a.packageId === pkg.id);
 
-            let valBudget = 0;
-            let valPrevia = 0;
-            let valReal = 0;
-            let valLY = 0;
-
-            // Se o pacote tem contas filhas, ele não deve puxar valores importados para o seu próprio nome,
-            // senão ele vai puxar o valor (ex: "Custo de outras receitas") e DEPOIS somar a conta (que tem o mesmo nome), duplicando.
-            if (pkgAccs.length === 0) {
-                valBudget = getImportedValue(pkg.name, selectedYear, 'Budget');
-                valPrevia = getPreviaOrReal(pkg.name, selectedYear); // Actuals to Previa
-                valReal = getImportedValue(pkg.name, selectedYear, 'Forecast'); // Forecast
-                valLY = getImportedValue(pkg.name, (selectedYear || 0) - 1, 'Real');
-            }
+            let valBudget = getImportedValue(pkg.name, selectedYear, 'Budget');
+            let valPrevia = getPreviaOrReal(pkg.name, selectedYear); // Actuals to Previa
+            let valReal = getImportedValue(pkg.name, selectedYear, 'Forecast'); // Forecast
+            let valLY = getImportedValue(pkg.name, (selectedYear || 0) - 1, 'Real');
 
             const packageRowIndex = rows.length;
             rows.push(generateRow(
@@ -1226,8 +1215,6 @@ export const getDynamicForecastData = (
                 1
             ));
             const startChildrenIndex = rows.length;
-
-
 
             pkgAccs.forEach(acc => {
                 const accBudget = getImportedValue(acc.name, selectedYear, 'Budget');
@@ -1269,10 +1256,10 @@ export const getDynamicForecastData = (
                 }
             }
 
-            rows[packageRowIndex].budget += sumBudget;
-            rows[packageRowIndex].real += sumReal;
-            rows[packageRowIndex].previa += sumPrevia;
-            rows[packageRowIndex].lastYear += sumLY;
+            if (sumBudget !== 0) rows[packageRowIndex].budget = sumBudget;
+            if (sumReal !== 0) rows[packageRowIndex].real = sumReal;
+            if (sumPrevia !== 0) rows[packageRowIndex].previa = sumPrevia;
+            if (sumLY !== 0) rows[packageRowIndex].lastYear = sumLY;
         });
 
         // Add a spacer after each section
