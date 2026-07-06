@@ -963,151 +963,45 @@ export const getForecastData = (
         const isProvisoes = pkgName.toUpperCase() === 'PROVISÕES GERAIS' || pkgName.toUpperCase() === 'PROVISOES GERAIS';
 
 
-        let pkgBudget = 0; let pkgReal = 0; let pkgPrevia = 0; let pkgLY = 0;
+        // STANDARD PACKAGE - Aggregate values directly
+        pkgAccs.forEach(acc => {
+            pkgBudget += getImportedValue(acc.name, selectedYear, 'Budget');
+            pkgPrevia += getPreviaOrReal(acc.name, selectedYear);
+            pkgReal += getImportedValue(acc.name, selectedYear, 'Forecast');
+            pkgLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
+        });
+        // Fallback: Also check if there's a value directly for the Package name (simplified import)
+        pkgBudget += getImportedValue(pkgName, selectedYear, 'Budget');
+        pkgPrevia += getPreviaOrReal(pkgName, selectedYear);
+        pkgReal += getImportedValue(pkgName, selectedYear, 'Forecast');
+        pkgLY += getImportedValue(pkgName, (selectedYear || 0) - 1, 'Real');
 
-        if (!isAdminTI && !isSalesMkt && !isServicosTerceiros && !isProvisoes) {
-            // STANDARD PACKAGE - Aggregate values directly
-            pkgAccs.forEach(acc => {
-                pkgBudget += getImportedValue(acc.name, selectedYear, 'Budget');
-                pkgPrevia += getPreviaOrReal(acc.name, selectedYear);
-                pkgReal += getImportedValue(acc.name, selectedYear, 'Forecast');
-                pkgLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
-            });
-            // Fallback: Also check if there's a value directly for the Package name (simplified import)
-            pkgBudget += getImportedValue(pkgName, selectedYear, 'Budget');
-            pkgPrevia += getPreviaOrReal(pkgName, selectedYear);
-            pkgReal += getImportedValue(pkgName, selectedYear, 'Forecast');
-            pkgLY += getImportedValue(pkgName, (selectedYear || 0) - 1, 'Real');
+        rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', pkgName, pkgBudget, pkgReal, pkgLY, pkgPrevia, true, false, 1));
 
-            rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', pkgName, pkgBudget, pkgReal, pkgLY, pkgPrevia, true, false, 1));
-        } else if (isAdminTI) {
-            // --- DESPESAS ADMINISTRATIVAS SPECIAL DRILL DOWN ---
-            rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', 'Despesas Administrativas', 0, 0, 0, 0, true, false, 1));
+        // Add individual accounts
+        pkgAccs.forEach(acc => {
+            const accBudget = getImportedValue(acc.name, selectedYear, 'Budget');
+            const accPrevia = getPreviaOrReal(acc.name, selectedYear);
+            const accReal = getImportedValue(acc.name, selectedYear, 'Forecast');
+            const accLY = getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
 
-            let genBudget = 0; let genReal = 0; let genPrevia = 0; let genLY = 0;
-            const tiAccountKeyword = 'processamento';
-
-            pkgAccs.forEach(acc => {
-                if (acc.name.toLowerCase().includes(tiAccountKeyword)) return;
-                genBudget += getImportedValue(acc.name, selectedYear, 'Budget');
-                genPrevia += getPreviaOrReal(acc.name, selectedYear);
-                genReal += getImportedValue(acc.name, selectedYear, 'Forecast');
-                genLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
-            });
-            
-            // Fallback for explicit import
-            genBudget += getImportedValue('Despesas administrativas gerais', selectedYear, 'Budget');
-            genPrevia += getPreviaOrReal('Despesas administrativas gerais', selectedYear);
-            genReal += getImportedValue('Despesas administrativas gerais', selectedYear, 'Forecast');
-            genLY += getImportedValue('Despesas administrativas gerais', (selectedYear || 0) - 1, 'Real');
-            rows.push(generateRow(`p-drill-${masterName}-${pkgName}-gerais`, pkgCode, 'Costs', 'Despesas administrativas gerais', genBudget, genReal, genLY, genPrevia, false, false, 2, undefined, { method: 'Fixed' }));
-
-            const subAreas = [
-                { label: 'TI', cr: 'ti' },
-                { label: 'Martech', cr: 'martech' },
-                { label: 'Outros', cr: 'outros' }
-            ];
-            const tiAccs = pkgAccs.filter(acc => acc.name.toLowerCase().includes(tiAccountKeyword));
-            if (tiAccs.length > 0) {
-                subAreas.forEach(sub => {
-                    let subBudget = 0; let subPrevia = 0; let subReal = 0; let subLY = 0;
-                    tiAccs.forEach(tiAcc => {
-                        let sB = getImportedValue(tiAcc.name, selectedYear, 'Budget', sub.cr);
-                        let sP = getPreviaOrReal(tiAcc.name, selectedYear, sub.cr);
-                        let sR = getImportedValue(tiAcc.name, selectedYear, 'Forecast', sub.cr);
-                        let sLY = getImportedValue(tiAcc.name, (selectedYear || 0) - 1, 'Real', sub.cr);
-
-                        // Fallback for "Tech" if "martech" CR is empty - try "ti"
-                        if (sub.label === 'TI' && sB === 0 && sP === 0 && sR === 0) {
-                            sB = getImportedValue(tiAcc.name, selectedYear, 'Budget', 'ti');
-                            sP = getPreviaOrReal(tiAcc.name, selectedYear, 'ti');
-                            sR = getImportedValue(tiAcc.name, selectedYear, 'Forecast', 'ti');
-                            sLY = getImportedValue(tiAcc.name, (selectedYear || 0) - 1, 'Real', 'ti');
-                        }
-
-                        subBudget += sB; subPrevia += sP; subReal += sR; subLY += sLY;
-                    });
-                    
-                    // Fallback for exact string imported
-                    const subLabel = `Processamento de dados e TI (${sub.label})`;
-                    if (subBudget === 0 && subPrevia === 0 && subReal === 0 && subLY === 0) {
-                        subBudget += getImportedValue(subLabel, selectedYear, 'Budget');
-                        subPrevia += getPreviaOrReal(subLabel, selectedYear);
-                        subReal += getImportedValue(subLabel, selectedYear, 'Forecast');
-                        subLY += getImportedValue(subLabel, (selectedYear || 0) - 1, 'Real');
-                    }
-                    rows.push(generateRow(`p-drill-${masterName}-${pkgName}-${sub.label}`, pkgCode, 'Costs', subLabel, subBudget, subReal, subLY, subPrevia, false, false, 2, undefined, { method: 'Fixed' }));
-                });
-            }
-        } else if (isSalesMkt) {
-            // --- DESPESAS DE VENDAS E MARKETING SPECIAL DRILL DOWN ---
-            rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', 'Despesas com Vendas e Marketing', 0, 0, 0, 0, true, false, 1));
-            const subAreas = [
-                { label: 'Martech', cr: 'martech' },
-                { label: 'Marketing', cr: 'marketing' },
-                { label: 'Outros setores', cr: 'outros' }
-            ];
-            subAreas.forEach(sub => {
-                let subBudget = 0; let subReal = 0; let subPrevia = 0; let subLY = 0;
-                pkgAccs.forEach(acc => {
-                    subBudget += getImportedValue(acc.name, selectedYear, 'Budget', sub.cr);
-                    subPrevia += getPreviaOrReal(acc.name, selectedYear, sub.cr);
-                    subReal += getImportedValue(acc.name, selectedYear, 'Forecast', sub.cr);
-                    subLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real', sub.cr);
-                });
-                subBudget += getImportedValue(pkgName, selectedYear, 'Budget', sub.cr);
-                subPrevia += getPreviaOrReal(pkgName, selectedYear, sub.cr);
-                subReal += getImportedValue(pkgName, selectedYear, 'Forecast', sub.cr);
-                subLY += getImportedValue(pkgName, (selectedYear || 0) - 1, 'Real', sub.cr);
-
-                rows.push(generateRow(`p-drill-${masterName}-${pkgName}-${sub.label}`, pkgCode, 'Costs', sub.label, subBudget, subReal, subLY, subPrevia, false, false, 2, undefined, { method: 'Fixed' }));
-            });
-        } else if (isServicosTerceiros) {
-            rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', 'Serviços de Terceiros', 0, 0, 0, 0, true, false, 1));
-            const subAreas = [
-                { label: 'Servicos de terceiros temporarios', name: 'Servicos de terceiros temporarios' },
-                { label: 'Serviço de terceiros recorrente', name: 'Serviço de terceiros recorrente' },
-                { label: 'Serviços contratados de prestadores PJ - MEI', name: 'Serviços contratados de prestadores PJ - MEI' }
-            ];
-            subAreas.forEach(sub => {
-                const b = getImportedValue(sub.name, selectedYear, 'Budget');
-                const p = getPreviaOrReal(sub.name, selectedYear);
-                const f = getImportedValue(sub.name, selectedYear, 'Forecast');
-                const ly = getImportedValue(sub.name, (selectedYear || 0) - 1, 'Real');
-                rows.push(generateRow(`p-drill-${masterName}-${pkgName}-${sub.name}`, pkgCode, 'Costs', sub.label, b, f, ly, p, false, false, 2, undefined, { method: 'Fixed' }));
-            });
-        } else if (isProvisoes) {
-            rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Costs', 'Provisões Gerais', 0, 0, 0, 0, true, false, 1));
-            const keyTemp = 'Provisao de servicos de terceiros temporarios';
-            const tB = getImportedValue(keyTemp, selectedYear, 'Budget');
-            const tP = getPreviaOrReal(keyTemp, selectedYear);
-            const tF = getImportedValue(keyTemp, selectedYear, 'Forecast');
-            const tLY = getImportedValue(keyTemp, (selectedYear || 0) - 1, 'Real');
-
-            rows.push(generateRow(`p-drill-${masterName}-${pkgName}-temporarios`, pkgCode, 'Costs', keyTemp, tB, tF, tLY, tP, false, false, 2, undefined, { method: 'Fixed' }));
-
-            let oB = 0; let oP = 0; let oF = 0; let oLY = 0;
-
-
-
-            // Fallback for direct import of "Outras provisões"
-            oB += getImportedValue('Outras provisões', selectedYear, 'Budget');
-            oP += getPreviaOrReal('Outras provisões', selectedYear);
-            oF += getImportedValue('Outras provisões', selectedYear, 'Forecast');
-            oLY += getImportedValue('Outras provisões', (selectedYear || 0) - 1, 'Real');
-
-            pkgAccs.forEach(acc => {
-                if (acc.name.toLowerCase() === keyTemp.toLowerCase()) return;
-                if (acc.name.toLowerCase() === 'provisoes gerais') return;
-
-                oB += getImportedValue(acc.name, selectedYear, 'Budget');
-                oP += getPreviaOrReal(acc.name, selectedYear);
-                oF += getImportedValue(acc.name, selectedYear, 'Forecast');
-                oLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
-            });
-
-            rows.push(generateRow(`p-drill-${masterName}-${pkgName}-outras`, pkgCode, 'Costs', 'Outras provisões', oB, oF, oLY, oP, false, false, 2, undefined, { method: 'Fixed' }));
-        }
+            rows.push(generateRow(
+                acc.id,
+                acc.code,
+                'Account',
+                acc.name,
+                accBudget, accReal, accLY, accPrevia,
+                false,
+                false,
+                2,
+                undefined,
+                {
+                    method: acc.expenseType === 'Variável' ? 'Variable' : 'Fixed',
+                    driver: acc.expenseDriver,
+                    type: acc.expenseType
+                }
+            ));
+        });
     });
 
     // 4. RESULTS

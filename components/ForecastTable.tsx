@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { getForecastData, getDynamicForecastData } from '../services/mockData';
-import { Upload, ListFilter, LayoutList, Settings2, ChevronUp, Activity, TrendingUp, Lock, LockOpen, CheckCircle2, X, FileSpreadsheet, AlertCircle, CheckCircle } from 'lucide-react';
+import { Upload, ListFilter, LayoutList, Settings2, ChevronUp, Activity, TrendingUp, Lock, LockOpen, CheckCircle2, X, FileSpreadsheet, AlertCircle, CheckCircle, ChevronRight, ChevronDown } from 'lucide-react';
 import { ExpenseDriver, ImportedRow, Account, CostPackage, Hotel, ForecastRow, ForecastConfig, ForecastOperator, ColumnVisibility, UserRole } from '../types';
 import { evaluateFormula } from '../utils/formulaEngine';
 import { supabaseService } from '../services/supabaseService';
@@ -225,6 +225,16 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     }, [isMonthClosed, activeProjectionType, setActiveProjectionType]);
 
     const [showDetails, setShowDetails] = useState(false);
+    const [expandedPackages, setExpandedPackages] = useState<Set<string>>(new Set());
+
+    const togglePackage = (id: string) => {
+        setExpandedPackages(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
     const [showImportModal, setShowImportModal] = useState(false);
     const [importText, setImportText] = useState('');
     const [importResult, setImportResult] = useState<{ success: number; skipped: string[] } | null>(null);
@@ -597,6 +607,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     };
 
     const visibleData = useMemo(() => {
+        let currentPackageExpanded = true;
         return data.filter(row => {
             if (row.category === 'Spacer') return true;
             if (row.category === 'Indicators') {
@@ -605,15 +616,24 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 const allowedIndicators = ['IND-1', 'IND-2', 'IND-3', 'IND-4', 'IND-5', 'IND-6', 'IND-TREVPOR'];
                 return allowedIndicators.includes(row.id);
             }
+            if (row.isHeader && row.category === 'Section') {
+                return true;
+            }
+            if (row.isHeader && row.category === 'Package') {
+                currentPackageExpanded = expandedPackages.has(row.id) || showDetails;
+                return true;
+            }
             if (row.isHeader) return true;
+            
             if (!row.isHeader) {
                 if (showDetails) {
                     return true;
                 }
+                return currentPackageExpanded;
             }
             return false;
         });
-    }, [data, showDetails]);
+    }, [data, showDetails, expandedPackages]);
 
     const monthName = new Date(selectedYear || 2024, (selectedMonth || 1) - 1).toLocaleString('pt-BR', { month: 'long' });
 
@@ -806,7 +826,10 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             Colunas
                         </button>
                         <button
-                            onClick={() => setShowDetails(!showDetails)}
+                            onClick={() => {
+                                setShowDetails(!showDetails);
+                                setExpandedPackages(new Set());
+                            }}
                             className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-base font-bold transition-colors border ${!showDetails
                                 ? 'bg-indigo-100 text-indigo-700 border-indigo-200'
                                 : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 shadow-sm'
@@ -1330,7 +1353,15 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     return (
                                         <tr key={row.id} className="bg-gray-50 text-gray-800 font-bold border-b border-gray-200 hover:bg-gray-100 transition-colors">
                                             <td className="px-2 py-2 text-sm uppercase align-middle border-r border-gray-200 sticky left-0 z-20 bg-gray-50">
-                                                <div style={{ paddingLeft: `${(row.indentLevel || 0) * 16}px` }} className="truncate">
+                                                <div style={{ paddingLeft: `${(row.indentLevel || 0) * 16}px` }} className="truncate flex items-center gap-2">
+                                                    {row.category === 'Package' && (
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); togglePackage(row.id); }}
+                                                            className="text-gray-500 hover:text-indigo-600 focus:outline-none flex-shrink-0"
+                                                        >
+                                                            {expandedPackages.has(row.id) || showDetails ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                                                        </button>
+                                                    )}
                                                     {row.label}
                                                 </div>
                                             </td>

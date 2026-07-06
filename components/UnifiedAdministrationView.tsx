@@ -1498,7 +1498,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const handleDuplicateAccount = (id: string) => {
     const acc = accounts.find(i => i.id === id);
     if (!acc) return;
-    
+
     setEditingId(null);
     setAccountForm({
       ...acc,
@@ -1757,11 +1757,11 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       const ma = (a.masterPackage || '').trim();
       const mb = (b.masterPackage || '').trim();
       if (ma !== mb) return (masterMinSort.get(ma) || 0) - (masterMinSort.get(mb) || 0) || ma.localeCompare(mb);
-      
+
       const pa = ma + '|' + (a.package || '').trim();
       const pb = mb + '|' + (b.package || '').trim();
       if (pa !== pb) return (pkgMinSort.get(pa) || 0) - (pkgMinSort.get(pb) || 0) || pa.localeCompare(pb);
-      
+
       return (a.sortOrder || 0) - (b.sortOrder || 0);
     });
 
@@ -5162,11 +5162,11 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                               const ma = (a.masterPackage || '').trim();
                               const mb = (b.masterPackage || '').trim();
                               if (ma !== mb) return (masterMinSort.get(ma) || 0) - (masterMinSort.get(mb) || 0) || ma.localeCompare(mb);
-                              
+
                               const pa = ma + '|' + (a.package || '').trim();
                               const pb = mb + '|' + (b.package || '').trim();
                               if (pa !== pb) return (pkgMinSort.get(pa) || 0) - (pkgMinSort.get(pb) || 0) || pa.localeCompare(pb);
-                              
+
                               return (a.sortOrder || 0) - (b.sortOrder || 0);
                             });
 
