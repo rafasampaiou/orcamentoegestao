@@ -30,39 +30,6 @@ interface LocalDreSection {
 }
 
 
-// --- CONSTANTS FOR STRUCTURED IMPORTS ---
-const DRE_FORECAST_ROWS = [
-  "Custo de alimentos",
-  "Custo de bebidas",
-  "Custo de produtos diversos",
-  "Custos de outras receitas",
-  "Despesas com conservacao e limpeza",
-  "Despesas com manutencao",
-  "Despesas com servicos publicos",
-  "Despesas operacionais",
-  "Beneficios aos colaboradores",
-  "Despesas com pessoal",
-  "Encargos sociais",
-  "Serviços de terceiros",
-  "Servicos de terceiros temporarios",
-  "Serviço de terceiros recorrente",
-  "Serviços contratados de prestadores PJ - MEI",
-  "Despesas administrativas",
-  "Despesas administrativas gerais",
-  "Processamento de dados e TI (TI)",
-  "Processamento de dados e TI (Martech)",
-  "Processamento de dados e TI (Outros)",
-  "Provisoes gerais",
-  "Provisao de servicos de terceiros temporarios",
-  "Outras provisões",
-  "Despesas com vendas e marketing",
-  "Marketing",
-  "Martech",
-  "Outros setores",
-  "Despesas financeiras e bancarias",
-  "Outros impostos",
-  "Arrendamento"
-];
 
 const REVENUE_IMPORT_COLUMNS = [
   "Empresa", "Mês", "tipo_cr", "Grupo_CR", "CR_Hierarquico", "PDVs",
@@ -1206,6 +1173,24 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       setDreStructure(sections);
     }
   }, [activeDreName, dreConfigs]);
+
+  const dynamicExpenseRows = useMemo(() => {
+    const rows: string[] = [];
+    dreStructure.forEach(section => {
+      if (section.type === 'section') {
+        const nameUpper = section.name.toUpperCase();
+        if (nameUpper === 'RECEITAS' || nameUpper === 'DEDUCOES DA RECEITA BRUTA' || nameUpper === 'IMPOSTOS') return;
+        if (nameUpper.includes('RESULTADO')) return;
+        
+        section.items?.forEach(pkg => {
+          pkg.accounts?.forEach(acc => {
+            rows.push(acc.name);
+          });
+        });
+      }
+    });
+    return rows;
+  }, [dreStructure]);
 
   const handleSaveDreConfig = async () => {
     setIsSavingDre(true);
@@ -4039,14 +4024,14 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 </button>
               </div>
               <SpreadsheetTable
-                rows={DRE_FORECAST_ROWS}
+                rows={dynamicExpenseRows}
                 data={dreForecastData}
                 onCellChange={(row, month, val) => setDreForecastData(prev => ({ ...prev, [row]: { ...(prev[row] || {}), [month]: val } }))}
                 onPaste={(row, month, pasted) => {
                   const newData = { ...dreForecastData };
-                  const startIdx = DRE_FORECAST_ROWS.indexOf(row);
+                  const startIdx = dynamicExpenseRows.indexOf(row);
                   pasted.forEach((pRow, rOffset) => {
-                    const targetRow = DRE_FORECAST_ROWS[startIdx + rOffset];
+                    const targetRow = dynamicExpenseRows[startIdx + rOffset];
                     if (targetRow) {
                       if (!newData[targetRow]) newData[targetRow] = {};
                       pRow.forEach((val, cOffset) => {
@@ -4390,14 +4375,14 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
             </button>
           </div>
           <SpreadsheetTable
-            rows={DRE_FORECAST_ROWS}
+            rows={dynamicExpenseRows}
             data={dreBudgetData}
             onCellChange={(row, month, val) => setDreBudgetData(prev => ({ ...prev, [row]: { ...(prev[row] || {}), [month]: val } }))}
             onPaste={(row, month, pasted) => {
               const newData = { ...dreBudgetData };
-              const startIdx = DRE_FORECAST_ROWS.indexOf(row);
+              const startIdx = dynamicExpenseRows.indexOf(row);
               pasted.forEach((pRow, rOffset) => {
-                const targetRow = DRE_FORECAST_ROWS[startIdx + rOffset];
+                const targetRow = dynamicExpenseRows[startIdx + rOffset];
                 if (targetRow) {
                   if (!newData[targetRow]) newData[targetRow] = {};
                   pRow.forEach((val, cOffset) => {
