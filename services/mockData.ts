@@ -964,6 +964,11 @@ export const getForecastData = (
 
 
         // STANDARD PACKAGE - Aggregate values directly
+        let pkgBudget = 0;
+        let pkgPrevia = 0;
+        let pkgReal = 0;
+        let pkgLY = 0;
+
         pkgAccs.forEach(acc => {
             pkgBudget += getImportedValue(acc.name, selectedYear, 'Budget');
             pkgPrevia += getPreviaOrReal(acc.name, selectedYear);
