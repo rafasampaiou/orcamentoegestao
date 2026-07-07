@@ -1645,8 +1645,12 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     //  were populated inside the lazy updater, already empty
                                     //  when setImportResult ran right after setData())
                                     const newData = data.map(r => ({ ...r, forecastConfig: { ...r.forecastConfig }, previaConfig: r.previaConfig ? { ...r.previaConfig } : undefined }));
-                                    const labelMap = new Map(newData.map(r => [r.label.trim().toLowerCase(), r]));
-                                    const labelMapNA = new Map(newData.map(r => [stripAccents(r.label.trim().toLowerCase()), r]));
+                                    
+                                    // Filter to only map to non-header accounts or specifically editable revenue headers
+                                    const importableRows = newData.filter(r => !r.isHeader || isSpecialEditableRow(r.id) || r.category === 'Indicators');
+                                    
+                                    const labelMap = new Map(importableRows.map(r => [r.label.trim().toLowerCase(), r]));
+                                    const labelMapNA = new Map(importableRows.map(r => [stripAccents(r.label.trim().toLowerCase()), r]));
                                     // Accent-stripped version of IMPORT_LABEL_MAP keys
                                     const importMapNA: Record<string, string> = {};
                                     Object.entries(IMPORT_LABEL_MAP).forEach(([k, v]) => { importMapNA[stripAccents(k)] = v; });
@@ -1675,7 +1679,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         if (!mappedId) mappedId = importMapNA[normLabelNA];
 
                                         let targetRow = mappedId && mappedId !== '__label__'
-                                            ? newData.find(r => r.id === mappedId)
+                                            ? importableRows.find(r => r.id === mappedId)
                                             : undefined;
 
                                         // 3. Fallback: match by full label (with accents)

@@ -1191,17 +1191,17 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
   const dynamicExpenseRows = useMemo(() => {
     if (!accounts || accounts.length === 0) return [];
-    
+
     const expenseAccounts = accounts
       .filter(a => {
         // Filter out Revenues and Taxes
         const m = (a.masterPackage || '').toUpperCase();
         if (m === 'RECEITAS' || m === 'DEDUCOES DA RECEITA BRUTA' || m === 'IMPOSTOS' || m.includes('RESULTADO')) {
-            return false;
+          return false;
         }
-        
+
         if (a.classification === 'Revenue' || a.classification === 'Tax' || a.classification === 'Indicator' || a.classification === 'GOP') {
-            return false;
+          return false;
         }
 
         return true;
@@ -1210,21 +1210,21 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
     const rows: string[] = [];
     const masterPackagesList = Array.from(new Set(expenseAccounts.map(a => a.masterPackage || 'Sem Master')));
-    
+
     masterPackagesList.forEach(masterName => {
-        if (masterName) rows.push(masterName);
-        
-        const accountsInMaster = expenseAccounts.filter(a => (a.masterPackage || 'Sem Master') === masterName);
-        const pkgsInMaster = Array.from(new Set(accountsInMaster.map(a => a.package || 'Sem Pacote')));
-        
-        pkgsInMaster.forEach(pkgName => {
-            if (pkgName) rows.push(pkgName);
-            
-            const pkgAccs = accountsInMaster.filter(a => (a.package || 'Sem Pacote') === pkgName);
-            pkgAccs.forEach(acc => {
-                rows.push(acc.name);
-            });
+      if (masterName) rows.push(masterName);
+
+      const accountsInMaster = expenseAccounts.filter(a => (a.masterPackage || 'Sem Master') === masterName);
+      const pkgsInMaster = Array.from(new Set(accountsInMaster.map(a => a.package || 'Sem Pacote')));
+
+      pkgsInMaster.forEach(pkgName => {
+        if (pkgName) rows.push(pkgName);
+
+        const pkgAccs = accountsInMaster.filter(a => (a.package || 'Sem Pacote') === pkgName);
+        pkgAccs.forEach(acc => {
+          rows.push(acc.name);
         });
+      });
     });
 
     return rows;

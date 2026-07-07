@@ -980,12 +980,7 @@ export const getForecastData = (
             pkgReal += getImportedValue(acc.name, selectedYear, 'Forecast');
             pkgLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
         });
-        // Fallback: If no granular values were found in the accounts, check if the package was imported directly
-        if (pkgBudget === 0) pkgBudget = getImportedValue(pkgName, selectedYear, 'Budget');
-        if (pkgPrevia === 0) pkgPrevia = getPreviaOrReal(pkgName, selectedYear);
-        if (pkgReal === 0) pkgReal = getImportedValue(pkgName, selectedYear, 'Forecast');
-        if (pkgLY === 0) pkgLY = getImportedValue(pkgName, (selectedYear || 0) - 1, 'Real');
-
+        
         rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Package', pkgName, pkgBudget, pkgReal, pkgLY, pkgPrevia, true, false, 1));
 
         // Add individual accounts
@@ -1198,10 +1193,10 @@ export const getDynamicForecastData = (
 
             const pkgAccs = currentAccounts.filter(a => (a.package || '').toLowerCase() === (pkg.name || '').toLowerCase() || a.packageId === pkg.id);
 
-            let valBudget = getImportedValue(pkg.name, selectedYear, 'Budget');
-            let valPrevia = getPreviaOrReal(pkg.name, selectedYear); // Actuals to Previa
-            let valReal = getImportedValue(pkg.name, selectedYear, 'Forecast'); // Forecast
-            let valLY = getImportedValue(pkg.name, (selectedYear || 0) - 1, 'Real');
+            let valBudget = 0;
+            let valPrevia = 0;
+            let valReal = 0;
+            let valLY = 0;
 
             const packageRowIndex = rows.length;
             rows.push(generateRow(
