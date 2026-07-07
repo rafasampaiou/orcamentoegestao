@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { getForecastData } from '../services/mockData';
+import { getForecastData, normalizeAccountName } from '../services/mockData';
 import { Plus, Trash2, X, Save, Briefcase, Pencil, Calendar, PieChart, Lock, LockOpen, Settings as SettingsIcon, Users, Search, Upload, Settings, Eye, FileText, Layout, Info, ChevronUp, GripVertical, Database, BedDouble, DollarSign, Target, LayoutList, ArrowUp, ArrowDown, Copy } from 'lucide-react';
 import { User, UserRole, CostCenter, ImportedRow, Hotel, Account, BudgetVersion, LaborParameters, ScheduleItem, ImportedCostCenter, CostPackage, GMDConfiguration, ViewState, DreSection, HotelCategory, HotelRegion, ImportedAccount } from '../types';
 import TimelineView from './TimelineView';
@@ -2323,7 +2323,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     const parsed: ImportedRow[] = [];
 
     // OPTIMIZATION: Pre-compute Sets for O(1) lookup
-    const accountSet = new Set(accounts.map(a => a.name.trim().toLowerCase()));
+    const accountMap = new Map(accounts.map(a => [normalizeAccountName(a.name), a.name]));
     const crSet = new Set(costCenters.map(c => c.name.trim().toLowerCase()));
 
     for (let i = startIdx; i < rows.length; i++) {
@@ -2369,12 +2369,15 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         }
       }
 
-      // Try to match formatted first, then original
+      // Try to match normalized formatted first, then original
       let matchedAccountName = '';
-      if (accountSet.has(formattedContaName.trim().toLowerCase())) {
-        matchedAccountName = formattedContaName;
-      } else if (accountSet.has(originalContaName.trim().toLowerCase())) {
-        matchedAccountName = originalContaName;
+      const normFormatted = normalizeAccountName(formattedContaName);
+      const normOriginal = normalizeAccountName(originalContaName);
+      
+      if (accountMap.has(normFormatted)) {
+        matchedAccountName = accountMap.get(normFormatted) || '';
+      } else if (accountMap.has(normOriginal)) {
+        matchedAccountName = accountMap.get(normOriginal) || '';
       }
 
       const accountExists = !!matchedAccountName;
