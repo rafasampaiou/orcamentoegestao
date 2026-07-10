@@ -137,7 +137,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
           <div>
             <h1 className="font-black text-white text-sm leading-tight">Forecast &amp; GMD</h1>
-            <p className="text-[9px] text-white/40 uppercase font-bold tracking-widest">Tauá Resorts &amp; Hotéis</p>
+            <p className="text-[9px] text-white/40 uppercase font-bold tracking-widest">Grupo Tauá</p>
           </div>
         </div>
       </div>

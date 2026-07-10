@@ -2373,7 +2373,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       let matchedAccountName = '';
       const normFormatted = normalizeAccountName(formattedContaName);
       const normOriginal = normalizeAccountName(originalContaName);
-      
+
       if (accountMap.has(normFormatted)) {
         matchedAccountName = accountMap.get(normFormatted) || '';
       } else if (accountMap.has(normOriginal)) {
