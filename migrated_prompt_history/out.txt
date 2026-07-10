@@ -1,0 +1,233 @@
+--- 39 user ---
+eu quero que a DRE fique nessa estrutura
+
+Aptos Disponíveis
+Aptos Ocupados
+% Ocupação
+DM Bruta
+DM Líquida
+
+Total de Hóspedes
+
+Lazer
+Aptos Disponíveis
+Aptos Ocupados
+% Ocupação
+DM Bruta
+DM Líquida
+Total de Hóspedes Lazer
+
+Eventos
+Total de Hóspedes Eventos
+
+Receita Bruta Total
+Receita de Hospedagem bruta
+Receitas Extras
+Lazer
+Eventos
+Cancelamento de time share
+Receita de ISS
+
+Impostos
+
+Receita Liquida
+
+Quantidade de emocionadores
+Total de emocionadores
+Folha
+Extras
+Pelo  KPI (Total de emocionadores) 
+
+Custos e Despesas Operacionais
+ CUSTOS DE ALIMENTOS E BEBIDAS 
+ CUSTO DE ALIMENTOS 
+ Carnes / Aves / Peixes 
+ Condimentos / Conservas 
+ Embutidos / Massas 
+ Frios 
+ Guloseimas 
+ Hortifrutigranjeiros 
+ Laticinios 
+ Outros custos 
+ Paes / Biscoitos 
+ Secos 
+ CUSTO DE BEBIDAS 
+ Bebidas alcoolicas 
+ Bebidas nao alcoolicas 
+ CUSTO DE PRODUTOS DIVERSOS 
+ CUSTO DE PRODUTOS DIVERSOS 
+ Cigarros 
+ Custos Descartaveis 
+ Custos Diversos 
+ Diversos A&B 
+ Produtos diversos lojinha 
+ Vestuario 
+ CUSTOS DE OUTRAS RECEITAS 
+ CUSTOS DE OUTRAS RECEITAS 
+ Custo com entretenimento 
+ Custo de aluguel de equipamentos 
+ Custo de estacionamento 
+ Custo de internet 
+ Custo de lavanderia hospedes 
+ Custo de servico de fotografia 
+ Custo de servico de massagens 
+ Custo de telefonia 
+ Custo de transporte de clientes 
+ Outros custos de servicos prestados 
+ DESPESAS GERAIS E OPERACIONAIS 
+ DESPESAS COM CONSERVACAO E LIMPEZA 
+ Servicos de limpeza 
+ Material de limpeza 
+ Produtos de limpeza 
+ Servicos de limpeza 
+ DESPESAS COM MANUTENCAO 
+ Contratos de manutencao 
+ Reparos e materiais - Ar condicionado 
+ Reparos e materiais - Caldeira 
+ Reparos e materiais - Elevador 
+ Reparos e materiais - Equipamentos de TI 
+ Reparos e materiais - Estrutura predial 
+ Reparos e materiais - Instalacao eletrica 
+ Reparos e materiais - Instalacao hidraulica 
+ Reparos e materiais - Instrumentacao / automacao 
+ Reparos e materiais - Jardins / Quadras / Animais 
+ Reparos e materiais - Maquinas e equipamentos 
+ Reparos e mate
+
+--- 83 user ---
+QUANDO EU clicar em ocultar contas quero que fique exibindo só os pacotes 
+
+CUSTO DE ALIMENTOS
+CUSTO DE BEBIDAS
+CUSTO DE PRODUTOS DIVERSOS
+DESPESAS COM CONSERVACAO E LIMPEZA
+DESPESAS COM MANUTENCAO
+DESPESAS COM SERVICOS PUBLICOS
+DESPESAS OPERACIONAIS
+BENEFICIOS AOS COLABORADORES
+DESPESAS COM PESSOAL
+ENCARGOS SOCIAIS
+SERVIÇOS DE TERCEIROS
+DESPESAS ADMINISTRATIVAS (tudo a partir de assesoria contabil até licença de plataforma e ti é em despesas administrativas)
+PROVISOES GERAIS
+DESPESAS COM VENDAS E MARKETING (TUDO DE ASSESORIA DE IMPRENSA ATÉ MATERIAL PROMOCIOANL É DENTRO DESTE PACOTE)
+IMPOSTOS SOBRE O LUCRO (Descontos concedidos, Despesa Financeira / JSCP, IOF, Juros e multas diversos, Juros sobre emprestimos, Juros sobre financiamentos, Outras despesas financeiras, Tarifas e despesas bancarias diversas, Variacoes cambiais passivas, Variacoes monetarias passivas
+OUTROS IMPOSTOS (Funfural, IPTU, IPVA, ITBI E ITR, Tributos em atraso)
+ARRENDAMENTO (Aluguel fixo, Aluguel variavel, Arrendamento)
+
+
+
+--- 116 model ---
+**Analyzing the Configuration**
+
+I'm currently focused on dissecting the request. The goal is clear: update the "Configuração DRE" tab within `Settings.tsx` to align with the actual DRE structure presented in the `Forecast` component. My initial steps involve understanding the current DRE structure as displayed and identifying discrepancies to be corrected.
+
+
+**Mapping the Data Structure**
+
+I'm now deeply immersed in the structure defined within `mockData.ts`, which serves as the ultimate source of truth. My primary objective is to accurately map this structure into the `dreStructure` state within `Settings.tsx`. Currently, I'm carefully analyzing the Revenue section and its subsequent levels (L1, L2, etc.). I'm concentrating on how the hierarchy is flattened, how master headers were removed, and how packages were promoted in order to reflect it correctly in the target state.
+
+
+**Structuring the Levels**
+
+I've moved on to organizing the "Costs & Expenses" section, specifically focusing on the hierarchy. I'm noting the special L0 cases, which aren't typically used as deduction items, and how those map to the accounts, L2. This is essential to ensure everything is properly structured.
+
+
+**Refining the Mapping**
+
+I'm now refining the mapping strategy and focusing on the relationship between L1 and the Packages. I'm focusing on "Costs & Expenses".
+Specifically, I'm working with DESPESAS COM VENDAS E MARKETING (L1), DESPESAS FINANCEIRAS E BANCARIAS (L1), DESPESAS TRIBUTARIAS (L1), and ARRENDAMENTO (L1). They represent Accounts (L2). Also, the Result (Level 0: 'RES-OP') must be considered. Furthermore, the `Settings.tsx` structure is clear. I see how to map the packages now. Section 1 will contain Receitas, and I will be working with "Receita de Hospedagem", "Receitas Extras" and other ones.
+
+
+**Defining the Deductions**
+
+I'm now focusing on defining the sections. I've added an "IMPOSTOS" section for Deductions, with the "Impostos sobre Venda" package. Next, "Receita Líqu
+
+--- 155 user ---
+a configuração e estrutura das despesas deve ser assim
+
+CUSTO DE ALIMENTOS
+Carnes / Aves / Peixes
+Condimentos / Conservas
+Embutidos / Massas
+Frios
+Guloseimas
+Hortifrutigranjeiros
+Laticinios
+Outros custos
+Paes / Biscoitos
+Secos
+
+CUSTO DE BEBIDAS
+Bebidas alcoolicas
+Bebidas nao alcoolicas
+
+CUSTO DE PRODUTOS DIVERSOS
+Cigarros
+Custos Descartaveis
+Custos Diversos
+Diversos A&B
+Produtos diversos lojinha
+Vestuario
+
+CUSTOS DE OUTRAS RECEITAS
+Custo com entretenimento
+Custo de aluguel de equipamentos
+Custo de estacionamento
+Custo de internet
+Custo de lavanderia hospedes
+Custo de servico de fotografia
+Custo de servico de massagens
+Custo de telefonia
+Custo de transporte de clientes
+Outros custos de servicos prestados
+
+DESPESAS COM CONSERVACAO E LIMPEZA
+Servicos de limpeza
+Material de limpeza
+Produtos de limpeza
+Servicos de limpeza
+
+DESPESAS COM MANUTENCAO
+Contratos de manutencao
+Reparos e materiais - Ar condicionado
+Reparos e materiais - Caldeira
+Reparos e materiais - Elevador
+Reparos e materiais - Equipamentos de TI
+Reparos e materiais - Estrutura predial
+Reparos e materiais - Instalacao eletrica
+Reparos e materiais - Instalacao hidraulica
+Reparos e materiais - Instrumentacao / automacao
+Reparos e materiais - Jardins / Quadras / Animais
+Reparos e materiais - Maquinas e equipamentos
+Reparos e materiais - Material de consumo
+Reparos e materiais - Moveis e utensilios
+Reparos e materiais - Piscina
+Reparos e materiais - Restauracao
+Reparos e materiais - Telefonia
+Reparos e materiais - Veiculo
+Servico de dedetizacao
+Servicos de remocao de lixo e entulho
+
+DESPESAS COM SERVICOS PUBLICOS
+Agua
+Combustiveis para Geradores
+Combustiveis para veiculos
+Energia eletrica
+Gas
+
+DESPESAS OPERACIONAIS
+Amenidades / Suprimentos pra hospedes
+Assinatura de TV a cabo
+Danos e perdas
+Decoração e ornamentos
+Despesas com descartaveis
+Despesas de Taxa de Reservas
+Falhas de Hospedagem / Overbook
+Frete
+ICMS - Diferencial de aliquota
+Indenizacao ao hospede
+Jornais / livros / revistas
+Lavanderia enxoval
+Lavanderi
+

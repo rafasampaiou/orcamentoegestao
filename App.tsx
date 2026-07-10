@@ -473,13 +473,27 @@ const App: React.FC = () => {
         }
 
         // --- FETCH FINANCIAL DATA ---
-        // Increase limit to 50,000 to ensure we get all records even in large datasets
-        const { data: remoteFinancial, error: finError } = await (supabase as any)
-          .from('financial_data')
-          .select('*')
-          .limit(50000);
+        // Supabase/PostgREST caps rows per request (default 1000) regardless of .limit(),
+        // so large tables must be paged with .range() to retrieve every row.
+        const remoteFinancial: any[] = [];
+        let finError: any = null;
+        {
+          const pageSize = 1000;
+          let from = 0;
+          while (true) {
+            const { data: page, error } = await (supabase as any)
+              .from('financial_data')
+              .select('*')
+              .range(from, from + pageSize - 1);
+            if (error) { finError = error; break; }
+            if (!page || page.length === 0) break;
+            remoteFinancial.push(...page);
+            if (page.length < pageSize) break;
+            from += pageSize;
+          }
+        }
 
-        if (remoteFinancial && !finError && isMounted) {
+        if (remoteFinancial.length > 0 && !finError && isMounted) {
           const mapped = remoteFinancial.map((r: any) => ({
             ano: String(r.year),
             cenario: r.scenario,

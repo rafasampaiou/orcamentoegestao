@@ -1,17 +1,31 @@
 import { supabase } from './supabaseClient';
 import { Account, CostCenter, Hotel, BudgetVersion, User, GMDConfiguration, UserRole, ImportedRow } from '../types';
 
+// Supabase/PostgREST caps rows per request (default 1000) regardless of .limit(),
+// so tables that can exceed that must be paged with .range() to retrieve every row.
+async function fetchAllRows(table: string, configure?: (query: any) => any): Promise<any[]> {
+  const pageSize = 1000;
+  const allRows: any[] = [];
+  let from = 0;
+  while (true) {
+    let query = supabase.from(table).select('*');
+    if (configure) query = configure(query);
+    const { data, error } = await query.range(from, from + pageSize - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    allRows.push(...data);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return allRows;
+}
+
 export const supabaseService = {
   // ═══════════════════════════════════════════════════════════════════════════
   // ACCOUNTS (Contas Contábeis)
   // ═══════════════════════════════════════════════════════════════════════════
   async getAccounts(): Promise<Account[]> {
-    const { data, error } = await supabase
-      .from('accounts')
-      .select('*')
-      .order('sort_order', { ascending: true })
-      .limit(50000);
-    if (error) throw error;
+    const data = await fetchAllRows('accounts', q => q.order('sort_order', { ascending: true }));
 
     return (data || []).map(a => ({
       id: a.id,
@@ -94,12 +108,7 @@ export const supabaseService = {
   // COST CENTERS (Setores / CR / PDV)
   // ═══════════════════════════════════════════════════════════════════════════
   async getCostCenters(): Promise<CostCenter[]> {
-    const { data, error } = await supabase
-      .from('cost_centers')
-      .select('*')
-      .order('name', { ascending: true })
-      .limit(50000);
-    if (error) throw error;
+    const data = await fetchAllRows('cost_centers', q => q.order('name', { ascending: true }));
 
     return (data || []).map(cc => ({
       id: cc.id,

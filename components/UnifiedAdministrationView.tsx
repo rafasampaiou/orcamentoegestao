@@ -5648,7 +5648,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     admin_geral_logs: { title: 'Logs de Auditoria', subtitle: 'Registros de acesso e ações no sistema.', breadcrumb: 'Administração › Tauá Geral › Logs' },
     admin_geral_gmd: { title: 'Configuração GMD', subtitle: 'Matriz GMD: pacotes, gestores e associações.', breadcrumb: 'Administração › Tauá Geral › Config GMD' },
     admin_geral_permissions: { title: 'Matriz de Permissões', subtitle: 'Configure os perfis e acessos por funcionalidade.', breadcrumb: 'Administração › Tauá Geral › Permissões' },
-    admin_geral_import: { title: 'Importação de Cadastros', subtitle: 'Importe plano de contas e centros de resultado.', breadcrumb: 'Administração › Tauá Geral › Importação' },
+    admin_geral_import: { title: 'Importação', subtitle: 'Importe despesas, setores e contas.', breadcrumb: 'Administração › Tauá Geral › Importação' },
 
     // Legacy
     admin_geral: { title: 'Plano de Contas', subtitle: 'Cadastro e ordenação do plano de contas.', breadcrumb: 'Administração › Tauá Geral' },
