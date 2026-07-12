@@ -786,9 +786,22 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                         else updatedRow.previa = projected;
 
                         return updatedRow;
+                    } else if (account.expenseType === 'Fixo' && calculationBase === 'forecast') {
+                        // Fixed accounts have no ratio to project — the Forecast column simply
+                        // replicates whatever was entered in Meta.
+                        const newConfig = {
+                            ...currentConfig,
+                            method: 'Fixed' as const,
+                            manualValue: row.budget
+                        };
+                        return {
+                            ...row,
+                            forecastConfig: newConfig,
+                            real: row.budget
+                        };
                     } else if (account.expenseType === 'Fixo' || (account.expenseType === 'Variável' && !selfDenominator)) {
-                        // Fixed accounts, or Variável accounts whose KPI formula isn't a simple
-                        // self-referencing ratio, can't be auto-projected — leave for manual entry.
+                        // Fixed accounts on the Prévia base, or Variável accounts whose KPI formula
+                        // isn't a simple self-referencing ratio, can't be auto-projected — leave for manual entry.
                         const newConfig = {
                             ...currentConfig,
                             method: 'Fixed' as const
@@ -1999,7 +2012,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                         </div>
                         <div className="p-6 bg-slate-50">
                             <p className="text-slate-700 text-base leading-relaxed text-center">
-                                Insira as despesas <strong>fixas</strong> na DRE e as linhas contábeis da DRE que são baseadas em <strong>Fixo</strong> nos respectivos pacotes contábeis.
+                                {calculationBase === 'forecast'
+                                    ? <>As despesas <strong>fixas</strong> no Forecast foram preenchidas automaticamente com o valor da <strong>Meta</strong>. Revise se necessário.</>
+                                    : <>Insira as despesas <strong>fixas</strong> na DRE e as linhas contábeis da DRE que são baseadas em <strong>Fixo</strong> nos respectivos pacotes contábeis.</>}
                             </p>
                         </div>
                         <div className="p-4 border-t border-gray-100 flex justify-end bg-white">
