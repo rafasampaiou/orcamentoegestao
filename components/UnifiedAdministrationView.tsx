@@ -1241,6 +1241,38 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     return rows;
   }, [accounts]);
 
+  // Read-only "conferência" preview: sum of every account's Despesas Forecast value per
+  // Pacote Master, per month — lets the admin sanity-check totals before saving.
+  const expenseMasterTotals = useMemo(() => {
+    if (!accounts || accounts.length === 0) return { masters: [] as string[], totals: {} as Record<string, Record<number, number>> };
+
+    const masterOrder: string[] = [];
+    const seen = new Set<string>();
+    accounts.forEach(a => {
+      const m = a.masterPackage || 'Sem Master';
+      if (!seen.has(m)) { seen.add(m); masterOrder.push(m); }
+    });
+
+    const totals: Record<string, Record<number, number>> = {};
+    Object.entries(dreForecastData).forEach(([rowLabel, months]) => {
+      // Only sum leaf account rows — master/package rows are also editable cells in the
+      // spreadsheet, but summing them too would double-count whatever was typed at those levels.
+      const acc = accounts.find(a => a.name === rowLabel);
+      if (!acc) return;
+      const master = acc.masterPackage || 'Sem Master';
+
+      Object.entries(months).forEach(([month, value]) => {
+        const numVal = parseFinanceValue(value);
+        if (isNaN(numVal) || value === undefined || value === '') return;
+        const m = Number(month);
+        if (!totals[master]) totals[master] = {};
+        totals[master][m] = (totals[master][m] || 0) + numVal;
+      });
+    });
+
+    return { masters: masterOrder.filter(m => totals[m]), totals };
+  }, [dreForecastData, accounts]);
+
   const handleSaveDreConfig = async () => {
     setIsSavingDre(true);
     try {
@@ -2454,7 +2486,16 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         // SMART REPLACE: Delete existing data for the same contexts (Hotel+Year+Month+Scenario+Version)
         const contexts = new Set<string>();
         finalData.forEach(row => {
-          if (row.cenario.toUpperCase() === 'REAL' && importScenario === 'REAL') row.cenario = importRealTarget;
+          if (row.cenario.toUpperCase() === 'REAL' && importScenario === 'REAL') {
+            if (importRealTarget === 'ANO_ANTERIOR') {
+              // The DRE Forecast's "Ano Anterior" column reads year-1 tagged as Real —
+              // not a literal "Ano Anterior" scenario, which it would silently reject.
+              row.cenario = 'Real';
+              row.ano = String((parseInt(row.ano) || new Date().getFullYear()) - 1);
+            } else {
+              row.cenario = importRealTarget;
+            }
+          }
           const key = `${row.hotel}|${row.ano}|${row.mes}|${row.cenario}|${row.versionId || ''}`;
           contexts.add(key);
         });
@@ -2801,9 +2842,12 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       "Outros setores": { account: "Despesas com vendas e marketing", cr: "outros" },
     };
 
-    const targetYear = selectedVersion.year || importTargetYear;
+    const baseYear = selectedVersion.year || importTargetYear;
+    // "Ano Anterior" saves against last year's data with the Real scenario — the DRE Forecast's
+    // "Ano Anterior" column reads year-1 tagged as Real, not a literal "Ano Anterior" scenario.
+    const targetYear = importRealTarget === 'ANO_ANTERIOR' ? baseYear - 1 : baseYear;
     const dataToUse = scenario === 'BUDGET' ? dreBudgetData : dreForecastData;
-    const cenario = scenario === 'BUDGET' ? 'BUDGET' : importRealTarget;
+    const cenario = scenario === 'BUDGET' ? 'BUDGET' : (importRealTarget === 'ANO_ANTERIOR' ? 'Real' : importRealTarget);
 
     Object.entries(dataToUse).forEach(([rowLabel, months]) => {
       Object.entries(months).forEach(([month, value]) => {
@@ -4078,6 +4122,43 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                   setDreForecastData(newData);
                 }}
               />
+
+              {expenseMasterTotals.masters.length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                  <div className="px-4 py-2 bg-gray-50 border-b border-gray-200">
+                    <h4 className="text-xs font-bold text-gray-600 uppercase tracking-wide">Totais por Pacote Master (apenas para conferência)</h4>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-right border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50">
+                          <th className="px-3 py-2 text-left font-bold text-gray-500 sticky left-0 bg-gray-50">Pacote Master</th>
+                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => (
+                            <th key={m} className="px-3 py-2 font-bold text-gray-500 capitalize">
+                              {new Date(2024, m - 1).toLocaleString('pt-BR', { month: 'short' })}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {expenseMasterTotals.masters.map(master => (
+                          <tr key={master} className="hover:bg-gray-50">
+                            <td className="px-3 py-2 text-left font-bold text-gray-700 sticky left-0 bg-white truncate max-w-[220px]">{master}</td>
+                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => {
+                              const val = expenseMasterTotals.totals[master]?.[m] || 0;
+                              return (
+                                <td key={m} className="px-3 py-2 tabular-nums text-gray-600">
+                                  {val === 0 ? '-' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(val)}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
