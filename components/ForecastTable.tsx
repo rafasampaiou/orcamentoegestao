@@ -71,7 +71,7 @@ const formatPointsDiff = (val: number | undefined) => {
     return `${val > 0 ? '+' : ''}${val.toFixed(1).replace('.', ',')} p.p.`;
 };
 
-const blueRowIds = ['REV-TOTAL', 'REV-NET', 'CST-HEAD', 'RES-OP', 'RES-PCT', 'REV-IMP', 'RES-OP-SEM-IMP', 'RES-OP-COM-IMP', 'RES-OP-SEM-IMP-PCT', 'RES-OP-COM-IMP-PCT'];
+const blueRowIds = ['REV-TOTAL', 'REV-NET', 'CST-HEAD', 'RES-OP', 'RES-PCT', 'REV-IMP', 'RES-OP-SEM-IMP', 'RES-OP-COM-IMP', 'RES-OP-SEM-IMP-PCT', 'RES-OP-COM-IMP-PCT', 'LABOR-TOTAL'];
 
 // For a revenue row, coming in ABOVE the comparison period is good (green). For a cost/tax row
 // (Custos e Despesas Operacionais and its packages/accounts, plus the Impostos deduction line —
@@ -1223,7 +1223,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     const isRowEditable = isRowEditableForUser(row);
                                     const isVariableExpense = row.category === 'Costs' && row.rowConfig?.expenseType === 'Variável';
 
-                                    if (canEditForecast && isRowEditable && !isIndicator && (!isHeaderOrTotal || isEditableCost || isEditableSpecial)) {
+                                    if (canEditForecast && isRowEditable && !isIndicator && row.category !== 'Labor' && (!isHeaderOrTotal || isEditableCost || isEditableSpecial)) {
                                         realCellContent = (
                                             <FormattedInput
                                                 inputRef={(el: any) => { inputRefs.current[`input-real-${row.id}`] = el; }}
@@ -1332,7 +1332,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
                                             {columnVisibility.deltaPreviaBudget && (
                                                 <td className={`px-2 py-1 text-right border-r border-gray-100 tabular-nums font-medium ${getDeltaColorClass(row, row.deltaPreviaBudgetVal)} truncate`}>
-                                                    {formatValue(row.deltaPreviaBudgetVal || 0, isIndicator && formatType !== 'percent' ? formatType : 'currency')}
+                                                    {formatValue(row.deltaPreviaBudgetVal || 0, (isIndicator || row.category === 'Labor') && formatType !== 'percent' ? formatType : 'currency')}
                                                 </td>
                                             )}
 
@@ -1344,7 +1344,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
                                             {columnVisibility.deltaPreviaForecast && (
                                                 <td className={`px-2 py-1 text-right border-r border-gray-100 tabular-nums font-medium ${getDeltaColorClass(row, row.deltaPreviaForecastVal)} truncate`}>
-                                                    {formatValue(row.deltaPreviaForecastVal || 0, isIndicator && formatType !== 'percent' ? formatType : 'currency')}
+                                                    {formatValue(row.deltaPreviaForecastVal || 0, (isIndicator || row.category === 'Labor') && formatType !== 'percent' ? formatType : 'currency')}
                                                 </td>
                                             )}
 
@@ -1362,7 +1362,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
                                             {columnVisibility.deltaLY && (
                                                 <td className={`px-2 py-1 text-right border-r border-gray-100 tabular-nums font-medium ${previaLYValColor} truncate`}>
-                                                    {formatValue(previaLYVal, isIndicator && formatType !== 'percent' ? formatType : 'currency')}
+                                                    {formatValue(previaLYVal, (isIndicator || row.category === 'Labor') && formatType !== 'percent' ? formatType : 'currency')}
                                                 </td>
                                             )}
 

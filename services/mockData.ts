@@ -802,6 +802,18 @@ export const getForecastData = (
     const gAdultsPrevia = getRealOccValue('geral_adults_previa') ?? 0;
     const gChdPrevia = getRealOccValue('geral_chd_previa') ?? 0;
 
+    const gMoCltReal = getRealOccValue('geral_mo_clt_forecast') ?? 0;
+    const gMoCltPrevia = getRealOccValue('geral_mo_clt_previa') ?? 0;
+    const gMoCltLY = getLYOccValue('geral_mo_clt_forecast') ?? 0;
+
+    const gMoExtraReal = getRealOccValue('geral_mo_extra_forecast') ?? 0;
+    const gMoExtraPrevia = getRealOccValue('geral_mo_extra_previa') ?? 0;
+    const gMoExtraLY = getLYOccValue('geral_mo_extra_forecast') ?? 0;
+
+    const gMoTotalReal = getRealOccValue('geral_mo_total_forecast') ?? 0;
+    const gMoTotalPrevia = getRealOccValue('geral_mo_total_previa') ?? 0;
+    const gMoTotalLY = getLYOccValue('geral_mo_total_forecast') ?? 0;
+
     // Retrieve budget values from budgetOccupancyData based on the selectedMonth (0-indexed)
     const monthIdx = selectedMonth ? selectedMonth - 1 : 0;
     const gDaysBudget = budgetOccupancyData['days_month'] ? budgetOccupancyData['days_month'][monthIdx] : 0;
@@ -812,6 +824,9 @@ export const getForecastData = (
     const gPaxBudget = budgetOccupancyData['geral_pax'] ? budgetOccupancyData['geral_pax'][monthIdx] : 0;
     const gAdultsBudget = budgetOccupancyData['geral_adults'] ? budgetOccupancyData['geral_adults'][monthIdx] : 0;
     const gChdBudget = budgetOccupancyData['geral_chd'] ? budgetOccupancyData['geral_chd'][monthIdx] : 0;
+    const gMoCltBudget = budgetOccupancyData['geral_mo_clt'] ? budgetOccupancyData['geral_mo_clt'][monthIdx] : 0;
+    const gMoExtraBudget = budgetOccupancyData['geral_mo_extra'] ? budgetOccupancyData['geral_mo_extra'][monthIdx] : 0;
+    const gMoTotalBudget = budgetOccupancyData['geral_mo_total'] ? budgetOccupancyData['geral_mo_total'][monthIdx] : 0;
 
     // DM and Revpar Budget calculation based on imported budget vs occupancy, or from budgetOccupancyData if there were a field.
     // We'll calculate it from imported if possible, otherwise 0 or basic calc.
@@ -855,6 +870,13 @@ export const getForecastData = (
     rows.push(generateRow('IND-TREVPAR', '', 'Indicators', 'TREVPAR', trevparBudget, trevparReal, trevparLY, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
 
     rows.push(generateRow('SPACER-IND-REV', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
+
+    // 1.5 MÃO DE OBRA (pulls straight from the Ocupação tab, read-only here)
+    rows.push(generateRow('LABOR-TOTAL', '', 'Labor', 'Mão de obra (Total)', gMoTotalBudget, gMoTotalReal, gMoTotalLY, gMoTotalPrevia, true, true, 0, undefined, { format: 'integer' }));
+    rows.push(generateRow('LABOR-CLT', '', 'Labor', 'Mão de obra (CLT)', gMoCltBudget, gMoCltReal, gMoCltLY, gMoCltPrevia, false, false, 1, undefined, { format: 'integer' }));
+    rows.push(generateRow('LABOR-EXTRA', '', 'Labor', 'Mão de obra (Extra)', gMoExtraBudget, gMoExtraReal, gMoExtraLY, gMoExtraPrevia, false, false, 1, undefined, { format: 'integer' }));
+
+    rows.push(generateRow('SPACER-LABOR-REV', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
 
     // 2. REVENUE
 
