@@ -240,7 +240,13 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         v.month === selectedMonth &&
         v.year === selectedYear
     );
-    const isLocked = isMonthClosed && isAlreadyValidated;
+    // A validated closing can be reopened for editing via the "Resultados validados" button —
+    // this local flag lifts the lock for the current period until it's validated again.
+    const [forceUnlockValidated, setForceUnlockValidated] = useState(false);
+    useEffect(() => {
+        setForceUnlockValidated(false);
+    }, [selectedHotel, selectedMonth, selectedYear, activeProjectionType]);
+    const isLocked = isMonthClosed && isAlreadyValidated && !forceUnlockValidated;
 
     const [data, setData] = useState<ForecastRow[]>(() => {
         const forecastStructure = dreConfigs?.['Forecast'] || [];
@@ -734,6 +740,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             if (setValidations) {
                 setValidations(prev => [...prev, newValidation]);
             }
+            setForceUnlockValidated(false);
 
             const notificationMsg = `A unidade ${selectedHotel} salvou os resultados de ${activeProjectionType} para ${monthName}/${selectedYear}. Dados salvos no banco.`;
             console.log('Notification sent to Admin:', notificationMsg);
@@ -899,13 +906,24 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
 
                         {canValidate && (
-                            <button
-                                onClick={handleSaveResultsDirectly}
-                                className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-md text-base font-bold"
-                            >
-                                <CheckCircle2 size={20} />
-                                {isMonthClosed ? 'Validar fechamento' : 'Salvar resultados'}
-                            </button>
+                            isMonthClosed && isAlreadyValidated && !forceUnlockValidated ? (
+                                <button
+                                    onClick={() => setForceUnlockValidated(true)}
+                                    className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors shadow-sm text-base font-bold"
+                                    title="Clique para reabrir esta versão para edição"
+                                >
+                                    <Lock size={20} />
+                                    Resultados validados (clique aqui caso queira fazer alguma alteração)
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={handleSaveResultsDirectly}
+                                    className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-md text-base font-bold"
+                                >
+                                    <CheckCircle2 size={20} />
+                                    {isMonthClosed ? 'Validar fechamento' : 'Salvar resultados'}
+                                </button>
+                            )
                         )}
                         {canEditForecast && (
                             <button
@@ -2298,10 +2316,13 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
     // --- VARIABLE CALCULATIONS FOR INDIVIDUAL ACCOUNTS ---
     const updatedRows = Array.from(rowMap.values());
     updatedRows.forEach(row => {
-        if (row.forecastConfig.method === 'Variable') {
+        // A validated/restored override (from a saved Forecast version) already carries the
+        // right value in row.real/previa — this legacy driver÷factor projection must not clobber
+        // it just because the account's Plano de Contas config still says "Variável" on reload.
+        if (row.forecastConfig.method === 'Variable' && !row.isManualOverride) {
             row.real = calculateRowValue(row, row.forecastConfig, updatedRows, 'forecast');
         }
-        if (row.previaConfig?.method === 'Variable') {
+        if (row.previaConfig?.method === 'Variable' && !row.isManualPreviaOverride) {
             row.previa = calculateRowValue(row, row.previaConfig, updatedRows, 'previa');
         }
     });
