@@ -64,6 +64,13 @@ const formatPercentDiff = (val: number | undefined) => {
     return `${val > 0 ? '+' : ''}${val.toFixed(1)}%`;
 };
 
+// For rows whose own value is already a percentage (GOP %), the "difference" is naturally
+// expressed in percentage points ("5,5 p.p."), not as a % change of a %.
+const formatPointsDiff = (val: number | undefined) => {
+    if (val === undefined || isNaN(val as number)) return '-';
+    return `${val > 0 ? '+' : ''}${val.toFixed(1).replace('.', ',')} p.p.`;
+};
+
 const blueRowIds = ['REV-TOTAL', 'REV-NET', 'CST-HEAD', 'RES-OP', 'RES-PCT', 'REV-IMP', 'RES-OP-SEM-IMP', 'RES-OP-COM-IMP', 'RES-OP-SEM-IMP-PCT', 'RES-OP-COM-IMP-PCT'];
 
 // For a revenue row, coming in ABOVE the comparison period is good (green). For a cost/tax row
@@ -644,6 +651,12 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 const allowedIndicators = ['IND-1', 'IND-2', 'IND-3', 'IND-4', 'IND-5', 'IND-6', 'IND-TREVPOR'];
                 return allowedIndicators.includes(row.id);
             }
+            if (row.category === 'Revenue' && !row.isHeader) {
+                // Lazer/Eventos/OR breakdown rows under Receita de Apartamentos and Receitas
+                // Extras only show with "Mostrar Contas" — the totals themselves (which are
+                // header rows) are unaffected and always visible.
+                return showDetails;
+            }
             if (row.isHeader && row.category === 'Section') {
                 return true;
             }
@@ -1065,7 +1078,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 )}
 
                                 {(columnVisibility.driverPrevia || columnVisibility.driverForecast || columnVisibility.driverBudget) && (
-                                    <th className="w-4 bg-white border-2 border-white p-0 relative"></th>
+                                    <th className="w-4 bg-white p-0 relative" style={{ borderStyle: 'hidden' }}></th>
                                 )}
 
                                 {columnVisibility.driverPrevia && (
@@ -1139,13 +1152,13 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 if (row.category === 'Spacer') {
                                     return (
                                         <tr key={row.id} className="bg-transparent border-none">
-                                            <td colSpan={visibleBaseCols} className="h-6 bg-white border-y-2 border-white"></td>
+                                            <td colSpan={visibleBaseCols} className="h-6 bg-white"></td>
                                             {(columnVisibility.driverPrevia || columnVisibility.driverForecast || columnVisibility.driverBudget) && (
-                                                <td className="w-4 bg-white border-y-2 border-white p-0 relative"></td>
+                                                <td className="w-4 bg-white p-0 relative" style={{ borderStyle: 'hidden' }}></td>
                                             )}
-                                            {columnVisibility.driverPrevia && <td className="bg-white border-y-2 border-white border-l-2"></td>}
-                                            {columnVisibility.driverForecast && <td className="bg-white border-y-2 border-white border-l-2"></td>}
-                                            {columnVisibility.driverBudget && <td className="bg-white border-y-2 border-white border-x-2"></td>}
+                                            {columnVisibility.driverPrevia && <td className="bg-white" style={{ borderStyle: 'hidden' }}></td>}
+                                            {columnVisibility.driverForecast && <td className="bg-white" style={{ borderStyle: 'hidden' }}></td>}
+                                            {columnVisibility.driverBudget && <td className="bg-white" style={{ borderStyle: 'hidden' }}></td>}
                                         </tr>
                                     );
                                 }
@@ -1158,11 +1171,25 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 const isBlueHighlight = blueRowIds.includes(row.id);
                                 const isSpecialRevenue = ['REV-HOSP', 'REV-EXTRA', 'REV-ISS', 'REV-APT', 'REV-TIME'].includes(row.id);
                                 const formatType = row.rowConfig?.format || 'currency';
+                                const isPercentFormatRow = formatType === 'percent';
 
-                                const hideKpi = isSectionHeader || isBlueHighlight || isTotal || row.category === 'Indicators' || row.category === 'Revenue';
+                                // GOP R$ (com/sem impostos) always show KPI = GOP ÷ UH Disponível, even though
+                                // they're otherwise blue/total rows with KPIs hidden. GOP % rows stay blank.
+                                const isGopRsRow = row.id === 'RES-OP-COM-IMP' || row.id === 'RES-OP-SEM-IMP';
+                                const hideKpi = (!isGopRsRow && (isSectionHeader || isBlueHighlight || isTotal)) || row.category === 'Indicators' || row.category === 'Revenue';
+                                // In the KPI columns, the only borders shown are top/bottom on every package
+                                // row and on "Custos e Despesas Operacionais" — everywhere else stays borderless.
+                                // The table uses border-collapse, where a wider border always wins the conflict
+                                // resolution regardless of which element declared it — so a plain 0-width border
+                                // on the cell can't suppress the row's own border. `border-style: hidden` is the
+                                // one declaration that always wins in that algorithm, guaranteeing no border shows.
+                                const showsKpiBorder = row.category === 'Package' || row.id === 'CST-HEAD';
+                                const kpiBorderClass = showsKpiBorder ? 'border-y border-gray-200' : '';
+                                const kpiBorderStyle: React.CSSProperties = showsKpiBorder ? {} : { borderStyle: 'hidden' };
                                 const accountKpiCalc = (row.category === 'Costs' || row.category === 'Account') && row.rowConfig?.expenseType === 'Variável' ? row.rowConfig?.kpiCalculation : undefined;
                                 const packageKpiCalc = !hideKpi && row.category === 'Package' ? packageKpiConfigs[row.label.trim()] : undefined;
-                                const rowKpiCalc = accountKpiCalc || packageKpiCalc;
+                                const gopKpiCalc: KpiCalculation | undefined = isGopRsRow ? { formula: `@[${row.label}] / @[UH Disponível]`, format: 'number' } : undefined;
+                                const rowKpiCalc = accountKpiCalc || packageKpiCalc || gopKpiCalc;
                                 const kpiFormatType = rowKpiCalc?.format === 'percent' ? 'percent' : 'decimal';
                                 const kpiValue = (field: 'previa' | 'real' | 'budget') => {
                                     const raw = evaluateKpiCalculation(rowKpiCalc, data, field);
@@ -1311,7 +1338,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
                                             {columnVisibility.deltaPreviaBudgetPct && (
                                                 <td className={`px-2 py-1 text-right tabular-nums ${getDeltaColorClass(row, row.deltaPreviaBudgetPct)} truncate`}>
-                                                    {formatPercentDiff(row.deltaPreviaBudgetPct)}
+                                                    {isPercentFormatRow ? formatPointsDiff(row.deltaPreviaBudgetVal) : formatPercentDiff(row.deltaPreviaBudgetPct)}
                                                 </td>
                                             )}
 
@@ -1323,12 +1350,12 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
                                             {columnVisibility.deltaPreviaForecastPct && (
                                                 <td className={`px-2 py-1 text-right border-r border-gray-200 tabular-nums ${getDeltaColorClass(row, row.deltaPreviaForecastPct)} truncate`}>
-                                                    {formatPercentDiff(row.deltaPreviaForecastPct)}
+                                                    {isPercentFormatRow ? formatPointsDiff(row.deltaPreviaForecastVal) : formatPercentDiff(row.deltaPreviaForecastPct)}
                                                 </td>
                                             )}
 
                                             {columnVisibility.lastYear && (
-                                                <td style={textStyle} className={`px-2 py-1 text-right tabular-nums border-r border-gray-100 bg-orange-50/20 text-slate-500 truncate`}>
+                                                <td style={textStyle} className={`px-2 py-1 text-right tabular-nums border-r border-gray-100 truncate ${isBlueHighlight ? 'bg-sky-100 text-sky-900' : 'bg-orange-50/20 text-slate-500'}`}>
                                                     {formatValue(row.lastYear, formatType)}
                                                 </td>
                                             )}
@@ -1341,18 +1368,19 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
                                             {columnVisibility.deltaLYPct && (
                                                 <td className={`px-2 py-1 text-right tabular-nums ${previaLYColor} ${isBlueHighlight ? 'bg-sky-100' : 'bg-orange-50/10'} truncate`}>
-                                                    {formatPercentDiff(previaLYPct)}
+                                                    {isPercentFormatRow ? formatPointsDiff(previaLYVal) : formatPercentDiff(previaLYPct)}
                                                 </td>
                                             )}
 
                                             {(columnVisibility.driverPrevia || columnVisibility.driverForecast || columnVisibility.driverBudget) && (
-                                                <td className="w-4 bg-white border-2 border-white p-0 relative"></td>
+                                                <td className="w-4 bg-white p-0 relative" style={{ borderStyle: 'hidden' }}></td>
                                             )}
 
                                             {columnVisibility.driverPrevia && (
                                                 <td
                                                     title={!hideKpi ? kpiFormulaTooltip : undefined}
-                                                    className={`px-1 text-center tabular-nums text-xs truncate ${hideKpi || !rowKpiCalc ? 'bg-transparent border-b border-gray-100 text-transparent' : 'border border-slate-200 text-slate-500 bg-slate-50 shadow-sm cursor-help'}`}>
+                                                    style={kpiBorderStyle}
+                                                    className={`px-1 text-center tabular-nums text-xs truncate ${kpiBorderClass} ${hideKpi || !rowKpiCalc ? 'bg-white text-transparent' : 'text-slate-500 bg-slate-50 cursor-help'}`}>
                                                     {!hideKpi && rowKpiCalc
                                                         ? (isEditableKpi ? (
                                                             <FormattedInput
@@ -1370,7 +1398,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             {columnVisibility.driverForecast && (
                                                 <td
                                                     title={!hideKpi ? kpiFormulaTooltip : undefined}
-                                                    className={`px-1 text-center tabular-nums text-xs truncate ${hideKpi || !rowKpiCalc ? 'bg-transparent border-b border-gray-100 text-transparent' : 'border border-slate-200 text-slate-500 bg-slate-50 shadow-sm cursor-help'}`}>
+                                                    style={kpiBorderStyle}
+                                                    className={`px-1 text-center tabular-nums text-xs truncate ${kpiBorderClass} ${hideKpi || !rowKpiCalc ? 'bg-white text-transparent' : 'text-slate-500 bg-slate-50 cursor-help'}`}>
                                                     {!hideKpi && rowKpiCalc
                                                         ? (isEditableKpi ? (
                                                             <FormattedInput
@@ -1388,7 +1417,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             {columnVisibility.driverBudget && (
                                                 <td
                                                     title={!hideKpi ? kpiFormulaTooltip : undefined}
-                                                    className={`px-2 py-1 text-center tabular-nums text-xs truncate ${hideKpi || !rowKpiCalc ? 'bg-transparent border-b border-gray-100 text-transparent' : 'border border-slate-200 text-slate-500 bg-slate-50 shadow-sm cursor-help'}`}>
+                                                    style={kpiBorderStyle}
+                                                    className={`px-2 py-1 text-center tabular-nums text-xs truncate ${kpiBorderClass} ${hideKpi || !rowKpiCalc ? 'bg-white text-transparent' : 'text-slate-500 bg-slate-50 cursor-help'}`}>
                                                     {!hideKpi && rowKpiCalc ? formatValue(kpiValue('budget'), kpiFormatType) : ''}
                                                 </td>
                                             )}
@@ -1413,7 +1443,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     const rowClass = isBlueHighlight
                                         ? "bg-sky-100 hover:bg-sky-200 transition-colors border-y border-sky-200"
                                         : "bg-slate-100 hover:bg-slate-200 transition-colors border-y border-slate-200";
-                                    const stickyClass = isBlueHighlight ? "bg-sky-100 border-r border-sky-300" : "bg-slate-100 border-r border-slate-300";
+                                    const stickyClass = isBlueHighlight ? "bg-sky-100 border-r border-sky-200" : "bg-slate-100 border-r border-slate-300";
                                     const textClass = isBlueHighlight ? "text-sky-900" : "text-slate-800";
 
                                     return (

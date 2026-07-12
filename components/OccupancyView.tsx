@@ -364,6 +364,9 @@ export const geralRows: BudgetRow[] = [
     { id: 'geral_revpar', label: 'REVPAR', isCalculated: true, format: 'currency' },
     { id: 'geral_trevpor', label: 'TREVPOR', isCalculated: true, format: 'currency' },
     { id: 'geral_trevpar', label: 'TREVPAR', isCalculated: true, format: 'currency' },
+    { id: 'geral_mo_total', label: 'Mão de obra (Total)', isCalculated: true, forceWhite: true, format: 'integer' },
+    { id: 'geral_mo_clt', label: 'Mão de obra (CLT)', isInput: true, isManualReal: true, format: 'integer' },
+    { id: 'geral_mo_extra', label: 'Mão de obra (Extra)', isInput: true, isManualReal: true, format: 'integer' },
 ];
 
 export const lazerRows: BudgetRow[] = [
@@ -598,6 +601,10 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
 
             set(`event_trevpor_${s}`, evSold > 0 ? (evRevFap + evExtra) / evSold : 0);
             set(`event_trevpar_${s}`, evAvail > 0 ? (evRevFap + evExtra) / evAvail : 0);
+
+            const gMoClt = get(`geral_mo_clt_${s}`);
+            const gMoExtra = get(`geral_mo_extra_${s}`);
+            set(`geral_mo_total_${s}`, gMoClt + gMoExtra);
         });
 
         return newData;
@@ -777,6 +784,10 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
 
             set('event_trevpor', i, evSold > 0 ? (evRevFap + evExtra) / evSold : 0);
             set('event_trevpar', i, evAvail > 0 ? (evRevFap + evExtra) / evAvail : 0);
+
+            const gMoClt = get('geral_mo_clt', i);
+            const gMoExtra = get('geral_mo_extra', i);
+            set('geral_mo_total', i, gMoClt + gMoExtra);
         });
 
         return newData;

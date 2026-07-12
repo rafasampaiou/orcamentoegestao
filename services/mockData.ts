@@ -804,6 +804,7 @@ export const getForecastData = (
 
     // Retrieve budget values from budgetOccupancyData based on the selectedMonth (0-indexed)
     const monthIdx = selectedMonth ? selectedMonth - 1 : 0;
+    const gDaysBudget = budgetOccupancyData['days_month'] ? budgetOccupancyData['days_month'][monthIdx] : 0;
     const gAvailBudget = budgetOccupancyData['geral_avail'] ? budgetOccupancyData['geral_avail'][monthIdx] : 0;
     const gOccBudget = budgetOccupancyData['geral_sold'] ? budgetOccupancyData['geral_sold'][monthIdx] : 0;
     const gOccPctBudget = gAvailBudget > 0 ? (gOccBudget / gAvailBudget) * 100 : 0;
@@ -839,6 +840,7 @@ export const getForecastData = (
     const trevparReal = getRealOccValue('geral_trevpar_forecast') ?? 0;
     const trevparLY = getLYOccValue('geral_trevpar_forecast') ?? 0;
 
+    rows.push(generateRow('IND-DAYS', '', 'Indicators', 'Dias do mês', gDaysBudget, gDaysBudget, gDaysBudget, gDaysBudget, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
     rows.push(generateRow('IND-1', '', 'Indicators', 'UH Disponível', gAvailBudget, gAvailReal, gAvailLY, gAvailPrevia, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
     rows.push(generateRow('IND-2', '', 'Indicators', 'UH Ocupada', gOccBudget, gOccReal, gOccLY, gOccPrevia, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
     rows.push(generateRow('IND-3', '', 'Indicators', '% de Ocupação', gOccPctBudget, gAvailReal > 0 ? (gOccReal / gAvailReal) * 100 : 0, gAvailLY > 0 ? (gOccLY / gAvailLY) * 100 : 0, gAvailPrevia > 0 ? (gOccPrevia / gAvailPrevia) * 100 : 0, false, false, 0, undefined, { format: 'percent' }, 'INDICADORES GERAIS'));
@@ -851,7 +853,6 @@ export const getForecastData = (
     rows.push(generateRow('IND-6', '', 'Indicators', 'REVPAR', revparBudget, revparReal, revparLY, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
     rows.push(generateRow('IND-TREVPOR', '', 'Indicators', 'TREVPOR', trevporBudget, trevporReal, trevporLY, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
     rows.push(generateRow('IND-TREVPAR', '', 'Indicators', 'TREVPAR', trevparBudget, trevparReal, trevparLY, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
-    rows.push(generateRow('IND-KPI', '', 'Indicators', 'KPI de produtividade', 0, 0, 0, 0, false, false, 0, undefined, { format: 'decimal' }, 'INDICADORES GERAIS'));
 
     rows.push(generateRow('SPACER-IND-REV', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
 

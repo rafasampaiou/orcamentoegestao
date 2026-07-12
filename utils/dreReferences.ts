@@ -8,7 +8,7 @@ export interface DreReferenceOption {
 
 // Indicators and revenue/result lines that actually exist as rows in the DRE Forecast
 // (kept in sync with the row labels generated in services/mockData.ts).
-const INDICATOR_LABELS = ['UH Ocupada', 'PAX', 'KPI de produtividade'];
+const INDICATOR_LABELS = ['UH Ocupada', 'PAX'];
 const REVENUE_RESULT_LABELS = [
   'RECEITA BRUTA TOTAL',
   'RECEITA LÍQUIDA',
