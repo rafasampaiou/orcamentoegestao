@@ -1110,10 +1110,6 @@ export const getForecastData = (
             });
         }
 
-        let dbgAccountRowsTotal = 0;
-        let dbgAccountRowsMatched = 0;
-        const dbgUnmatchedSample: string[] = [];
-
         rows.forEach(r => {
             const targetName = `override_${r.id}`.toLowerCase();
 
@@ -1127,18 +1123,11 @@ export const getForecastData = (
                 return undefined;
             };
 
-            if (r.category === 'Account') {
-                dbgAccountRowsTotal++;
-            }
-
             const realOverride = tryOverride('REAL');
             if (realOverride !== undefined) {
                 r.real = realOverride;
                 r.isManualOverride = true;
                 if (r.forecastConfig) r.forecastConfig.manualValue = realOverride;
-                if (r.category === 'Account') dbgAccountRowsMatched++;
-            } else if (r.category === 'Account' && dbgUnmatchedSample.length < 10) {
-                dbgUnmatchedSample.push(r.id);
             }
 
             const previaOverride = tryOverride('PREVIA');
@@ -1148,14 +1137,6 @@ export const getForecastData = (
                 if (r.previaConfig) r.previaConfig.manualValue = previaOverride;
             }
         });
-
-        console.log('[DEBUG applyOverrides] ' + JSON.stringify({
-            selectedMonth, selectedYear, selectedHotelName, activeHotelCode, activeProjectionType,
-            overrideIndexSize: overrideIndex.size,
-            accountRowsTotal: dbgAccountRowsTotal,
-            accountRowsMatched: dbgAccountRowsMatched,
-            unmatchedAccountSample: dbgUnmatchedSample
-        }));
     };
     applyOverrides();
 

@@ -337,14 +337,71 @@ const App: React.FC = () => {
       if (hasLoadedFromSupabase.current) return; // Prevent multiple global fetches
       
       try {
-        const remoteHotels = await supabaseService.getHotels();
-        if (remoteHotels && isMounted) setHotels(remoteHotels);
+        // All of these reads are independent of each other — fetching them concurrently
+        // (instead of one round-trip at a time) cuts the startup wait from the sum of every
+        // call's latency down to whichever single call is slowest.
+        const fetchFinancialData = async () => {
+          // Supabase/PostgREST caps rows per request (default 1000) regardless of .limit(),
+          // so large tables must be paged with .range() to retrieve every row.
+          const remoteFinancial: any[] = [];
+          const pageSize = 1000;
+          let from = 0;
+          while (true) {
+            const { data: page, error } = await (supabase as any)
+              .from('financial_data')
+              .select('*')
+              .range(from, from + pageSize - 1);
+            if (error) throw error;
+            if (!page || page.length === 0) break;
+            remoteFinancial.push(...page);
+            if (page.length < pageSize) break;
+            from += pageSize;
+          }
+          return remoteFinancial;
+        };
 
-        const remoteCostCenters = await supabaseService.getCostCenters();
-        if (remoteCostCenters && isMounted) setCostCenters(remoteCostCenters);
+        const [
+          remoteHotels,
+          remoteCostCenters,
+          remoteAccounts,
+          remoteProfiles,
+          remoteGmd,
+          remoteDreConfigs,
+          remotePackageKpiConfigs,
+          remoteValidations,
+          remoteCategories,
+          remoteRegions,
+          remoteVersions,
+          remoteFinancial
+        ] = await Promise.all([
+          supabaseService.getHotels(),
+          supabaseService.getCostCenters(),
+          supabaseService.getAccounts(),
+          supabaseService.getProfiles(),
+          supabaseService.getGmdConfigs(),
+          supabaseService.getDreConfigs(),
+          supabaseService.getPackageKpiConfigs(),
+          supabaseService.getValidations().catch(valError => {
+            // Don't let a missing 'validations' table (e.g. before the migration has been
+            // run) abort the rest of this startup fetch.
+            console.warn('Could not fetch validations from Supabase.', valError);
+            return null;
+          }),
+          supabaseService.getHotelCategories(),
+          supabaseService.getHotelRegions(),
+          supabaseService.getBudgetVersions(),
+          fetchFinancialData().catch(finError => {
+            console.warn('Could not fetch financial data from Supabase.', finError);
+            return [] as any[];
+          })
+        ]);
 
-        const remoteAccounts = await supabaseService.getAccounts();
-        if (remoteAccounts && isMounted) {
+        if (!isMounted) return;
+
+        if (remoteHotels) setHotels(remoteHotels);
+        if (remoteCostCenters) setCostCenters(remoteCostCenters);
+
+        if (remoteAccounts) {
           setAccounts(remoteAccounts);
           // Auto-migration for factory account configurations
           if (!localStorage.getItem('accounts_migrated_v4')) {
@@ -363,14 +420,10 @@ const App: React.FC = () => {
           }
         }
 
-        const remoteProfiles = await supabaseService.getProfiles();
-        if (remoteProfiles && isMounted) setUsers(remoteProfiles);
+        if (remoteProfiles) setUsers(remoteProfiles);
+        if (remoteGmd) setGmdConfigs(remoteGmd);
 
-        const remoteGmd = await supabaseService.getGmdConfigs();
-        if (remoteGmd && isMounted) setGmdConfigs(remoteGmd);
-
-        const remoteDreConfigs = await supabaseService.getDreConfigs();
-        if (remoteDreConfigs && isMounted) {
+        if (remoteDreConfigs) {
           const configRecord: Record<string, DreSection[]> = {};
           remoteDreConfigs.forEach(cfg => {
             configRecord[cfg.name] = cfg.structure;
@@ -378,29 +431,14 @@ const App: React.FC = () => {
           setDreConfigs(configRecord);
         }
 
-        const remotePackageKpiConfigs = await supabaseService.getPackageKpiConfigs();
-        if (remotePackageKpiConfigs && isMounted) setPackageKpiConfigs(remotePackageKpiConfigs);
+        if (remotePackageKpiConfigs) setPackageKpiConfigs(remotePackageKpiConfigs);
+        if (remoteValidations) setValidations(remoteValidations);
+        if (remoteCategories) setHotelCategories(remoteCategories);
+        if (remoteRegions) setHotelRegions(remoteRegions);
 
-        try {
-          const remoteValidations = await supabaseService.getValidations();
-          if (remoteValidations && isMounted) setValidations(remoteValidations);
-        } catch (valError) {
-          // Don't let a missing 'validations' table (e.g. before the migration has been run)
-          // abort the rest of this startup fetch sequence.
-          console.warn('Could not fetch validations from Supabase.', valError);
-        }
-
-
-        const remoteCategories = await supabaseService.getHotelCategories();
-        if (remoteCategories && isMounted) setHotelCategories(remoteCategories);
-
-        const remoteRegions = await supabaseService.getHotelRegions();
-        if (remoteRegions && isMounted) setHotelRegions(remoteRegions);
-        
         hasLoadedFromSupabase.current = true;
 
-        const remoteVersions = await supabaseService.getBudgetVersions();
-        if (remoteVersions && remoteVersions.length > 0 && isMounted) {
+        if (remoteVersions && remoteVersions.length > 0) {
           setBudgetVersions(remoteVersions.filter(v => v.id.startsWith('v')));
           setRealVersions(remoteVersions.filter(v => v.id.startsWith('r')));
 
@@ -456,28 +494,7 @@ const App: React.FC = () => {
           if (activeReal) setActiveRealVersionId(activeReal.id);
         }
 
-        // --- FETCH FINANCIAL DATA ---
-        // Supabase/PostgREST caps rows per request (default 1000) regardless of .limit(),
-        // so large tables must be paged with .range() to retrieve every row.
-        const remoteFinancial: any[] = [];
-        let finError: any = null;
-        {
-          const pageSize = 1000;
-          let from = 0;
-          while (true) {
-            const { data: page, error } = await (supabase as any)
-              .from('financial_data')
-              .select('*')
-              .range(from, from + pageSize - 1);
-            if (error) { finError = error; break; }
-            if (!page || page.length === 0) break;
-            remoteFinancial.push(...page);
-            if (page.length < pageSize) break;
-            from += pageSize;
-          }
-        }
-
-        if (remoteFinancial.length > 0 && !finError && isMounted) {
+        if (remoteFinancial.length > 0) {
           const mapped = remoteFinancial.map((r: any) => ({
             ano: String(r.year),
             cenario: r.scenario,
