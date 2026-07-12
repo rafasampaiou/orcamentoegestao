@@ -4155,6 +4155,19 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                           </tr>
                         ))}
                       </tbody>
+                      <tfoot>
+                        <tr className="bg-indigo-50 border-t-2 border-indigo-200">
+                          <td className="px-3 py-2 text-left font-black text-indigo-900 sticky left-0 bg-indigo-50">Total Geral</td>
+                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => {
+                            const total = expenseMasterTotals.masters.reduce((sum, master) => sum + (expenseMasterTotals.totals[master]?.[m] || 0), 0);
+                            return (
+                              <td key={m} className="px-3 py-2 tabular-nums font-black text-indigo-900">
+                                {total === 0 ? '-' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(total)}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      </tfoot>
                     </table>
                   </div>
                 </div>
