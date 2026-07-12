@@ -699,7 +699,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
         const rowsToSave: { accountName: string; costCenter?: string; value: number; scenario: 'Real' | 'Previa' | 'Meta' }[] = [];
         data.forEach(row => {
-            if (row.category === 'Costs' || row.category === 'Indicators' || row.category === 'Revenue') {
+            if (row.category === 'Costs' || row.category === 'Account' || row.category === 'Indicators' || row.category === 'Revenue') {
                 rowsToSave.push({ accountName: `override_${row.id}`, value: row.real, scenario: 'Real' });
                 if (row.previa !== undefined) {
                     rowsToSave.push({ accountName: `override_${row.id}`, value: row.previa, scenario: 'Previa' });
@@ -711,16 +711,10 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         });
 
         try {
-            console.log('[DEBUG confirmSaveResults] iniciando. selectedHotel=', selectedHotel, 'activeProjectionType=', activeProjectionType, 'rowsToSave.length=', rowsToSave.length);
-
             const activeHotel = hotels?.find(h => h.id === selectedHotel || h.name === selectedHotel);
             const hName = activeHotel?.name || selectedHotel || '';
-            console.log('[DEBUG confirmSaveResults] hName=', hName);
             if (hName) {
                 await supabaseService.saveForecastProjections(hName, selectedMonth || 1, selectedYear || 2026, activeRealVersionId || 'default', rowsToSave, activeProjectionType);
-                console.log('[DEBUG confirmSaveResults] saveForecastProjections concluído sem erro');
-            } else {
-                console.log('[DEBUG confirmSaveResults] hName vazio, saveForecastProjections foi PULADO');
             }
 
             const newValidation: import('../types').ValidationRecord = {
@@ -734,16 +728,11 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 validatedAt: new Date().toISOString(),
                 status: 'Validado'
             };
-            console.log('[DEBUG confirmSaveResults] newValidation=', JSON.stringify(newValidation));
 
             await supabaseService.saveValidation(newValidation);
-            console.log('[DEBUG confirmSaveResults] saveValidation concluído sem erro');
 
             if (setValidations) {
                 setValidations(prev => [...prev, newValidation]);
-                console.log('[DEBUG confirmSaveResults] setValidations chamado');
-            } else {
-                console.log('[DEBUG confirmSaveResults] setValidations é undefined! Não atualizou o estado local.');
             }
 
             const notificationMsg = `A unidade ${selectedHotel} salvou os resultados de ${activeProjectionType} para ${monthName}/${selectedYear}. Dados salvos no banco.`;
@@ -1956,7 +1945,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
                                     const rowsToSave: { accountName: string; costCenter?: string; value: number; scenario: 'Real' | 'Previa' | 'Meta' }[] = [];
                                     data.forEach(row => {
-                                        if (row.category === 'Costs' || row.category === 'Indicators' || row.category === 'Revenue') {
+                                        if (row.category === 'Costs' || row.category === 'Account' || row.category === 'Indicators' || row.category === 'Revenue') {
                                             rowsToSave.push({ accountName: `override_${row.id}`, value: row.real, scenario: 'Real' });
                                             if (row.previa !== undefined) {
                                                 rowsToSave.push({ accountName: `override_${row.id}`, value: row.previa, scenario: 'Previa' });
