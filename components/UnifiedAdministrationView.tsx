@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { getForecastData, normalizeAccountName } from '../services/mockData';
-import { Plus, Trash2, X, Save, Briefcase, Pencil, Calendar, PieChart, Lock, LockOpen, Settings as SettingsIcon, Users, Search, Upload, Settings, Eye, FileText, Layout, Info, ChevronUp, GripVertical, Database, BedDouble, DollarSign, Target, LayoutList, ArrowUp, ArrowDown, Copy } from 'lucide-react';
+import { Plus, Trash2, X, Save, Briefcase, Pencil, Calendar, PieChart, Lock, Settings as SettingsIcon, Users, Search, Upload, Settings, Eye, FileText, Layout, Info, ChevronUp, GripVertical, Database, BedDouble, DollarSign, Target, LayoutList, ArrowUp, ArrowDown, Copy } from 'lucide-react';
 import { User, UserRole, CostCenter, ImportedRow, Hotel, Account, BudgetVersion, LaborParameters, ScheduleItem, ImportedCostCenter, CostPackage, GMDConfiguration, ViewState, DreSection, HotelCategory, HotelRegion, ImportedAccount, KpiCalculation } from '../types';
 import { getDreReferenceOptions } from '../utils/dreReferences';
 import KpiCalculationEditor from './KpiCalculationEditor';
@@ -302,9 +302,6 @@ interface UnifiedAdministrationViewProps {
   accounts: Account[]; setAccounts: React.Dispatch<React.SetStateAction<Account[]>>;
   gmdConfigs: GMDConfiguration[]; setGmdConfigs: React.Dispatch<React.SetStateAction<GMDConfiguration[]>>;
 
-  // Month Management
-  onToggleMonthClosure?: (month: number) => void;
-
   // Budget Versioning
   budgetVersions: BudgetVersion[];
   setBudgetVersions: React.Dispatch<React.SetStateAction<BudgetVersion[]>>;
@@ -354,7 +351,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   packages, setPackages,
   accounts, setAccounts,
   gmdConfigs, setGmdConfigs,
-  onToggleMonthClosure,
   budgetVersions, setBudgetVersions,
   activeBudgetVersionId, setActiveBudgetVersionId,
   realVersions, setRealVersions,
@@ -397,8 +393,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     // ── Admin > Tauá Real ──────────────────────────────────────────
     if (currentView === 'admin_real_versions' || currentView === 'admin_real' || currentView === 'admin') {
       setMainTab('real'); setActiveRealTab('versions');
-    } else if (currentView === 'admin_real_closure') {
-      setMainTab('real'); setActiveRealTab('closure');
     } else if (currentView === 'admin_real_import') {
       setMainTab('geral'); setActiveGeralTab('import');
     } else if (currentView === 'admin_real_schedule') {
@@ -434,7 +428,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     fetchImportHistory();
   }, []);
 
-  const [activeRealTab, setActiveRealTab] = useState<'versions' | 'closure' | 'import' | 'labor' | 'schedule' | 'dre_params'>('versions');
+  const [activeRealTab, setActiveRealTab] = useState<'versions' | 'import' | 'labor' | 'schedule' | 'dre_params'>('versions');
   const [realFilterYear, setRealFilterYear] = useState<number>(new Date().getFullYear());
   const [replicateModalOpen, setReplicateModalOpen] = useState(false);
   const [replicateTarget, setReplicateTarget] = useState<{ year: number, month: number } | null>(null);
@@ -4703,42 +4697,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               )}
             </>
           )}
-          {activeRealTab === 'closure' && (
-            !hasSelectedRealVersion ? (
-              <div className="text-center py-20 space-y-4">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
-                  <Lock className="text-gray-400" size={28} />
-                </div>
-                <h3 className="text-xl font-bold text-gray-400">Selecione uma versão primeiro</h3>
-                <p className="text-gray-400 text-sm max-w-sm mx-auto">Acesse a aba <strong>Versões</strong> e clique na engrenagem da versão que deseja configurar.</p>
-                <button onClick={() => setActiveRealTab('versions')} className="text-indigo-600 font-bold text-sm hover:underline">Ir para Versões →</button>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  <Lock className="text-indigo-600" size={20} />
-                  Fechamento de Meses
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => {
-                    const yearOfVersion = selectedRealVersion?.year || realFilterYear;
-                    const isClosed = selectedRealVersion?.closedMonths?.includes(m) || false;
-                    return (
-                      <div key={m} className={`p-4 rounded-lg border flex items-center justify-between ${isClosed ? 'bg-gray-50 border-gray-200' : 'bg-indigo-50/30 border-indigo-100'}`}>
-                        <span className="font-bold text-gray-700 capitalize">{new Date(yearOfVersion, m - 1).toLocaleString('pt-BR', { month: 'long' })}</span>
-                        <button
-                          onClick={() => onToggleMonthClosure && onToggleMonthClosure(m)}
-                          className={`p-2 rounded-md ${isClosed ? 'bg-emerald-600 text-white' : 'bg-indigo-600 text-white'}`}
-                        >
-                          {isClosed ? <Lock size={18} /> : <LockOpen size={18} />}
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )
-          )}
           {activeRealTab === 'labor' && (
             !hasSelectedRealVersion ? (
               <div className="text-center py-20 space-y-4">
@@ -5678,7 +5636,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const viewTitles: Record<string, { title: string; subtitle: string; breadcrumb: string }> = {
     // Admin > Tauá Real
     admin_real_versions: { title: 'Versões de Realizado', subtitle: 'Selecione a versão do realizado que deseja configurar clicando na engrenagem. É necessário escolher uma versão antes de editar configurações ou importar dados.', breadcrumb: 'Administração › Tauá Real › Versões' },
-    admin_real_closure: { title: 'Fechamento', subtitle: 'Configure o fechamento mensal do Realizado.', breadcrumb: 'Administração › Tauá Real › Fechamento' },
     admin_real_import: { title: 'Importação de Dados', subtitle: 'Importe dados financeiros reais em lote.', breadcrumb: 'Administração › Tauá Real › Importação' },
     admin_real_schedule: { title: 'Cronograma', subtitle: 'Defina o cronograma de elaboração do forecast.', breadcrumb: 'Administração › Tauá Real › Cronograma' },
     admin_real_dre: { title: 'Parâmetros DRE', subtitle: 'Edite a estrutura e ordem da DRE do Forecast.', breadcrumb: 'Administração › Tauá Real › Parâmetros DRE' },

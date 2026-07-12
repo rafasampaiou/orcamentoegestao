@@ -444,6 +444,8 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
         deltaBudgetPct: true,
         deltaPreviaBudget: true,
         deltaPreviaBudgetPct: true,
+        deltaPreviaForecast: true,
+        deltaPreviaForecastPct: true,
         lastYear: true,
         deltaLY: true,
         deltaLYPct: true,

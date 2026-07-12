@@ -3,7 +3,7 @@ import {
   Users, Settings, LogOut, Building2, BarChart2,
   BedDouble, CheckCircle2, ChevronDown, ChevronRight,
   TrendingUp, Database, PieChart, FileText, Upload,
-  Calendar, Lock, GanttChartSquare, Layers, ShieldCheck, Package
+  Calendar, GanttChartSquare, Layers, ShieldCheck, Package
 } from 'lucide-react';
 import { ViewState, ModuleType, User, UserRole } from '../types';
 
@@ -177,9 +177,8 @@ const Sidebar: React.FC<SidebarProps> = ({
             />
             {exp.admin && (
               <div className="space-y-0.5 pb-1 mt-0.5">
-                {/* Versões / Fechamento */}
+                {/* Versões */}
                 <NavItem depth={1} label="Versões"          icon={Database}        active={currentView === 'admin_real_versions'} onClick={() => go('admin_real_versions')} />
-                <NavItem depth={1} label="Fechamento"       icon={Lock}            active={currentView === 'admin_real_closure'}  onClick={() => go('admin_real_closure')} />
 
                 {/* Divisor visual suave */}
                 <div className="my-1.5 mx-3 h-px bg-white/5" />

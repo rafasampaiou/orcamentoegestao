@@ -66,6 +66,25 @@ const formatPercentDiff = (val: number | undefined) => {
 
 const blueRowIds = ['REV-TOTAL', 'REV-NET', 'CST-HEAD', 'RES-OP', 'RES-PCT', 'REV-IMP', 'RES-OP-SEM-IMP', 'RES-OP-COM-IMP', 'RES-OP-SEM-IMP-PCT', 'RES-OP-COM-IMP-PCT'];
 
+// For a revenue row, coming in ABOVE the comparison period is good (green). For a cost/tax row
+// (Custos e Despesas Operacionais and its packages/accounts, plus the Impostos deduction line —
+// which is category 'Revenue' in the data model despite behaving like a cost), it's the opposite:
+// a HIGHER value means more expense/tax, which is bad (red).
+const isCostLikeRow = (row: ForecastRow) =>
+    row.category === 'Costs' || row.category === 'Package' || row.category === 'Account' || row.id === 'REV-IMP';
+
+const getDeltaColorClass = (row: ForecastRow, val: number | undefined) => {
+    const isWorse = isCostLikeRow(row) ? (val || 0) > 0 : (val || 0) < 0;
+    return isWorse ? 'text-rose-600' : 'text-emerald-600';
+};
+
+// Turns a stored KPI formula ("@[Hortifrutigranjeiros] / @[PAX]") into the human-readable
+// text shown in the hover tooltip ("Hortifrutigranjeiros / PAX").
+const formatKpiFormulaForDisplay = (formula: string | undefined) => {
+    if (!formula) return '';
+    return formula.replace(/@\[([^\]]+)\]|@([a-zA-Z0-9À-ÿ_.À-ſ\s\-]+)/g, (_match, bracketed, plain) => (bracketed || plain || '').trim());
+};
+
 // Mapeamento: Label do template → ID da linha no DRE Forecast
 // As colunas do template são: Descrição | Prévia | Forecast | Meta | Last Year
 const IMPORT_LABEL_MAP: Record<string, string> = {
@@ -205,6 +224,17 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         currentUser?.role === UserRole.ENTITY_MANAGER ||
         currentUser?.role === UserRole.COST_ANALYST;
 
+    // Selecting "Fechamento" as the Forecast version only swaps labels (Prévia → Real) — it
+    // does NOT lock editing by itself. Editing only locks once THIS specific closing has
+    // actually been validated/saved (a matching ValidationRecord already exists).
+    const isAlreadyValidated = (validations || []).some(v =>
+        v.projectionType === 'Fechamento oficial' &&
+        v.hotelId === selectedHotel &&
+        v.month === selectedMonth &&
+        v.year === selectedYear
+    );
+    const isLocked = isMonthClosed && isAlreadyValidated;
+
     const [data, setData] = useState<ForecastRow[]>(() => {
         const forecastStructure = dreConfigs?.['Forecast'] || [];
         const initialData = getDynamicForecastData(forecastStructure, selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData);
@@ -219,12 +249,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         });
         return recalculateTotals(initializedData, packages, accounts);
     });
-
-    useEffect(() => {
-        if (isMonthClosed && setActiveProjectionType && activeProjectionType !== 'Fechamento oficial') {
-            setActiveProjectionType('Fechamento oficial');
-        }
-    }, [isMonthClosed, activeProjectionType, setActiveProjectionType]);
 
     const [showDetails, setShowDetails] = useState(false);
     const [expandedPackages, setExpandedPackages] = useState<Set<string>>(new Set());
@@ -242,7 +266,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     const [importResult, setImportResult] = useState<{ success: number; skipped: string[] } | null>(null);
     const [showImportLines, setShowImportLines] = useState(false);
     const [calculationBase, setCalculationBase] = useState<'forecast' | 'previa'>('forecast');
-    const [kpiBasis, setKpiBasis] = useState<'with_tax' | 'no_tax'>('with_tax');
 
     const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>({
         previa: true,
@@ -250,6 +273,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         budget: true,
         deltaPreviaBudget: true,
         deltaPreviaBudgetPct: true,
+        deltaPreviaForecast: true,
+        deltaPreviaForecastPct: true,
         deltaBudget: true,
         deltaBudgetPct: true,
         lastYear: true,
@@ -272,6 +297,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         budget: 120,
         deltaPreviaBudget: 120,
         deltaPreviaBudgetPct: 120,
+        deltaPreviaForecast: 120,
+        deltaPreviaForecastPct: 120,
         lastYear: 120,
         deltaLY: 120,
         deltaLYPct: 120,
@@ -487,6 +514,28 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         });
     };
 
+    // Typing a new KPI value (e.g. "R$ 12,00 / PAX") back-solves the account's underlying
+    // Prévia/Forecast value from the formula's denominator, so adjusting the rate adjusts the result.
+    const handleKpiValueChange = (rowId: string, field: 'previa' | 'real', typedKpiValue: number) => {
+        setData(prevData => {
+            const newData = prevData.map(row => {
+                if (row.id !== rowId) return row;
+
+                const calc = row.rowConfig?.kpiCalculation;
+                const denominator = calc ? parseSelfRatioDenominator(calc.formula, row.label) : null;
+                if (!denominator) return row;
+
+                const rawKpi = calc!.format === 'percent' ? typedKpiValue / 100 : typedKpiValue;
+                const denomValue = resolveKpiTerm(denominator, prevData, field);
+                const newValue = rawKpi * denomValue;
+
+                if (field === 'real') return { ...row, real: newValue, isManualOverride: true };
+                return { ...row, previa: newValue, isManualPreviaOverride: true };
+            });
+            return recalculateTotals(newData, packages, accounts);
+        });
+    };
+
     const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>, startRowId: string, field: 'real' | 'previa') => {
         const pasteData = e.clipboardData.getData('text');
         if (!pasteData) return;
@@ -517,8 +566,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 const isIndicator = row.id.startsWith('IND-');
                 const isManualRow = ['IND-MO-2', 'IND-MO-3'].includes(row.id);
                 const isInputIndicator = ['IND-1', 'IND-LZ-2', 'IND-LZ-4', 'IND-LZ-5', 'IND-EV-2', 'IND-EV-4', 'IND-EV-5'].includes(row.id);
-                const canEditReal = !isMonthClosed && (!row.isHeader || isSpecialEditableRow(row.id)) && !row.isTotal && (row.forecastConfig.method === 'Fixed' || isSpecialEditableRow(row.id)) && isRowEditableForUser(row);
-                const canEditPrevia = !isMonthClosed && (!row.isHeader || isSpecialEditableRow(row.id)) && !row.isTotal && ((row.previaConfig?.method || 'Fixed') === 'Fixed' || isSpecialEditableRow(row.id)) && isRowEditableForUser(row);
+                const canEditReal = !isLocked && (!row.isHeader || isSpecialEditableRow(row.id)) && !row.isTotal && (row.forecastConfig.method === 'Fixed' || isSpecialEditableRow(row.id)) && isRowEditableForUser(row);
+                const canEditPrevia = !isLocked && (!row.isHeader || isSpecialEditableRow(row.id)) && !row.isTotal && ((row.previaConfig?.method || 'Fixed') === 'Fixed' || isSpecialEditableRow(row.id)) && isRowEditableForUser(row);
 
                 let canEdit = false;
                 if (!isIndicator) {
@@ -664,8 +713,18 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             const notificationMsg = `A unidade ${selectedHotel} salvou os resultados de ${activeProjectionType} para ${monthName}/${selectedYear}. Dados salvos no banco.`;
             console.log('Notification sent to Admin:', notificationMsg);
 
-            toast.success(`Resultados salvos com sucesso no banco de dados!`);
             setShowDetails(false);
+            toast.success((t) => (
+                <span>
+                    Versão salva!{' '}
+                    <button
+                        onClick={() => { setShowDetails(true); toast.dismiss(t.id); }}
+                        className="underline font-bold"
+                    >
+                        Clique aqui caso deseje editá-la
+                    </button>
+                </span>
+            ), { duration: 8000 });
         } catch (err) {
             console.error('Failed to save projections:', err);
             toast.error('Ocorreu um erro ao salvar os dados no Supabase. Tente novamente.');
@@ -731,6 +790,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     const visibleBaseCols = 1 + [
         columnVisibility.previa, columnVisibility.real, columnVisibility.budget,
         columnVisibility.deltaPreviaBudget, columnVisibility.deltaPreviaBudgetPct,
+        columnVisibility.deltaPreviaForecast, columnVisibility.deltaPreviaForecastPct,
         columnVisibility.lastYear, columnVisibility.deltaLY, columnVisibility.deltaLYPct
     ].filter(Boolean).length;
 
@@ -751,36 +811,12 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                     </div>
 
                     <div className="flex items-center gap-4">
-                        <div className="flex items-center bg-gray-100 rounded-lg p-1 border border-gray-200">
-                            <button
-                                onClick={() => setKpiBasis('with_tax')}
-                                className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${kpiBasis === 'with_tax'
-                                    ? 'bg-white text-indigo-700 shadow-sm'
-                                    : 'text-gray-500 hover:text-gray-700'
-                                    }`}
-                                title="Calcular Reatividade/Transformação com GOP Com Impostos"
-                            >
-                                GOP C/ Imp.
-                            </button>
-                            <button
-                                onClick={() => setKpiBasis('no_tax')}
-                                className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${kpiBasis === 'no_tax'
-                                    ? 'bg-white text-indigo-700 shadow-sm'
-                                    : 'text-gray-500 hover:text-gray-700'
-                                    }`}
-                                title="Calcular Reatividade/Transformação com GOP Sem Impostos"
-                            >
-                                GOP S/ Imp.
-                            </button>
-                        </div>
-
                         <div className="flex flex-col">
                             <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Versão do Forecast</span>
                             <select
                                 value={activeProjectionType || 'Reunião de Ritmo'}
                                 onChange={(e) => setActiveProjectionType && setActiveProjectionType(e.target.value as any)}
-                                disabled={isMonthClosed}
-                                className={`border rounded-md px-2 py-1 text-xs font-bold outline-none ${isMonthClosed ? 'bg-red-50 text-red-700 border-red-200 cursor-not-allowed' : 'bg-white border-gray-300 text-gray-700 focus:ring-0 focus:border-indigo-500'}`}
+                                className={`border rounded-md px-2 py-1 text-xs font-bold outline-none ${isMonthClosed ? 'bg-red-50 text-red-700 border-red-200' : 'bg-white border-gray-300 text-gray-700 focus:ring-0 focus:border-indigo-500'}`}
                             >
                                 <option value="Reunião de Ritmo">Reunião de Ritmo</option>
                                 <option value="FCA N1">FCA N1</option>
@@ -856,15 +892,17 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             </div>
                             <div className="space-y-2">
                                 {[
-                                    { key: 'previa', label: isMonthClosed ? 'Fechamento' : 'Prévia' },
+                                    { key: 'previa', label: isMonthClosed ? 'Real' : 'Prévia' },
                                     { key: 'real', label: 'Forecast (Real)' },
                                     { key: 'budget', label: 'Meta (Budget)' },
-                                    { key: 'deltaPreviaBudget', label: 'Δ Prévia - Meta R$' },
-                                    { key: 'deltaPreviaBudgetPct', label: 'Δ Prévia - Meta %' },
+                                    { key: 'deltaPreviaBudget', label: isMonthClosed ? 'Δ Real - Meta R$' : 'Δ Prévia - Meta R$' },
+                                    { key: 'deltaPreviaBudgetPct', label: isMonthClosed ? 'Δ Real - Meta %' : 'Δ Prévia - Meta %' },
+                                    { key: 'deltaPreviaForecast', label: isMonthClosed ? 'Δ Real - Forecast R$' : 'Δ Prévia - Forecast R$' },
+                                    { key: 'deltaPreviaForecastPct', label: isMonthClosed ? 'Δ Real - Forecast %' : 'Δ Prévia - Forecast %' },
                                     { key: 'lastYear', label: 'Ano anterior' },
                                     { key: 'deltaLY', label: `Δ ${selectedYear} x Ano anterior R$` },
                                     { key: 'deltaLYPct', label: `Δ ${selectedYear} x Ano anterior %` },
-                                    { key: 'driverPrevia', label: 'Driver (Prévia)' },
+                                    { key: 'driverPrevia', label: isMonthClosed ? 'Driver (Real)' : 'Driver (Prévia)' },
                                     { key: 'driverForecast', label: 'Driver (Forecast)' },
                                     { key: 'driverBudget', label: 'Driver (Meta)' },
                                 ].map(col => (
@@ -901,7 +939,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         style={{ width: columnWidths.previa }}
                                         className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 border-l border-sky-200 group relative"
                                     >
-                                        {isMonthClosed ? 'FECHAMENTO' : 'PRÉVIA'}
+                                        {isMonthClosed ? 'REAL' : 'PRÉVIA'}
                                         <div
                                             onMouseDown={(e) => handleResizeStart(e, 'previa')}
                                             className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
@@ -951,11 +989,37 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 {columnVisibility.deltaPreviaBudgetPct && (
                                     <th
                                         style={{ width: columnWidths.deltaPreviaBudgetPct }}
-                                        className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 border-r border-sky-200 whitespace-pre-line leading-tight group relative"
+                                        className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 whitespace-pre-line leading-tight group relative"
                                     >
                                         Δ %<br />{isMonthClosed ? 'REAL' : 'PRÉVIA'} - META
                                         <div
                                             onMouseDown={(e) => handleResizeStart(e, 'deltaPreviaBudgetPct')}
+                                            className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
+                                        />
+                                    </th>
+                                )}
+
+                                {columnVisibility.deltaPreviaForecast && (
+                                    <th
+                                        style={{ width: columnWidths.deltaPreviaForecast }}
+                                        className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 whitespace-pre-line leading-tight group relative"
+                                    >
+                                        Δ<br />{isMonthClosed ? 'REAL' : 'PRÉVIA'} - Forecast
+                                        <div
+                                            onMouseDown={(e) => handleResizeStart(e, 'deltaPreviaForecast')}
+                                            className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
+                                        />
+                                    </th>
+                                )}
+
+                                {columnVisibility.deltaPreviaForecastPct && (
+                                    <th
+                                        style={{ width: columnWidths.deltaPreviaForecastPct }}
+                                        className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 border-r border-sky-200 whitespace-pre-line leading-tight group relative"
+                                    >
+                                        Δ %<br />{isMonthClosed ? 'REAL' : 'PRÉVIA'} - Forecast
+                                        <div
+                                            onMouseDown={(e) => handleResizeStart(e, 'deltaPreviaForecastPct')}
                                             className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
                                         />
                                     </th>
@@ -1009,7 +1073,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         style={{ width: columnWidths.driverPrevia }}
                                         className="px-2 py-3 text-center bg-slate-50 text-slate-700 border-b border-slate-200 border-l border-slate-200 group relative text-xs"
                                     >
-                                        KPI<br />(PRÉVIA)
+                                        KPI<br />({isMonthClosed ? 'REAL' : 'PRÉVIA'})
                                         <div
                                             onMouseDown={(e) => handleResizeStart(e, 'driverPrevia')}
                                             className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-slate-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
@@ -1104,6 +1168,13 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     const raw = evaluateKpiCalculation(rowKpiCalc, data, field);
                                     return rowKpiCalc?.format === 'percent' ? raw * 100 : raw;
                                 };
+                                const kpiFormulaTooltip = rowKpiCalc ? formatKpiFormulaForDisplay(rowKpiCalc.formula) : undefined;
+
+                                // The KPI can be typed directly (to adjust the underlying result) only when
+                                // its formula is a simple self ÷ denominator ratio — the same shape "Calcular
+                                // Forecast" already knows how to project, so it's cleanly invertible.
+                                const kpiSelfDenominator = accountKpiCalc ? parseSelfRatioDenominator(accountKpiCalc.formula, row.label) : null;
+                                const isEditableKpi = !!kpiSelfDenominator && canEditForecast && !isLocked && isRowEditableForUser(row);
 
                                 const renderFinancialCells = (isHeaderOrTotal = false, customBg = "") => {
                                     const effectiveBg = row.bgColor || (isBlueHighlight ? 'bg-sky-100 border-sky-200' : (customBg || 'bg-blue-50/20 border-r border-blue-50'));
@@ -1153,7 +1224,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         const isInputIndicator = ['IND-1', 'IND-2', 'IND-ADULTOS', 'IND-CHD', 'IND-LZ-2', 'IND-LZ-4', 'IND-LZ-5', 'IND-EV-2', 'IND-EV-4', 'IND-EV-5'].includes(row.id);
                                         const canEditIndicator = [UserRole.ADMIN, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST].includes(currentUser?.role as any);
 
-                                        if (canEditIndicator && (isInputIndicator || isManualRow) && !isMonthClosed) {
+                                        if (canEditIndicator && (isInputIndicator || isManualRow) && !isLocked) {
                                             realCellContent = (
                                                 <FormattedInput
                                                     inputRef={(el: any) => { inputRefs.current[`input-real-${row.id}`] = el; }}
@@ -1198,7 +1269,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                                     onPaste={(e: any) => handlePaste(e, row.id, 'previa')}
                                                 />
                                             );
-                                        } else if ((isInputIndicator || isManualRow) && (isMonthClosed || !canEditForecast)) {
+                                        } else if ((isInputIndicator || isManualRow) && (isLocked || !canEditForecast)) {
                                             realCellContent = <span className="font-medium">{formatValue(row.real, formatType)}</span>;
                                             previaCellContent = <span className="font-medium">{formatValue(row.previa, formatType)}</span>;
                                         }
@@ -1209,8 +1280,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         ? (previaLYVal / row.lastYear) * 100
                                         : 0;
 
-                                    const previaLYColor = previaLYPct < 0 ? 'text-rose-600' : 'text-emerald-600';
-                                    const previaLYValColor = previaLYVal < 0 ? 'text-rose-600' : 'text-emerald-600';
+                                    const previaLYColor = getDeltaColorClass(row, previaLYPct);
+                                    const previaLYValColor = getDeltaColorClass(row, previaLYVal);
 
                                     return (
                                         <>
@@ -1233,14 +1304,26 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             )}
 
                                             {columnVisibility.deltaPreviaBudget && (
-                                                <td className={`px-2 py-1 text-right border-r border-gray-100 tabular-nums font-medium ${row.deltaPreviaBudgetVal && row.deltaPreviaBudgetVal < 0 ? 'text-rose-600' : 'text-emerald-600'} truncate`}>
+                                                <td className={`px-2 py-1 text-right border-r border-gray-100 tabular-nums font-medium ${getDeltaColorClass(row, row.deltaPreviaBudgetVal)} truncate`}>
                                                     {formatValue(row.deltaPreviaBudgetVal || 0, isIndicator && formatType !== 'percent' ? formatType : 'currency')}
                                                 </td>
                                             )}
 
                                             {columnVisibility.deltaPreviaBudgetPct && (
-                                                <td className={`px-2 py-1 text-right border-r border-gray-200 tabular-nums ${row.deltaPreviaBudgetPct && row.deltaPreviaBudgetPct < 0 ? 'text-rose-600' : 'text-emerald-600'} truncate`}>
+                                                <td className={`px-2 py-1 text-right tabular-nums ${getDeltaColorClass(row, row.deltaPreviaBudgetPct)} truncate`}>
                                                     {formatPercentDiff(row.deltaPreviaBudgetPct)}
+                                                </td>
+                                            )}
+
+                                            {columnVisibility.deltaPreviaForecast && (
+                                                <td className={`px-2 py-1 text-right border-r border-gray-100 tabular-nums font-medium ${getDeltaColorClass(row, row.deltaPreviaForecastVal)} truncate`}>
+                                                    {formatValue(row.deltaPreviaForecastVal || 0, isIndicator && formatType !== 'percent' ? formatType : 'currency')}
+                                                </td>
+                                            )}
+
+                                            {columnVisibility.deltaPreviaForecastPct && (
+                                                <td className={`px-2 py-1 text-right border-r border-gray-200 tabular-nums ${getDeltaColorClass(row, row.deltaPreviaForecastPct)} truncate`}>
+                                                    {formatPercentDiff(row.deltaPreviaForecastPct)}
                                                 </td>
                                             )}
 
@@ -1267,19 +1350,45 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             )}
 
                                             {columnVisibility.driverPrevia && (
-                                                <td className={`px-1 text-center tabular-nums text-xs truncate ${hideKpi || !rowKpiCalc ? 'bg-transparent border-b border-gray-100 text-transparent' : 'border border-slate-200 text-slate-500 bg-slate-50 shadow-sm'}`}>
-                                                    {!hideKpi && rowKpiCalc ? formatValue(kpiValue('previa'), kpiFormatType) : ''}
+                                                <td
+                                                    title={!hideKpi ? kpiFormulaTooltip : undefined}
+                                                    className={`px-1 text-center tabular-nums text-xs truncate ${hideKpi || !rowKpiCalc ? 'bg-transparent border-b border-gray-100 text-transparent' : 'border border-slate-200 text-slate-500 bg-slate-50 shadow-sm cursor-help'}`}>
+                                                    {!hideKpi && rowKpiCalc
+                                                        ? (isEditableKpi ? (
+                                                            <FormattedInput
+                                                                inputRef={(el: any) => { inputRefs.current[`input-kpi-previa-${row.id}`] = el; }}
+                                                                className="w-full text-center bg-transparent border border-transparent hover:bg-white focus:bg-white focus:border-indigo-300 focus:ring-1 focus:ring-indigo-100 rounded outline-none py-1"
+                                                                value={kpiValue('previa')}
+                                                                formatType={kpiFormatType}
+                                                                onChange={(val: number) => handleKpiValueChange(row.id, 'previa', val)}
+                                                            />
+                                                        ) : formatValue(kpiValue('previa'), kpiFormatType))
+                                                        : ''}
                                                 </td>
                                             )}
 
                                             {columnVisibility.driverForecast && (
-                                                <td className={`px-1 text-center tabular-nums text-xs truncate ${hideKpi || !rowKpiCalc ? 'bg-transparent border-b border-gray-100 text-transparent' : 'border border-slate-200 text-slate-500 bg-slate-50 shadow-sm'}`}>
-                                                    {!hideKpi && rowKpiCalc ? formatValue(kpiValue('real'), kpiFormatType) : ''}
+                                                <td
+                                                    title={!hideKpi ? kpiFormulaTooltip : undefined}
+                                                    className={`px-1 text-center tabular-nums text-xs truncate ${hideKpi || !rowKpiCalc ? 'bg-transparent border-b border-gray-100 text-transparent' : 'border border-slate-200 text-slate-500 bg-slate-50 shadow-sm cursor-help'}`}>
+                                                    {!hideKpi && rowKpiCalc
+                                                        ? (isEditableKpi ? (
+                                                            <FormattedInput
+                                                                inputRef={(el: any) => { inputRefs.current[`input-kpi-forecast-${row.id}`] = el; }}
+                                                                className="w-full text-center bg-transparent border border-transparent hover:bg-white focus:bg-white focus:border-indigo-300 focus:ring-1 focus:ring-indigo-100 rounded outline-none py-1"
+                                                                value={kpiValue('real')}
+                                                                formatType={kpiFormatType}
+                                                                onChange={(val: number) => handleKpiValueChange(row.id, 'real', val)}
+                                                            />
+                                                        ) : formatValue(kpiValue('real'), kpiFormatType))
+                                                        : ''}
                                                 </td>
                                             )}
 
                                             {columnVisibility.driverBudget && (
-                                                <td className={`px-2 py-1 text-center tabular-nums text-xs truncate ${hideKpi || !rowKpiCalc ? 'bg-transparent border-b border-gray-100 text-transparent' : 'border border-slate-200 text-slate-500 bg-slate-50 shadow-sm'}`}>
+                                                <td
+                                                    title={!hideKpi ? kpiFormulaTooltip : undefined}
+                                                    className={`px-2 py-1 text-center tabular-nums text-xs truncate ${hideKpi || !rowKpiCalc ? 'bg-transparent border-b border-gray-100 text-transparent' : 'border border-slate-200 text-slate-500 bg-slate-50 shadow-sm cursor-help'}`}>
                                                     {!hideKpi && rowKpiCalc ? formatValue(kpiValue('budget'), kpiFormatType) : ''}
                                                 </td>
                                             )}
@@ -1710,7 +1819,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             </div>
                                             <div className="flex items-center gap-4 text-sm">
                                                 <div className="text-right">
-                                                    <span className="block text-xs text-gray-500">Prévia</span>
+                                                    <span className="block text-xs text-gray-500">{isMonthClosed ? 'Real' : 'Prévia'}</span>
                                                     <span className="font-medium text-gray-900">
                                                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(row.previa || 0)}
                                                     </span>
@@ -2196,6 +2305,9 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
 
         row.deltaPreviaBudgetVal = (row.previa || 0) - row.budget;
         row.deltaPreviaBudgetPct = row.budget === 0 ? 0 : (((row.previa || 0) - row.budget) / Math.abs(row.budget)) * 100;
+
+        row.deltaPreviaForecastVal = (row.previa || 0) - row.real;
+        row.deltaPreviaForecastPct = row.real === 0 ? 0 : (((row.previa || 0) - row.real) / Math.abs(row.real)) * 100;
     });
 
     // --- TRANSFORMATION / REACTIVITY KPIs ---

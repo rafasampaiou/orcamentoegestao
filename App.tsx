@@ -118,36 +118,6 @@ const App: React.FC = () => {
   // Date State for Forecast - Defaults to Today
   const [selectedDate, setSelectedDate] = useState(new Date());
 
-  // Month Status State (New)
-  // Record<"YYYY-MM", "open" | "closed">
-  const getIsMonthClosed = (year: number, month: number) => {
-    const version = realVersions.find(v => v.id === activeRealVersionId);
-    if (!version) return false;
-    return version.closedMonths?.includes(month) || false;
-  };
-
-  const isClosed = getIsMonthClosed(selectedDate.getFullYear(), selectedDate.getMonth() + 1);
-
-  const handleToggleMonthClosure = async (month: number) => {
-    const version = realVersions.find(v => v.id === activeRealVersionId);
-    if (!version) return;
-
-    const currentClosed = version.closedMonths || [];
-    const newClosed = currentClosed.includes(month)
-      ? currentClosed.filter(m => m !== month)
-      : [...currentClosed, month];
-    
-    const updatedVersion = { ...version, closedMonths: newClosed };
-    
-    setRealVersions(prev => prev.map(v => v.id === version.id ? updatedVersion : v));
-    
-    try {
-      await supabaseService.upsertBudgetVersion(updatedVersion);
-    } catch (e) {
-      console.error('Falha ao salvar fechamento de mês', e);
-    }
-  };
-
   // Financial Data State (Source of Truth)
   const [importedFinancialData, setImportedFinancialData] = useState<ImportedRow[]>([]);
 
@@ -885,7 +855,9 @@ const App: React.FC = () => {
   };
 
   const renderContent = () => {
-    const isClosed = getIsMonthClosed(selectedDate.getFullYear(), selectedDate.getMonth() + 1);
+    // Whether the month is "closed" is now controlled entirely by which Forecast version is
+    // selected — selecting "Fechamento oficial" is what marks the month as closed/official.
+    const isClosed = activeProjectionType === 'Fechamento oficial';
     const activeRealVersionName = realVersions.find(v => v.id === activeRealVersionId)?.name;
 
     switch (currentView) {
@@ -1070,11 +1042,21 @@ const App: React.FC = () => {
             validations={validations}
             hotels={hotels}
             currentUser={currentUser}
+            onNavigateToValidation={(validation) => {
+              const hotel = hotels.find(h => h.id === validation.hotelId || h.name === validation.hotelId || h.code === validation.hotelId);
+              const matchedVersion = realVersions.find(v =>
+                v.year === validation.year && (v.hotelId === hotel?.id || v.hotelId === hotel?.code || v.hotel === hotel?.name)
+              );
+              if (hotel) setSelectedHotel(hotel.name);
+              setSelectedDate(new Date(validation.year, validation.month - 1));
+              if (matchedVersion) setActiveRealVersionId(matchedVersion.id);
+              setActiveProjectionType(validation.projectionType);
+              setCurrentView('dashboard');
+            }}
         />
       );
       // Admin > Tauá Real
       case 'admin_real_versions':
-      case 'admin_real_closure':
       case 'admin_real_import':
       case 'admin_real_schedule':
       case 'admin_real_dre':
@@ -1112,7 +1094,6 @@ const App: React.FC = () => {
             accounts={accounts} setAccounts={setAccounts}
             gmdConfigs={gmdConfigs} setGmdConfigs={setGmdConfigs}
             setCurrentView={setCurrentView}
-            onToggleMonthClosure={handleToggleMonthClosure}
             onImportData={handleImportData}
             onDeleteImport={handleDeleteImport}
             budgetVersions={budgetVersions}

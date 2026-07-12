@@ -189,6 +189,8 @@ export interface ForecastRow {
   deltaPreviaPct?: number;
   deltaPreviaBudgetVal?: number;
   deltaPreviaBudgetPct?: number;
+  deltaPreviaForecastVal?: number;
+  deltaPreviaForecastPct?: number;
   
   // GMD Integration
   gmdManagerName?: string; // The person responsible for this line in the Matrix
@@ -249,7 +251,6 @@ export type ViewState =
 
   // ADMIN > Tauá Real
   | 'admin_real_versions'
-  | 'admin_real_closure'
   | 'admin_real_import'
   | 'admin_real_schedule'
   | 'admin_real_dre'
@@ -288,6 +289,8 @@ export interface ColumnVisibility {
   budget: boolean;
   deltaPreviaBudget: boolean;
   deltaPreviaBudgetPct: boolean;
+  deltaPreviaForecast: boolean;
+  deltaPreviaForecastPct: boolean;
   deltaBudget: boolean;
   deltaBudgetPct: boolean;
   lastYear: boolean;

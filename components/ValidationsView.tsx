@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { ValidationRecord, Hotel, User } from '../types';
-import { Calendar, Filter, Building2, CheckCircle2 } from 'lucide-react';
+import { Calendar, Filter, Building2, CheckCircle2, ArrowRight } from 'lucide-react';
 
 interface ValidationsViewProps {
   validations: ValidationRecord[];
   hotels: Hotel[];
   currentUser?: User;
+  onNavigateToValidation?: (validation: ValidationRecord) => void;
 }
 
-const ValidationsView: React.FC<ValidationsViewProps> = ({ validations, hotels, currentUser }) => {
+const ValidationsView: React.FC<ValidationsViewProps> = ({ validations, hotels, currentUser, onNavigateToValidation }) => {
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedHotel, setSelectedHotel] = useState<string>('all');
@@ -124,11 +125,12 @@ const ValidationsView: React.FC<ValidationsViewProps> = ({ validations, hotels, 
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Usuário</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Reunião</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Status</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Ações</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                             {filteredValidations.map(validation => {
-                                const h = hotels.find(h => h.id === validation.hotelId);
+                                const h = hotels.find(h => h.id === validation.hotelId || h.name === validation.hotelId);
                                 const d = new Date(validation.validatedAt);
                                 return (
                                     <tr key={validation.id} className="hover:bg-gray-50 transition-colors">
@@ -153,6 +155,17 @@ const ValidationsView: React.FC<ValidationsViewProps> = ({ validations, hotels, 
                                                 <CheckCircle2 size={16} />
                                                 Validado
                                             </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            {onNavigateToValidation && (
+                                                <button
+                                                    onClick={() => onNavigateToValidation(validation)}
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg text-sm font-bold border border-indigo-100 transition-colors"
+                                                >
+                                                    Ir para Forecast
+                                                    <ArrowRight size={14} />
+                                                </button>
+                                            )}
                                         </td>
                                     </tr>
                                 );
