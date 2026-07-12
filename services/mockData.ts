@@ -1,4 +1,4 @@
-import { Account, BudgetVersion, CostPackage, DreSection, ForecastConfig, ForecastOperator, ForecastRow, Hotel, ImportedRow, User, UserRole, ExpenseType, ExpenseDriver, CostCenter, GMDConfiguration, DrePackage } from '../types';
+import { Account, BudgetVersion, CostPackage, DreSection, ForecastConfig, ForecastOperator, ForecastRow, Hotel, ImportedRow, User, UserRole, ExpenseType, ExpenseDriver, CostCenter, GMDConfiguration, DrePackage, KpiCalculation } from '../types';
 
 // Helper for robust string matching (ignores accents, case, and plural suffix 's')
 export const normalizeAccountName = (str: string) => {
@@ -534,7 +534,7 @@ const generateRow = (
     isTotal = false,
     indentLevel = 0,
     gmdManagerName?: string,
-    config?: { type?: ExpenseType, driver?: ExpenseDriver, taxRate?: number, inputType?: 'expense' | 'tax' | 'none', format?: 'currency' | 'percent' | 'integer' | 'decimal', method?: 'Fixed' | 'Variable', factor?: number },
+    config?: { type?: ExpenseType, driver?: ExpenseDriver, kpiCalculation?: KpiCalculation, taxRate?: number, inputType?: 'expense' | 'tax' | 'none', format?: 'currency' | 'percent' | 'integer' | 'decimal', method?: 'Fixed' | 'Variable', factor?: number },
     indicatorSection?: string,
     dreConfig?: {
         isCalculated?: boolean,
@@ -590,6 +590,7 @@ const generateRow = (
             inputType: config.inputType || 'none',
             expenseType: config.type,
             expenseDriver: config.driver,
+            kpiCalculation: config.kpiCalculation,
             taxRate: config.taxRate,
             format: config.format || 'currency'
         } : { inputType: 'none', format: 'currency' },
@@ -957,7 +958,7 @@ export const getForecastData = (
         const pkgAccs = expenseAccounts.filter(a => (a.masterPackage || '').toLowerCase() === (masterName || '').toLowerCase() && (a.package || '').toLowerCase() === (pkgName || '').toLowerCase()).map(a => ({
             ...a,
             expenseType: a.expenseType || defaultAccountConfigs[a.name]?.expenseType,
-            expenseDriver: a.expenseDriver || defaultAccountConfigs[a.name]?.expenseDriver
+            kpiCalculation: a.kpiCalculation
         }));
         const pkgCode = pkgAccs[0]?.packageCode || '';
 
@@ -1002,8 +1003,8 @@ export const getForecastData = (
                 undefined,
                 {
                     method: acc.expenseType === 'Variável' ? 'Variable' : 'Fixed',
-                    driver: acc.expenseDriver,
-                    type: acc.expenseType
+                    type: acc.expenseType,
+                    kpiCalculation: acc.kpiCalculation
                 }
             ));
         });

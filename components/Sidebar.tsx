@@ -3,7 +3,7 @@ import {
   Users, Settings, LogOut, Building2, BarChart2,
   BedDouble, CheckCircle2, ChevronDown, ChevronRight,
   TrendingUp, Database, PieChart, FileText, Upload,
-  Calendar, Lock, GanttChartSquare, Layers, ShieldCheck
+  Calendar, Lock, GanttChartSquare, Layers, ShieldCheck, Package
 } from 'lucide-react';
 import { ViewState, ModuleType, User, UserRole } from '../types';
 
@@ -186,6 +186,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
                 {/* Cadastros gerais */}
                 <NavItem depth={1} label="Plano de Contas"  icon={FileText}        active={currentView === 'admin_geral_accounts'}    onClick={() => go('admin_geral_accounts')} />
+                <NavItem depth={1} label="Pacotes"          icon={Package}         active={currentView === 'admin_geral_packages'}    onClick={() => go('admin_geral_packages')} />
                 <NavItem depth={1} label="Hotéis"           icon={Building2}       active={currentView === 'admin_geral_hotels'}      onClick={() => go('admin_geral_hotels')} />
                 <NavItem depth={1} label="Setores (CR)"     icon={Layers}          active={currentView === 'admin_geral_costcenters'} onClick={() => go('admin_geral_costcenters')} />
                 <NavItem depth={1} label="Usuários"         icon={Users}           active={currentView === 'admin_geral_users'}       onClick={() => go('admin_geral_users')} />

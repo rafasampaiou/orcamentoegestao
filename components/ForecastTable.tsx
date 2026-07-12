@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { getForecastData, getDynamicForecastData } from '../services/mockData';
 import { Upload, ListFilter, LayoutList, Settings2, ChevronUp, Activity, TrendingUp, Lock, LockOpen, CheckCircle2, X, FileSpreadsheet, AlertCircle, CheckCircle, ChevronRight, ChevronDown } from 'lucide-react';
-import { ExpenseDriver, ImportedRow, Account, CostPackage, Hotel, ForecastRow, ForecastConfig, ForecastOperator, ColumnVisibility, UserRole } from '../types';
+import { ExpenseDriver, ImportedRow, Account, CostPackage, Hotel, ForecastRow, ForecastConfig, ForecastOperator, ColumnVisibility, UserRole, KpiCalculation } from '../types';
 import { evaluateFormula } from '../utils/formulaEngine';
 import { supabaseService } from '../services/supabaseService';
 import { VersionInfoBanner } from './VersionInfoBanner';
@@ -15,6 +15,7 @@ interface ForecastTableProps {
     // New props for dynamic structure
     accounts: Account[];
     packages: CostPackage[];
+    packageKpiConfigs?: Record<string, KpiCalculation>;
     hotels: Hotel[];
 
     // Month Status Props
@@ -180,6 +181,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     selectedHotel,
     accounts,
     packages,
+    packageKpiConfigs = {},
     hotels,
     isMonthClosed = false,
     realOccupancyData = {},
@@ -460,29 +462,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         });
     };
 
-    const handleKpiFactorChange = (rowId: string, base: 'forecast' | 'previa', newFactor: number) => {
-        setData(prevData => {
-            const newData = prevData.map(row => {
-                if (row.id !== rowId) return row;
-
-                const currentConfig = base === 'forecast' ? row.forecastConfig : (row.previaConfig || { method: 'Fixed' });
-                const newConfig = { ...currentConfig, factor: newFactor, method: 'Variable' as const };
-
-                const updatedRow = {
-                    ...row,
-                    [base === 'forecast' ? 'forecastConfig' : 'previaConfig']: newConfig
-                };
-
-                const calculated = calculateRowValue(updatedRow, newConfig, prevData, base);
-                if (base === 'forecast') updatedRow.real = calculated;
-                else updatedRow.previa = calculated;
-
-                return updatedRow;
-            });
-            return recalculateTotals(newData, packages, accounts);
-        });
-    };
-
     const handleManualValueChange = (rowId: string, field: 'real' | 'previa', value: number) => {
         setData(prevData => {
             const newData = prevData.map(row => {
@@ -704,29 +683,31 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 }
                 
                 const account = accounts.find(a => a.id === row.id || (a.code && a.code === row.accountCode));
-                
+
                 if (account) {
                     const currentConfig = calculationBase === 'forecast' ? row.forecastConfig : (row.previaConfig || { method: 'Fixed' });
-                    
-                    if (account.expenseType === 'Variável' && account.expenseDriver) {
-                        const newConfig = {
-                            ...currentConfig,
-                            method: 'Variable' as const,
-                            driver: account.expenseDriver,
-                            factor: account.expenseFactor || 0
-                        };
-                        
+                    // Only a self ÷ denominator formula can be turned into a projection — it's the
+                    // account's own rate (observed in Prévia) reapplied to the Meta's denominator.
+                    const selfDenominator = parseSelfRatioDenominator(account.kpiCalculation?.formula, account.name);
+
+                    if (account.expenseType === 'Variável' && selfDenominator) {
+                        const denomPrevia = resolveKpiTerm(selfDenominator, prevData, 'previa');
+                        const denomMeta = resolveKpiTerm(selfDenominator, prevData, 'budget');
+                        const rate = denomPrevia !== 0 ? (row.previa || 0) / denomPrevia : 0;
+                        const projected = rate * denomMeta;
+
+                        const newConfig = { ...currentConfig, method: 'Fixed' as const, manualValue: projected };
                         const updatedRow = {
                             ...row,
                             [calculationBase === 'forecast' ? 'forecastConfig' : 'previaConfig']: newConfig
                         };
-                        
-                        const calculated = calculateRowValue(updatedRow, newConfig, prevData, calculationBase);
-                        if (calculationBase === 'forecast') updatedRow.real = calculated;
-                        else updatedRow.previa = calculated;
-                        
+                        if (calculationBase === 'forecast') updatedRow.real = projected;
+                        else updatedRow.previa = projected;
+
                         return updatedRow;
-                    } else if (account.expenseType === 'Fixo') {
+                    } else if (account.expenseType === 'Fixo' || (account.expenseType === 'Variável' && !selfDenominator)) {
+                        // Fixed accounts, or Variável accounts whose KPI formula isn't a simple
+                        // self-referencing ratio, can't be auto-projected — leave for manual entry.
                         const newConfig = {
                             ...currentConfig,
                             method: 'Fixed' as const
@@ -737,7 +718,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                         };
                     }
                 }
-                
+
                 return row;
             });
             
@@ -1116,8 +1097,14 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 const formatType = row.rowConfig?.format || 'currency';
 
                                 const hideKpi = isSectionHeader || isBlueHighlight || isTotal || row.category === 'Indicators' || row.category === 'Revenue';
-                                const isAccountKpi = (row.category === 'Costs' || row.category === 'Account') && row.rowConfig?.expenseType === 'Variável' && !!row.rowConfig?.expenseDriver;
-                                const packageKpiDriver = !hideKpi && row.category === 'Package' ? getPackageDriver(row.label, accounts) : undefined;
+                                const accountKpiCalc = (row.category === 'Costs' || row.category === 'Account') && row.rowConfig?.expenseType === 'Variável' ? row.rowConfig?.kpiCalculation : undefined;
+                                const packageKpiCalc = !hideKpi && row.category === 'Package' ? packageKpiConfigs[row.label.trim()] : undefined;
+                                const rowKpiCalc = accountKpiCalc || packageKpiCalc;
+                                const kpiFormatType = rowKpiCalc?.format === 'percent' ? 'percent' : 'decimal';
+                                const kpiValue = (field: 'previa' | 'real' | 'budget') => {
+                                    const raw = evaluateKpiCalculation(rowKpiCalc, data, field);
+                                    return rowKpiCalc?.format === 'percent' ? raw * 100 : raw;
+                                };
 
                                 const renderFinancialCells = (isHeaderOrTotal = false, customBg = "") => {
                                     const effectiveBg = row.bgColor || (isBlueHighlight ? 'bg-sky-100 border-sky-200' : (customBg || 'bg-blue-50/20 border-r border-blue-50'));
@@ -1281,48 +1268,20 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             )}
 
                                             {columnVisibility.driverPrevia && (
-                                                <td className={`px-1 text-center tabular-nums text-xs truncate ${hideKpi || (!isAccountKpi && !packageKpiDriver) ? 'bg-transparent border-b border-gray-100 text-transparent' : 'border border-slate-200 text-slate-500 bg-slate-50 shadow-sm'}`}>
-                                                    {!hideKpi && isAccountKpi
-                                                        ? (canEditForecast && !isMonthClosed && isRowEditableForUser(row) ? (
-                                                            <FormattedInput
-                                                                inputRef={(el: any) => { inputRefs.current[`input-kpi-previa-${row.id}`] = el; }}
-                                                                className="w-full text-center bg-transparent border border-transparent hover:bg-white focus:bg-white focus:border-indigo-300 focus:ring-1 focus:ring-indigo-100 rounded outline-none py-1"
-                                                                value={row.previaConfig?.factor ?? 0}
-                                                                formatType="decimal"
-                                                                onChange={(val: number) => handleKpiFactorChange(row.id, 'previa', val)}
-                                                            />
-                                                        ) : formatValue(row.previaConfig?.factor ?? 0, 'decimal'))
-                                                        : (!hideKpi && packageKpiDriver
-                                                            ? formatValue((row.previa || 0) / (getDriverValue(packageKpiDriver, data, 'previa') || 1), 'decimal')
-                                                            : '')}
+                                                <td className={`px-1 text-center tabular-nums text-xs truncate ${hideKpi || !rowKpiCalc ? 'bg-transparent border-b border-gray-100 text-transparent' : 'border border-slate-200 text-slate-500 bg-slate-50 shadow-sm'}`}>
+                                                    {!hideKpi && rowKpiCalc ? formatValue(kpiValue('previa'), kpiFormatType) : ''}
                                                 </td>
                                             )}
 
                                             {columnVisibility.driverForecast && (
-                                                <td className={`px-1 text-center tabular-nums text-xs truncate ${hideKpi || (!isAccountKpi && !packageKpiDriver) ? 'bg-transparent border-b border-gray-100 text-transparent' : 'border border-slate-200 text-slate-500 bg-slate-50 shadow-sm'}`}>
-                                                    {!hideKpi && isAccountKpi
-                                                        ? (canEditForecast && !isMonthClosed && isRowEditableForUser(row) ? (
-                                                            <FormattedInput
-                                                                inputRef={(el: any) => { inputRefs.current[`input-kpi-forecast-${row.id}`] = el; }}
-                                                                className="w-full text-center bg-transparent border border-transparent hover:bg-white focus:bg-white focus:border-indigo-300 focus:ring-1 focus:ring-indigo-100 rounded outline-none py-1"
-                                                                value={row.forecastConfig?.factor ?? 0}
-                                                                formatType="decimal"
-                                                                onChange={(val: number) => handleKpiFactorChange(row.id, 'forecast', val)}
-                                                            />
-                                                        ) : formatValue(row.forecastConfig?.factor ?? 0, 'decimal'))
-                                                        : (!hideKpi && packageKpiDriver
-                                                            ? formatValue((row.real || 0) / (getDriverValue(packageKpiDriver, data, 'forecast') || 1), 'decimal')
-                                                            : '')}
+                                                <td className={`px-1 text-center tabular-nums text-xs truncate ${hideKpi || !rowKpiCalc ? 'bg-transparent border-b border-gray-100 text-transparent' : 'border border-slate-200 text-slate-500 bg-slate-50 shadow-sm'}`}>
+                                                    {!hideKpi && rowKpiCalc ? formatValue(kpiValue('real'), kpiFormatType) : ''}
                                                 </td>
                                             )}
 
                                             {columnVisibility.driverBudget && (
-                                                <td className={`px-2 py-1 text-center tabular-nums text-xs truncate ${hideKpi || (!isAccountKpi && !packageKpiDriver) ? 'bg-transparent border-b border-gray-100 text-transparent' : 'border border-slate-200 text-slate-500 bg-slate-50 shadow-sm'}`}>
-                                                    {!hideKpi && isAccountKpi
-                                                        ? formatValue((row.budget || 0) / (getDriverValue(row.rowConfig!.expenseDriver, data, 'budget') || 1), 'decimal')
-                                                        : (!hideKpi && packageKpiDriver
-                                                            ? formatValue((row.budget || 0) / (getDriverValue(packageKpiDriver, data, 'budget') || 1), 'decimal')
-                                                            : '')}
+                                                <td className={`px-2 py-1 text-center tabular-nums text-xs truncate ${hideKpi || !rowKpiCalc ? 'bg-transparent border-b border-gray-100 text-transparent' : 'border border-slate-200 text-slate-500 bg-slate-50 shadow-sm'}`}>
+                                                    {!hideKpi && rowKpiCalc ? formatValue(kpiValue('budget'), kpiFormatType) : ''}
                                                 </td>
                                             )}
                                         </>
@@ -1982,15 +1941,41 @@ function getDriverValue(driver: string | undefined, allRows: ForecastRow[], base
 
 // A package's KPI only makes sense when every Variável account inside it shares the
 // same Plano de Contas driver — otherwise there is no single unit to divide the total by.
-function getPackageDriver(pkgLabel: string, accountsList: Account[]): string | undefined {
-    const variableAccs = accountsList.filter(a =>
-        (a.package || '').trim().toLowerCase() === pkgLabel.trim().toLowerCase() &&
-        a.expenseType === 'Variável' &&
-        a.expenseDriver
-    );
-    if (variableAccs.length === 0) return undefined;
-    const drivers = new Set(variableAccs.map(a => a.expenseDriver));
-    return drivers.size === 1 ? variableAccs[0].expenseDriver : undefined;
+// Resolves the value of any freely-picked KPI calculation term (an account, package, indicator
+// or revenue/result line, matched by its DRE row label) for a given scenario field.
+function resolveKpiTerm(termLabel: string | undefined, allRows: ForecastRow[], field: 'previa' | 'real' | 'budget'): number {
+    if (!termLabel) return 0;
+    const target = termLabel.trim().toLowerCase();
+    const row = allRows.find(r => r.label.trim().toLowerCase() === target);
+    if (!row) return 0;
+    // Forecast always projects off the Meta (budget) quantity for indicator/Receita Bruta lines,
+    // since there's no separately-tracked "forecast occupancy" distinct from the plan.
+    const usesMetaOnForecast = row.category === 'Indicators' || row.id === 'REV-TOTAL';
+    if (field === 'real' && usesMetaOnForecast) return row.budget;
+    if (field === 'real') return row.real;
+    if (field === 'previa') return row.previa;
+    return row.budget;
+}
+
+// The KPI formula is a free spreadsheet-style expression ("@[Line A] + @[Line B] / @[Line C]"),
+// evaluated with the same engine already used for Intelligent DRE calculated rows.
+function evaluateKpiCalculation(calc: KpiCalculation | undefined, allRows: ForecastRow[], field: 'previa' | 'real' | 'budget'): number {
+    if (!calc || !calc.formula || !calc.formula.trim()) return 0;
+    const context = { getValue: (name: string) => resolveKpiTerm(name, allRows, field) };
+    return evaluateFormula(calc.formula, context);
+}
+
+const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// "Calcular Forecast" can only auto-project a value when the formula is the simple ratio
+// "@[This account] / @[Denominator]" — anything else (extra terms, +, -, multiply, or a
+// numerator that isn't the account itself) has no single "rate" to reapply to the Meta.
+function parseSelfRatioDenominator(formula: string | undefined, selfName: string): string | null {
+    if (!formula) return null;
+    const self = escapeRegExp(selfName.trim());
+    const pattern = new RegExp(`^\\s*@\\[?${self}\\]?\\s*/\\s*@\\[?([^/*+\\-]+?)\\]?\\s*$`, 'i');
+    const match = formula.trim().match(pattern);
+    return match ? match[1].trim() : null;
 }
 
 function calculateRowValue(row: ForecastRow | null, config: ForecastConfig, allRows: ForecastRow[], base: 'forecast' | 'previa'): number {
@@ -2120,24 +2105,6 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
         }
         if (row.previaConfig?.method === 'Variable') {
             row.previa = calculateRowValue(row, row.previaConfig, updatedRows, 'previa');
-        }
-    });
-
-    // --- AUTO-CALCULATE KPI/DRIVER INDICATOR (R$ per driver unit) ---
-    // Whenever a value lands on a Variável account (import, manual entry or the Variable
-    // formula above), refresh its displayed rate so the KPI columns always reflect it.
-    updatedRows.forEach(row => {
-        if ((row.category !== 'Costs' && row.category !== 'Account') || row.rowConfig?.expenseType !== 'Variável' || !row.rowConfig?.expenseDriver) return;
-        const driver = row.rowConfig.expenseDriver;
-
-        const previaDriverQty = getDriverValue(driver, updatedRows, 'previa');
-        if (row.previaConfig && previaDriverQty > 0) {
-            row.previaConfig.factor = (row.previa || 0) / previaDriverQty;
-        }
-
-        const forecastDriverQty = getDriverValue(driver, updatedRows, 'forecast');
-        if (row.forecastConfig && forecastDriverQty > 0) {
-            row.forecastConfig.factor = (row.real || 0) / forecastDriverQty;
         }
     });
 

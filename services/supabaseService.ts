@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { Account, CostCenter, Hotel, BudgetVersion, User, GMDConfiguration, UserRole, ImportedRow } from '../types';
+import { Account, CostCenter, Hotel, BudgetVersion, User, GMDConfiguration, UserRole, ImportedRow, KpiCalculation } from '../types';
 
 // Supabase/PostgREST caps rows per request (default 1000) regardless of .limit(),
 // so tables that can exceed that must be paged with .range() to retrieve every row.
@@ -46,7 +46,8 @@ export const supabaseService = {
       budgetSource: a.budget_source,
       expenseType: a.expense_type,
       expenseDriver: a.expense_driver,
-      expenseFactor: a.expense_factor
+      expenseFactor: a.expense_factor,
+      kpiCalculation: a.kpi_calculation || undefined
     })) as Account[];
   },
 
@@ -71,6 +72,7 @@ export const supabaseService = {
       expense_type: a.expenseType,
       expense_driver: a.expenseDriver,
       expense_factor: a.expenseFactor,
+      kpi_calculation: a.kpiCalculation || null,
       updated_at: new Date().toISOString()
     }));
 
@@ -95,12 +97,32 @@ export const supabaseService = {
   async truncateAccounts(): Promise<void> {
     // 1. Nullify self-references to avoid FK violations during mass delete
     await supabase.from('accounts').update({ parent_id: null }).neq('id', 'placeholder-non-existent');
-    
+
     // 2. Now safe to delete all
     const { error } = await supabase
       .from('accounts')
       .delete()
-      .neq('id', 'placeholder-non-existent'); 
+      .neq('id', 'placeholder-non-existent');
+    if (error) throw error;
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PACKAGE KPI CONFIG (Cálculo de KPI por pacote)
+  // ═══════════════════════════════════════════════════════════════════════════
+  async getPackageKpiConfigs(): Promise<Record<string, KpiCalculation>> {
+    const { data, error } = await supabase.from('package_kpi_configs').select('package_name, kpi_calculation');
+    if (error) throw error;
+    const result: Record<string, KpiCalculation> = {};
+    (data || []).forEach((row: any) => {
+      if (row.kpi_calculation) result[row.package_name] = row.kpi_calculation;
+    });
+    return result;
+  },
+
+  async upsertPackageKpiConfig(packageName: string, calculation: KpiCalculation): Promise<void> {
+    const { error } = await supabase
+      .from('package_kpi_configs')
+      .upsert({ package_name: packageName, kpi_calculation: calculation, updated_at: new Date().toISOString() }, { onConflict: 'package_name' });
     if (error) throw error;
   },
 

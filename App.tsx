@@ -20,7 +20,7 @@ import ValidationsView from './components/ValidationsView';
 import { supabase } from './services/supabaseClient';
 import { supabaseService } from './services/supabaseService';
 import { Session } from '@supabase/supabase-js';
-import { ViewState, ImportedRow, User, Hotel, HotelCategory, HotelRegion, CostCenter, CostPackage, Account, GMDConfiguration, ModuleType, UserRole, BudgetVersion, LaborParameters, ScheduleItem, ProjectionType, ValidationRecord, DreSection } from './types';
+import { ViewState, ImportedRow, User, Hotel, HotelCategory, HotelRegion, CostCenter, CostPackage, Account, GMDConfiguration, ModuleType, UserRole, BudgetVersion, LaborParameters, ScheduleItem, ProjectionType, ValidationRecord, DreSection, KpiCalculation } from './types';
 import { Calendar, ArrowLeft, ArrowRight, Building2 as Building2Icon, Layers } from 'lucide-react';
 import { mockUsers, mockHotels, mockCostCenters, mockPackages, mockAccounts, mockGMDConfigs } from './services/mockData';
 import { Toaster, toast } from 'react-hot-toast';
@@ -292,6 +292,7 @@ const App: React.FC = () => {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [gmdConfigs, setGmdConfigs] = useState<GMDConfiguration[]>([]);
   const [dreConfigs, setDreConfigs] = useState<Record<string, DreSection[]>>({});
+  const [packageKpiConfigs, setPackageKpiConfigs] = useState<Record<string, KpiCalculation>>({});
   const [hotelCategories, setHotelCategories] = useState<HotelCategory[]>([]);
   const [hotelRegions, setHotelRegions] = useState<HotelRegion[]>([]);
 
@@ -406,7 +407,11 @@ const App: React.FC = () => {
           });
           setDreConfigs(configRecord);
         }
-        
+
+        const remotePackageKpiConfigs = await supabaseService.getPackageKpiConfigs();
+        if (remotePackageKpiConfigs && isMounted) setPackageKpiConfigs(remotePackageKpiConfigs);
+
+
         const remoteCategories = await supabaseService.getHotelCategories();
         if (remoteCategories && isMounted) setHotelCategories(remoteCategories);
 
@@ -993,6 +998,7 @@ const App: React.FC = () => {
               selectedHotel={selectedHotel}
               accounts={accounts}
               packages={packages}
+              packageKpiConfigs={packageKpiConfigs}
               hotels={hotels}
               isMonthClosed={isClosed}
               realOccupancyData={realOccupancyData}
@@ -1123,6 +1129,8 @@ const App: React.FC = () => {
             setBudgetSchedule={setBudgetSchedule}
             dreConfigs={dreConfigs}
             setDreConfigs={setDreConfigs}
+            packageKpiConfigs={packageKpiConfigs}
+            setPackageKpiConfigs={setPackageKpiConfigs}
             hotelCategories={hotelCategories}
             setHotelCategories={setHotelCategories}
             hotelRegions={hotelRegions}

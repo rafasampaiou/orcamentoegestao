@@ -118,6 +118,7 @@ export interface Account {
   expenseType?: ExpenseType;
   expenseDriver?: ExpenseDriver;
   expenseFactor?: number;
+  kpiCalculation?: KpiCalculation;
 }
 
 export interface GMDConfiguration {
@@ -144,6 +145,17 @@ export type ExpenseType = 'Fixo' | 'Variável';
 // Updated Driver List per user request
 export type ExpenseDriver = 'UH Ocupada' | 'PAX' | 'Receita' | 'Receita Bruta' | 'Emocionadores' | 'Emocionadores (CLT)' | 'KPI de produtividade' | 'Definido Manualmente' | 'Extras';
 export type ForecastOperator = 'multiply' | 'divide';
+
+// KPI formula freely built in Plano de Contas — a spreadsheet-style expression where each
+// term references ANY DRE Forecast line (account, package, indicator, revenue/GOP row) via
+// "@[Line Name]", combined with +, -, *, /, and parentheses (see utils/formulaEngine.ts).
+// e.g. "(@[Despesa com Pessoal] + @[Encargos Pessoais]) / @[UH Ocupada]"
+export type KpiFormat = 'number' | 'percent';
+
+export interface KpiCalculation {
+  formula: string;
+  format: KpiFormat;
+}
 
 export interface ForecastConfig {
   method: 'Fixed' | 'Variable';
@@ -191,6 +203,7 @@ export interface ForecastRow {
     inputType?: 'expense' | 'tax' | 'none';
     expenseType?: ExpenseType;
     expenseDriver?: ExpenseDriver;
+    kpiCalculation?: KpiCalculation;
     taxRate?: number;
     format?: 'currency' | 'percent' | 'integer' | 'decimal'; // Added decimal for ratios
   };
@@ -249,6 +262,7 @@ export type ViewState =
 
   // ADMIN > Tauá Geral
   | 'admin_geral_accounts'
+  | 'admin_geral_packages'
   | 'admin_geral_hotels'
   | 'admin_geral_costcenters'
   | 'admin_geral_users'

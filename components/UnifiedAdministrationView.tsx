@@ -1,7 +1,9 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { getForecastData, normalizeAccountName } from '../services/mockData';
 import { Plus, Trash2, X, Save, Briefcase, Pencil, Calendar, PieChart, Lock, LockOpen, Settings as SettingsIcon, Users, Search, Upload, Settings, Eye, FileText, Layout, Info, ChevronUp, GripVertical, Database, BedDouble, DollarSign, Target, LayoutList, ArrowUp, ArrowDown, Copy } from 'lucide-react';
-import { User, UserRole, CostCenter, ImportedRow, Hotel, Account, BudgetVersion, LaborParameters, ScheduleItem, ImportedCostCenter, CostPackage, GMDConfiguration, ViewState, DreSection, HotelCategory, HotelRegion, ImportedAccount } from '../types';
+import { User, UserRole, CostCenter, ImportedRow, Hotel, Account, BudgetVersion, LaborParameters, ScheduleItem, ImportedCostCenter, CostPackage, GMDConfiguration, ViewState, DreSection, HotelCategory, HotelRegion, ImportedAccount, KpiCalculation } from '../types';
+import { getDreReferenceOptions } from '../utils/dreReferences';
+import KpiCalculationEditor from './KpiCalculationEditor';
 import TimelineView from './TimelineView';
 import ReplicateBudgetModal, { ReplicationOptions } from './ReplicateBudgetModal';
 import { VersionInfoBanner } from './VersionInfoBanner';
@@ -327,6 +329,10 @@ interface UnifiedAdministrationViewProps {
   dreConfigs: Record<string, DreSection[]>;
   setDreConfigs: React.Dispatch<React.SetStateAction<Record<string, DreSection[]>>>;
 
+  // Package KPI Config
+  packageKpiConfigs: Record<string, KpiCalculation>;
+  setPackageKpiConfigs: React.Dispatch<React.SetStateAction<Record<string, KpiCalculation>>>;
+
   // Hotel Categories
   hotelCategories: HotelCategory[];
   setHotelCategories: React.Dispatch<React.SetStateAction<HotelCategory[]>>;
@@ -356,6 +362,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   laborParametersMap, setLaborParametersMap,
   budgetSchedule, setBudgetSchedule,
   dreConfigs, setDreConfigs,
+  packageKpiConfigs, setPackageKpiConfigs,
   hotelCategories, setHotelCategories,
   hotelRegions, setHotelRegions,
   currentView,
@@ -370,6 +377,13 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     accounts.forEach(a => { if (a.package) pkgs.add(a.package.trim()); });
     return Array.from(pkgs).sort();
   }, [accounts]);
+
+  // Every DRE line (account/package/indicator/revenue-result) selectable as a KPI calculation term
+  const dreReferenceOptions = useMemo(() => getDreReferenceOptions(accounts), [accounts]);
+
+  // Pacotes tab: which package is being edited and its (possibly unsaved) KPI calculation
+  const [selectedPackageForKpi, setSelectedPackageForKpi] = useState<string | null>(null);
+  const [packageKpiDraft, setPackageKpiDraft] = useState<KpiCalculation | undefined>(undefined);
 
   // Memoized cost centers list for Area Manager selection in User Form
   const uniqueCostCentersList = useMemo(() => {
@@ -393,6 +407,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       setMainTab('real'); setActiveRealTab('dre_params');
     }
     // ── Admin > Tauá Geral ─────────────────────────────────────────
+    else if (currentView === 'admin_geral_packages') {
+      setMainTab('geral'); setActiveGeralTab('registries'); setActiveRegistryTab('packages');
+    }
     else if (currentView === 'admin_geral_accounts' || currentView === 'admin_geral') {
       setMainTab('geral'); setActiveGeralTab('registries'); setActiveRegistryTab('accounts');
     } else if (currentView === 'admin_geral_hotels' || currentView === 'admin_hotels') {
@@ -1548,8 +1565,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
           allocationRules: acc.allocationRules || [],
           budgetSource: acc.budgetSource || '',
           expenseType: acc.expenseType || 'Fixo',
-          expenseDriver: acc.expenseDriver || 'Receita',
-          expenseFactor: acc.expenseFactor || 0
+          kpiCalculation: acc.kpiCalculation
         });
       }
     }
@@ -5381,35 +5397,14 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                   </select>
                                 </div>
                                 {accountForm.expenseType === 'Variável' && (
-                                  <>
-                                    <div>
-                                      <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Baseado em</label>
-                                      <select
-                                        value={accountForm.expenseDriver || 'Receita'}
-                                        onChange={e => setAccountForm({ ...accountForm, expenseDriver: e.target.value as any })}
-                                        className="w-full bg-slate-50 border-none rounded-lg p-2 text-xs font-bold focus:ring-2 focus:ring-indigo-500"
-                                      >
-                                        <option value="PAX">PAX (hóspedes)</option>
-                                        <option value="UH Ocupada">UH Ocupada</option>
-                                        <option value="Receita Bruta">Receita Bruta</option>
-                                        <option value="Emocionadores (CLT)">Emocionadores (CLT)</option>
-                                        <option value="KPI de produtividade">KPI de produtividade</option>
-                                        <option value="Definido Manualmente">Definido Manualmente</option>
-                                      </select>
-                                    </div>
-                                    <div className="mt-2 col-span-2">
-                                      <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Índice / Fator de Projeção</label>
-                                      <input
-                                        type="number"
-                                        step="0.000001"
-                                        value={accountForm.expenseFactor || 0}
-                                        onChange={e => setAccountForm({ ...accountForm, expenseFactor: parseFloat(e.target.value) })}
-                                        className="w-full bg-slate-50 border-none rounded-lg p-2 text-xs font-bold focus:ring-2 focus:ring-indigo-500"
-                                        placeholder="Ex: 0.05 para 5% ou 1.5 para multiplicador"
-                                      />
-                                      <p className="text-[9px] text-gray-400 mt-1 italic">Multiplicador aplicado sobre o direcionador selecionado.</p>
-                                    </div>
-                                  </>
+                                  <div className="col-span-2 mt-2">
+                                    <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Cálculo do KPI</label>
+                                    <KpiCalculationEditor
+                                      value={accountForm.kpiCalculation}
+                                      onChange={kpiCalculation => setAccountForm({ ...accountForm, kpiCalculation })}
+                                      options={dreReferenceOptions}
+                                    />
+                                  </div>
                                 )}
                               </div>
                             </div>
@@ -5426,6 +5421,53 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                       <button onClick={() => setEditingId(null)} className="flex-1 py-2 text-xs font-bold text-gray-400 hover:text-gray-600">Cancelar</button>
                       <button onClick={handleSaveAccount} className="flex-[2] py-2 bg-indigo-600 text-white rounded-lg font-bold text-xs hover:bg-indigo-700 flex items-center justify-center gap-2 shadow-sm"><Save size={14} /> Salvar</button>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {activeRegistryTab === 'packages' && (
+                <div className="flex-1 flex overflow-hidden">
+                  <div className="w-1/3 border-r border-gray-100 overflow-y-auto">
+                    {uniquePackagesList.map(pkgName => (
+                      <button
+                        key={pkgName}
+                        onClick={() => { setSelectedPackageForKpi(pkgName); setPackageKpiDraft(packageKpiConfigs[pkgName]); }}
+                        className={`w-full text-left px-4 py-3 text-xs font-bold border-b border-gray-50 hover:bg-slate-50 ${selectedPackageForKpi === pkgName ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600'}`}
+                      >
+                        {pkgName}
+                        {packageKpiConfigs[pkgName] && <span className="ml-2 text-[9px] font-normal text-emerald-600">KPI configurado</span>}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex-1 p-6 overflow-y-auto">
+                    {selectedPackageForKpi ? (
+                      <div className="max-w-md">
+                        <h3 className="text-sm font-bold text-gray-800 mb-4">Cálculo de KPI — {selectedPackageForKpi}</h3>
+                        <KpiCalculationEditor
+                          value={packageKpiDraft}
+                          onChange={setPackageKpiDraft}
+                          options={dreReferenceOptions}
+                        />
+                        <button
+                          onClick={async () => {
+                            if (!selectedPackageForKpi || !packageKpiDraft) return;
+                            try {
+                              await supabaseService.upsertPackageKpiConfig(selectedPackageForKpi, packageKpiDraft);
+                              setPackageKpiConfigs(prev => ({ ...prev, [selectedPackageForKpi]: packageKpiDraft }));
+                              toast.success('Cálculo de KPI do pacote salvo!');
+                            } catch (err: any) {
+                              toast.error(`Erro ao salvar: ${err.message || JSON.stringify(err)}`);
+                            }
+                          }}
+                          disabled={!packageKpiDraft?.formula?.trim()}
+                          className="mt-4 px-5 py-2 bg-indigo-600 text-white rounded-lg font-bold text-xs hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          Salvar
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400">Selecione um pacote à esquerda para configurar o cálculo de KPI dele.</p>
+                    )}
                   </div>
                 </div>
               )}
