@@ -534,7 +534,7 @@ const generateRow = (
     isTotal = false,
     indentLevel = 0,
     gmdManagerName?: string,
-    config?: { type?: ExpenseType, driver?: ExpenseDriver, kpiCalculation?: KpiCalculation, taxRate?: number, inputType?: 'expense' | 'tax' | 'none', format?: 'currency' | 'percent' | 'integer' | 'decimal', method?: 'Fixed' | 'Variable', factor?: number },
+    config?: { type?: ExpenseType, driver?: ExpenseDriver, kpiCalculation?: KpiCalculation, taxRate?: number, inputType?: 'expense' | 'tax' | 'none', format?: 'currency' | 'percent' | 'integer' | 'decimal', method?: 'Fixed' | 'Variable', factor?: number, precomputedKpi?: { previa: number; real: number; budget: number; format: 'currency' | 'percent' | 'integer' | 'decimal', denominator?: { previa: number; real: number; budget: number } } },
     indicatorSection?: string,
     dreConfig?: {
         isCalculated?: boolean,
@@ -592,7 +592,8 @@ const generateRow = (
             expenseDriver: config.driver,
             kpiCalculation: config.kpiCalculation,
             taxRate: config.taxRate,
-            format: config.format || 'currency'
+            format: config.format || 'currency',
+            precomputedKpi: config.precomputedKpi
         } : { inputType: 'none', format: 'currency' },
 
         // Intelligent DRE fields
@@ -905,23 +906,48 @@ export const getForecastData = (
     });
 
     // 1.02 Receitas Extras
-    rows.push(generateRow('REV-EXTRA', '1.02', 'Revenue', 'Receitas Extras', 0, 0, 0, 0, true, false, 1));
-
     const revExtraItems = [
-        { id: 'REV-EXTRA-LAZER', code: '1.02.01', label: 'Lazer', sourceId: 'lazer_extra_rev' },
-        { id: 'REV-EXTRA-EVENTOS', code: '1.02.02', label: 'Eventos', sourceId: 'event_extra_rev' },
+        { id: 'REV-EXTRA-LAZER', code: '1.02.01', label: 'Lazer', sourceId: 'lazer_extra_rev', paxSourceId: 'lazer_pax' },
+        { id: 'REV-EXTRA-EVENTOS', code: '1.02.02', label: 'Eventos', sourceId: 'event_extra_rev', paxSourceId: 'event_pax' },
         { id: 'REV-EXTRA-OR', code: '1.02.03', label: 'OR Extras', sourceId: 'geral_or_extras' }
     ];
 
-    revExtraItems.forEach(item => {
+    // KPI for Lazer/Eventos = Receita ÷ PAX do segmento. Precomputed directly (instead of via the
+    // @[Label] formula engine) because "Lazer"/"Eventos" labels collide with Receita de
+    // Apartamentos' own Lazer/Eventos rows, which would make a label lookup ambiguous.
+    const revExtraKpiSum = { previa: 0, real: 0, budget: 0 };
+
+    const revExtraItemRows = revExtraItems.map(item => {
         const valBudget = budgetOccupancyData[item.sourceId] ? budgetOccupancyData[item.sourceId][monthIdx] : 0;
         const valReal = getRealOccValue(`${item.sourceId}_forecast`) || 0;
         const valPrevia = getRealOccValue(`${item.sourceId}_previa`) || 0;
-        
+
         let valLY = getLYOccValue(`${item.sourceId}_forecast`) || 0;
 
-        rows.push(generateRow(item.id, item.code, 'Revenue', item.label, valBudget, valReal, valLY, valPrevia, false, false, 2));
+        let precomputedKpi: { previa: number; real: number; budget: number; format: 'decimal'; denominator: { previa: number; real: number; budget: number } } | undefined;
+        if (item.paxSourceId) {
+            const paxBudget = budgetOccupancyData[item.paxSourceId] ? budgetOccupancyData[item.paxSourceId][monthIdx] : 0;
+            const paxReal = getRealOccValue(`${item.paxSourceId}_forecast`) || 0;
+            const paxPrevia = getRealOccValue(`${item.paxSourceId}_previa`) || 0;
+
+            precomputedKpi = {
+                previa: paxPrevia > 0 ? valPrevia / paxPrevia : 0,
+                real: paxReal > 0 ? valReal / paxReal : 0,
+                budget: paxBudget > 0 ? valBudget / paxBudget : 0,
+                format: 'decimal',
+                denominator: { previa: paxPrevia, real: paxReal, budget: paxBudget }
+            };
+
+            revExtraKpiSum.previa += precomputedKpi.previa;
+            revExtraKpiSum.real += precomputedKpi.real;
+            revExtraKpiSum.budget += precomputedKpi.budget;
+        }
+
+        return generateRow(item.id, item.code, 'Revenue', item.label, valBudget, valReal, valLY, valPrevia, false, false, 2, undefined, precomputedKpi ? { precomputedKpi } : undefined);
     });
+
+    rows.push(generateRow('REV-EXTRA', '1.02', 'Revenue', 'Receitas Extras', 0, 0, 0, 0, true, false, 1, undefined, { precomputedKpi: { ...revExtraKpiSum, format: 'decimal' } }));
+    rows.push(...revExtraItemRows);
 
     // 1.03 Cancelamento de Time Share
     const valBudgetTS = budgetOccupancyData['geral_cancel_ts'] ? budgetOccupancyData['geral_cancel_ts'][monthIdx] : 0;

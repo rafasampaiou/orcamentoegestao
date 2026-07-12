@@ -208,6 +208,16 @@ export interface ForecastRow {
     kpiCalculation?: KpiCalculation;
     taxRate?: number;
     format?: 'currency' | 'percent' | 'integer' | 'decimal'; // Added decimal for ratios
+    // Already-computed KPI value, bypassing the @[Label] formula engine — used where the row's
+    // label collides with another row's label (e.g. "Lazer" appears both under Receita de
+    // Apartamentos and Receitas Extras), so a formula-string lookup by label would be ambiguous.
+    precomputedKpi?: {
+      previa: number; real: number; budget: number;
+      format: 'currency' | 'percent' | 'integer' | 'decimal';
+      // Present only on rows whose KPI is a single ratio (value ÷ denominator) — lets the KPI
+      // Prévia cell be typed directly, back-solving the row's own Prévia from denominator.previa.
+      denominator?: { previa: number; real: number; budget: number };
+    };
   };
   
   // Intelligent DRE fields
