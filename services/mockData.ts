@@ -810,9 +810,11 @@ export const getForecastData = (
     const gMoExtraPrevia = getRealOccValue('geral_mo_extra_previa') ?? 0;
     const gMoExtraLY = getLYOccValue('geral_mo_extra_forecast') ?? 0;
 
-    const gMoTotalReal = getRealOccValue('geral_mo_total_forecast') ?? 0;
-    const gMoTotalPrevia = getRealOccValue('geral_mo_total_previa') ?? 0;
-    const gMoTotalLY = getLYOccValue('geral_mo_total_forecast') ?? 0;
+    // Total is always derived from CLT + Extra, never read from a stored field — this
+    // stays correct even for budget versions saved before this Total row existed.
+    const gMoTotalReal = gMoCltReal + gMoExtraReal;
+    const gMoTotalPrevia = gMoCltPrevia + gMoExtraPrevia;
+    const gMoTotalLY = gMoCltLY + gMoExtraLY;
 
     // Retrieve budget values from budgetOccupancyData based on the selectedMonth (0-indexed)
     const monthIdx = selectedMonth ? selectedMonth - 1 : 0;
@@ -826,7 +828,7 @@ export const getForecastData = (
     const gChdBudget = budgetOccupancyData['geral_chd'] ? budgetOccupancyData['geral_chd'][monthIdx] : 0;
     const gMoCltBudget = budgetOccupancyData['geral_mo_clt'] ? budgetOccupancyData['geral_mo_clt'][monthIdx] : 0;
     const gMoExtraBudget = budgetOccupancyData['geral_mo_extra'] ? budgetOccupancyData['geral_mo_extra'][monthIdx] : 0;
-    const gMoTotalBudget = budgetOccupancyData['geral_mo_total'] ? budgetOccupancyData['geral_mo_total'][monthIdx] : 0;
+    const gMoTotalBudget = gMoCltBudget + gMoExtraBudget;
 
     // DM and Revpar Budget calculation based on imported budget vs occupancy, or from budgetOccupancyData if there were a field.
     // We'll calculate it from imported if possible, otherwise 0 or basic calc.

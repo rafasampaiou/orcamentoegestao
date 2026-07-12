@@ -221,8 +221,12 @@ export const BudgetOccupancyTable: React.FC<{
                                 );
                             }
 
-                            const rowValues = data[row.id] || Array(12).fill(0);
-                            
+                            // Total is always derived from CLT + Extra at render time, never read from a
+                            // stored field — keeps it correct even for budget data saved before this row existed.
+                            const rowValues = row.id === 'geral_mo_total'
+                                ? Array.from({ length: 12 }, (_, idx) => (data['geral_mo_clt']?.[idx] || 0) + (data['geral_mo_extra']?.[idx] || 0))
+                                : (data[row.id] || Array(12).fill(0));
+
                             let total = rowValues.reduce((sum, v, idx) => sum + ((!visibleMonths || visibleMonths.includes(idx)) ? (v || 0) : 0), 0);
                             const getSum = (id: string) => (data[id] || []).reduce((sum, v, idx) => sum + ((!visibleMonths || visibleMonths.includes(idx)) ? (v || 0) : 0), 0);
                             
@@ -849,6 +853,12 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             if (fixedFields.includes(rowId)) {
                 forecast = meta;
                 previa = meta;
+            } else if (rowId === 'geral_mo_total') {
+                // Total is always derived from CLT + Extra at render time, never read from a
+                // stored field — keeps it correct even for data saved before this row existed.
+                meta = (budgetData?.['geral_mo_clt']?.[monthIdx] || 0) + (budgetData?.['geral_mo_extra']?.[monthIdx] || 0);
+                forecast = (currentRealData['geral_mo_clt_forecast'] || 0) + (currentRealData['geral_mo_extra_forecast'] || 0);
+                previa = (currentRealData['geral_mo_clt_previa'] || 0) + (currentRealData['geral_mo_extra_previa'] || 0);
             } else {
                 forecast = forecast || 0;
                 previa = previa || 0;
