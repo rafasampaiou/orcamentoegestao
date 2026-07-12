@@ -1083,6 +1083,9 @@ export const getForecastData = (
         // key space so tagging overrides by meeting type can never affect normal Real/Budget/Previa
         // import matching.
         const overrideIndex = new Map<string, number>();
+        const dbgAllOverrideRows = importedData.filter(r => (r.conta || '').trim().toLowerCase().startsWith('override_'));
+        let dbgPassedMonthYear = 0;
+        let dbgPassedProjectionType = 0;
         if (selectedMonth && selectedYear) {
             importedData.forEach(row => {
                 if (row.status !== 'valid') return;
@@ -1092,8 +1095,10 @@ export const getForecastData = (
                 const rYear = parseInt(row.ano);
                 const rMonth = parseInt(row.mes);
                 if (rMonth !== selectedMonth || rYear !== selectedYear) return;
+                dbgPassedMonthYear++;
 
                 if ((row.projectionType || '') !== (activeProjectionType || '')) return;
+                dbgPassedProjectionType++;
 
                 const scen = (row.cenario || '').trim().toLowerCase();
                 let normScenario = '';
@@ -1109,6 +1114,14 @@ export const getForecastData = (
                 overrideIndex.set(`${normHotel}|${normScenario}|${conta}`, val);
             });
         }
+        console.log('[DEBUG applyOverrides]', {
+            selectedMonth, selectedYear, selectedHotelName, activeHotelCode, activeProjectionType,
+            totalOverrideRowsInImportedData: dbgAllOverrideRows.length,
+            sampleOverrideRow: dbgAllOverrideRows[0] ? { ano: dbgAllOverrideRows[0].ano, mes: dbgAllOverrideRows[0].mes, hotel: dbgAllOverrideRows[0].hotel, cenario: dbgAllOverrideRows[0].cenario, projectionType: dbgAllOverrideRows[0].projectionType, conta: dbgAllOverrideRows[0].conta } : null,
+            passedMonthYearFilter: dbgPassedMonthYear,
+            passedProjectionTypeFilter: dbgPassedProjectionType,
+            finalOverrideIndexSize: overrideIndex.size
+        });
 
         rows.forEach(r => {
             const targetName = `override_${r.id}`.toLowerCase();
