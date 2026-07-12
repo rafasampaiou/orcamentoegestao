@@ -686,14 +686,13 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
                 if (account) {
                     const currentConfig = calculationBase === 'forecast' ? row.forecastConfig : (row.previaConfig || { method: 'Fixed' });
-                    // Only a self ÷ denominator formula can be turned into a projection — it's the
-                    // account's own rate (observed in Prévia) reapplied to the Meta's denominator.
+                    // Only a self ÷ denominator formula can be turned into a projection — the
+                    // Forecast replicates the Meta's own KPI rate, reapplied to the Meta's denominator.
                     const selfDenominator = parseSelfRatioDenominator(account.kpiCalculation?.formula, account.name);
 
                     if (account.expenseType === 'Variável' && selfDenominator) {
-                        const denomPrevia = resolveKpiTerm(selfDenominator, prevData, 'previa');
                         const denomMeta = resolveKpiTerm(selfDenominator, prevData, 'budget');
-                        const rate = denomPrevia !== 0 ? (row.previa || 0) / denomPrevia : 0;
+                        const rate = denomMeta !== 0 ? (row.budget || 0) / denomMeta : 0;
                         const projected = rate * denomMeta;
 
                         const newConfig = { ...currentConfig, method: 'Fixed' as const, manualValue: projected };
