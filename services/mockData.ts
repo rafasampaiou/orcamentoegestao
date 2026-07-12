@@ -617,7 +617,8 @@ export const getForecastData = (
     activeBudgetVersionId?: string,
     currentAccounts: Account[] = mockAccounts,
     currentPackages: CostPackage[] = mockPackages,
-    budgetOccupancyData: Record<string, number[]> = {}
+    budgetOccupancyData: Record<string, number[]> = {},
+    activeProjectionType?: string
 ): ForecastRow[] => {
 
     const rows: ForecastRow[] = [];
@@ -1077,14 +1078,46 @@ export const getForecastData = (
         const activeHotelCodeUpper = activeHotelCode.trim().toUpperCase();
         const selHotelNameUpper = (selectedHotelName || '').trim().toUpperCase();
 
+        // Validated Forecast snapshots (override_<rowId> rows) get their own index, scoped by
+        // Versão do Forecast (activeProjectionType) — kept separate from dataIndex/getImportedValue's
+        // key space so tagging overrides by meeting type can never affect normal Real/Budget/Previa
+        // import matching.
+        const overrideIndex = new Map<string, number>();
+        if (selectedMonth && selectedYear) {
+            importedData.forEach(row => {
+                if (row.status !== 'valid') return;
+                const conta = (row.conta || '').trim().toLowerCase();
+                if (!conta.startsWith('override_')) return;
+
+                const rYear = parseInt(row.ano);
+                const rMonth = parseInt(row.mes);
+                if (rMonth !== selectedMonth || rYear !== selectedYear) return;
+
+                if ((row.projectionType || '') !== (activeProjectionType || '')) return;
+
+                const scen = (row.cenario || '').trim().toLowerCase();
+                let normScenario = '';
+                if (scen === 'real' || scen === 'realizado') normScenario = 'REAL';
+                else if (scen === 'previa' || scen === 'prévia') normScenario = 'PREVIA';
+                else if (scen === 'meta' || scen === 'budget') normScenario = 'BUDGET';
+                else return;
+
+                const val = parseFloat((row.valor || '').replace(',', '.'));
+                if (isNaN(val)) return;
+
+                const normHotel = row.hotel.trim().toUpperCase();
+                overrideIndex.set(`${normHotel}|${normScenario}|${conta}`, val);
+            });
+        }
+
         rows.forEach(r => {
             const targetName = `override_${r.id}`.toLowerCase();
 
             const tryOverride = (scenarioKey: string) => {
                 for (const h of [selHotelNameUpper, activeHotelCodeUpper].filter(Boolean)) {
-                    const key = `${selectedYear}|${selectedMonth}|${h}|${scenarioKey}|${targetName}`;
-                    if (dataIndex.has(key)) {
-                        return dataIndex.get(key);
+                    const key = `${h}|${scenarioKey}|${targetName}`;
+                    if (overrideIndex.has(key)) {
+                        return overrideIndex.get(key);
                     }
                 }
                 return undefined;

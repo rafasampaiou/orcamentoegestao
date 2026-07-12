@@ -384,7 +384,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         if (forecastStructure.length > 0) {
             newData = getDynamicForecastData(forecastStructure, selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData);
         } else {
-            newData = getForecastData(selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData);
+            newData = getForecastData(selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData, activeProjectionType);
         }
 
         const initializedData = newData.map(row => {
@@ -396,7 +396,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             };
         });
         return recalculateTotals(initializedData, packages, accounts);
-    }, [selectedMonth, selectedYear, financialData, selectedHotel, packages, accounts, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, budgetOccupancyData, dreConfigs, isMonthClosed]);
+    }, [selectedMonth, selectedYear, financialData, selectedHotel, packages, accounts, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, budgetOccupancyData, dreConfigs, isMonthClosed, activeProjectionType]);
 
     useEffect(() => {
         setData(derivedData);
@@ -714,7 +714,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             const activeHotel = hotels?.find(h => h.id === selectedHotel || h.name === selectedHotel);
             const hName = activeHotel?.name || selectedHotel || '';
             if (hName) {
-                await supabaseService.saveForecastProjections(hName, selectedMonth || 1, selectedYear || 2026, activeRealVersionId || 'default', rowsToSave);
+                await supabaseService.saveForecastProjections(hName, selectedMonth || 1, selectedYear || 2026, activeRealVersionId || 'default', rowsToSave, activeProjectionType);
             }
 
             const newValidation: import('../types').ValidationRecord = {
@@ -728,6 +728,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 validatedAt: new Date().toISOString(),
                 status: 'Validado'
             };
+
+            await supabaseService.saveValidation(newValidation);
 
             if (setValidations) {
                 setValidations(prev => [...prev, newValidation]);
@@ -1958,7 +1960,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         const activeHotel = hotels?.find(h => h.id === selectedHotel || h.name === selectedHotel);
                                         const hName = activeHotel?.name || selectedHotel || '';
                                         if (hName) {
-                                            await supabaseService.saveForecastProjections(hName, selectedMonth || 1, selectedYear || 2026, activeRealVersionId || 'default', rowsToSave);
+                                            await supabaseService.saveForecastProjections(hName, selectedMonth || 1, selectedYear || 2026, activeRealVersionId || 'default', rowsToSave, activeProjectionType);
                                         }
 
                                         const newValidation: import('../types').ValidationRecord = {
@@ -1972,6 +1974,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             validatedAt: new Date().toISOString(),
                                             status: 'Validado'
                                         };
+
+                                        await supabaseService.saveValidation(newValidation);
 
                                         if (setValidations) {
                                             setValidations(prev => [...prev, newValidation]);

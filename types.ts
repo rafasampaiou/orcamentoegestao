@@ -333,6 +333,10 @@ export interface ImportedRow {
     pacote?: string; // Pacote
     pacoteMaster?: string; // Pacote Master
     diretoria?: string; // Diretoria
+
+    // Set only on validated-Forecast override rows (account_name = "override_<rowId>") — scopes
+    // that snapshot to a specific Versão do Forecast (Reunião de Ritmo / FCA N1 / FCA N2 / Fechamento).
+    projectionType?: string;
 }
 
 export interface ImportHistory {

@@ -381,6 +381,15 @@ const App: React.FC = () => {
         const remotePackageKpiConfigs = await supabaseService.getPackageKpiConfigs();
         if (remotePackageKpiConfigs && isMounted) setPackageKpiConfigs(remotePackageKpiConfigs);
 
+        try {
+          const remoteValidations = await supabaseService.getValidations();
+          if (remoteValidations && isMounted) setValidations(remoteValidations);
+        } catch (valError) {
+          // Don't let a missing 'validations' table (e.g. before the migration has been run)
+          // abort the rest of this startup fetch sequence.
+          console.warn('Could not fetch validations from Supabase.', valError);
+        }
+
 
         const remoteCategories = await supabaseService.getHotelCategories();
         if (remoteCategories && isMounted) setHotelCategories(remoteCategories);
@@ -485,6 +494,7 @@ const App: React.FC = () => {
             diretoria: r.directorate || '',
             versionId: r.version_id || '',
             importId: r.import_id || '',
+            projectionType: r.projection_type || '',
             status: 'valid' as const,
           }));
           setImportedFinancialData(mapped);

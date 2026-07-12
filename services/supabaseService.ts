@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { Account, CostCenter, Hotel, BudgetVersion, User, GMDConfiguration, UserRole, ImportedRow, KpiCalculation } from '../types';
+import { Account, CostCenter, Hotel, BudgetVersion, User, GMDConfiguration, UserRole, ImportedRow, KpiCalculation, ValidationRecord } from '../types';
 
 // Supabase/PostgREST caps rows per request (default 1000) regardless of .limit(),
 // so tables that can exceed that must be paged with .range() to retrieve every row.
@@ -745,11 +745,14 @@ export const supabaseService = {
     month: number,
     year: number,
     versionId: string,
-    rows: { accountName: string, costCenter?: string, value: number, scenario: 'Real' | 'Previa' | 'Meta' }[]
+    rows: { accountName: string, costCenter?: string, value: number, scenario: 'Real' | 'Previa' | 'Meta' }[],
+    projectionType?: string
   ): Promise<void> {
-    // 1. Delete existing overrides for this specific context
+    // 1. Delete existing overrides for this specific context (scoped to this Versão do Forecast
+    // so validating a different meeting type — Reunião de Ritmo / FCA N1 / FCA N2 / Fechamento —
+    // never clobbers another meeting type's saved snapshot).
     // We only delete Real and Previa scenarios to preserve meta/budget
-    const { error: deleteError } = await supabase
+    let deleteQuery = supabase
       .from('financial_data')
       .delete()
       .eq('hotel', hotelName)
@@ -757,6 +760,8 @@ export const supabaseService = {
       .eq('year', year)
       .eq('version_id', versionId)
       .in('scenario', ['Real', 'Previa', 'Meta']);
+    if (projectionType) deleteQuery = deleteQuery.eq('projection_type', projectionType);
+    const { error: deleteError } = await deleteQuery;
 
     if (deleteError) throw deleteError;
 
@@ -772,7 +777,8 @@ export const supabaseService = {
       cost_center: r.costCenter || '',
       value: r.value,
       scenario: r.scenario,
-      real_meta: r.scenario === 'Real' ? 'Real' : (r.scenario === 'Meta' ? 'Meta' : 'Previa')
+      real_meta: r.scenario === 'Real' ? 'Real' : (r.scenario === 'Meta' ? 'Meta' : 'Previa'),
+      projection_type: projectionType || null
     }));
 
     // 3. Batch insert
@@ -783,6 +789,41 @@ export const supabaseService = {
         .insert(records.slice(i, i + batchSize));
       if (insertError) throw insertError;
     }
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // VALIDATIONS (Reunião de Ritmo / FCA N1 / FCA N2 / Fechamento oficial)
+  // ═══════════════════════════════════════════════════════════════════════════
+  async getValidations(): Promise<ValidationRecord[]> {
+    const rows = await fetchAllRows('validations');
+    return rows.map((r: any) => ({
+      id: r.id,
+      hotelId: r.hotel_id,
+      userId: r.user_id || '',
+      userName: r.user_name || '',
+      month: r.month,
+      year: r.year,
+      projectionType: r.projection_type,
+      validatedAt: r.validated_at,
+      status: r.status || 'Validado'
+    }));
+  },
+
+  async saveValidation(record: ValidationRecord): Promise<void> {
+    const { error } = await supabase
+      .from('validations')
+      .insert({
+        id: record.id,
+        hotel_id: record.hotelId,
+        user_id: record.userId,
+        user_name: record.userName,
+        month: record.month,
+        year: record.year,
+        projection_type: record.projectionType,
+        validated_at: record.validatedAt,
+        status: record.status
+      });
+    if (error) throw error;
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
