@@ -956,8 +956,8 @@ export const getForecastData = (
         const [masterName, pkgName] = key.split('|');
         const pkgAccs = expenseAccounts.filter(a => (a.masterPackage || '').toLowerCase() === (masterName || '').toLowerCase() && (a.package || '').toLowerCase() === (pkgName || '').toLowerCase()).map(a => ({
             ...a,
-            expenseType: defaultAccountConfigs[a.id]?.expenseType,
-            expenseDriver: defaultAccountConfigs[a.id]?.expenseDriver
+            expenseType: a.expenseType || defaultAccountConfigs[a.name]?.expenseType,
+            expenseDriver: a.expenseDriver || defaultAccountConfigs[a.name]?.expenseDriver
         }));
         const pkgCode = pkgAccs[0]?.packageCode || '';
 
@@ -1011,8 +1011,11 @@ export const getForecastData = (
 
     // 4. RESULTS
     rows.push(generateRow('SPACER-RES', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
-    rows.push(generateRow('RES-OP-SEM-IMP', '6.00.00', 'Result', 'RESULTADO OPERACIONAL (G.O.P) SEM IMPOSTOS', 0, 0, 0, 0, true, true, 0));
-    rows.push(generateRow('RES-OP-COM-IMP', '6.01.00', 'Result', 'RESULTADO OPERACIONAL (G.O.P) COM IMPOSTOS', 0, 0, 0, 0, true, true, 0));
+    rows.push(generateRow('RES-OP-COM-IMP', '6.00.00', 'Result', 'GOP COM DEDUÇÃO DE IMPOSTOS (R$)', 0, 0, 0, 0, true, true, 0));
+    rows.push(generateRow('RES-OP-COM-IMP-PCT', '', 'Result', 'GOP COM DEDUÇÃO DE IMPOSTOS (%)', 0, 0, 0, 0, true, true, 0, undefined, { inputType: 'none', format: 'percent' }));
+    rows.push(generateRow('SPACER-RES-GOP', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
+    rows.push(generateRow('RES-OP-SEM-IMP', '6.01.00', 'Result', 'GOP SEM DEDUÇÃO DE IMPOSTOS (R$)', 0, 0, 0, 0, true, true, 0));
+    rows.push(generateRow('RES-OP-SEM-IMP-PCT', '', 'Result', 'GOP SEM DEDUÇÃO DE IMPOSTOS (%)', 0, 0, 0, 0, true, true, 0, undefined, { inputType: 'none', format: 'percent' }));
 
     // KPI: Transformação / Reatividade
     rows.push(generateRow('KPI-TRANS-BUDGET', '', 'Result', 'Transformação/Reatividade (Meta)', 0, 0, 0, 0, true, true, 0));
@@ -1069,14 +1072,15 @@ export const getDynamicForecastData = (
     currentPackages: CostPackage[] = mockPackages,
     budgetOccupancyData: Record<string, number[]> = {}
 ): ForecastRow[] => {
-    // Merge factory configs to ensure Variable settings are always respected
+    // Merge factory configs as a fallback only — the account's own Plano de Contas
+    // registration (expenseType/expenseDriver) always takes precedence.
     const activeAccounts = currentAccounts.map(acc => {
         const factoryConfig = defaultAccountConfigs[acc.name];
         if (factoryConfig) {
             return {
                 ...acc,
-                expenseType: factoryConfig.expenseType || acc.expenseType,
-                expenseDriver: factoryConfig.expenseDriver || acc.expenseDriver
+                expenseType: acc.expenseType || factoryConfig.expenseType,
+                expenseDriver: acc.expenseDriver || factoryConfig.expenseDriver
             };
         }
         return acc;

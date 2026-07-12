@@ -63,7 +63,7 @@ const formatPercentDiff = (val: number | undefined) => {
     return `${val > 0 ? '+' : ''}${val.toFixed(1)}%`;
 };
 
-const blueRowIds = ['REV-TOTAL', 'REV-NET', 'CST-HEAD', 'RES-OP', 'RES-PCT', 'REV-IMP', 'RES-OP-SEM-IMP', 'RES-OP-COM-IMP'];
+const blueRowIds = ['REV-TOTAL', 'REV-NET', 'CST-HEAD', 'RES-OP', 'RES-PCT', 'REV-IMP', 'RES-OP-SEM-IMP', 'RES-OP-COM-IMP', 'RES-OP-SEM-IMP-PCT', 'RES-OP-COM-IMP-PCT'];
 
 // Mapeamento: Label do template → ID da linha no DRE Forecast
 // As colunas do template são: Descrição | Prévia | Forecast | Meta | Last Year
@@ -1116,6 +1116,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 const formatType = row.rowConfig?.format || 'currency';
 
                                 const hideKpi = isSectionHeader || isBlueHighlight || isTotal || row.category === 'Indicators' || row.category === 'Revenue';
+                                const isAccountKpi = (row.category === 'Costs' || row.category === 'Account') && row.rowConfig?.expenseType === 'Variável' && !!row.rowConfig?.expenseDriver;
+                                const packageKpiDriver = !hideKpi && row.category === 'Package' ? getPackageDriver(row.label, accounts) : undefined;
 
                                 const renderFinancialCells = (isHeaderOrTotal = false, customBg = "") => {
                                     const effectiveBg = row.bgColor || (isBlueHighlight ? 'bg-sky-100 border-sky-200' : (customBg || 'bg-blue-50/20 border-r border-blue-50'));
@@ -1279,8 +1281,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             )}
 
                                             {columnVisibility.driverPrevia && (
-                                                <td className={`px-1 text-center tabular-nums text-xs truncate ${hideKpi || row.rowConfig?.expenseType !== 'Variável' ? 'bg-transparent border-b border-gray-100 text-transparent' : 'border border-slate-200 text-slate-500 bg-slate-50 shadow-sm'}`}>
-                                                    {!hideKpi && row.category === 'Costs' && row.rowConfig?.expenseType === 'Variável' && row.rowConfig?.expenseDriver
+                                                <td className={`px-1 text-center tabular-nums text-xs truncate ${hideKpi || (!isAccountKpi && !packageKpiDriver) ? 'bg-transparent border-b border-gray-100 text-transparent' : 'border border-slate-200 text-slate-500 bg-slate-50 shadow-sm'}`}>
+                                                    {!hideKpi && isAccountKpi
                                                         ? (canEditForecast && !isMonthClosed && isRowEditableForUser(row) ? (
                                                             <FormattedInput
                                                                 inputRef={(el: any) => { inputRefs.current[`input-kpi-previa-${row.id}`] = el; }}
@@ -1290,13 +1292,15 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                                                 onChange={(val: number) => handleKpiFactorChange(row.id, 'previa', val)}
                                                             />
                                                         ) : formatValue(row.previaConfig?.factor ?? 0, 'decimal'))
-                                                        : ''}
+                                                        : (!hideKpi && packageKpiDriver
+                                                            ? formatValue((row.previa || 0) / (getDriverValue(packageKpiDriver, data, 'previa') || 1), 'decimal')
+                                                            : '')}
                                                 </td>
                                             )}
 
                                             {columnVisibility.driverForecast && (
-                                                <td className={`px-1 text-center tabular-nums text-xs truncate ${hideKpi || row.rowConfig?.expenseType !== 'Variável' ? 'bg-transparent border-b border-gray-100 text-transparent' : 'border border-slate-200 text-slate-500 bg-slate-50 shadow-sm'}`}>
-                                                    {!hideKpi && row.category === 'Costs' && row.rowConfig?.expenseType === 'Variável' && row.rowConfig?.expenseDriver
+                                                <td className={`px-1 text-center tabular-nums text-xs truncate ${hideKpi || (!isAccountKpi && !packageKpiDriver) ? 'bg-transparent border-b border-gray-100 text-transparent' : 'border border-slate-200 text-slate-500 bg-slate-50 shadow-sm'}`}>
+                                                    {!hideKpi && isAccountKpi
                                                         ? (canEditForecast && !isMonthClosed && isRowEditableForUser(row) ? (
                                                             <FormattedInput
                                                                 inputRef={(el: any) => { inputRefs.current[`input-kpi-forecast-${row.id}`] = el; }}
@@ -1306,15 +1310,19 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                                                 onChange={(val: number) => handleKpiFactorChange(row.id, 'forecast', val)}
                                                             />
                                                         ) : formatValue(row.forecastConfig?.factor ?? 0, 'decimal'))
-                                                        : ''}
+                                                        : (!hideKpi && packageKpiDriver
+                                                            ? formatValue((row.real || 0) / (getDriverValue(packageKpiDriver, data, 'forecast') || 1), 'decimal')
+                                                            : '')}
                                                 </td>
                                             )}
 
                                             {columnVisibility.driverBudget && (
-                                                <td className={`px-2 py-1 text-center tabular-nums text-xs truncate ${hideKpi || row.rowConfig?.expenseType !== 'Variável' ? 'bg-transparent border-b border-gray-100 text-transparent' : 'border border-slate-200 text-slate-500 bg-slate-50 shadow-sm'}`}>
-                                                    {!hideKpi && row.category === 'Costs' && row.rowConfig?.expenseType === 'Variável' && row.rowConfig?.expenseDriver
-                                                        ? formatValue((row.budget || 0) / (getDriverValue(row.rowConfig.expenseDriver, data, 'budget') || 1), 'decimal')
-                                                        : ''}
+                                                <td className={`px-2 py-1 text-center tabular-nums text-xs truncate ${hideKpi || (!isAccountKpi && !packageKpiDriver) ? 'bg-transparent border-b border-gray-100 text-transparent' : 'border border-slate-200 text-slate-500 bg-slate-50 shadow-sm'}`}>
+                                                    {!hideKpi && isAccountKpi
+                                                        ? formatValue((row.budget || 0) / (getDriverValue(row.rowConfig!.expenseDriver, data, 'budget') || 1), 'decimal')
+                                                        : (!hideKpi && packageKpiDriver
+                                                            ? formatValue((row.budget || 0) / (getDriverValue(packageKpiDriver, data, 'budget') || 1), 'decimal')
+                                                            : '')}
                                                 </td>
                                             )}
                                         </>
@@ -1965,10 +1973,24 @@ function getDriverValue(driver: string | undefined, allRows: ForecastRow[], base
 
     const row = allRows.find(r => r.id === targetRowId);
     if (!row) return 0;
-    if (base === 'forecast') return row.real;
+    // Forecast always projects off the Meta (budget) driver quantity, not a separately-tracked forecast occupancy.
+    if (base === 'forecast') return row.budget;
     if (base === 'previa') return row.previa;
     if (base === 'budget') return row.budget;
     return 0;
+}
+
+// A package's KPI only makes sense when every Variável account inside it shares the
+// same Plano de Contas driver — otherwise there is no single unit to divide the total by.
+function getPackageDriver(pkgLabel: string, accountsList: Account[]): string | undefined {
+    const variableAccs = accountsList.filter(a =>
+        (a.package || '').trim().toLowerCase() === pkgLabel.trim().toLowerCase() &&
+        a.expenseType === 'Variável' &&
+        a.expenseDriver
+    );
+    if (variableAccs.length === 0) return undefined;
+    const drivers = new Set(variableAccs.map(a => a.expenseDriver));
+    return drivers.size === 1 ? variableAccs[0].expenseDriver : undefined;
 }
 
 function calculateRowValue(row: ForecastRow | null, config: ForecastConfig, allRows: ForecastRow[], base: 'forecast' | 'previa'): number {
@@ -2101,6 +2123,24 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
         }
     });
 
+    // --- AUTO-CALCULATE KPI/DRIVER INDICATOR (R$ per driver unit) ---
+    // Whenever a value lands on a Variável account (import, manual entry or the Variable
+    // formula above), refresh its displayed rate so the KPI columns always reflect it.
+    updatedRows.forEach(row => {
+        if ((row.category !== 'Costs' && row.category !== 'Account') || row.rowConfig?.expenseType !== 'Variável' || !row.rowConfig?.expenseDriver) return;
+        const driver = row.rowConfig.expenseDriver;
+
+        const previaDriverQty = getDriverValue(driver, updatedRows, 'previa');
+        if (row.previaConfig && previaDriverQty > 0) {
+            row.previaConfig.factor = (row.previa || 0) / previaDriverQty;
+        }
+
+        const forecastDriverQty = getDriverValue(driver, updatedRows, 'forecast');
+        if (row.forecastConfig && forecastDriverQty > 0) {
+            row.forecastConfig.factor = (row.real || 0) / forecastDriverQty;
+        }
+    });
+
     // --- COSTS HIERARCHICAL AGGREGATION ---
     // 1. Sum Accounts (Level 2) into Packages (Level 1)
     // Use semantic properties: isHeader + indentLevel instead of ID prefixes
@@ -2169,6 +2209,12 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
 
         const resOpComImp = rowMap.get('RES-OP-COM-IMP');
         if (resOpComImp) resOpComImp[field] = revTotal - revImp - cstHeadVal;
+
+        const resOpSemImpPct = rowMap.get('RES-OP-SEM-IMP-PCT');
+        if (resOpSemImpPct) resOpSemImpPct[field] = revTotal !== 0 ? ((revTotal - cstHeadVal) / revTotal) * 100 : 0;
+
+        const resOpComImpPct = rowMap.get('RES-OP-COM-IMP-PCT');
+        if (resOpComImpPct) resOpComImpPct[field] = revTotal !== 0 ? ((revTotal - revImp - cstHeadVal) / revTotal) * 100 : 0;
     });
 
     // --- DELTAS CALCULATIONS ---
