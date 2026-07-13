@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { getForecastData, normalizeAccountName } from '../services/mockData';
-import { Plus, Trash2, X, Save, Briefcase, Pencil, Calendar, PieChart, Lock, Settings as SettingsIcon, Users, Search, Upload, Settings, Eye, FileText, Layout, Info, ChevronUp, GripVertical, Database, BedDouble, DollarSign, Target, LayoutList, ArrowUp, ArrowDown, Copy } from 'lucide-react';
+import { Plus, Trash2, X, Save, Briefcase, Pencil, Calendar, PieChart, Lock, Settings as SettingsIcon, Users, Search, Upload, Settings, Eye, FileText, Layout, Info, ChevronUp, GripVertical, Database, BedDouble, DollarSign, Target, LayoutList, ArrowUp, ArrowDown, Copy, Mail, Loader2 } from 'lucide-react';
 import { User, UserRole, CostCenter, ImportedRow, Hotel, Account, BudgetVersion, LaborParameters, ScheduleItem, ImportedCostCenter, CostPackage, GMDConfiguration, ViewState, DreSection, HotelCategory, HotelRegion, ImportedAccount, KpiCalculation } from '../types';
 import { getDreReferenceOptions } from '../utils/dreReferences';
 import KpiCalculationEditor from './KpiCalculationEditor';
@@ -1369,6 +1369,24 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     setActiveModal('user');
   };
 
+  const [sendingResetId, setSendingResetId] = useState<string | null>(null);
+
+  const handleSendPasswordReset = async (u: User) => {
+    if (!u.email) {
+      toast.error('Este usuário não tem e-mail cadastrado.');
+      return;
+    }
+    setSendingResetId(u.id);
+    try {
+      await supabaseService.sendPasswordResetEmail(u.email);
+      toast.success(`E-mail de redefinição enviado para ${u.email}.`);
+    } catch (err: any) {
+      toast.error('Erro ao enviar e-mail: ' + (err?.message || JSON.stringify(err)));
+    } finally {
+      setSendingResetId(null);
+    }
+  };
+
   const openEditUser = (id: string) => {
     const u = users.find(i => i.id === id);
     if (u) {
@@ -1399,11 +1417,13 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       setEditingId(id);
       setCcImportStep('input');
 
-      // Find all hotels that share this same identity to populate the multi-select
+      // Find all hotels that share this same identity to populate the multi-select. Legacy
+      // rows (old numeric ids) and the newer hotel-slug ids can both exist for the same
+      // hotel — dedupe or the save below would submit the same id twice in one upsert batch.
       const identicalNodes = costCenters.filter(item =>
         item.name === cc.name && item.hierarchicalCode === cc.hierarchicalCode
       );
-      const hotelsForThisSector = identicalNodes.map(n => n.hotelName || '').filter(Boolean);
+      const hotelsForThisSector = Array.from(new Set(identicalNodes.map(n => n.hotelName || '').filter(Boolean)));
 
       setCostCenterForm({
         id: cc.id,
@@ -1730,8 +1750,10 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     setIsSavingRegistry(true);
 
     try {
-      // If no hotels selected, we use at least one record (maybe empty hotel) or block
-      const hotelsToSave = costCenterForm.hotelNames.length > 0 ? costCenterForm.hotelNames : [''];
+      // If no hotels selected, we use at least one record (maybe empty hotel) or block.
+      // Dedupe defensively — a duplicate hotel name here would submit the same row id twice
+      // in the same upsert batch, which Postgres rejects ("cannot affect row a second time").
+      const hotelsToSave = costCenterForm.hotelNames.length > 0 ? Array.from(new Set(costCenterForm.hotelNames)) : [''];
 
       const newCCs: CostCenter[] = hotelsToSave.map(hName => ({
         id: `${hName}-${costCenterForm.hierarchicalCode}`.toLowerCase().replace(/\s+/g, '-'),
@@ -4901,6 +4923,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unidade</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Perfil</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Responsabilidades</th>
+                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
                           <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Data Cadastro</th>
                           <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Últ. Acesso</th>
                           <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
@@ -4974,6 +4997,13 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                   <span className="text-slate-600 font-bold text-[9px] uppercase tracking-wider bg-slate-100 px-2 py-0.5 rounded">Acesso Consulta</span>
                                 )}
                               </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-center">
+                                {u.isValidated ? (
+                                  <span className="px-2 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-[10px] uppercase font-bold">Usuário validado</span>
+                                ) : (
+                                  <span className="px-2 py-1 bg-amber-50 text-amber-700 rounded-lg text-[10px] uppercase font-bold">Usuário em validação</span>
+                                )}
+                              </td>
                               <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-mono text-gray-500">
                                 {u.createdAt ? new Date(u.createdAt).toLocaleDateString('pt-BR') : '-'}
                               </td>
@@ -4981,6 +5011,14 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                 {u.lastAccess ? new Date(u.lastAccess).toLocaleDateString('pt-BR') : '-'}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <button
+                                    onClick={() => handleSendPasswordReset(u)}
+                                    disabled={sendingResetId === u.id}
+                                    className="text-emerald-600 hover:text-emerald-900 mr-3 disabled:opacity-50"
+                                    title="Enviar e-mail de redefinição de senha"
+                                >
+                                    {sendingResetId === u.id ? <Loader2 size={16} className="animate-spin" /> : <Mail size={16} />}
+                                </button>
                                 <button onClick={() => openEditUser(u.id)} className="text-indigo-600 hover:text-indigo-900 mr-3"><Pencil size={16} /></button>
                                 <button onClick={() => handleDelete('users', u.id)} className="text-red-600 hover:text-red-900"><Trash2 size={16} /></button>
                               </td>
@@ -5790,10 +5828,10 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 <input type="email" value={userForm.email} onChange={e => setUserForm({ ...userForm, email: e.target.value })} className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="joao@taua.com.br" />
               </div>
               {!editingId && (
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Senha Provisória</label>
-                  <input type="password" value={userForm.password} onChange={e => setUserForm({ ...userForm, password: e.target.value })} className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Definir senha de acesso" />
-                  <p className="text-[10px] text-gray-500 mt-1 italic">Defina uma senha para que o usuário possa acessar o sistema. Opcional caso o usuário já possua cadastro no sistema corporativo.</p>
+                <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-100">
+                  <p className="text-xs text-indigo-800">
+                    Após criar o usuário, use o botão <strong>"Enviar e-mail de redefinição"</strong> na lista para que ele defina a própria senha de acesso.
+                  </p>
                 </div>
               )}
               <div>
@@ -5815,23 +5853,23 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 <div className="space-y-4 pt-2 border-t border-gray-100">
                   <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-widest">Responsabilidade do Gerente de Pacotes</h4>
 
-                  {/* Expense Packages */}
+                  {/* Expense Packages (Pacotes Master, do Plano de Contas) */}
                   <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Pacotes de Despesa</label>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Pacotes Master</label>
                     <div className="p-3 border border-gray-200 rounded-xl bg-gray-50 max-h-40 overflow-y-auto space-y-2 custom-scrollbar">
-                      {uniquePackagesList.map(pkg => (
-                        <label key={pkg} className="flex items-center gap-2.5 text-xs font-medium text-gray-700 cursor-pointer hover:text-indigo-600">
+                      {masterPackages.map(pkg => (
+                        <label key={pkg.name} className="flex items-center gap-2.5 text-xs font-medium text-gray-700 cursor-pointer hover:text-indigo-600">
                           <input
                             type="checkbox"
-                            checked={userForm.responsiblePackages?.includes(pkg) || false}
+                            checked={userForm.responsiblePackages?.includes(pkg.name) || false}
                             onChange={e => {
                               const current = userForm.responsiblePackages || [];
-                              if (e.target.checked) setUserForm({ ...userForm, responsiblePackages: [...current, pkg] });
-                              else setUserForm({ ...userForm, responsiblePackages: current.filter(p => p !== pkg) });
+                              if (e.target.checked) setUserForm({ ...userForm, responsiblePackages: [...current, pkg.name] });
+                              else setUserForm({ ...userForm, responsiblePackages: current.filter(p => p !== pkg.name) });
                             }}
                             className="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5"
                           />
-                          {pkg}
+                          {pkg.name}
                         </label>
                       ))}
                       {accounts.length === 0 && <p className="text-[10px] text-gray-400 italic">Carregando pacotes...</p>}
@@ -5872,27 +5910,37 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                   <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-widest">Responsabilidade do Gerente/Analista de Área</h4>
                   <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Centros de Resultado (CR)</label>
-                    <div className="p-3 border border-gray-200 rounded-xl bg-gray-50 max-h-48 overflow-y-auto space-y-2 custom-scrollbar">
-                      {uniqueCostCentersList.map(cc => (
-                        <label key={cc.code} className="flex items-center gap-2.5 text-xs font-medium text-gray-700 cursor-pointer hover:text-indigo-600" title={cc.hierarchicalCode}>
-                          <input
-                            type="checkbox"
-                            checked={userForm.responsibleCostCenters?.includes(cc.code) || false}
-                            onChange={e => {
-                              const current = userForm.responsibleCostCenters || [];
-                              if (e.target.checked) setUserForm({ ...userForm, responsibleCostCenters: [...current, cc.code] });
-                              else setUserForm({ ...userForm, responsibleCostCenters: current.filter(c => c !== cc.code) });
-                            }}
-                            className="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5"
-                          />
-                          <div>
-                            <span className="font-bold block text-gray-800">{cc.name}</span>
-                            <span className="text-[9px] text-gray-400 font-mono leading-none">{cc.code} • {cc.department || 'Sem depto'}</span>
-                          </div>
-                        </label>
-                      ))}
-                      {costCenters.length === 0 && <p className="text-[10px] text-gray-400 italic">Nenhum CR cadastrado.</p>}
-                    </div>
+                    {(() => {
+                      const selectedHotelName = hotels.find(h => h.id === userForm.hotelId)?.name;
+                      const costCentersForHotel = uniqueCostCentersList.filter(cc => !userForm.hotelId || cc.hotelName === selectedHotelName);
+                      return (
+                        <div className="p-3 border border-gray-200 rounded-xl bg-gray-50 max-h-48 overflow-y-auto space-y-2 custom-scrollbar">
+                          {costCentersForHotel.map(cc => (
+                            <label key={cc.code} className="flex items-center gap-2.5 text-xs font-medium text-gray-700 cursor-pointer hover:text-indigo-600" title={cc.hierarchicalCode}>
+                              <input
+                                type="checkbox"
+                                checked={userForm.responsibleCostCenters?.includes(cc.code) || false}
+                                onChange={e => {
+                                  const current = userForm.responsibleCostCenters || [];
+                                  if (e.target.checked) setUserForm({ ...userForm, responsibleCostCenters: [...current, cc.code] });
+                                  else setUserForm({ ...userForm, responsibleCostCenters: current.filter(c => c !== cc.code) });
+                                }}
+                                className="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5"
+                              />
+                              <div>
+                                <span className="font-bold block text-gray-800">{cc.name}</span>
+                                <span className="text-[9px] text-gray-400 font-mono leading-none">{cc.code} • {cc.department || 'Sem depto'}</span>
+                              </div>
+                            </label>
+                          ))}
+                          {costCentersForHotel.length === 0 && (
+                            <p className="text-[10px] text-gray-400 italic">
+                              {userForm.hotelId ? 'Nenhum CR cadastrado para o hotel selecionado.' : 'Nenhum CR cadastrado.'}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               )}

@@ -420,18 +420,21 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             return true;
         }
 
-        // Gerente de Pacotes can only edit their assigned packages and revenues
+        // Gerente de Pacotes can only edit accounts under their assigned Pacotes Master and revenues.
+        // responsiblePackages holds Pacote Master names (see "Pacotes Master" in the user form) —
+        // matched against each account's own masterPackage, not the narrower sub-pacote.
         if (currentUser.role === UserRole.PACKAGE_MANAGER) {
-            if (row.category === 'Costs') {
+            if (row.category === 'Costs' || row.category === 'Package' || row.category === 'Account') {
                 // If it's a package header
                 if (row.isHeader && row.indentLevel === 1) {
-                    return currentUser.responsiblePackages?.includes(row.label) || false;
+                    const anyAcc = accounts.find(a => (a.package || '').toLowerCase() === row.label.trim().toLowerCase());
+                    return !!anyAcc?.masterPackage && (currentUser.responsiblePackages?.includes(anyAcc.masterPackage) || false);
                 }
                 // If it's an individual account
                 const accId = row.id.split('-')[0];
                 const acc = accounts.find(a => a.id === accId);
-                if (acc && acc.package) {
-                    return currentUser.responsiblePackages?.includes(acc.package) || false;
+                if (acc && acc.masterPackage) {
+                    return currentUser.responsiblePackages?.includes(acc.masterPackage) || false;
                 }
                 // Fallback checking label or indicatorSection
                 return currentUser.responsiblePackages?.some(p =>
@@ -842,9 +845,13 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     ].filter(Boolean).length;
 
     return (
-        <div className="flex flex-col h-full w-full">
+        <div className="flex flex-col w-full">
             <VersionInfoBanner versionName={activeRealVersionName} />
-            <div className="bg-white rounded-xl shadow-lg border border-gray-200 flex flex-col h-full overflow-hidden font-sans w-full">
+            {/* No h-full here: the table renders at its natural full height (no internal
+                scrollbar) and the page itself scrolls (via the ancestor <main overflow-auto>
+                in App.tsx) to reach the Transformação/Reatividade cards below, instead of the
+                table being squeezed to make room for them. */}
+            <div className="bg-white rounded-xl shadow-lg border border-gray-200 flex flex-col overflow-hidden font-sans w-full">
                 <div className="px-5 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center shrink-0 gap-8">
                     <div>
                         <div className="flex items-center gap-3">

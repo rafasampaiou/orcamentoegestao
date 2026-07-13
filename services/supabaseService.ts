@@ -414,9 +414,27 @@ export const supabaseService = {
         avatarUrl: p.avatar_url || undefined,
         responsiblePackages: meta.responsiblePackages || [],
         responsibleRevenues: meta.responsibleRevenues || [],
-        responsibleCostCenters: meta.responsibleCostCenters || []
+        responsibleCostCenters: meta.responsibleCostCenters || [],
+        isValidated: !!p.is_validated
       };
     }) as User[];
+  },
+
+  // Sends Supabase's own "reset password" email — the user clicks the link, is redirected
+  // back to this app, and DefinePasswordView takes over to let them set their own password.
+  async sendPasswordResetEmail(email: string): Promise<void> {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin
+    });
+    if (error) throw error;
+  },
+
+  async markProfileValidated(userId: string): Promise<void> {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ is_validated: true })
+      .eq('id', userId);
+    if (error) throw error;
   },
 
   async upsertProfile(user: User): Promise<void> {

@@ -38,6 +38,9 @@ export interface User {
   responsibleCostCenters?: string[];
   createdAt?: string;
   lastAccess?: string;
+  // True once the user has set their own password via the "Enviar e-mail de redefinição"
+  // link and successfully signed in — false while the account is newly created and pending.
+  isValidated?: boolean;
 }
 
 // Profile represents a user account managed in the `profiles` table in Supabase.

@@ -16,6 +16,7 @@ import ReplicateBudgetModal, { ReplicationOptions } from './components/Replicate
 import ErrorBoundary from './components/ErrorBoundary';
 import Header from './components/Header';
 import Auth from './components/Auth';
+import DefinePasswordView from './components/DefinePasswordView';
 import ValidationsView from './components/ValidationsView';
 import { supabase } from './services/supabaseClient';
 import { supabaseService } from './services/supabaseService';
@@ -35,6 +36,10 @@ const App: React.FC = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [authChecking, setAuthChecking] = useState(true);
+  // Set when the user arrives via the "Enviar e-mail de redefinição" link — Supabase fires a
+  // distinct PASSWORD_RECOVERY event for that flow, which we intercept to show
+  // DefinePasswordView instead of dropping them straight into the app with a bare session.
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
 
   React.useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -44,7 +49,10 @@ const App: React.FC = () => {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsPasswordRecovery(true);
+      }
       setSession(session);
     });
 
@@ -988,8 +996,8 @@ const App: React.FC = () => {
         </div>
       );
       case 'dashboard': return (
-        <div className="max-w-[98%] mx-auto px-4 py-6 h-[calc(100vh-5rem)]">
-          <div className="bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-2 h-full flex flex-col overflow-hidden">
+        <div className="max-w-[98%] mx-auto px-4 py-6 min-h-[calc(100vh-5rem)]">
+          <div className="bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-2 flex flex-col">
             <ForecastTable
               selectedMonth={selectedDate.getMonth() + 1}
               selectedYear={selectedDate.getFullYear()}
@@ -1162,6 +1170,10 @@ const App: React.FC = () => {
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
       </div>
     );
+  }
+
+  if (isPasswordRecovery) {
+    return <DefinePasswordView onDone={() => setIsPasswordRecovery(false)} />;
   }
 
   if (!session) {
