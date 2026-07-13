@@ -660,6 +660,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     const visibleData = useMemo(() => {
         let currentPackageExpanded = true;
         return data.filter(row => {
+            // Transformação/Reatividade rows are shown as cards below the table, not as rows.
+            if (row.id.startsWith('KPI-TRANS-')) return false;
             if (row.category === 'Spacer') return true;
             if (row.category === 'Indicators') {
                 if (showDetails) return true;
@@ -1166,31 +1168,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                             {visibleData.map((row, idx) => {
-                                if (row.id === 'KPI-TRANS-BUDGET' || row.id === 'KPI-TRANS-LY') {
-                                    const isTransformation = row.label.includes('Transformação');
-                                    return (
-                                        <tr key={row.id}>
-                                            <td colSpan={12} className="px-4 py-2 border-b border-gray-100 bg-white">
-                                                <div className={`flex items-center gap-3 p-3 rounded-lg border shadow-sm max-w-lg mx-auto ${isTransformation ? 'bg-emerald-50 border-emerald-100' : 'bg-blue-50 border-blue-100'}`}>
-                                                    <div className={`p-2 rounded-full ${isTransformation ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'}`}>
-                                                        {isTransformation ? <TrendingUp size={20} /> : <Activity size={20} />}
-                                                    </div>
-                                                    <div className="flex-1">
-                                                        <h4 className={`text-sm font-bold ${isTransformation ? 'text-emerald-800' : 'text-blue-800'}`}>
-                                                            {row.label}
-                                                        </h4>
-                                                        <p className="text-xs text-gray-500">Indicador de eficiência operacional sobre variação de receita.</p>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <span className={`text-xl font-bold ${isTransformation ? 'text-emerald-700' : 'text-blue-700'}`}>
-                                                            {formatValue(row.real, 'percent')}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                }
 
                                 if (row.category === 'Spacer') {
                                     return (
@@ -1577,6 +1554,80 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                     </table>
                 </div>
             </div>
+
+            {/* ====== CARDS: TRANSFORMAÇÃO / REATIVIDADE ====== */}
+            {(() => {
+                const revTotalRow = data.find(r => r.id === 'REV-TOTAL');
+                const kpiBudgetRow = data.find(r => r.id === 'KPI-TRANS-BUDGET');
+                const kpiLYRow = data.find(r => r.id === 'KPI-TRANS-LY');
+                const kpiMetaLYRow = data.find(r => r.id === 'KPI-TRANS-M-LY');
+                const kpiBudgetSemRow = data.find(r => r.id === 'KPI-TRANS-BUDGET-SEM');
+                const kpiLYSemRow = data.find(r => r.id === 'KPI-TRANS-LY-SEM');
+                const kpiMetaLYSemRow = data.find(r => r.id === 'KPI-TRANS-M-LY-SEM');
+                if (!revTotalRow || !kpiBudgetRow || !kpiLYRow || !kpiMetaLYRow || !kpiBudgetSemRow || !kpiLYSemRow || !kpiMetaLYSemRow) return null;
+
+                const yy = String(selectedYear || new Date().getFullYear()).slice(-2);
+                const yyLY = String((selectedYear || new Date().getFullYear()) - 1).slice(-2);
+
+                const revPrevia = revTotalRow.previa || 0;
+                const groups = [
+                    {
+                        label: 'GOP com dedução de impostos',
+                        cards: [
+                            { title: `R${yy} x M${yy}`, currentRev: revPrevia, baseRev: revTotalRow.budget, value: kpiBudgetRow.real },
+                            { title: `R${yy} x R${yyLY}`, currentRev: revPrevia, baseRev: revTotalRow.lastYear, value: kpiLYRow.real },
+                            { title: `M${yy} x R${yyLY}`, currentRev: revTotalRow.budget, baseRev: revTotalRow.lastYear, value: kpiMetaLYRow.real },
+                        ]
+                    },
+                    {
+                        label: 'GOP sem dedução de impostos',
+                        cards: [
+                            { title: `R${yy} x M${yy}`, currentRev: revPrevia, baseRev: revTotalRow.budget, value: kpiBudgetSemRow.real },
+                            { title: `R${yy} x R${yyLY}`, currentRev: revPrevia, baseRev: revTotalRow.lastYear, value: kpiLYSemRow.real },
+                            { title: `M${yy} x R${yyLY}`, currentRev: revTotalRow.budget, baseRev: revTotalRow.lastYear, value: kpiMetaLYSemRow.real },
+                        ]
+                    }
+                ];
+
+                return (
+                    <div className="flex flex-col gap-4 mt-4 shrink-0">
+                        {groups.map(group => (
+                            <div key={group.label}>
+                                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">{group.label}</p>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    {group.cards.map(card => {
+                                        // Transformação quando a receita do período à esquerda cresceu em
+                                        // relação ao da direita; Reatividade quando encolheu (ver computeTransReat).
+                                        const isTransformation = (card.currentRev - card.baseRev) >= 0;
+                                        const kindLabel = isTransformation ? 'Transformação' : 'Reatividade';
+                                        return (
+                                            <div
+                                                key={card.title}
+                                                className={`flex items-center gap-3 p-4 rounded-xl border shadow-sm ${isTransformation ? 'bg-emerald-50 border-emerald-100' : 'bg-blue-50 border-blue-100'}`}
+                                            >
+                                                <div className={`p-2 rounded-full shrink-0 ${isTransformation ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'}`}>
+                                                    {isTransformation ? <TrendingUp size={20} /> : <Activity size={20} />}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <h4 className={`text-sm font-bold truncate ${isTransformation ? 'text-emerald-800' : 'text-blue-800'}`}>
+                                                        {kindLabel} ({card.title})
+                                                    </h4>
+                                                    <p className="text-xs text-gray-500">Indicador de eficiência operacional sobre variação de receita.</p>
+                                                </div>
+                                                <div className="text-right shrink-0">
+                                                    <span className={`text-xl font-bold ${isTransformation ? 'text-emerald-700' : 'text-blue-700'}`}>
+                                                        {formatValue(card.value, 'percent')}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                );
+            })()}
 
             {/* ====== MODAL: IMPORTAR DO EXCEL ====== */}
             {showImportModal && (
@@ -2422,38 +2473,53 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
     });
 
     // --- TRANSFORMATION / REACTIVITY KPIs ---
-    const kpiBudget = rowMap.get('KPI-TRANS-BUDGET');
-    const kpiLY = rowMap.get('KPI-TRANS-LY');
+    // Transformação = ΔGOP / ΔReceita quando a receita do período "atual" é MAIOR que a do
+    // período "base" (a operação está crescendo por transformação real do negócio).
+    // Reatividade = ΔCustos / ΔReceita quando a receita do período "atual" é MENOR que a do
+    // período "base" (a operação está reagindo via corte/aumento de custos).
+    const computeTransReat = (currentRev: number, baseRev: number, currentGop: number, baseGop: number, currentCost: number, baseCost: number) => {
+        const deltaRev = currentRev - baseRev;
+        if (deltaRev > 0) return ((currentGop - baseGop) / deltaRev) * 100;
+        if (deltaRev < 0) return ((currentCost - baseCost) / deltaRev) * 100;
+        return 0;
+    };
+
+    const kpiBudget = rowMap.get('KPI-TRANS-BUDGET'); // R x M, GOP c/ Imp.
+    const kpiLY = rowMap.get('KPI-TRANS-LY'); // R x R Ant., GOP c/ Imp.
+    const kpiMetaLY = rowMap.get('KPI-TRANS-M-LY'); // M x R Ant., GOP c/ Imp.
+    const kpiBudgetSem = rowMap.get('KPI-TRANS-BUDGET-SEM'); // R x M, GOP s/ Imp.
+    const kpiLYSem = rowMap.get('KPI-TRANS-LY-SEM'); // R x R Ant., GOP s/ Imp.
+    const kpiMetaLYSem = rowMap.get('KPI-TRANS-M-LY-SEM'); // M x R Ant., GOP s/ Imp.
     const revTotalRow = rowMap.get('REV-TOTAL');
     const gopRow = rowMap.get('RES-OP-COM-IMP');
+    const gopRowSem = rowMap.get('RES-OP-SEM-IMP');
     const costHead = rowMap.get('CST-HEAD');
 
+    // "Receita da prévia ou fechamento" is row.previa — the column literally relabeled from
+    // Prévia to Real once Fechamento oficial is validated (row.real is the separate "Forecast"
+    // projection produced by "Calcular Forecast", not what the Δ REAL-META/LY columns show).
     if (kpiBudget && revTotalRow && gopRow && costHead) {
-        const deltaRev = revTotalRow.real - revTotalRow.budget;
-        const deltaGop = gopRow.real - gopRow.budget;
-        const deltaCost = costHead.real - costHead.budget;
-
-        if (deltaRev > 0 && deltaGop > 0) {
-            kpiBudget.real = (deltaGop / deltaRev) * 100;
-        } else if (deltaRev < 0 && deltaCost < 0) {
-            kpiBudget.real = (deltaCost / deltaRev) * 100;
-        } else {
-            kpiBudget.real = 0;
-        }
+        kpiBudget.real = computeTransReat(revTotalRow.previa || 0, revTotalRow.budget, gopRow.previa || 0, gopRow.budget, costHead.previa || 0, costHead.budget);
     }
 
     if (kpiLY && revTotalRow && gopRow && costHead) {
-        const deltaRevLY = revTotalRow.real - revTotalRow.lastYear;
-        const deltaGopLY = gopRow.real - gopRow.lastYear;
-        const deltaCostLY = costHead.real - costHead.lastYear;
+        kpiLY.real = computeTransReat(revTotalRow.previa || 0, revTotalRow.lastYear, gopRow.previa || 0, gopRow.lastYear, costHead.previa || 0, costHead.lastYear);
+    }
 
-        if (deltaRevLY > 0 && deltaGopLY > 0) {
-            kpiLY.real = (deltaGopLY / deltaRevLY) * 100;
-        } else if (deltaRevLY < 0 && deltaCostLY < 0) {
-            kpiLY.real = (deltaCostLY / deltaRevLY) * 100;
-        } else {
-            kpiLY.real = 0;
-        }
+    if (kpiMetaLY && revTotalRow && gopRow && costHead) {
+        kpiMetaLY.real = computeTransReat(revTotalRow.budget, revTotalRow.lastYear, gopRow.budget, gopRow.lastYear, costHead.budget, costHead.lastYear);
+    }
+
+    if (kpiBudgetSem && revTotalRow && gopRowSem && costHead) {
+        kpiBudgetSem.real = computeTransReat(revTotalRow.previa || 0, revTotalRow.budget, gopRowSem.previa || 0, gopRowSem.budget, costHead.previa || 0, costHead.budget);
+    }
+
+    if (kpiLYSem && revTotalRow && gopRowSem && costHead) {
+        kpiLYSem.real = computeTransReat(revTotalRow.previa || 0, revTotalRow.lastYear, gopRowSem.previa || 0, gopRowSem.lastYear, costHead.previa || 0, costHead.lastYear);
+    }
+
+    if (kpiMetaLYSem && revTotalRow && gopRowSem && costHead) {
+        kpiMetaLYSem.real = computeTransReat(revTotalRow.budget, revTotalRow.lastYear, gopRowSem.budget, gopRowSem.lastYear, costHead.budget, costHead.lastYear);
     }
 
     return Array.from(rowMap.values());

@@ -1070,9 +1070,16 @@ export const getForecastData = (
     rows.push(generateRow('RES-OP-SEM-IMP', '6.01.00', 'Result', 'GOP SEM DEDUÇÃO DE IMPOSTOS (R$)', 0, 0, 0, 0, true, true, 0));
     rows.push(generateRow('RES-OP-SEM-IMP-PCT', '', 'Result', 'GOP SEM DEDUÇÃO DE IMPOSTOS (%)', 0, 0, 0, 0, true, true, 0, undefined, { inputType: 'none', format: 'percent' }));
 
-    // KPI: Transformação / Reatividade
-    rows.push(generateRow('KPI-TRANS-BUDGET', '', 'Result', 'Transformação/Reatividade (Meta)', 0, 0, 0, 0, true, true, 0));
-    rows.push(generateRow('KPI-TRANS-LY', '', 'Result', 'Transformação/Reatividade (Ano Anterior)', 0, 0, 0, 0, true, true, 0));
+    // KPI: Transformação / Reatividade — these 6 rows only hold the computed numeric value
+    // (see recalculateTotals in ForecastTable.tsx); they're never shown as table rows, only
+    // as the 6 cards rendered below the DRE Forecast table (3 using GOP com dedução de
+    // impostos, 3 using GOP sem dedução de impostos).
+    rows.push(generateRow('KPI-TRANS-BUDGET', '', 'Result', 'Transformação/Reatividade (R x M) - GOP c/ Imp.', 0, 0, 0, 0, true, true, 0));
+    rows.push(generateRow('KPI-TRANS-LY', '', 'Result', 'Transformação/Reatividade (R x R Ant.) - GOP c/ Imp.', 0, 0, 0, 0, true, true, 0));
+    rows.push(generateRow('KPI-TRANS-M-LY', '', 'Result', 'Transformação/Reatividade (M x R Ant.) - GOP c/ Imp.', 0, 0, 0, 0, true, true, 0));
+    rows.push(generateRow('KPI-TRANS-BUDGET-SEM', '', 'Result', 'Transformação/Reatividade (R x M) - GOP s/ Imp.', 0, 0, 0, 0, true, true, 0));
+    rows.push(generateRow('KPI-TRANS-LY-SEM', '', 'Result', 'Transformação/Reatividade (R x R Ant.) - GOP s/ Imp.', 0, 0, 0, 0, true, true, 0));
+    rows.push(generateRow('KPI-TRANS-M-LY-SEM', '', 'Result', 'Transformação/Reatividade (M x R Ant.) - GOP s/ Imp.', 0, 0, 0, 0, true, true, 0));
 
     const applyOverrides = () => {
         const activeHotelCodeUpper = activeHotelCode.trim().toUpperCase();
