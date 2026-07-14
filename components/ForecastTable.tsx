@@ -783,13 +783,20 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 if (account) {
                     const currentConfig = calculationBase === 'forecast' ? row.forecastConfig : (row.previaConfig || { method: 'Fixed' });
                     // Only a self ÷ denominator formula can be turned into a projection — the
-                    // Forecast replicates the Meta's own KPI rate, reapplied to the Meta's denominator.
+                    // rate itself replicates the Meta's own KPI ratio, but it's reapplied to the
+                    // Forecast/Prévia column's OWN indicator value (not Meta's), so the projection
+                    // actually varies with whatever occupancy was entered for that column.
                     const selfDenominator = parseSelfRatioDenominator(account.kpiCalculation?.formula, account.name);
 
                     if (account.expenseType === 'Variável' && selfDenominator) {
-                        const denomMeta = resolveKpiTerm(selfDenominator, prevData, 'budget');
+                        // Looked up directly (not via resolveKpiTerm) so Indicators/Receita Bruta
+                        // denominators use their own real Forecast/Prévia value here, instead of
+                        // resolveKpiTerm's fallback to Meta for those categories.
+                        const denomRow = prevData.find(r => r.label.trim().toLowerCase() === selfDenominator.trim().toLowerCase());
+                        const denomMeta = denomRow?.budget || 0;
+                        const denomProjected = calculationBase === 'forecast' ? (denomRow?.real || 0) : (denomRow?.previa || 0);
                         const rate = denomMeta !== 0 ? (row.budget || 0) / denomMeta : 0;
-                        const projected = rate * denomMeta;
+                        const projected = rate * denomProjected;
 
                         const newConfig = { ...currentConfig, method: 'Fixed' as const, manualValue: projected };
                         const updatedRow = {
@@ -946,7 +953,12 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                     </div>
                 </div>
 
-                <div className="overflow-auto flex-1 bg-white relative">
+                {/* Bounded height so this box (not the whole page) scrolls internally — that's
+                    what lets the sticky <thead> below actually stay pinned while scrolling
+                    through rows, no matter how far down (e.g. into Despesas) you are. The
+                    Transformação/Reatividade cards sit below this box in normal page flow,
+                    still reachable with a simple page scroll. */}
+                <div className="overflow-auto max-h-[75vh] bg-white relative">
                     {showColumnSettings && (
                         <div className="absolute right-4 top-4 z-50 bg-white border border-gray-200 shadow-xl rounded-xl p-4 w-64 animate-in fade-in slide-in-from-top-2">
                             <div className="flex justify-between items-center mb-3">

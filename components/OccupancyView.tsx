@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Settings2, ChevronUp, Save, Trash2, CheckCircle } from 'lucide-react';
-import { ColumnVisibility, ImportedRow, User, UserRole } from '../types';
-import { VersionInfoBanner } from './VersionInfoBanner';
+import { Settings2, ChevronUp, Save, Trash2, CheckCircle, ListFilter, LayoutList } from 'lucide-react';
+import { ColumnVisibility, ImportedRow, User, UserRole, Hotel, BudgetVersion } from '../types';
 
 // --- Types ---
 interface OccupancyViewProps {
@@ -15,6 +14,9 @@ interface OccupancyViewProps {
     selectedMonth?: number;
     selectedYear?: number;
     selectedHotel?: string;
+    hotels?: Hotel[];
+    budgetVersions?: BudgetVersion[];
+    budgetOccupancyDataMap?: Record<string, Record<string, number[]>>;
     realOccupancyData?: Record<string, Record<string, number>>;
     setRealOccupancyData?: React.Dispatch<React.SetStateAction<Record<string, Record<string, number>>>>;
     financialData?: ImportedRow[];
@@ -429,6 +431,9 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
     selectedMonth,
     selectedYear,
     selectedHotel,
+    hotels,
+    budgetVersions,
+    budgetOccupancyDataMap,
     realOccupancyData,
     setRealOccupancyData,
     financialData,
@@ -463,6 +468,14 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
     const [showColumnSettings, setShowColumnSettings] = useState(false);
     const [decimalOverrides, setDecimalOverrides] = useState<Record<string, number>>({});
     const [visibleMonthsFilter, setVisibleMonthsFilter] = useState<number[]>([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    // "Mostrar/Ocultar Contas" in Comparativo de ocupação — mirrors the same toggle in the DRE
+    // Forecast. When hidden, only these indicators stay visible (across Geral/Lazer/Eventos).
+    const [showAccountDetails, setShowAccountDetails] = useState(true);
+    const ALWAYS_VISIBLE_INDICATOR_SUFFIXES = ['_avail', '_sold', '_occ_pct', '_dm_fap', '_pax', '_revpar', '_trevpor'];
+    const isAlwaysVisibleIndicator = (rowId: string) => ALWAYS_VISIBLE_INDICATOR_SUFFIXES.some(suffix => rowId.endsWith(suffix));
+    // Hotel filter for Comparativo de ocupação — independent from the global header hotel
+    // selector, lets several hotels be summed together (same idea as the month filter).
+    const [selectedHotelsFilter, setSelectedHotelsFilter] = useState<string[]>(() => selectedHotel ? [selectedHotel] : []);
 
     const toggleDecimals = (rowId: string) => {
         setDecimalOverrides(prev => {
@@ -819,70 +832,167 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             }
         };
 
-        const getLYValue = (accountName: string) => {
-            if (!financialData || !selectedMonth || !selectedYear) return 0;
-            const lyYear = (selectedYear - 1).toString();
-            const targetMonth = selectedMonth.toString();
-            const targetName = accountName.trim().toLowerCase();
+        // "Ver acumulado" — Prévia/Forecast/Meta/Ano Anterior sum across every month checked in
+        // the filter below (all 12 by default), instead of only the single globally-selected month.
+        const accumMonths = visibleMonthsFilter.length > 0 ? visibleMonthsFilter.map(idx => idx + 1) : [selectedMonth || 1];
+        // Hotel filter — several hotels can be checked at once and get summed together, same
+        // idea as the month filter. Falls back to the global header hotel if none is checked.
+        const hotelsToUse = selectedHotelsFilter.length > 0 ? selectedHotelsFilter : (selectedHotel ? [selectedHotel] : []);
 
-            return financialData
-                .filter(row =>
-                    row.ano === lyYear &&
-                    row.mes === targetMonth &&
-                    row.cenario === 'REAL' &&
-                    row.conta.trim().toLowerCase() === targetName
-                )
-                .reduce((sum, row) => sum + (parseFloat(row.valor) || 0), 0);
+        // Editing a specific month's value only makes unambiguous sense when exactly one month
+        // and one hotel are selected — with several summed together, cells become read-only.
+        // Edits always write to the globally-active hotel's data (handleRealUpdate/contextKey
+        // below), so viewing a DIFFERENT hotel from the filter must not offer an edit box that
+        // would silently write to the wrong hotel.
+        const isSingleMonthView = accumMonths.length === 1 && hotelsToUse.length === 1 && hotelsToUse[0] === selectedHotel;
+
+        // budgetData (Meta) is scoped to whichever budget version is currently active, which
+        // only matches ONE hotel (the global one). For any OTHER hotel in the filter, look up
+        // that hotel's own "main" budget version to get its Meta figures instead.
+        const getBudgetDataForHotel = (hotelName: string): Record<string, number[]> => {
+            if (hotelName === selectedHotel) return budgetData || {};
+            const hotel = hotels?.find(h => h.name === hotelName);
+            const version = budgetVersions?.find(v => v.isMain && (v.hotelId === hotel?.code || v.hotelId === hotel?.id || v.hotel === hotelName));
+            return (version && budgetOccupancyDataMap?.[version.id]) || {};
         };
 
-        const getRowData = (rowId: string) => {
-            const monthIdx = (selectedMonth || 1) - 1;
-            let meta = budgetData?.[rowId]?.[monthIdx] || 0;
-            
-            if (rowId === 'lazer_capacity' || rowId === 'event_capacity') {
-                meta = budgetData?.['geral_capacity']?.[monthIdx] || 0;
-            } else if (rowId === 'lazer_avail' || rowId === 'event_avail') {
-                meta = budgetData?.['geral_avail']?.[monthIdx] || 0;
+        const sumMetaAcross = (rowId: string, months: number[]) =>
+            hotelsToUse.reduce((hotelSum, hotelName) => {
+                const hotelBudget = getBudgetDataForHotel(hotelName);
+                return hotelSum + months.reduce((sum, m) => sum + (hotelBudget?.[rowId]?.[m - 1] || 0), 0);
+            }, 0);
+
+        const sumRealAcross = (rowId: string, suffix: 'forecast' | 'previa', months: number[]) =>
+            hotelsToUse.reduce((hotelSum, hotelName) => {
+                return hotelSum + months.reduce((sum, m) => {
+                    const key = `${hotelName}_${selectedYear}_${m}_${activeRealVersionId || ''}`;
+                    const monthData = realOccupancyData?.[key] || {};
+                    return sum + (monthData[`${rowId}_${suffix}`] || 0);
+                }, 0);
+            }, 0);
+
+        // Mirrors BudgetOccupancyTable's own "Total" column ratio logic — a plain sum is wrong
+        // for rates/percentages, they must be recomputed from the summed raw components.
+        const getMetaAggregate = (rowId: string, months: number[]) => {
+            const sum = (id: string) => sumMetaAcross(id, months);
+            const prefix = rowId.split('_')[0];
+
+            if (rowId.endsWith('_occ_pct')) {
+                const avail = sum(`${prefix}_avail`), sold = sum(`${prefix}_sold`);
+                return avail > 0 ? (sold / avail) * 100 : 0;
             }
+            if (rowId.endsWith('_coef_total')) {
+                const pax = sum(`${prefix}_pax`), sold = sum(`${prefix}_sold`);
+                return sold > 0 ? pax / sold : 0;
+            }
+            if (rowId.endsWith('_coef_ad')) {
+                const ad = sum(`${prefix}_adults`), sold = sum(`${prefix}_sold`);
+                return sold > 0 ? ad / sold : 0;
+            }
+            if (rowId.endsWith('_coef_chd')) {
+                const chd = sum(`${prefix}_chd`), sold = sum(`${prefix}_sold`);
+                return sold > 0 ? chd / sold : 0;
+            }
+            if (rowId.endsWith('_rate_ad')) {
+                const fap = sum(`${prefix}_rev_fap`), hosp = sum(`${prefix}_rev_hosp`), ad = sum(`${prefix}_adults`);
+                return ad > 0 ? (fap - hosp) / ad : 0;
+            }
+            if (rowId.endsWith('_rate_chd')) {
+                const fap = sum(`${prefix}_rev_fap`), hosp = sum(`${prefix}_rev_hosp`), chd = sum(`${prefix}_chd`);
+                return chd > 0 ? (fap - hosp) / chd : 0;
+            }
+            if (rowId.endsWith('_dm_fap')) {
+                const fap = sum(`${prefix}_rev_fap`), sold = sum(`${prefix}_sold`);
+                return sold > 0 ? fap / sold : 0;
+            }
+            if (rowId.endsWith('_dm_hosp')) {
+                const hosp = sum(`${prefix}_rev_hosp`), sold = sum(`${prefix}_sold`);
+                return sold > 0 ? hosp / sold : 0;
+            }
+            if (rowId.endsWith('_revpar')) {
+                const fap = sum(`${prefix}_rev_fap`), avail = sum(`${prefix}_avail`);
+                return avail > 0 ? fap / avail : 0;
+            }
+            if (rowId.endsWith('_trevpor') || rowId.endsWith('_trevpar')) {
+                const fap = sum(`${prefix}_rev_fap`), extra = sum(`${prefix}_extra_rev`);
+                const orExtras = prefix === 'geral' ? sum('geral_or_extras') : 0;
+                const orHosp = prefix === 'geral' ? sum('geral_or_hosp') : 0;
+                const base = rowId.endsWith('_trevpor') ? sum(`${prefix}_sold`) : sum(`${prefix}_avail`);
+                return base > 0 ? (fap + extra + orExtras + orHosp) / base : 0;
+            }
+            if (rowId === 'lazer_capacity' || rowId === 'event_capacity') return sum('geral_capacity');
+            if (rowId === 'lazer_avail' || rowId === 'event_avail') return sum('geral_avail');
+            if (rowId === 'geral_mo_total') return sum('geral_mo_clt') + sum('geral_mo_extra');
+            return sum(rowId);
+        };
+
+        const OCCUPANCY_BASE_FIELDS = [
+            'lazer_sold', 'lazer_adults', 'lazer_chd', 'lazer_rev_fap', 'lazer_rev_hosp', 'lazer_extra_rev',
+            'event_sold', 'event_adults', 'event_chd', 'event_rev_fap', 'event_rev_hosp', 'event_extra_rev',
+            'geral_or_extras', 'geral_or_hosp', 'geral_iss_rev', 'geral_cancel_ts', 'geral_impostos',
+            'geral_mo_clt', 'geral_mo_extra'
+        ];
+
+        // Real/Prévia aggregate: sum the raw inputs across the selected months, then feed them
+        // through the SAME recalculateReal formulas used for a single month — so every derived
+        // ratio (occ_pct, dm_fap, revpar, trevpor...) is recomputed from the accumulated totals
+        // instead of being (wrongly) summed directly.
+        const accumulatedReal = useMemo(() => {
+            const agg: Record<string, number> = {};
+            (['forecast', 'previa'] as const).forEach(s => {
+                // Fixed fields: forecast/previa always mirror the Meta sum, same as the single-month rule.
+                agg[`days_month_${s}`] = sumMetaAcross('days_month', accumMonths);
+                agg[`geral_capacity_${s}`] = sumMetaAcross('geral_capacity', accumMonths);
+                OCCUPANCY_BASE_FIELDS.forEach(f => { agg[`${f}_${s}`] = sumRealAcross(f, s, accumMonths); });
+            });
+            return recalculateReal(agg);
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+        }, [realOccupancyData, budgetData, selectedHotel, selectedYear, activeRealVersionId, JSON.stringify(accumMonths), JSON.stringify(hotelsToUse)]);
+
+        // Ano Anterior — same source and shape as accumulatedReal, but reading realOccupancyData
+        // under the PREVIOUS year's context key. This matches exactly how the "Ocupação" tab
+        // computes its own "Ano anterior" period, instead of the old (and often empty/mismatched)
+        // lookup into imported financial_data rows by hardcoded account-name strings.
+        const accumulatedLY = useMemo(() => {
+            const lyYear = (selectedYear || 0) - 1;
+            const sumRealAcrossLY = (rowId: string, suffix: 'forecast' | 'previa') =>
+                hotelsToUse.reduce((hotelSum, hotelName) => {
+                    return hotelSum + accumMonths.reduce((sum, m) => {
+                        const key = `${hotelName}_${lyYear}_${m}_${activeRealVersionId || ''}`;
+                        const monthData = realOccupancyData?.[key] || {};
+                        return sum + (monthData[`${rowId}_${suffix}`] || 0);
+                    }, 0);
+                }, 0);
+
+            const agg: Record<string, number> = {};
+            (['forecast', 'previa'] as const).forEach(s => {
+                // Same fallback as the "Ocupação" tab: capacity/days reuse the CURRENT year's
+                // Meta, since a prior year's Meta isn't tracked as a separate figure here.
+                agg[`days_month_${s}`] = sumMetaAcross('days_month', accumMonths);
+                agg[`geral_capacity_${s}`] = sumMetaAcross('geral_capacity', accumMonths);
+                OCCUPANCY_BASE_FIELDS.forEach(f => { agg[`${f}_${s}`] = sumRealAcrossLY(f, s); });
+            });
+            return recalculateReal(agg);
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+        }, [realOccupancyData, budgetData, selectedHotel, selectedYear, activeRealVersionId, JSON.stringify(accumMonths), JSON.stringify(hotelsToUse)]);
+
+        const getRowData = (rowId: string) => {
+            let meta = getMetaAggregate(rowId, accumMonths);
 
             const fixedFields = ['days_month', 'geral_capacity', 'lazer_capacity', 'event_capacity', 'geral_avail', 'lazer_avail', 'event_avail'];
 
-            let forecast = currentRealData[`${rowId}_forecast`];
-            let previa = currentRealData[`${rowId}_previa`];
+            let forecast: number;
+            let previa: number;
 
             if (fixedFields.includes(rowId)) {
                 forecast = meta;
                 previa = meta;
-            } else if (rowId === 'geral_mo_total') {
-                // Total is always derived from CLT + Extra at render time, never read from a
-                // stored field — keeps it correct even for data saved before this row existed.
-                meta = (budgetData?.['geral_mo_clt']?.[monthIdx] || 0) + (budgetData?.['geral_mo_extra']?.[monthIdx] || 0);
-                forecast = (currentRealData['geral_mo_clt_forecast'] || 0) + (currentRealData['geral_mo_extra_forecast'] || 0);
-                previa = (currentRealData['geral_mo_clt_previa'] || 0) + (currentRealData['geral_mo_extra_previa'] || 0);
             } else {
-                forecast = forecast || 0;
-                previa = previa || 0;
+                forecast = accumulatedReal[`${rowId}_forecast`] || 0;
+                previa = accumulatedReal[`${rowId}_previa`] || 0;
             }
 
-            const lyMap: Record<string, string> = {
-                'lazer_avail': 'Lazer - UH Disponível',
-                'lazer_sold': 'Lazer - UH Ocupada',
-                'lazer_pax': 'Lazer - PAX',
-                'event_avail': 'Eventos - UH Disponível',
-                'event_sold': 'Eventos - UH Ocupada',
-                'event_pax': 'Eventos - PAX',
-            };
-
-            let ly = 0;
-            if (lyMap[rowId]) {
-                ly = getLYValue(lyMap[rowId]);
-            } else if (rowId === 'geral_avail') {
-                ly = getLYValue('Lazer - UH Disponível');
-            } else if (rowId === 'geral_sold') {
-                ly = getLYValue('Lazer - UH Ocupada') + getLYValue('Eventos - UH Ocupada');
-            } else if (rowId === 'geral_pax') {
-                ly = getLYValue('Lazer - PAX') + getLYValue('Eventos - PAX');
-            }
+            const ly = fixedFields.includes(rowId) ? meta : (accumulatedLY[`${rowId}_forecast`] || 0);
 
             const deltaBudgetVal = forecast - meta;
             const deltaBudgetPct = meta !== 0 ? (deltaBudgetVal / meta) * 100 : 0;
@@ -899,23 +1009,27 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
         };
 
         const renderRealTable = (title: string, rows: BudgetRow[]) => (
-            <div className="mb-8 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden relative">
-                <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                    <h3 className="text-lg font-bold text-gray-800">{title}</h3>
+            <div className="mb-8 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden relative w-fit max-w-full flex">
+                <div className="bg-gray-50 border-r border-gray-200 flex items-center justify-center px-1 shrink-0 w-10">
+                    <h3 className="text-lg font-bold text-gray-800 whitespace-nowrap" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>{title}</h3>
                 </div>
                 <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left border-collapse">
-                        <thead className="bg-sky-100 font-bold text-sky-900 uppercase tracking-tight text-xs border-b border-sky-200">
+                    {/* table-fixed + no w-full: without this, a w-full table stretches to fill
+                        the whole container and redistributes the extra space across columns,
+                        making the per-column width classes below meaningless. table-fixed makes
+                        them the actual, enforced column widths instead of just hints. */}
+                    <table className="table-fixed text-base text-left border-collapse">
+                        <thead className="bg-sky-100 font-bold text-sky-900 uppercase tracking-tight text-sm border-b border-sky-200">
                             <tr>
-                                <th className="px-4 py-3 w-64 sticky left-0 bg-sky-100 z-10 border-r border-sky-200">Indicador</th>
-                                {columnVisibility.previa && <th className="px-2 py-3 text-right w-24 bg-purple-50/50 text-purple-900 border-r border-gray-100">PRÉVIA</th>}
-                                {columnVisibility.real && <th className="px-2 py-3 text-right w-24 bg-sky-100 text-sky-900 border-r border-gray-100">FORECAST</th>}
-                                {columnVisibility.budget && <th className="px-2 py-3 text-right w-24 border-r border-gray-100">META</th>}
-                                {columnVisibility.deltaBudget && <th className="px-2 py-3 text-right w-24 border-r border-gray-100">Δ META R$</th>}
-                                {columnVisibility.deltaBudgetPct && <th className="px-2 py-3 text-right w-24 border-r border-gray-100">Δ %</th>}
-                                {columnVisibility.lastYear && <th className="px-2 py-3 text-right w-24 bg-orange-50/50 text-orange-900 border-r border-gray-100">LAST YEAR</th>}
-                                {columnVisibility.deltaLY && <th className="px-2 py-3 text-right w-24 border-r border-gray-100">Δ LY R$</th>}
-                                {columnVisibility.deltaLYPct && <th className="px-2 py-3 text-right w-24">Δ %</th>}
+                                <th className="px-2 py-3 w-44 sticky left-0 bg-sky-100 z-10 border-r border-sky-200 text-sm truncate">Indicador</th>
+                                {columnVisibility.previa && <th className="px-1 py-3 text-center w-32 truncate text-sm bg-sky-100 text-sky-900 border-r border-gray-100">PRÉVIA</th>}
+                                {columnVisibility.real && <th className="px-1 py-3 text-center w-32 truncate text-sm bg-sky-100 text-sky-900 border-r border-gray-100">FORECAST</th>}
+                                {columnVisibility.budget && <th className="px-1 py-3 text-center w-32 truncate text-sm border-r border-gray-100">META</th>}
+                                {columnVisibility.deltaBudget && <th className="px-1 py-3 text-center w-32 truncate text-sm border-r border-gray-100">Δ META R$</th>}
+                                {columnVisibility.deltaBudgetPct && <th className="px-1 py-3 text-center w-32 truncate text-sm border-r border-gray-100">Δ %</th>}
+                                {columnVisibility.lastYear && <th className="px-1 py-3 text-center w-32 truncate text-sm bg-sky-100 text-sky-900 border-r border-gray-100">ANO ANTERIOR</th>}
+                                {columnVisibility.deltaLY && <th className="px-1 py-3 text-center w-32 truncate text-sm border-r border-gray-100">Δ LY R$</th>}
+                                {columnVisibility.deltaLYPct && <th className="px-1 py-3 text-center w-32 truncate text-sm">Δ %</th>}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
@@ -926,18 +1040,18 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
 
                                 return (
                                     <tr key={row.id} className="hover:bg-gray-50 transition-colors">
-                                        <td className={`px-4 py-2 sticky left-0 bg-white z-10 border-r border-gray-200 ${row.indent ? 'pl-8 text-gray-500' : 'text-gray-700 font-medium'}`}>
-                                            {row.label}
-                                            <button
+                                        <td className={`px-2 py-2 text-sm sticky left-0 bg-white z-10 border-r border-gray-200 overflow-hidden whitespace-nowrap ${row.indent ? 'pl-4 text-gray-500' : 'text-gray-700 font-medium'}`}>
+                                            <span
                                                 onClick={() => toggleDecimals(row.id)}
-                                                className="ml-2 text-[10px] text-gray-400 hover:text-indigo-600 font-bold"
+                                                className="truncate inline-block max-w-full align-middle cursor-pointer"
+                                                title={row.label}
                                             >
-                                                .{decimalOverrides[row.id] ?? 0}
-                                            </button>
+                                                {row.label}
+                                            </span>
                                         </td>
                                         {columnVisibility.previa && (
-                                            <td className="px-2 py-2 text-right bg-purple-50/20 text-purple-800 font-medium border-r border-gray-100">
-                                                {row.isManualReal && canEditOccupancy ? (
+                                            <td className="px-1 py-2 text-right text-sm truncate bg-sky-50/30 border-r border-gray-100">
+                                                {row.isManualReal && canEditOccupancy && isSingleMonthView ? (
                                                     <TableInput
                                                         value={previa || 0}
                                                         format={row.format}
@@ -945,19 +1059,19 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
                                                         onUpdate={(val) => handleRealUpdate(row.id, 'previa', val)}
                                                         align="right"
                                                         textSizeClass=""
-                                                        idleColorClass="text-purple-900 font-bold"
-                                                        activeColorClass="text-purple-900 font-bold"
-                                                        focusRingClass="focus:ring-purple-300"
+                                                        idleColorClass="text-sky-900 font-bold"
+                                                        activeColorClass="text-sky-900 font-bold"
+                                                        focusRingClass="focus:ring-sky-300"
                                                         focusBgClass="focus:bg-white"
                                                     />
                                                 ) : (
-                                                    <span className="font-bold text-purple-900">{formatValue(previa, row.format, decimalOverrides[row.id])}</span>
+                                                    <span className="font-bold text-sky-900">{formatValue(previa, row.format, decimalOverrides[row.id])}</span>
                                                 )}
                                             </td>
                                         )}
                                         {columnVisibility.real && (
-                                            <td className="px-2 py-2 text-right bg-sky-50/30 border-r border-gray-100">
-                                                {row.isManualReal && canEditOccupancy ? (
+                                            <td className="px-1 py-2 text-right text-sm truncate bg-sky-50/30 border-r border-gray-100">
+                                                {row.isManualReal && canEditOccupancy && isSingleMonthView ? (
                                                     <TableInput
                                                         value={forecast || 0}
                                                         format={row.format}
@@ -976,32 +1090,32 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
                                             </td>
                                         )}
                                         {columnVisibility.budget && (
-                                            <td className="px-2 py-2 text-right text-gray-500 border-r border-gray-100">
+                                            <td className="px-1 py-2 text-right text-sm truncate bg-sky-50/30 text-sky-900 font-bold border-r border-gray-100">
                                                 {formatValue(meta, row.format, decimalOverrides[row.id])}
                                             </td>
                                         )}
                                         {columnVisibility.deltaBudget && (
-                                            <td className={`px-2 py-2 text-right font-medium border-r border-gray-100 ${deltaColor}`}>
+                                            <td className={`px-1 py-2 text-right text-sm truncate font-medium border-r border-gray-100 ${deltaColor}`}>
                                                 {formatValue(deltaBudgetVal, row.format, decimalOverrides[row.id])}
                                             </td>
                                         )}
                                         {columnVisibility.deltaBudgetPct && (
-                                            <td className={`px-2 py-2 text-right font-bold border-r border-gray-100 ${deltaColor}`}>
+                                            <td className={`px-1 py-2 text-right text-sm truncate font-bold border-r border-gray-100 ${deltaColor}`}>
                                                 {formatPercentDiff(deltaBudgetPct)}
                                             </td>
                                         )}
                                         {columnVisibility.lastYear && (
-                                            <td className="px-2 py-2 text-right bg-orange-50/20 text-orange-800 border-r border-gray-100">
+                                            <td className="px-1 py-2 text-right text-sm truncate bg-sky-50/30 text-sky-900 font-bold border-r border-gray-100">
                                                 {formatValue(ly, row.format, decimalOverrides[row.id])}
                                             </td>
                                         )}
                                         {columnVisibility.deltaLY && (
-                                            <td className={`px-2 py-2 text-right font-medium border-r border-gray-100 ${lyColor}`}>
+                                            <td className={`px-1 py-2 text-right text-sm truncate font-medium border-r border-gray-100 ${lyColor}`}>
                                                 {formatValue(deltaLYVal, row.format, decimalOverrides[row.id])}
                                             </td>
                                         )}
                                         {columnVisibility.deltaLYPct && (
-                                            <td className={`px-2 py-2 text-right font-bold ${lyColor}`}>
+                                            <td className={`px-1 py-2 text-right text-sm truncate font-bold ${lyColor}`}>
                                                 {formatPercentDiff(deltaLYPct)}
                                             </td>
                                         )}
@@ -1018,7 +1132,6 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             <div className="p-8 w-full">
                 <div className="mb-6 flex justify-between items-center">
                     <div>
-                        <VersionInfoBanner versionName={activeRealVersionName} />
                         <div className="flex items-center gap-3">
                             <h2 className="text-2xl font-bold text-gray-900">Comparativo de ocupação</h2>
                             {!isBudget && (
@@ -1030,6 +1143,15 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
                         <p className="text-gray-500 mt-1">Análise detalhada de ocupação por segmento para {selectedMonth}/{selectedYear}.</p>
                     </div>
                     <div className="flex gap-3 relative">
+                        <button
+                            onClick={() => setShowAccountDetails(!showAccountDetails)}
+                            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-base font-bold transition-all border ${!showAccountDetails ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 shadow-sm'
+                                }`}
+                            title={showAccountDetails ? "Ocultar contas" : "Mostrar contas"}
+                        >
+                            {showAccountDetails ? <ListFilter size={20} /> : <LayoutList size={20} />}
+                            {showAccountDetails ? 'Ocultar Contas' : 'Mostrar Contas'}
+                        </button>
                         <button
                             onClick={() => setShowColumnSettings(!showColumnSettings)}
                             className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-base font-bold transition-all border ${showColumnSettings ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 shadow-sm'
@@ -1054,7 +1176,7 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
                                         { key: 'budget', label: 'Meta (Budget)' },
                                         { key: 'deltaBudget', label: 'Δ Meta R$' },
                                         { key: 'deltaBudgetPct', label: 'Δ Meta %' },
-                                        { key: 'lastYear', label: 'Last Year' },
+                                        { key: 'lastYear', label: 'Ano Anterior' },
                                         { key: 'deltaLY', label: 'Δ LY R$' },
                                         { key: 'deltaLYPct', label: 'Δ LY %' },
                                     ].map(col => (
@@ -1074,9 +1196,68 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
                     </div>
                 </div>
 
-                {renderRealTable("Geral", geralRows)}
-                {renderRealTable("Lazer", lazerRows)}
-                {renderRealTable("Eventos", eventRows)}
+                {hotels && hotels.filter(h => h.type !== 'Administradora').length > 0 && (() => {
+                    const filterableHotels = hotels.filter(h => h.type !== 'Administradora');
+                    return (
+                    <div className="flex flex-wrap gap-1 mb-3 items-center">
+                        <span className="text-sm font-bold text-gray-700 mr-2">Hotéis:</span>
+                        {filterableHotels.map(h => (
+                            <button
+                                key={h.id}
+                                onClick={() => {
+                                    setSelectedHotelsFilter(prev =>
+                                        prev.includes(h.name) ? prev.filter(n => n !== h.name) : [...prev, h.name]
+                                    );
+                                }}
+                                className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                                    selectedHotelsFilter.includes(h.name)
+                                        ? 'bg-indigo-100 text-indigo-700 border border-indigo-200 shadow-sm'
+                                        : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'
+                                }`}
+                            >
+                                {h.name}
+                            </button>
+                        ))}
+                        <button
+                            onClick={() => setSelectedHotelsFilter(selectedHotelsFilter.length === filterableHotels.length ? [] : filterableHotels.map(h => h.name))}
+                            className="px-3 py-1 text-xs font-bold rounded-md transition-all bg-gray-100 text-gray-600 hover:bg-gray-200 ml-2 border border-gray-200"
+                        >
+                            {selectedHotelsFilter.length === filterableHotels.length ? 'Deselecionar Todos' : 'Selecionar Todos'}
+                        </button>
+                    </div>
+                    );
+                })()}
+
+                <div className="flex flex-wrap gap-1 mb-6 items-center">
+                    <span className="text-sm font-bold text-gray-700 mr-2">Ver acumulado de:</span>
+                    {MONTHS.map((m, idx) => (
+                        <button
+                            key={m}
+                            onClick={() => {
+                                setVisibleMonthsFilter(prev =>
+                                    prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx].sort((a, b) => a - b)
+                                );
+                            }}
+                            className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                                visibleMonthsFilter.includes(idx)
+                                    ? 'bg-indigo-100 text-indigo-700 border border-indigo-200 shadow-sm'
+                                    : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'
+                            }`}
+                        >
+                            {m}
+                        </button>
+                    ))}
+                    <button
+                        onClick={() => setVisibleMonthsFilter(visibleMonthsFilter.length === 12 ? [] : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])}
+                        className="px-3 py-1 text-xs font-bold rounded-md transition-all bg-gray-100 text-gray-600 hover:bg-gray-200 ml-2 border border-gray-200"
+                    >
+                        {visibleMonthsFilter.length === 12 ? 'Deselecionar Todos' : 'Selecionar Todos'}
+                    </button>
+                </div>
+
+                {renderRealTable("Geral", showAccountDetails ? geralRows : geralRows.filter(r => isAlwaysVisibleIndicator(r.id)))}
+                {renderRealTable("Lazer", showAccountDetails ? lazerRows : lazerRows.filter(r => isAlwaysVisibleIndicator(r.id)))}
+                {renderRealTable("Eventos", showAccountDetails ? eventRows : eventRows.filter(r => isAlwaysVisibleIndicator(r.id)))}
             </div>
         );
     }

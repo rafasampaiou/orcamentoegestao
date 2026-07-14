@@ -51,7 +51,9 @@ const Header: React.FC<HeaderProps> = ({
     activeVersionId,
     setActiveVersionId
 }) => {
-    const showFilters = currentView === 'dashboard' || currentView === 'occupancy_real';
+    // Comparativo de ocupação has its own hotel filter (multi-select, view-only) — the global
+    // Tipo/Categoria/Região/Hotel/Versão filters don't apply there anymore.
+    const showFilters = currentView === 'dashboard';
     const selectedHotelObj = hotels.find(h => h.name === selectedHotel);
     const hotelCode = selectedHotelObj?.code || selectedHotel;
     const availableVersionsForHotel = versions?.filter(v => 

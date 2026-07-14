@@ -1028,6 +1028,9 @@ const App: React.FC = () => {
           selectedMonth={selectedDate.getMonth() + 1}
           selectedYear={selectedDate.getFullYear()}
           selectedHotel={selectedHotel}
+          hotels={hotels}
+          budgetVersions={budgetVersions}
+          budgetOccupancyDataMap={budgetOccupancyDataMap}
           budgetData={budgetOccupancyDataMap[activeBudgetVersionId] || {}}
           realOccupancyData={realOccupancyData}
           setRealOccupancyData={setRealOccupancyData}
