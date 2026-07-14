@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { getForecastData, normalizeAccountName } from '../services/mockData';
-import { Plus, Trash2, X, Save, Briefcase, Pencil, Calendar, PieChart, Lock, Settings as SettingsIcon, Users, Search, Upload, Settings, Eye, FileText, Layout, Info, ChevronUp, GripVertical, Database, BedDouble, DollarSign, Target, LayoutList, ArrowUp, ArrowDown, Copy, Mail, Loader2 } from 'lucide-react';
+import { Plus, Trash2, X, Save, Briefcase, Pencil, Calendar, PieChart, Lock, Settings as SettingsIcon, Users, Search, Upload, Settings, Eye, FileText, Layout, Info, ChevronUp, GripVertical, Database, BedDouble, DollarSign, Target, LayoutList, ArrowUp, ArrowDown, Copy, Loader2 } from 'lucide-react';
 import { User, UserRole, CostCenter, ImportedRow, Hotel, Account, BudgetVersion, LaborParameters, ScheduleItem, ImportedCostCenter, CostPackage, GMDConfiguration, ViewState, DreSection, HotelCategory, HotelRegion, ImportedAccount, KpiCalculation } from '../types';
 import { getDreReferenceOptions } from '../utils/dreReferences';
 import KpiCalculationEditor from './KpiCalculationEditor';
@@ -1367,24 +1367,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       responsibleCostCenters: []
     });
     setActiveModal('user');
-  };
-
-  const [sendingResetId, setSendingResetId] = useState<string | null>(null);
-
-  const handleSendPasswordReset = async (u: User) => {
-    if (!u.email) {
-      toast.error('Este usuário não tem e-mail cadastrado.');
-      return;
-    }
-    setSendingResetId(u.id);
-    try {
-      await supabaseService.sendPasswordResetEmail(u.email);
-      toast.success(`E-mail de redefinição enviado para ${u.email}.`);
-    } catch (err: any) {
-      toast.error('Erro ao enviar e-mail: ' + (err?.message || JSON.stringify(err)));
-    } finally {
-      setSendingResetId(null);
-    }
   };
 
   const openEditUser = (id: string) => {
@@ -4923,7 +4905,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unidade</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Perfil</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Responsabilidades</th>
-                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
                           <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Data Cadastro</th>
                           <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Últ. Acesso</th>
                           <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
@@ -4997,13 +4978,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                   <span className="text-slate-600 font-bold text-[9px] uppercase tracking-wider bg-slate-100 px-2 py-0.5 rounded">Acesso Consulta</span>
                                 )}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-center">
-                                {u.isValidated ? (
-                                  <span className="px-2 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-[10px] uppercase font-bold">Usuário validado</span>
-                                ) : (
-                                  <span className="px-2 py-1 bg-amber-50 text-amber-700 rounded-lg text-[10px] uppercase font-bold">Usuário em validação</span>
-                                )}
-                              </td>
                               <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-mono text-gray-500">
                                 {u.createdAt ? new Date(u.createdAt).toLocaleDateString('pt-BR') : '-'}
                               </td>
@@ -5011,14 +4985,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                 {u.lastAccess ? new Date(u.lastAccess).toLocaleDateString('pt-BR') : '-'}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                <button
-                                    onClick={() => handleSendPasswordReset(u)}
-                                    disabled={sendingResetId === u.id}
-                                    className="text-emerald-600 hover:text-emerald-900 mr-3 disabled:opacity-50"
-                                    title="Enviar e-mail de redefinição de senha"
-                                >
-                                    {sendingResetId === u.id ? <Loader2 size={16} className="animate-spin" /> : <Mail size={16} />}
-                                </button>
                                 <button onClick={() => openEditUser(u.id)} className="text-indigo-600 hover:text-indigo-900 mr-3"><Pencil size={16} /></button>
                                 <button onClick={() => handleDelete('users', u.id)} className="text-red-600 hover:text-red-900"><Trash2 size={16} /></button>
                               </td>
@@ -5830,7 +5796,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               {!editingId && (
                 <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-100">
                   <p className="text-xs text-indigo-800">
-                    Após criar o usuário, use o botão <strong>"Enviar e-mail de redefinição"</strong> na lista para que ele defina a própria senha de acesso.
+                    O login é feito só com o e-mail cadastrado (precisa terminar em @taua.com.br) — não é preciso definir senha.
                   </p>
                 </div>
               )}
