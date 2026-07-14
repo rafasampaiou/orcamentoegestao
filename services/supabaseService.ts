@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { supabase, SITE_URL } from './supabaseClient';
 import { Account, CostCenter, Hotel, BudgetVersion, User, GMDConfiguration, UserRole, ImportedRow, KpiCalculation, ValidationRecord } from '../types';
 
 // Supabase/PostgREST caps rows per request (default 1000) regardless of .limit(),
@@ -422,9 +422,11 @@ export const supabaseService = {
 
   // Sends Supabase's own "reset password" email — the user clicks the link, is redirected
   // back to this app, and DefinePasswordView takes over to let them set their own password.
+  // Always points at the deployed site (not window.location.origin) so a link sent while an
+  // admin is testing on localhost still lands the end user on the real app.
   async sendPasswordResetEmail(email: string): Promise<void> {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin
+      redirectTo: SITE_URL
     });
     if (error) throw error;
   },

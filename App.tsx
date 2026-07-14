@@ -242,6 +242,9 @@ const App: React.FC = () => {
   // --- REGISTRY STATE (LIFTED FROM SETTINGS) ---
   // This ensures data persists when switching tabs
   const [users, setUsers] = useState<User[]>([]);
+  // Tracks whether the profiles fetch has completed at least once, so the "no matching
+  // profile" gate below doesn't false-positive on a valid user while `users` is still loading.
+  const [profilesLoaded, setProfilesLoaded] = useState(false);
 
   const loggedInProfile = React.useMemo(() => {
     if (!session) return null;
@@ -526,6 +529,8 @@ const App: React.FC = () => {
         }
       } catch (error) {
         console.warn('Could not fetch real data from Supabase, falling back to mockData.', error);
+      } finally {
+        if (isMounted) setProfilesLoaded(true);
       }
     };
 
@@ -1181,6 +1186,29 @@ const App: React.FC = () => {
 
   if (!session) {
     return <Auth />;
+  }
+
+  // Authenticated with Supabase but no matching row in `profiles` — this can happen with
+  // self-service sign-in (Google) for an account the admin never provisioned. Block instead
+  // of falling through to the ADMIN-fallback in `currentUser` below.
+  if (profilesLoaded && !loggedInProfile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#0f172a] p-4">
+        <div className="max-w-md w-full text-center bg-white rounded-2xl shadow-2xl p-8 border border-red-200">
+          <h1 className="text-xl font-bold text-red-600 mb-2">Acesso não autorizado</h1>
+          <p className="text-sm text-gray-600 mb-6">
+            O e-mail <span className="font-semibold">{session.user.email}</span> não está cadastrado no sistema.
+            Contate o administrador para solicitar acesso.
+          </p>
+          <button
+            onClick={handleLogout}
+            className="px-5 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold transition-colors"
+          >
+            Sair
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
