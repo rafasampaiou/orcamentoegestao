@@ -327,7 +327,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     const [startWidth, setStartWidth] = useState(0);
     const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
-    const handleKeyDown = (e: React.KeyboardEvent, rowId: string, field: 'real' | 'previa') => {
+    const handleKeyDown = (e: React.KeyboardEvent, rowId: string, field: string) => {
         if (e.key === 'Tab') {
             e.preventDefault();
             const direction = e.shiftKey ? -1 : 1;
@@ -1460,6 +1460,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                                                 value={kpiValue('previa')}
                                                                 formatType={kpiFormatType}
                                                                 onChange={(val: number) => handleKpiValueChange(row.id, 'previa', val)}
+                                                                onKeyDown={(e: any) => handleKeyDown(e, row.id, 'kpi-previa')}
                                                             />
                                                         ) : formatValue(kpiValue('previa'), kpiFormatType))
                                                         : ''}
@@ -1479,6 +1480,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                                                 value={kpiValue('real')}
                                                                 formatType={kpiFormatType}
                                                                 onChange={(val: number) => handleKpiValueChange(row.id, 'real', val)}
+                                                                onKeyDown={(e: any) => handleKeyDown(e, row.id, 'kpi-forecast')}
                                                             />
                                                         ) : formatValue(kpiValue('real'), kpiFormatType))
                                                         : ''}
