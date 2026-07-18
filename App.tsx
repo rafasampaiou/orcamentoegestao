@@ -26,6 +26,38 @@ import { Calendar, ArrowLeft, ArrowRight, Building2 as Building2Icon, Layers } f
 import { mockUsers, mockHotels, mockCostCenters, mockPackages, mockAccounts, mockGMDConfigs } from './services/mockData';
 import { Toaster, toast } from 'react-hot-toast';
 
+const PROJECTION_TYPES: ProjectionType[] = ['Reunião de Ritmo', 'FCA N1', 'FCA N2', 'Fechamento oficial'];
+
+// Reads OccupancyView's `${hotel}_${year}_${month}_${versionId}__${projectionType}` in-memory
+// keys and rebuilds the `__projections` snapshot to merge back into a real BudgetVersion's
+// `occupancy_data` JSONB on save. Always rebuilt from the FULL realOccupancyData map — never
+// only when a projection version happens to be the one currently selected on screen — so a
+// plain Realizado edit/save never clobbers previously saved Reunião de Ritmo/FCA N1/FCA N2/
+// Fechamento history.
+function buildProjectionsSnapshot(
+  realOccMap: Record<string, Record<string, number>>,
+  hotel: string,
+  year: number,
+  versionId: string
+): Record<string, Record<string, number[]>> {
+  const projections: Record<string, Record<string, number[]>> = {};
+  PROJECTION_TYPES.forEach(pt => {
+    const rowsForType: Record<string, number[]> = {};
+    let hasAny = false;
+    for (let i = 0; i < 12; i++) {
+      const key = `${hotel}_${year}_${i + 1}_${versionId}__${pt}`;
+      const monthData = realOccMap[key] || {};
+      Object.keys(monthData).forEach(rowId => {
+        if (!rowsForType[rowId]) rowsForType[rowId] = Array(12).fill(0);
+        rowsForType[rowId][i] = monthData[rowId];
+        hasAny = true;
+      });
+    }
+    if (hasAny) projections[pt] = rowsForType;
+  });
+  return projections;
+}
+
 const App: React.FC = () => {
   const [currentModule, setCurrentModule] = useState<ModuleType>('REAL');
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
@@ -231,8 +263,14 @@ const App: React.FC = () => {
           });
         }
 
-        if (hasData || Object.keys(occupancyDataToSave).length > 0) {
-          supabaseService.upsertBudgetVersion({ ...version, occupancyData: occupancyDataToSave }).catch(console.error);
+        // Sempre reconstrói __projections a partir do mapa completo — independente de qual
+        // Versão do Forecast está selecionada na tela agora — para nunca apagar o histórico de
+        // Reunião de Ritmo/FCA N1/FCA N2/Fechamento com um autosave disparado por uma edição comum.
+        const projections = buildProjectionsSnapshot(realOccupancyDataRef.current, selectedHotel, selectedDate.getFullYear(), activeRealVersionId);
+        const finalOccupancyData: any = { ...occupancyDataToSave, __projections: projections };
+
+        if (hasData || Object.keys(occupancyDataToSave).length > 0 || Object.keys(projections).length > 0) {
+          supabaseService.upsertBudgetVersion({ ...version, occupancyData: finalOccupancyData }).catch(console.error);
         }
       }
     }, 2000);
@@ -465,14 +503,15 @@ const App: React.FC = () => {
               if (v.extraRevenueData) newExtraMap[v.id] = v.extraRevenueData;
             } else if (v.id.startsWith('r')) {
               if (v.occupancyData) {
+                // Resolve hotel name from hotelId to match how the UI accesses it via selectedHotel (which stores the name)
+                const hotelName = remoteHotels.find(h => h.code === v.hotelId || h.id === v.hotelId)?.name || v.hotelId;
                 for (let i = 0; i < 12; i++) {
-                  // Resolve hotel name from hotelId to match how the UI accesses it via selectedHotel (which stores the name)
-                  const hotelName = remoteHotels.find(h => h.code === v.hotelId || h.id === v.hotelId)?.name || v.hotelId;
                   const contextKey = `${hotelName}_${v.year}_${i + 1}_${v.id}`;
                   const monthData: Record<string, number> = {};
                   const contextKeyLY = `${hotelName}_${v.year - 1}_${i + 1}_${v.id}`;
                   const monthDataLY: Record<string, number> = {};
                   Object.keys(v.occupancyData).forEach(rowId => {
+                    if (rowId === '__projections') return; // handled separately below, not a month-array row
                     if (rowId.endsWith('_LY')) {
                       const val = v.occupancyData![rowId][i];
                       if (val !== undefined && val !== null) {
@@ -490,6 +529,25 @@ const App: React.FC = () => {
                   });
                   newRealOccMap[contextKey] = monthData;
                   newRealOccMap[contextKeyLY] = monthDataLY;
+                }
+
+                // Histórico por Versão do Forecast (Reunião de Ritmo/FCA N1/FCA N2/Fechamento),
+                // guardado à parte em __projections — mesmo desempacotamento acima, mas com a
+                // chave de contexto sufixada por projectionType em vez de _forecast/_previa.
+                const projections = (v.occupancyData as any).__projections as Record<string, Record<string, number[]>> | undefined;
+                if (projections) {
+                  Object.keys(projections).forEach(projectionType => {
+                    const rowsForType = projections[projectionType];
+                    for (let i = 0; i < 12; i++) {
+                      const key = `${hotelName}_${v.year}_${i + 1}_${v.id}__${projectionType}`;
+                      const monthData: Record<string, number> = {};
+                      Object.keys(rowsForType).forEach(rowId => {
+                        const val = rowsForType[rowId][i];
+                        if (val !== undefined && val !== null) monthData[rowId] = val;
+                      });
+                      newRealOccMap[key] = monthData;
+                    }
+                  });
                 }
               }
             }
@@ -638,9 +696,15 @@ const App: React.FC = () => {
       });
     }
 
+    // Mesma regra do autosave debounced: reconstrói __projections do zero, sempre, a partir do
+    // mapa completo — nunca só quando a versão ativa é uma das 4 — para o salvamento manual
+    // também não apagar o histórico de outras Versões do Forecast.
+    const projections = buildProjectionsSnapshot(realOccupancyData, selectedHotel, selectedDate.getFullYear(), activeRealVersionId);
+    const finalOccupancyData: any = { ...occupancyDataToSave, __projections: projections };
+
     const updatedVersion = {
       ...version,
-      occupancyData: occupancyDataToSave
+      occupancyData: finalOccupancyData
     };
 
     try {
@@ -1023,6 +1087,7 @@ const App: React.FC = () => {
               validations={validations}
               setValidations={setValidations}
               currentUser={currentUser}
+              onNavigateToOccupancy={() => setCurrentView('occupancy_real')}
             />
           </div>
         </div>

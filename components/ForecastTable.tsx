@@ -35,6 +35,7 @@ interface ForecastTableProps {
     setValidations?: React.Dispatch<React.SetStateAction<import('../types').ValidationRecord[]>>;
     currentUser?: import('../types').User;
     dreConfigs?: Record<string, import('../types').DreSection[]>;
+    onNavigateToOccupancy?: () => void;
 }
 
 // --- UTILITÁRIOS MOVIDOS PARA FORA PARA EVITAR RE-RENDERIZAÇÕES DESNECESSÁRIAS ---
@@ -220,7 +221,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     validations,
     setValidations,
     currentUser,
-    dreConfigs
+    dreConfigs,
+    onNavigateToOccupancy
 }) => {
     const canEditForecast = currentUser?.role === UserRole.ADMIN ||
         currentUser?.role === UserRole.ENTITY_MANAGER ||
@@ -920,6 +922,26 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             {showDetails ? 'Ocultar Contas' : 'Mostrar Contas'}
                         </button>
 
+                        {canEditForecast && onNavigateToOccupancy && (
+                            <button
+                                onClick={onNavigateToOccupancy}
+                                className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-base font-bold transition-colors border bg-white text-gray-600 border-gray-300 hover:bg-gray-50 shadow-sm"
+                                title="Ir para a aba Ocupação já filtrada nesta Versão do Forecast"
+                            >
+                                <TrendingUp size={20} />
+                                Iniciar Projeção
+                            </button>
+                        )}
+
+                        {canEditForecast && (
+                            <button
+                                onClick={handleCalcularForecast}
+                                className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-md text-base font-bold"
+                            >
+                                <Activity size={20} />
+                                Calcular Forecast
+                            </button>
+                        )}
 
                         {canValidate && (
                             isMonthClosed && isAlreadyValidated && !forceUnlockValidated ? (
@@ -937,18 +959,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-md text-base font-bold"
                                 >
                                     <CheckCircle2 size={20} />
-                                    {isMonthClosed ? 'Validar fechamento' : 'Salvar resultados'}
+                                    {isMonthClosed ? 'Validar fechamento' : 'Salvar Projeção'}
                                 </button>
                             )
-                        )}
-                        {canEditForecast && (
-                            <button
-                                onClick={handleCalcularForecast}
-                                className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-md text-base font-bold"
-                            >
-                                <Activity size={20} />
-                                Calcular Forecast
-                            </button>
                         )}
                     </div>
                 </div>
@@ -1561,7 +1574,17 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             style={rowTextStyle}
                                             className={`px-2 py-1 border-r border-gray-100 align-middle sticky left-0 z-20 ${row.id === 'REV-IMP' ? 'bg-sky-100' : 'bg-white'} group-hover:bg-indigo-50/30 ${isTotal ? 'bg-indigo-50' : ''}`}
                                         >
-                                            <div style={{ paddingLeft: `${(row.indentLevel || 0) * 16 + 12}px` }} className={`truncate text-xs ${isTotal ? 'uppercase tracking-wide' : ''}`}>
+                                            <div
+                                                style={{ paddingLeft: `${(row.indentLevel || 0) * 16 + 12}px` }}
+                                                className={`truncate text-xs ${isTotal ? 'uppercase tracking-wide' : ''}`}
+                                                title={
+                                                    row.id === 'REV-EXTRA-OR'
+                                                        ? 'OR = Outras Receitas. Linha utilizada para inserir a diferença de receita extra da USALI com a ferramenta de receitas extras que pode ter algumas correções gerenciais.'
+                                                        : row.id === 'REV-APT-OR'
+                                                        ? 'OR = Outras Receitas. Linha utilizada para inserir a diferença de receita de hospedagem entre o Consolidado e a planilha Meta x Realizado da equipe de Inteligência de Mercado, já que podem ter alguns ajustes gerenciais que não refletem no Consolidado.'
+                                                        : undefined
+                                                }
+                                            >
                                                 {displayLabel}
                                             </div>
                                         </td>
