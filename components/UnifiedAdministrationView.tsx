@@ -1498,7 +1498,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   };
 
   const handleDeleteCategory = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta categoria? Hotéis vinculados ficarão sem categoria.')) return;
+    if (!(await confirmAction('Tem certeza que deseja excluir esta categoria? Hotéis vinculados ficarão sem categoria.'))) return;
     try {
       await supabaseService.deleteHotelCategory(id);
       setHotelCategories(prev => prev.filter(c => c.id !== id));
@@ -1527,7 +1527,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   };
 
   const handleDeleteRegion = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta região? Hotéis vinculados ficarão sem região.')) return;
+    if (!(await confirmAction('Tem certeza que deseja excluir esta região? Hotéis vinculados ficarão sem região.'))) return;
     try {
       await supabaseService.deleteHotelRegion(id);
       setHotelRegions(prev => prev.filter(c => c.id !== id));
@@ -2316,9 +2316,16 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
   // --- HANDLERS: DELETE ---
 
-  const handleDelete = async (type: 'users' | 'gmd' | 'hotels' | 'costCenters' | 'costCentersGrouped' | 'accounts', id: string) => {
-    if (!confirm("Tem certeza que deseja excluir este item?")) return;
+  // Native confirm() gets silently IGNORED (returns false, no dialog ever shown) when this page
+  // runs inside a sandboxed iframe without "allow-modals" — which is exactly why the delete
+  // button "did nothing": `if (!confirm(...)) return;` always took the early return. This
+  // generic async confirm renders its own in-app dialog instead, so it works regardless of
+  // iframe sandboxing.
+  const [confirmState, setConfirmState] = useState<{ message: string; resolve: (v: boolean) => void } | null>(null);
+  const confirmAction = (message: string): Promise<boolean> => new Promise(resolve => setConfirmState({ message, resolve }));
 
+  const handleDelete = async (type: 'users' | 'gmd' | 'hotels' | 'costCenters' | 'costCentersGrouped' | 'accounts', id: string, message?: string) => {
+    if (!(await confirmAction(message || 'Tem certeza que deseja excluir este item?'))) return;
     try {
       switch (type) {
         case 'users':
@@ -2354,7 +2361,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       }
     } catch (err) {
       console.error(`Erro ao excluir ${type}:`, err);
-      alert("Erro ao excluir no banco de dados.");
+      toast.error(err instanceof Error ? err.message : 'Erro ao excluir no banco de dados.');
     }
   };
 
@@ -2809,8 +2816,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     }
   };
 
-  const handleClearExpensesForecast = () => {
-    if (confirm('Tem certeza que deseja limpar todos os valores digitados na tabela?')) {
+  const handleClearExpensesForecast = async () => {
+    if (await confirmAction('Tem certeza que deseja limpar todos os valores digitados na tabela?')) {
       setDreForecastData({});
     }
   };
@@ -2889,7 +2896,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       if (onImportData) {
         onImportData(rowsToSave, 'append');
       }
-      const wantToValidate = confirm(`Dados de despesas (${scenario === 'BUDGET' ? 'Budget' : 'Forecast'}) salvos com sucesso!\n\nDados salvos, clique OK para validar a importação na DRE Forecast ou Cancelar para permanecer nesta tela.`);
+      const wantToValidate = await confirmAction(`Dados de despesas (${scenario === 'BUDGET' ? 'Budget' : 'Forecast'}) salvos com sucesso!\n\nDados salvos, clique OK para validar a importação na DRE Forecast ou Cancelar para permanecer nesta tela.`);
       if (wantToValidate) {
         setCurrentView('dashboard');
       }
@@ -2902,8 +2909,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   };
 
 
-  const handleClearTaxes = () => {
-    if (confirm('Tem certeza que deseja limpar a tabela de impostos?')) {
+  const handleClearTaxes = async () => {
+    if (await confirmAction('Tem certeza que deseja limpar a tabela de impostos?')) {
       setTaxesImportData({});
     }
   };
@@ -2956,8 +2963,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   };
 
 
-  const handleClearOccupancy = () => {
-    if (confirm('Tem certeza que deseja limpar todos os dados de ocupação (Geral, Lazer e Eventos)?')) {
+  const handleClearOccupancy = async () => {
+    if (await confirmAction('Tem certeza que deseja limpar todos os dados de ocupação (Geral, Lazer e Eventos)?')) {
       setOccupancyImportData({});
       setLeisureImportData({});
       setEventsImportData({});
@@ -5146,11 +5153,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                               <td className="px-4 py-3 whitespace-nowrap text-right text-xs font-medium">
                                 <div className="flex justify-end gap-2">
                                   <button onClick={() => openEditCostCenter(cc.id)} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-all shadow-sm" title="Editar Grupo"><Pencil size={14} /></button>
-                                  <button onClick={() => {
-                                    if (confirm(`Excluir o setor "${cc.name}" em todos os ${cc.hotelNames.length} hotéis? Esta ação não pode ser desfeita.`)) {
-                                      handleDelete('costCentersGrouped', `${cc.name}|${cc.hierarchicalCode}`);
-                                    }
-                                  }} className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all shadow-sm" title="Excluir Grupo"><Trash2 size={14} /></button>
+                                  <button onClick={() => handleDelete('costCentersGrouped', `${cc.name}|${cc.hierarchicalCode}`, `Excluir o setor "${cc.name}" em todos os ${cc.hotelNames.length} hotéis? Esta ação não pode ser desfeita.`)} className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all shadow-sm" title="Excluir Grupo"><Trash2 size={14} /></button>
                                 </div>
                               </td>
                             </tr>
@@ -6436,6 +6439,32 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                   className="px-4 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition-colors shadow-md shadow-red-200 flex items-center gap-2"
                 >
                   Sim, Excluir Importação
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* GENERIC CONFIRM MODAL — replaces window.confirm(), which gets silently ignored when
+          this page runs inside a sandboxed iframe without "allow-modals" */}
+      {confirmState && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[70] p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6">
+              <p className="text-gray-700 text-sm mb-6 whitespace-pre-line">{confirmState.message}</p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => { confirmState.resolve(false); setConfirmState(null); }}
+                  className="px-4 py-2 border border-gray-300 rounded-lg font-bold text-gray-700 hover:bg-gray-50 transition-colors shadow-sm"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => { confirmState.resolve(true); setConfirmState(null); }}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition-colors shadow-md shadow-red-200"
+                >
+                  Confirmar
                 </button>
               </div>
             </div>
