@@ -40,9 +40,9 @@ const PERIOD_ORDER: OccupancyVersionOption[] = ['Reunião de Ritmo', 'FCA N2', '
 // Em "Geral" a maioria das linhas é somatório de Lazer+Eventos, nada fica editável — exceção:
 // Mão de obra só existe no nível Geral (não tem quebra por Lazer/Eventos), então CLT/Extra
 // precisam ser editáveis ali mesmo.
-// Ordem igual à das linhas completas (geralRows/lazerRows/eventRows) — só um subconjunto delas
-// aparece aqui, mas na mesma sequência de Realizado/Meta/Ano anterior.
-const MEETING_ROW_SUFFIXES = ['sold', 'occ_pct', 'pax', 'adults', 'coef_ad', 'chd', 'coef_chd', 'rev_fap', 'dm_fap'];
+// Ordem pedida especificamente para esta tabela restrita (não é a mesma ordem de
+// Realizado/Meta/Ano anterior) — Coef. Occ Geral e N° de Hóspedes entram aqui também.
+const MEETING_ROW_SUFFIXES = ['sold', 'occ_pct', 'dm_fap', 'rev_fap', 'coef_ad', 'coef_chd', 'coef_total', 'pax', 'adults', 'chd'];
 const MEETING_EDITABLE_SUFFIXES = ['sold', 'dm_fap', 'coef_ad', 'coef_chd'];
 const MEETING_GERAL_LABOR_SUFFIXES = ['mo_total', 'mo_clt', 'mo_extra'];
 const MEETING_GERAL_LABOR_EDITABLE_SUFFIXES = ['mo_clt', 'mo_extra'];
