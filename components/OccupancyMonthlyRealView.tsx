@@ -40,9 +40,11 @@ const PERIOD_ORDER: OccupancyVersionOption[] = ['Reunião de Ritmo', 'FCA N2', '
 // Em "Geral" a maioria das linhas é somatório de Lazer+Eventos, nada fica editável — exceção:
 // Mão de obra só existe no nível Geral (não tem quebra por Lazer/Eventos), então CLT/Extra
 // precisam ser editáveis ali mesmo.
-const MEETING_ROW_SUFFIXES = ['sold', 'dm_fap', 'coef_ad', 'coef_chd', 'rev_fap', 'adults', 'chd', 'pax', 'occ_pct'];
+// Ordem igual à das linhas completas (geralRows/lazerRows/eventRows) — só um subconjunto delas
+// aparece aqui, mas na mesma sequência de Realizado/Meta/Ano anterior.
+const MEETING_ROW_SUFFIXES = ['sold', 'occ_pct', 'pax', 'adults', 'coef_ad', 'chd', 'coef_chd', 'rev_fap', 'dm_fap'];
 const MEETING_EDITABLE_SUFFIXES = ['sold', 'dm_fap', 'coef_ad', 'coef_chd'];
-const MEETING_GERAL_LABOR_SUFFIXES = ['mo_clt', 'mo_extra', 'mo_total'];
+const MEETING_GERAL_LABOR_SUFFIXES = ['mo_total', 'mo_clt', 'mo_extra'];
 const MEETING_GERAL_LABOR_EDITABLE_SUFFIXES = ['mo_clt', 'mo_extra'];
 const getMeetingRows = (baseRows: BudgetRow[], prefix: string): BudgetRow[] => {
     const suffixes = prefix === 'geral' ? [...MEETING_ROW_SUFFIXES, ...MEETING_GERAL_LABOR_SUFFIXES] : MEETING_ROW_SUFFIXES;
