@@ -1087,7 +1087,7 @@ const App: React.FC = () => {
               validations={validations}
               setValidations={setValidations}
               currentUser={currentUser}
-              onNavigateToOccupancy={() => setCurrentView('occupancy_real')}
+              onNavigateToOccupancy={() => setCurrentView('occupancy_monthly')}
             />
           </div>
         </div>
@@ -1126,6 +1126,8 @@ const App: React.FC = () => {
           activeRealVersionId={activeRealVersionId}
           activeRealVersionName={activeRealVersionName}
           currentUser={currentUser}
+          activeProjectionType={activeProjectionType}
+          setActiveProjectionType={setActiveProjectionType}
         />
       );
       case 'comparatives': return <ComparativesView activeRealVersionName={activeRealVersionName} />;

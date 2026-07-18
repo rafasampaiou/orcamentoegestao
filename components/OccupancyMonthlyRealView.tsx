@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Save, CheckCircle } from 'lucide-react';
-import { User, UserRole } from '../types';
-import { BudgetRow, BudgetOccupancyTable, geralRows, lazerRows, eventRows } from './OccupancyView';
+import { User, UserRole, ProjectionType } from '../types';
+import { BudgetRow, BudgetOccupancyTable, geralRows, lazerRows, eventRows, OccupancyVersionOption, MEETING_VERSIONS } from './OccupancyView';
 import { VersionInfoBanner } from './VersionInfoBanner';
 
 interface OccupancyMonthlyRealViewProps {
@@ -16,7 +16,40 @@ interface OccupancyMonthlyRealViewProps {
     activeRealVersionName?: string;
     currentUser?: User;
     onSaveOccupancy?: () => void;
+    activeProjectionType?: ProjectionType;
+    setActiveProjectionType?: React.Dispatch<React.SetStateAction<ProjectionType>>;
 }
+
+// Rótulo curto de cada Versão do Forecast pra exibir nos botões/badge (mesmo padrão do
+// dropdown "Versão do Forecast" na DRE Forecast, que já mostra "Fechamento" em vez do valor
+// completo do enum "Fechamento oficial").
+const PERIOD_LABELS: Record<OccupancyVersionOption, string> = {
+    'Reunião de Ritmo': 'Reunião de Ritmo',
+    'FCA N2': 'FCA N2',
+    'FCA N1': 'FCA N1',
+    'Fechamento oficial': 'Fechamento',
+    'Realizado': 'Realizado',
+    'Meta': 'Meta',
+    'Ano anterior': 'Ano anterior',
+};
+const PERIOD_ORDER: OccupancyVersionOption[] = ['Reunião de Ritmo', 'FCA N2', 'FCA N1', 'Fechamento oficial', 'Realizado', 'Meta', 'Ano anterior'];
+
+// Reunião de Ritmo / FCA N1 / FCA N2 — linhas restritas para preenchimento manual: só Aptos
+// vendidos, DM bruta e os Coef. Occ ficam editáveis (Coef. Occ vem sugerido da Meta, mas o
+// usuário pode mudar); Receita/Adultos/CHD/Pax/% ocupação são derivados, ao invés do contrário.
+// Em "Geral" tudo é somatório de Lazer+Eventos, nada fica editável.
+const MEETING_ROW_SUFFIXES = ['sold', 'dm_fap', 'coef_ad', 'coef_chd', 'rev_fap', 'adults', 'chd', 'pax', 'occ_pct'];
+const MEETING_EDITABLE_SUFFIXES = ['sold', 'dm_fap', 'coef_ad', 'coef_chd'];
+const getMeetingRows = (baseRows: BudgetRow[], prefix: string): BudgetRow[] => {
+    const mapped: (BudgetRow | null)[] = MEETING_ROW_SUFFIXES.map(suffix => {
+        const id = `${prefix}_${suffix}`;
+        const base = baseRows.find(r => r.id === id);
+        if (!base) return null;
+        const isEditable = prefix !== 'geral' && MEETING_EDITABLE_SUFFIXES.includes(suffix);
+        return { ...base, isInput: isEditable, isManualReal: isEditable, isCalculated: !isEditable };
+    });
+    return mapped.filter((r): r is BudgetRow => !!r);
+};
 
 const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
     selectedYear,
@@ -29,7 +62,9 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
     activeRealVersionId,
     activeRealVersionName,
     currentUser,
-    onSaveOccupancy
+    onSaveOccupancy,
+    activeProjectionType,
+    setActiveProjectionType
 }) => {
     const canEditOccupancy = currentUser?.role === UserRole.ADMIN ||
         currentUser?.role === UserRole.ENTITY_MANAGER ||
@@ -38,7 +73,17 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
     const [decimalOverrides, setDecimalOverrides] = useState<Record<string, number>>({});
     const [savedIndicator, setSavedIndicator] = useState(false);
     const [visibleMonthsFilter, setVisibleMonthsFilter] = useState<number[]>([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
-    const [period, setPeriod] = useState<'Realizado' | 'Meta' | 'Ano anterior'>('Realizado');
+    // Semeado uma única vez a partir da Versão do Forecast ativa (mesmo padrão de
+    // `initialSelectedHotel` em GMDView) — assim "Iniciar Projeção" na DRE Forecast já chega
+    // aqui filtrado na versão certa.
+    const [period, setPeriod] = useState<OccupancyVersionOption>(activeProjectionType || 'Realizado');
+    const isMeetingMode = MEETING_VERSIONS.includes(period);
+    const handlePeriodChange = (value: OccupancyVersionOption) => {
+        setPeriod(value);
+        if (setActiveProjectionType && (value === 'Reunião de Ritmo' || value === 'FCA N1' || value === 'FCA N2' || value === 'Fechamento oficial')) {
+            setActiveProjectionType(value);
+        }
+    };
     const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
     const toggleDecimals = (rowId: string) => {
@@ -213,6 +258,79 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
         return newData;
     };
 
+    // Reunião de Ritmo / FCA N1 / FCA N2 — inverte a direção da fórmula em relação ao modo
+    // Realizado: aqui DM bruta e os Coef. Occ são as entradas manuais (Coef. Occ vem sugerido
+    // da Meta do mesmo mês, mas editável), e Receita/Adultos/CHD são derivados.
+    const recalculateMeetingProjectionForMonth = (currentData: Record<string, number>, monthIdx: number) => {
+        const newData = { ...currentData };
+        const get = (key: string) => newData[key] || 0;
+        const set = (key: string, val: number) => { newData[key] = val; };
+        const metaGet = (id: string) => budgetData?.[id]?.[monthIdx] || 0;
+        const getDaysInMonth = (year: number, month: number) => new Date(year, month, 0).getDate();
+
+        const suffixes = ['forecast', 'previa'];
+        suffixes.forEach(s => {
+            const days = metaGet('days_month') || getDaysInMonth(selectedYear, monthIdx + 1);
+            set(`days_month_${s}`, days);
+            const baseCap = metaGet('geral_capacity') || metaGet('lazer_capacity');
+
+            (['lazer', 'event'] as const).forEach(prefix => {
+                set(`${prefix}_capacity_${s}`, baseCap);
+                const avail = baseCap * days;
+                set(`${prefix}_avail_${s}`, avail);
+
+                const sold = get(`${prefix}_sold_${s}`);
+                const dmFap = get(`${prefix}_dm_fap_${s}`);
+                const revFap = dmFap * sold;
+                set(`${prefix}_rev_fap_${s}`, revFap);
+
+                // Coef. Occ default = Meta do mesmo hotel/mês, só usado enquanto o usuário não
+                // tiver digitado o próprio valor (currentData ainda não tem a chave).
+                const metaSold = metaGet(`${prefix}_sold`);
+                const metaCoefAd = metaSold > 0 ? metaGet(`${prefix}_adults`) / metaSold : 0;
+                const metaCoefChd = metaSold > 0 ? metaGet(`${prefix}_chd`) / metaSold : 0;
+                const coefAd = currentData[`${prefix}_coef_ad_${s}`] !== undefined ? currentData[`${prefix}_coef_ad_${s}`] : metaCoefAd;
+                const coefChd = currentData[`${prefix}_coef_chd_${s}`] !== undefined ? currentData[`${prefix}_coef_chd_${s}`] : metaCoefChd;
+                set(`${prefix}_coef_ad_${s}`, coefAd);
+                set(`${prefix}_coef_chd_${s}`, coefChd);
+
+                const adults = coefAd * sold;
+                const chd = coefChd * sold;
+                set(`${prefix}_adults_${s}`, adults);
+                set(`${prefix}_chd_${s}`, chd);
+                const pax = adults + chd;
+                set(`${prefix}_pax_${s}`, pax);
+                set(`${prefix}_coef_total_${s}`, sold > 0 ? pax / sold : 0);
+                set(`${prefix}_occ_pct_${s}`, avail > 0 ? (sold / avail) * 100 : 0);
+            });
+
+            const lzSold = get(`lazer_sold_${s}`), evSold = get(`event_sold_${s}`);
+            const lzAd = get(`lazer_adults_${s}`), evAd = get(`event_adults_${s}`);
+            const lzChd = get(`lazer_chd_${s}`), evChd = get(`event_chd_${s}`);
+            const lzRevFap = get(`lazer_rev_fap_${s}`), evRevFap = get(`event_rev_fap_${s}`);
+
+            set(`geral_capacity_${s}`, baseCap);
+            const gAvail = baseCap * days;
+            set(`geral_avail_${s}`, gAvail);
+            const gSold = lzSold + evSold;
+            set(`geral_sold_${s}`, gSold);
+            set(`geral_occ_pct_${s}`, gAvail > 0 ? (gSold / gAvail) * 100 : 0);
+            const gAd = lzAd + evAd, gChd = lzChd + evChd;
+            set(`geral_adults_${s}`, gAd);
+            set(`geral_chd_${s}`, gChd);
+            const gPax = gAd + gChd;
+            set(`geral_pax_${s}`, gPax);
+            set(`geral_coef_total_${s}`, gSold > 0 ? gPax / gSold : 0);
+            set(`geral_coef_ad_${s}`, gSold > 0 ? gAd / gSold : 0);
+            set(`geral_coef_chd_${s}`, gSold > 0 ? gChd / gSold : 0);
+            const gRevFap = lzRevFap + evRevFap;
+            set(`geral_rev_fap_${s}`, gRevFap);
+            set(`geral_dm_fap_${s}`, gSold > 0 ? gRevFap / gSold : 0);
+        });
+
+        return newData;
+    };
+
     // Transform data into a 12-month array format for BudgetOccupancyTable
     const tableData: Record<string, number[]> = useMemo(() => {
         if (period === 'Meta') {
@@ -230,9 +348,15 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
         const getDaysInMonth = (year: number, month: number) => new Date(year, month, 0).getDate();
 
         for (let i = 0; i < 12; i++) {
-            const contextKey = `${selectedHotel}_${targetYear}_${i + 1}_${activeRealVersionId || ''}`;
+            // Reunião de Ritmo/FCA N1/FCA N2/Fechamento têm seu próprio snapshot isolado (sufixo
+            // pela versão), nunca misturado com o balde "Realizado" de sempre nem entre si.
+            const contextKey = isMeetingMode
+                ? `${selectedHotel}_${selectedYear}_${i + 1}_${activeRealVersionId || ''}__${period}`
+                : `${selectedHotel}_${targetYear}_${i + 1}_${activeRealVersionId || ''}`;
             const rawMonthData = realOccupancyData?.[contextKey] || {};
-            const monthData = recalculateRealForMonth(rawMonthData, i);
+            const monthData = isMeetingMode
+                ? recalculateMeetingProjectionForMonth(rawMonthData, i)
+                : recalculateRealForMonth(rawMonthData, i);
 
             const daysInMonth = getDaysInMonth(targetYear, i + 1);
             let baseCap = 0;
@@ -418,7 +542,9 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
 
         const targetYear = period === 'Ano anterior' ? selectedYear - 1 : selectedYear;
         const month = monthIndex + 1;
-        const contextKey = `${selectedHotel}_${targetYear}_${month}_${activeRealVersionId || ''}`;
+        const contextKey = isMeetingMode
+            ? `${selectedHotel}_${selectedYear}_${month}_${activeRealVersionId || ''}__${period}`
+            : `${selectedHotel}_${targetYear}_${month}_${activeRealVersionId || ''}`;
 
         setRealOccupancyData(prev => {
             const contextData = prev[contextKey] || {};
@@ -427,7 +553,9 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
                 [`${rowId}_forecast`]: value,
                 [`${rowId}_previa`]: value
             };
-            const recalculated = recalculateRealForMonth(newData, monthIndex);
+            const recalculated = isMeetingMode
+                ? recalculateMeetingProjectionForMonth(newData, monthIndex)
+                : recalculateRealForMonth(newData, monthIndex);
 
             return {
                 ...prev,
@@ -444,7 +572,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
                     <div className="flex items-center gap-3">
                         <h2 className="text-2xl font-bold text-gray-900">Ocupação</h2>
                         <span className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-sm rounded-lg py-1 px-3 font-bold">
-                            {period === 'Realizado' ? 'Realizado' : period === 'Meta' ? 'Meta' : 'Ano Anterior'}
+                            {PERIOD_LABELS[period]}
                         </span>
                     </div>
                     <p className="text-gray-500 mt-1">Visão anual de ocupação. As alterações feitas aqui alimentam automaticamente as colunas correspondentes no DRE Forecast.</p>
@@ -467,17 +595,17 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
 
             <div className="flex flex-wrap gap-4 mt-4 mb-6 items-center">
                 <div className="flex items-center bg-gray-100 p-1 rounded-lg">
-                    {['Realizado', 'Meta', 'Ano anterior'].map(p => (
+                    {PERIOD_ORDER.map(p => (
                         <button
                             key={p}
-                            onClick={() => setPeriod(p as any)}
+                            onClick={() => handlePeriodChange(p)}
                             className={`px-4 py-1.5 text-sm font-bold rounded-md transition-all ${
                                 period === p
                                     ? 'bg-white text-indigo-600 shadow-sm border border-gray-200'
                                     : 'text-gray-500 hover:text-gray-700'
                             }`}
                         >
-                            {p}
+                            {PERIOD_LABELS[p]}
                         </button>
                     ))}
                 </div>
@@ -514,7 +642,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
 
             <BudgetOccupancyTable
                 title="Geral"
-                rows={geralRows}
+                rows={isMeetingMode ? getMeetingRows(geralRows, 'geral') : geralRows}
                 data={tableData}
                 onUpdate={handleUpdate}
                 decimalOverrides={decimalOverrides}
@@ -525,7 +653,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
             />
             <BudgetOccupancyTable
                 title="Lazer"
-                rows={lazerRows}
+                rows={isMeetingMode ? getMeetingRows(lazerRows, 'lazer') : lazerRows}
                 data={tableData}
                 onUpdate={handleUpdate}
                 decimalOverrides={decimalOverrides}
@@ -536,7 +664,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
             />
             <BudgetOccupancyTable
                 title="Eventos Corporativos"
-                rows={eventRows}
+                rows={isMeetingMode ? getMeetingRows(eventRows, 'event') : eventRows}
                 data={tableData}
                 onUpdate={handleUpdate}
                 decimalOverrides={decimalOverrides}

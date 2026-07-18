@@ -6,7 +6,7 @@ import { ColumnVisibility, ImportedRow, User, UserRole, Hotel, BudgetVersion, Pr
 // (shared with DRE Forecast) plus 3 view-only labels that just re-show today's existing
 // comparative table (Realizado/Meta/Ano anterior never had their own scenario before).
 export type OccupancyVersionOption = ProjectionType | 'Realizado' | 'Meta' | 'Ano anterior';
-const MEETING_VERSIONS: OccupancyVersionOption[] = ['Reunião de Ritmo', 'FCA N1', 'FCA N2'];
+export const MEETING_VERSIONS: OccupancyVersionOption[] = ['Reunião de Ritmo', 'FCA N1', 'FCA N2'];
 
 // --- Types ---
 interface OccupancyViewProps {
@@ -482,10 +482,6 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
     // Hotel filter for Comparativo de ocupação — independent from the global header hotel
     // selector, lets several hotels be summed together (same idea as the month filter).
     const [selectedHotelsFilter, setSelectedHotelsFilter] = useState<string[]>(() => selectedHotel ? [selectedHotel] : []);
-    // Versão do Forecast selecionada nesta aba — semeada uma única vez a partir do prop
-    // compartilhado (mesmo padrão de `initialSelectedHotel` em GMDView), assim "Iniciar
-    // Projeção" na DRE Forecast já chega aqui filtrado na versão certa.
-    const [occupancyVersion, setOccupancyVersion] = useState<OccupancyVersionOption>(activeProjectionType || 'Realizado');
 
     const toggleDecimals = (rowId: string) => {
         setDecimalOverrides(prev => {
@@ -633,74 +629,6 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             const gMoExtra = get(`geral_mo_extra_${s}`);
             set(`geral_mo_total_${s}`, gMoClt + gMoExtra);
         });
-
-        return newData;
-    };
-
-    // Reunião de Ritmo / FCA N1 / FCA N2 — inverte a direção da fórmula em relação ao modo Real:
-    // aqui DM bruta e os Coef. Occ são as entradas manuais (Coef. Occ vem sugerido da Meta, mas
-    // editável), e Receita/Adultos/CHD são derivados, ao invés do contrário.
-    const recalculateMeetingProjection = (currentData: Record<string, number>, metaForMonth: Record<string, number>) => {
-        const newData = { ...currentData };
-        const get = (key: string) => newData[key] || 0;
-        const set = (key: string, val: number) => { newData[key] = val; };
-        const metaGet = (key: string) => metaForMonth[key] || 0;
-
-        const days = metaGet('days_month');
-        const baseCap = metaGet('geral_capacity') || metaGet('lazer_capacity');
-
-        (['lazer', 'event'] as const).forEach(prefix => {
-            set(`${prefix}_capacity`, baseCap);
-            const avail = baseCap * days;
-            set(`${prefix}_avail`, avail);
-
-            const sold = get(`${prefix}_sold`);
-            const dmFap = get(`${prefix}_dm_fap`);
-            const revFap = dmFap * sold;
-            set(`${prefix}_rev_fap`, revFap);
-
-            // Coef. Occ default = Meta do mesmo hotel/mês, só usado enquanto o usuário não
-            // tiver digitado o próprio valor (currentData ainda não tem a chave).
-            const metaSold = metaGet(`${prefix}_sold`);
-            const metaCoefAd = metaSold > 0 ? metaGet(`${prefix}_adults`) / metaSold : 0;
-            const metaCoefChd = metaSold > 0 ? metaGet(`${prefix}_chd`) / metaSold : 0;
-            const coefAd = currentData[`${prefix}_coef_ad`] !== undefined ? currentData[`${prefix}_coef_ad`] : metaCoefAd;
-            const coefChd = currentData[`${prefix}_coef_chd`] !== undefined ? currentData[`${prefix}_coef_chd`] : metaCoefChd;
-            set(`${prefix}_coef_ad`, coefAd);
-            set(`${prefix}_coef_chd`, coefChd);
-
-            const adults = coefAd * sold;
-            const chd = coefChd * sold;
-            set(`${prefix}_adults`, adults);
-            set(`${prefix}_chd`, chd);
-            const pax = adults + chd;
-            set(`${prefix}_pax`, pax);
-            set(`${prefix}_coef_total`, sold > 0 ? pax / sold : 0);
-            set(`${prefix}_occ_pct`, avail > 0 ? (sold / avail) * 100 : 0);
-        });
-
-        const lzSold = get('lazer_sold'), evSold = get('event_sold');
-        const lzAd = get('lazer_adults'), evAd = get('event_adults');
-        const lzChd = get('lazer_chd'), evChd = get('event_chd');
-        const lzRevFap = get('lazer_rev_fap'), evRevFap = get('event_rev_fap');
-
-        set('geral_capacity', baseCap);
-        const gAvail = baseCap * days;
-        set('geral_avail', gAvail);
-        const gSold = lzSold + evSold;
-        set('geral_sold', gSold);
-        set('geral_occ_pct', gAvail > 0 ? (gSold / gAvail) * 100 : 0);
-        const gAd = lzAd + evAd, gChd = lzChd + evChd;
-        set('geral_adults', gAd);
-        set('geral_chd', gChd);
-        const gPax = gAd + gChd;
-        set('geral_pax', gPax);
-        set('geral_coef_total', gSold > 0 ? gPax / gSold : 0);
-        set('geral_coef_ad', gSold > 0 ? gAd / gSold : 0);
-        set('geral_coef_chd', gSold > 0 ? gChd / gSold : 0);
-        const gRevFap = lzRevFap + evRevFap;
-        set('geral_rev_fap', gRevFap);
-        set('geral_dm_fap', gSold > 0 ? gRevFap / gSold : 0);
 
         return newData;
     };
@@ -892,50 +820,6 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
     if (!isBudget) {
         const contextKey = `${selectedHotel}_${selectedYear}_${selectedMonth}_${activeRealVersionId || ''}`;
         const currentRealData = realOccupancyData?.[contextKey] || {};
-
-        // isMeetingMode decides which table renders below (restrita vs. comparativa de hoje) —
-        // must stay a plain derived value, never gating the hooks below, since the user can
-        // flip the selector without navigating away (isBudget itself never flips mid-life, but
-        // occupancyVersion does).
-        const isMeetingMode = occupancyVersion === 'Reunião de Ritmo' || occupancyVersion === 'FCA N1' || occupancyVersion === 'FCA N2';
-
-        const handleOccupancyVersionChange = (value: OccupancyVersionOption) => {
-            setOccupancyVersion(value);
-            if (setActiveProjectionType && (value === 'Reunião de Ritmo' || value === 'FCA N1' || value === 'FCA N2' || value === 'Fechamento oficial')) {
-                setActiveProjectionType(value);
-            }
-        };
-
-        // Snapshot isolado por Versão do Forecast — mesma chave de contexto de hoje, com um
-        // sufixo extra pela versão, então Reunião de Ritmo/FCA N1/FCA N2/Fechamento nunca se
-        // misturam entre si nem com o balde "Realizado" de sempre (sem sufixo).
-        const projectionContextKey = `${selectedHotel}_${selectedYear}_${selectedMonth}_${activeRealVersionId || ''}__${occupancyVersion}`;
-        const currentProjectionData = realOccupancyData?.[projectionContextKey] || {};
-
-        const monthIdx = (selectedMonth || 1) - 1;
-        const metaForMonth = useMemo(() => {
-            const ids = ['days_month', 'geral_capacity', 'lazer_capacity', 'lazer_sold', 'lazer_adults', 'lazer_chd', 'event_sold', 'event_adults', 'event_chd'];
-            const m: Record<string, number> = {};
-            ids.forEach(id => { m[id] = budgetData?.[id]?.[monthIdx] || 0; });
-            return m;
-            // eslint-disable-next-line react-hooks/exhaustive-deps
-        }, [budgetData, monthIdx]);
-
-        const projectionData = useMemo(
-            () => recalculateMeetingProjection(currentProjectionData, metaForMonth),
-            // eslint-disable-next-line react-hooks/exhaustive-deps
-            [currentProjectionData, metaForMonth]
-        );
-
-        const handleProjectionUpdate = (rowId: string, value: number) => {
-            if (setRealOccupancyData) {
-                setRealOccupancyData(prev => {
-                    const contextData = prev[projectionContextKey] || {};
-                    const newData = { ...contextData, [rowId]: value };
-                    return { ...prev, [projectionContextKey]: recalculateMeetingProjection(newData, metaForMonth) };
-                });
-            }
-        };
 
         const handleRealUpdate = (rowId: string, col: 'forecast' | 'previa', value: number) => {
             if (setRealOccupancyData) {
@@ -1250,77 +1134,17 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             </div>
         );
 
-        // Reunião de Ritmo / FCA N1 / FCA N2 — tabela restrita: só as linhas relevantes para o
-        // preenchimento manual desta versão, com edição direta na própria célula (sem Prévia/
-        // Forecast/Meta/LY lado a lado, já que aqui é uma projeção nova, não uma comparação).
-        const renderProjectionTable = (title: string, prefix: 'geral' | 'lazer' | 'event', sourceRows: BudgetRow[]) => {
-            const rowIds = [
-                `${prefix}_sold`, `${prefix}_dm_fap`, `${prefix}_coef_ad`, `${prefix}_coef_chd`,
-                `${prefix}_rev_fap`, `${prefix}_adults`, `${prefix}_chd`, `${prefix}_pax`, `${prefix}_occ_pct`
-            ];
-            const editableIds = prefix === 'geral' ? [] : [`${prefix}_sold`, `${prefix}_dm_fap`, `${prefix}_coef_ad`, `${prefix}_coef_chd`];
-            const rows = rowIds.map(id => sourceRows.find(r => r.id === id)).filter((r): r is BudgetRow => !!r);
-
-            return (
-                <div className="mb-8 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                    <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
-                        <h3 className="text-lg font-bold text-gray-800">{title}</h3>
-                    </div>
-                    <table className="w-full text-sm">
-                        <thead className="bg-sky-50 text-sky-900 text-xs uppercase font-bold">
-                            <tr>
-                                <th className="px-4 py-2 text-left">Indicador</th>
-                                <th className="px-4 py-2 text-right w-40">Valor</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {rows.map(row => {
-                                const value = projectionData[row.id] || 0;
-                                const isEditable = editableIds.includes(row.id) && canEditOccupancy;
-                                return (
-                                    <tr key={row.id} className="hover:bg-gray-50">
-                                        <td className="px-4 py-2 text-gray-700 font-medium">{row.label}</td>
-                                        <td className="px-4 py-2 text-right">
-                                            {isEditable ? (
-                                                <TableInput
-                                                    value={value}
-                                                    format={row.format}
-                                                    decimals={decimalOverrides[row.id]}
-                                                    onUpdate={(val) => handleProjectionUpdate(row.id, val)}
-                                                    align="right"
-                                                />
-                                            ) : (
-                                                <span className="font-bold text-gray-800">{formatValue(value, row.format, decimalOverrides[row.id])}</span>
-                                            )}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-            );
-        };
-
         return (
             <div className="p-8 w-full">
                 <div className="mb-6 flex justify-between items-center">
                     <div>
                         <div className="flex items-center gap-3">
                             <h2 className="text-2xl font-bold text-gray-900">Comparativo de ocupação</h2>
-                            <select
-                                value={occupancyVersion}
-                                onChange={(e) => handleOccupancyVersionChange(e.target.value as OccupancyVersionOption)}
-                                className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-sm rounded-lg py-1 px-3 font-bold outline-none cursor-pointer"
-                            >
-                                <option value="Reunião de Ritmo">Reunião de Ritmo</option>
-                                <option value="FCA N2">FCA N2</option>
-                                <option value="FCA N1">FCA N1</option>
-                                <option value="Fechamento oficial">Fechamento</option>
-                                <option value="Realizado">Realizado</option>
-                                <option value="Meta">Meta</option>
-                                <option value="Ano anterior">Ano anterior</option>
-                            </select>
+                            {!isBudget && (
+                                <span className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-sm rounded-lg py-1 px-3 font-bold">
+                                    Fechamento oficial
+                                </span>
+                            )}
                         </div>
                         <p className="text-gray-500 mt-1">Análise detalhada de ocupação por segmento para {selectedMonth}/{selectedYear}.</p>
                     </div>
@@ -1378,81 +1202,68 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
                     </div>
                 </div>
 
-                {isMeetingMode ? (
-                    <>
-                        <p className="text-sm text-gray-500 mb-4">
-                            Preenchimento de {selectedMonth}/{selectedYear} para {selectedHotel} — versão "{occupancyVersion}".
-                        </p>
-                        {renderProjectionTable("Geral", 'geral', geralRows)}
-                        {renderProjectionTable("Lazer", 'lazer', lazerRows)}
-                        {renderProjectionTable("Eventos", 'event', eventRows)}
-                    </>
-                ) : (
-                    <>
-                        {hotels && hotels.filter(h => h.type !== 'Administradora').length > 0 && (() => {
-                            const filterableHotels = hotels.filter(h => h.type !== 'Administradora');
-                            return (
-                            <div className="flex flex-wrap gap-1 mb-3 items-center">
-                                <span className="text-sm font-bold text-gray-700 mr-2">Hotéis:</span>
-                                {filterableHotels.map(h => (
-                                    <button
-                                        key={h.id}
-                                        onClick={() => {
-                                            setSelectedHotelsFilter(prev =>
-                                                prev.includes(h.name) ? prev.filter(n => n !== h.name) : [...prev, h.name]
-                                            );
-                                        }}
-                                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
-                                            selectedHotelsFilter.includes(h.name)
-                                                ? 'bg-indigo-100 text-indigo-700 border border-indigo-200 shadow-sm'
-                                                : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'
-                                        }`}
-                                    >
-                                        {h.name}
-                                    </button>
-                                ))}
-                                <button
-                                    onClick={() => setSelectedHotelsFilter(selectedHotelsFilter.length === filterableHotels.length ? [] : filterableHotels.map(h => h.name))}
-                                    className="px-3 py-1 text-xs font-bold rounded-md transition-all bg-gray-100 text-gray-600 hover:bg-gray-200 ml-2 border border-gray-200"
-                                >
-                                    {selectedHotelsFilter.length === filterableHotels.length ? 'Deselecionar Todos' : 'Selecionar Todos'}
-                                </button>
-                            </div>
-                            );
-                        })()}
-
-                        <div className="flex flex-wrap gap-1 mb-6 items-center">
-                            <span className="text-sm font-bold text-gray-700 mr-2">Ver acumulado de:</span>
-                            {MONTHS.map((m, idx) => (
-                                <button
-                                    key={m}
-                                    onClick={() => {
-                                        setVisibleMonthsFilter(prev =>
-                                            prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx].sort((a, b) => a - b)
-                                        );
-                                    }}
-                                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
-                                        visibleMonthsFilter.includes(idx)
-                                            ? 'bg-indigo-100 text-indigo-700 border border-indigo-200 shadow-sm'
-                                            : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'
-                                    }`}
-                                >
-                                    {m}
-                                </button>
-                            ))}
+                {hotels && hotels.filter(h => h.type !== 'Administradora').length > 0 && (() => {
+                    const filterableHotels = hotels.filter(h => h.type !== 'Administradora');
+                    return (
+                    <div className="flex flex-wrap gap-1 mb-3 items-center">
+                        <span className="text-sm font-bold text-gray-700 mr-2">Hotéis:</span>
+                        {filterableHotels.map(h => (
                             <button
-                                onClick={() => setVisibleMonthsFilter(visibleMonthsFilter.length === 12 ? [] : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])}
-                                className="px-3 py-1 text-xs font-bold rounded-md transition-all bg-gray-100 text-gray-600 hover:bg-gray-200 ml-2 border border-gray-200"
+                                key={h.id}
+                                onClick={() => {
+                                    setSelectedHotelsFilter(prev =>
+                                        prev.includes(h.name) ? prev.filter(n => n !== h.name) : [...prev, h.name]
+                                    );
+                                }}
+                                className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                                    selectedHotelsFilter.includes(h.name)
+                                        ? 'bg-indigo-100 text-indigo-700 border border-indigo-200 shadow-sm'
+                                        : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'
+                                }`}
                             >
-                                {visibleMonthsFilter.length === 12 ? 'Deselecionar Todos' : 'Selecionar Todos'}
+                                {h.name}
                             </button>
-                        </div>
+                        ))}
+                        <button
+                            onClick={() => setSelectedHotelsFilter(selectedHotelsFilter.length === filterableHotels.length ? [] : filterableHotels.map(h => h.name))}
+                            className="px-3 py-1 text-xs font-bold rounded-md transition-all bg-gray-100 text-gray-600 hover:bg-gray-200 ml-2 border border-gray-200"
+                        >
+                            {selectedHotelsFilter.length === filterableHotels.length ? 'Deselecionar Todos' : 'Selecionar Todos'}
+                        </button>
+                    </div>
+                    );
+                })()}
 
-                        {renderRealTable("Geral", showAccountDetails ? geralRows : geralRows.filter(r => isAlwaysVisibleIndicator(r.id)))}
-                        {renderRealTable("Lazer", showAccountDetails ? lazerRows : lazerRows.filter(r => isAlwaysVisibleIndicator(r.id)))}
-                        {renderRealTable("Eventos", showAccountDetails ? eventRows : eventRows.filter(r => isAlwaysVisibleIndicator(r.id)))}
-                    </>
-                )}
+                <div className="flex flex-wrap gap-1 mb-6 items-center">
+                    <span className="text-sm font-bold text-gray-700 mr-2">Ver acumulado de:</span>
+                    {MONTHS.map((m, idx) => (
+                        <button
+                            key={m}
+                            onClick={() => {
+                                setVisibleMonthsFilter(prev =>
+                                    prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx].sort((a, b) => a - b)
+                                );
+                            }}
+                            className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                                visibleMonthsFilter.includes(idx)
+                                    ? 'bg-indigo-100 text-indigo-700 border border-indigo-200 shadow-sm'
+                                    : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'
+                            }`}
+                        >
+                            {m}
+                        </button>
+                    ))}
+                    <button
+                        onClick={() => setVisibleMonthsFilter(visibleMonthsFilter.length === 12 ? [] : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])}
+                        className="px-3 py-1 text-xs font-bold rounded-md transition-all bg-gray-100 text-gray-600 hover:bg-gray-200 ml-2 border border-gray-200"
+                    >
+                        {visibleMonthsFilter.length === 12 ? 'Deselecionar Todos' : 'Selecionar Todos'}
+                    </button>
+                </div>
+
+                {renderRealTable("Geral", showAccountDetails ? geralRows : geralRows.filter(r => isAlwaysVisibleIndicator(r.id)))}
+                {renderRealTable("Lazer", showAccountDetails ? lazerRows : lazerRows.filter(r => isAlwaysVisibleIndicator(r.id)))}
+                {renderRealTable("Eventos", showAccountDetails ? eventRows : eventRows.filter(r => isAlwaysVisibleIndicator(r.id)))}
             </div>
         );
     }
