@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Save, CheckCircle } from 'lucide-react';
 import { User, UserRole, ProjectionType } from '../types';
-import { BudgetRow, BudgetOccupancyTable, geralRows, lazerRows, eventRows, OccupancyVersionOption, MEETING_VERSIONS } from './OccupancyView';
+import { BudgetRow, BudgetOccupancyTable, geralRows, lazerRows, eventRows, OccupancyVersionOption, MEETING_VERSIONS, OWN_SNAPSHOT_VERSIONS } from './OccupancyView';
 import { VersionInfoBanner } from './VersionInfoBanner';
 
 interface OccupancyMonthlyRealViewProps {
@@ -77,10 +77,16 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
     // `initialSelectedHotel` em GMDView) — assim "Iniciar Projeção" na DRE Forecast já chega
     // aqui filtrado na versão certa.
     const [period, setPeriod] = useState<OccupancyVersionOption>(activeProjectionType || 'Realizado');
+    // Controla qual tabela/fórmula renderiza (restrita vs. completa).
     const isMeetingMode = MEETING_VERSIONS.includes(period);
+    // Controla a CHAVE DE CONTEXTO usada para ler/escrever em realOccupancyData — mais ampla que
+    // isMeetingMode, pois Fechamento oficial também precisa do próprio snapshot isolado (mesmo
+    // usando a tabela completa). "Realizado" fica de fora de propósito: é o único que continua
+    // no balde original sem sufixo, preservando qualquer dado já existente.
+    const usesProjectionSnapshot = OWN_SNAPSHOT_VERSIONS.includes(period);
     const handlePeriodChange = (value: OccupancyVersionOption) => {
         setPeriod(value);
-        if (setActiveProjectionType && (value === 'Reunião de Ritmo' || value === 'FCA N1' || value === 'FCA N2' || value === 'Fechamento oficial')) {
+        if (setActiveProjectionType && value !== 'Meta' && value !== 'Ano anterior') {
             setActiveProjectionType(value);
         }
     };
@@ -350,7 +356,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
         for (let i = 0; i < 12; i++) {
             // Reunião de Ritmo/FCA N1/FCA N2/Fechamento têm seu próprio snapshot isolado (sufixo
             // pela versão), nunca misturado com o balde "Realizado" de sempre nem entre si.
-            const contextKey = isMeetingMode
+            const contextKey = usesProjectionSnapshot
                 ? `${selectedHotel}_${selectedYear}_${i + 1}_${activeRealVersionId || ''}__${period}`
                 : `${selectedHotel}_${targetYear}_${i + 1}_${activeRealVersionId || ''}`;
             const rawMonthData = realOccupancyData?.[contextKey] || {};
@@ -542,7 +548,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
 
         const targetYear = period === 'Ano anterior' ? selectedYear - 1 : selectedYear;
         const month = monthIndex + 1;
-        const contextKey = isMeetingMode
+        const contextKey = usesProjectionSnapshot
             ? `${selectedHotel}_${selectedYear}_${month}_${activeRealVersionId || ''}__${period}`
             : `${selectedHotel}_${targetYear}_${month}_${activeRealVersionId || ''}`;
 

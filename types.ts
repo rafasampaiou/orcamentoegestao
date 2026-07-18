@@ -443,7 +443,9 @@ export interface RevenueDriverConfig {
     budgetFactor: number;
 }
 
-export type ProjectionType = 'Reunião de Ritmo' | 'FCA N1' | 'FCA N2' | 'Fechamento oficial';
+// 'Realizado' é a versão que representa o dado real já existente hoje (o balde original, sem
+// sufixo, da aba Ocupação) — só o ADMIN pode selecioná-la/salvá-la na DRE Forecast.
+export type ProjectionType = 'Reunião de Ritmo' | 'FCA N1' | 'FCA N2' | 'Fechamento oficial' | 'Realizado';
 
 export interface ValidationRecord {
     id: string;

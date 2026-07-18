@@ -768,8 +768,15 @@ export const getForecastData = (
         return r !== 0 ? r : p;
     };
 
+    // Reunião de Ritmo/FCA N1/FCA N2/Fechamento oficial têm cada um seu próprio snapshot isolado
+    // na aba Ocupação (sufixo __versão na chave) — "Realizado" é o único que continua no balde
+    // original sem sufixo, então dado já existente nunca some. Isso faz a coluna Prévia da DRE
+    // Forecast refletir só a Versão do Forecast que está ativa no momento.
+    const usesProjectionSnapshot = activeProjectionType && activeProjectionType !== 'Realizado';
     const getRealOccValue = (rowId: string) => {
-        const contextKey = `${selectedHotelName}_${selectedYear}_${selectedMonth}_${activeRealVersionId || ''}`;
+        const contextKey = usesProjectionSnapshot
+            ? `${selectedHotelName}_${selectedYear}_${selectedMonth}_${activeRealVersionId || ''}__${activeProjectionType}`
+            : `${selectedHotelName}_${selectedYear}_${selectedMonth}_${activeRealVersionId || ''}`;
         return realOccupancyData[contextKey]?.[rowId];
     };
 
@@ -803,6 +810,10 @@ export const getForecastData = (
     const gPaxPrevia = getRealOccValue('geral_pax_previa') ?? 0;
     const gAdultsPrevia = getRealOccValue('geral_adults_previa') ?? 0;
     const gChdPrevia = getRealOccValue('geral_chd_previa') ?? 0;
+    // Direto da aba Ocupação (Versão do Forecast ativa) — não é mais derivado de Adultos/CHD.
+    const gDmFapPrevia = getRealOccValue('geral_dm_fap_previa') ?? 0;
+    const gCoefAdPrevia = getRealOccValue('geral_coef_ad_previa') ?? 0;
+    const gCoefChdPrevia = getRealOccValue('geral_coef_chd_previa') ?? 0;
 
     const gMoCltReal = getRealOccValue('geral_mo_clt_forecast') ?? 0;
     const gMoCltPrevia = getRealOccValue('geral_mo_clt_previa') ?? 0;
@@ -863,12 +874,12 @@ export const getForecastData = (
     rows.push(generateRow('IND-1', '', 'Indicators', 'UH Disponível', gAvailBudget, gAvailReal, gAvailLY, gAvailPrevia, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
     rows.push(generateRow('IND-2', '', 'Indicators', 'UH Ocupada', gOccBudget, gOccReal, gOccLY, gOccPrevia, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
     rows.push(generateRow('IND-3', '', 'Indicators', '% de Ocupação', gOccPctBudget, gAvailReal > 0 ? (gOccReal / gAvailReal) * 100 : 0, gAvailLY > 0 ? (gOccLY / gAvailLY) * 100 : 0, gAvailPrevia > 0 ? (gOccPrevia / gAvailPrevia) * 100 : 0, false, false, 0, undefined, { format: 'percent' }, 'INDICADORES GERAIS'));
-    rows.push(generateRow('IND-4', '', 'Indicators', 'DM Bruta', dmBudget, dmReal, dmLY, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-4', '', 'Indicators', 'DM Bruta', dmBudget, dmReal, dmLY, gDmFapPrevia, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
     rows.push(generateRow('IND-5', '', 'Indicators', 'PAX', gPaxBudget, gPaxReal, gPaxLY, gPaxPrevia, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
     rows.push(generateRow('IND-ADULTOS', '', 'Indicators', 'Adultos', gAdultsBudget, gAdultsReal, gAdultsLY, gAdultsPrevia, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
     rows.push(generateRow('IND-CHD', '', 'Indicators', 'CHD', gChdBudget, gChdReal, gChdLY, gChdPrevia, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
-    rows.push(generateRow('IND-COEF-ADULTOS', '', 'Indicators', 'Coef. Adultos', gOccBudget > 0 ? gAdultsBudget / gOccBudget : 0, gOccReal > 0 ? gAdultsReal / gOccReal : 0, gOccLY > 0 ? gAdultsLY / gOccLY : 0, gOccPrevia > 0 ? gAdultsPrevia / gOccPrevia : 0, false, false, 0, undefined, { format: 'decimal' }, 'INDICADORES GERAIS'));
-    rows.push(generateRow('IND-COEF-CHD', '', 'Indicators', 'Coef. CHD', gOccBudget > 0 ? gChdBudget / gOccBudget : 0, gOccReal > 0 ? gChdReal / gOccReal : 0, gOccLY > 0 ? gChdLY / gOccLY : 0, gOccPrevia > 0 ? gChdPrevia / gOccPrevia : 0, false, false, 0, undefined, { format: 'decimal' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-COEF-ADULTOS', '', 'Indicators', 'Coef. Adultos', gOccBudget > 0 ? gAdultsBudget / gOccBudget : 0, gOccReal > 0 ? gAdultsReal / gOccReal : 0, gOccLY > 0 ? gAdultsLY / gOccLY : 0, gCoefAdPrevia, false, false, 0, undefined, { format: 'decimal' }, 'INDICADORES GERAIS'));
+    rows.push(generateRow('IND-COEF-CHD', '', 'Indicators', 'Coef. CHD', gOccBudget > 0 ? gChdBudget / gOccBudget : 0, gOccReal > 0 ? gChdReal / gOccReal : 0, gOccLY > 0 ? gChdLY / gOccLY : 0, gCoefChdPrevia, false, false, 0, undefined, { format: 'decimal' }, 'INDICADORES GERAIS'));
     rows.push(generateRow('IND-6', '', 'Indicators', 'REVPAR', revparBudget, revparReal, revparLY, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
     rows.push(generateRow('IND-TREVPOR', '', 'Indicators', 'TREVPOR', trevporBudget, trevporReal, trevporLY, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));
     rows.push(generateRow('IND-TREVPAR', '', 'Indicators', 'TREVPAR', trevparBudget, trevparReal, trevparLY, 0, false, false, 0, undefined, { format: 'currency' }, 'INDICADORES GERAIS'));

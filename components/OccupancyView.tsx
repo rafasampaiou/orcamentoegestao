@@ -2,11 +2,17 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Settings2, ChevronUp, Save, Trash2, CheckCircle, ListFilter, LayoutList } from 'lucide-react';
 import { ColumnVisibility, ImportedRow, User, UserRole, Hotel, BudgetVersion, ProjectionType } from '../types';
 
-// A "Versão do Forecast" as selectable in Ocupação — the 4 canonical ProjectionType values
-// (shared with DRE Forecast) plus 3 view-only labels that just re-show today's existing
-// comparative table (Realizado/Meta/Ano anterior never had their own scenario before).
-export type OccupancyVersionOption = ProjectionType | 'Realizado' | 'Meta' | 'Ano anterior';
+// A "Versão do Forecast" as selectable in Ocupação — the 5 canonical ProjectionType values
+// (shared with DRE Forecast) plus 2 view-only labels with no DRE Forecast equivalent (Meta/Ano
+// anterior).
+export type OccupancyVersionOption = ProjectionType | 'Meta' | 'Ano anterior';
+// Só estas 3 usam a tabela restrita (Aptos vendidos/DM bruta/Coef. Occ) — Fechamento oficial e
+// Realizado usam a tabela completa de sempre.
 export const MEETING_VERSIONS: OccupancyVersionOption[] = ['Reunião de Ritmo', 'FCA N1', 'FCA N2'];
+// Estas 4 têm snapshot isolado (sufixo __versão na chave de contexto); Realizado é o único dos
+// 5 que continua no balde original sem sufixo — é o que garante que dado antigo já preenchido
+// nunca some.
+export const OWN_SNAPSHOT_VERSIONS: OccupancyVersionOption[] = ['Reunião de Ritmo', 'FCA N1', 'FCA N2', 'Fechamento oficial'];
 
 // --- Types ---
 interface OccupancyViewProps {

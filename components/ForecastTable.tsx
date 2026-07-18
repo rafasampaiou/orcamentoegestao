@@ -705,8 +705,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     const confirmSaveResults = async () => {
         setIsSaving(true);
 
-        if (activeProjectionType === 'Fechamento oficial' && currentUser?.role !== UserRole.ADMIN) {
-            alert('Apenas o ADMIN GERAL pode criar o evento de Fechamento Oficial.');
+        if ((activeProjectionType === 'Fechamento oficial' || activeProjectionType === 'Realizado') && currentUser?.role !== UserRole.ADMIN) {
+            alert('Apenas o ADMIN GERAL pode salvar a versão Fechamento Oficial ou Realizado.');
             return;
         }
 
@@ -885,6 +885,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 <option value="FCA N1">FCA N1</option>
                                 <option value="FCA N2">FCA N2</option>
                                 <option value="Fechamento oficial">Fechamento</option>
+                                {currentUser?.role === UserRole.ADMIN && <option value="Realizado">Realizado</option>}
                             </select>
                         </div>
                     </div>
