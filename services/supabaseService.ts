@@ -87,11 +87,15 @@ export const supabaseService = {
   },
 
   async deleteAccount(id: string): Promise<void> {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('accounts')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .select();
     if (error) throw error;
+    if (!data || data.length === 0) {
+      throw new Error('Nenhuma conta foi excluída. Pode ser um bloqueio de permissão (RLS) no Supabase.');
+    }
   },
 
   async truncateAccounts(): Promise<void> {
@@ -170,11 +174,15 @@ export const supabaseService = {
   },
 
   async deleteCostCenter(id: string): Promise<void> {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('cost_centers')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .select();
     if (error) throw error;
+    if (!data || data.length === 0) {
+      throw new Error('Nenhum setor foi excluído. Pode ser um bloqueio de permissão (RLS) no Supabase.');
+    }
   },
   async truncateCostCenters(): Promise<void> {
     const { error } = await supabase
@@ -221,11 +229,15 @@ export const supabaseService = {
   },
 
   async deleteHotel(id: string): Promise<void> {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('hotels')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .select();
     if (error) throw error;
+    if (!data || data.length === 0) {
+      throw new Error('Nenhum hotel foi excluído. Pode ser um bloqueio de permissão (RLS) no Supabase.');
+    }
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -404,12 +416,20 @@ export const supabaseService = {
         }
       }
 
+      // Vários hotéis: a lista completa vive no metadata JSON (mesmo lugar de
+      // responsiblePackages/etc.) — hotel_id (coluna simples) continua guardando só o primeiro,
+      // para qualquer consumidor legado que ainda espere um hotelId único.
+      const hotelIds: string[] = (meta.hotelIds && meta.hotelIds.length > 0)
+        ? meta.hotelIds
+        : (p.hotel_id ? [p.hotel_id] : []);
+
       return {
         id: p.id,
         name: p.full_name || '',
         email: p.email || '',
         role: mappedRole,
         hotelId: p.hotel_id || undefined,
+        hotelIds,
         tempPassword: p.temp_password || undefined,
         avatarUrl: p.avatar_url || undefined,
         responsiblePackages: meta.responsiblePackages || [],
@@ -440,10 +460,12 @@ export const supabaseService = {
   },
 
   async upsertProfile(user: User): Promise<void> {
+    const hotelIds = user.hotelIds && user.hotelIds.length > 0 ? user.hotelIds : (user.hotelId ? [user.hotelId] : []);
     const meta = {
       responsiblePackages: user.responsiblePackages || [],
       responsibleRevenues: user.responsibleRevenues || [],
-      responsibleCostCenters: user.responsibleCostCenters || []
+      responsibleCostCenters: user.responsibleCostCenters || [],
+      hotelIds
     };
     const avatarUrl = JSON.stringify(meta);
 
@@ -452,7 +474,9 @@ export const supabaseService = {
       full_name: user.name,
       email: user.email,
       role: user.role,
-      hotel_id: user.hotelId || null,
+      // Coluna simples continua guardando só a primeira unidade (compatibilidade); a lista
+      // completa fica em meta.hotelIds, acima.
+      hotel_id: hotelIds[0] || null,
       temp_password: user.tempPassword || null,
       avatar_url: avatarUrl,
       updated_at: new Date().toISOString()
@@ -465,10 +489,12 @@ export const supabaseService = {
   },
 
   async adminSaveProfile(user: User): Promise<string> {
+      const hotelIds = user.hotelIds && user.hotelIds.length > 0 ? user.hotelIds : (user.hotelId ? [user.hotelId] : []);
       const meta = {
         responsiblePackages: user.responsiblePackages || [],
         responsibleRevenues: user.responsibleRevenues || [],
-        responsibleCostCenters: user.responsibleCostCenters || []
+        responsibleCostCenters: user.responsibleCostCenters || [],
+        hotelIds
       };
       const avatarUrl = JSON.stringify(meta);
 
@@ -478,7 +504,7 @@ export const supabaseService = {
           p_password: user.tempPassword || '',
           p_name: user.name,
           p_role: user.role,
-          p_hotel_id: user.hotelId || null,
+          p_hotel_id: hotelIds[0] || null,
           p_can_admin: true,
           p_can_geral: true,
           p_can_cadastros: true
@@ -496,11 +522,17 @@ export const supabaseService = {
   },
 
   async deleteProfile(id: string): Promise<void> {
-    const { error } = await supabase
+    // .select() forces the delete to return the affected rows — without it, RLS silently
+    // filtering out the row looks identical to a successful delete (no error, 0 rows changed).
+    const { data, error } = await supabase
       .from('profiles')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .select();
     if (error) throw error;
+    if (!data || data.length === 0) {
+      throw new Error('Nenhum usuário foi excluído. Pode ser um bloqueio de permissão (RLS) no Supabase.');
+    }
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -577,11 +609,15 @@ export const supabaseService = {
   },
 
   async deleteGmdConfig(id: string): Promise<void> {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('gmd_configurations')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .select();
     if (error) throw error;
+    if (!data || data.length === 0) {
+      throw new Error('Nenhuma configuração foi excluída. Pode ser um bloqueio de permissão (RLS) no Supabase.');
+    }
   },
 
   // ═══════════════════════════════════════════════════════════════════════════

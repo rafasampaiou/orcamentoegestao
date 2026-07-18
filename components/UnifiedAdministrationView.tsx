@@ -1301,7 +1301,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     name: '',
     email: '',
     role: UserRole.PACKAGE_MANAGER,
-    hotelId: '',
+    hotelIds: [] as string[],
     password: '',
     responsiblePackages: [] as string[],
     responsibleRevenues: [] as string[],
@@ -1360,7 +1360,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       name: '',
       email: '',
       role: UserRole.PACKAGE_MANAGER,
-      hotelId: '',
+      hotelIds: [],
       password: '',
       responsiblePackages: [],
       responsibleRevenues: [],
@@ -1377,7 +1377,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         name: u.name,
         email: u.email,
         role: u.role,
-        hotelId: u.hotelId || '',
+        hotelIds: u.hotelIds && u.hotelIds.length > 0 ? u.hotelIds : (u.hotelId ? [u.hotelId] : []),
         password: '',
         responsiblePackages: u.responsiblePackages || [],
         responsibleRevenues: u.responsibleRevenues || [],
@@ -1700,7 +1700,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         name: userForm.name,
         email: userForm.email,
         role: userForm.role,
-        hotelId: userForm.hotelId || undefined,
+        hotelId: userForm.hotelIds[0] || undefined,
+        hotelIds: userForm.hotelIds || [],
         tempPassword: userForm.password || undefined,
         responsiblePackages: userForm.responsiblePackages || [],
         responsibleRevenues: userForm.responsibleRevenues || [],
@@ -4912,12 +4913,13 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {users.map(u => {
-                          const userHotel = hotels.find(h => h.id === u.hotelId);
+                          const userHotelIds = u.hotelIds && u.hotelIds.length > 0 ? u.hotelIds : (u.hotelId ? [u.hotelId] : []);
+                          const userHotelNames = userHotelIds.map(id => hotels.find(h => h.id === id)?.name).filter((n): n is string => !!n);
                           return (
                             <tr key={u.id}>
                               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{u.name}</td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{u.email}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{userHotel?.name || '-'}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{userHotelNames.length > 0 ? userHotelNames.join(', ') : '-'}</td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-medium">
                                 <span className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[10px] uppercase font-bold">{u.role}</span>
                               </td>
@@ -5808,10 +5810,23 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               </div>
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1">Hotel Principal / Unidade</label>
-                <select value={userForm.hotelId} onChange={e => setUserForm({ ...userForm, hotelId: e.target.value })} className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none">
-                  <option value="">Selecione um hotel...</option>
-                  {hotels.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
-                </select>
+                <div className="p-3 border border-gray-300 rounded-xl bg-gray-50 max-h-48 overflow-y-auto space-y-2 custom-scrollbar">
+                  {hotels.map(h => (
+                    <label key={h.id} className="flex items-center gap-2.5 text-sm font-medium text-gray-700 cursor-pointer hover:text-indigo-600">
+                      <input
+                        type="checkbox"
+                        checked={userForm.hotelIds.includes(h.id)}
+                        onChange={e => {
+                          if (e.target.checked) setUserForm({ ...userForm, hotelIds: [...userForm.hotelIds, h.id] });
+                          else setUserForm({ ...userForm, hotelIds: userForm.hotelIds.filter(id => id !== h.id) });
+                        }}
+                        className="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5"
+                      />
+                      {h.name}
+                    </label>
+                  ))}
+                  {hotels.length === 0 && <p className="text-[10px] text-gray-400 italic">Nenhum hotel cadastrado.</p>}
+                </div>
               </div>
 
               {/* Condicionais de Responsabilidade com base no Perfil */}
@@ -5877,8 +5892,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                   <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Centros de Resultado (CR)</label>
                     {(() => {
-                      const selectedHotelName = hotels.find(h => h.id === userForm.hotelId)?.name;
-                      const costCentersForHotel = uniqueCostCentersList.filter(cc => !userForm.hotelId || cc.hotelName === selectedHotelName);
+                      const selectedHotelNames = userForm.hotelIds.map(id => hotels.find(h => h.id === id)?.name).filter((n): n is string => !!n);
+                      const costCentersForHotel = uniqueCostCentersList.filter(cc => selectedHotelNames.length === 0 || selectedHotelNames.includes(cc.hotelName));
                       return (
                         <div className="p-3 border border-gray-200 rounded-xl bg-gray-50 max-h-48 overflow-y-auto space-y-2 custom-scrollbar">
                           {costCentersForHotel.map(cc => (
@@ -5901,7 +5916,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                           ))}
                           {costCentersForHotel.length === 0 && (
                             <p className="text-[10px] text-gray-400 italic">
-                              {userForm.hotelId ? 'Nenhum CR cadastrado para o hotel selecionado.' : 'Nenhum CR cadastrado.'}
+                              {userForm.hotelIds.length > 0 ? 'Nenhum CR cadastrado para os hotéis selecionados.' : 'Nenhum CR cadastrado.'}
                             </p>
                           )}
                         </div>

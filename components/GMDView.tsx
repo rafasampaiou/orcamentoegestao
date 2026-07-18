@@ -93,11 +93,16 @@ const GMDView: React.FC<GMDViewProps> = ({
       const config = gmdConfigs.find(c => c.id === just.gmdConfigId);
       if (!config) return false;
 
-      // Gerente de Entidade e Analista de Custos: can resolve/approve if in their hotel
+      // Gerente de Entidade e Analista de Custos: can resolve/approve if in one of their hotels
       if (currentUser.role === UserRole.ENTITY_MANAGER || currentUser.role === UserRole.COST_ANALYST) {
-          const userHotelObj = hotels.find(h => h.id === currentUser.hotelId || h.code === currentUser.hotelId);
+          const userHotelIds = currentUser.hotelIds && currentUser.hotelIds.length > 0
+              ? currentUser.hotelIds
+              : (currentUser.hotelId ? [currentUser.hotelId] : []);
+          const userHotelObjs = userHotelIds
+              .map(id => hotels.find(h => h.id === id || h.code === id))
+              .filter((h): h is Hotel => !!h);
           const configHotelObj = hotels.find(h => h.id === config.hotelId);
-          return !userHotelObj || !configHotelObj || userHotelObj.name === configHotelObj.name;
+          return userHotelObjs.length === 0 || !configHotelObj || userHotelObjs.some(h => h.name === configHotelObj.name);
       }
 
       // Gerente de Pacotes: can resolve if the package is under their responsibility

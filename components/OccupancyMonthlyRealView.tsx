@@ -37,15 +37,21 @@ const PERIOD_ORDER: OccupancyVersionOption[] = ['Reunião de Ritmo', 'FCA N2', '
 // Reunião de Ritmo / FCA N1 / FCA N2 — linhas restritas para preenchimento manual: só Aptos
 // vendidos, DM bruta e os Coef. Occ ficam editáveis (Coef. Occ vem sugerido da Meta, mas o
 // usuário pode mudar); Receita/Adultos/CHD/Pax/% ocupação são derivados, ao invés do contrário.
-// Em "Geral" tudo é somatório de Lazer+Eventos, nada fica editável.
+// Em "Geral" a maioria das linhas é somatório de Lazer+Eventos, nada fica editável — exceção:
+// Mão de obra só existe no nível Geral (não tem quebra por Lazer/Eventos), então CLT/Extra
+// precisam ser editáveis ali mesmo.
 const MEETING_ROW_SUFFIXES = ['sold', 'dm_fap', 'coef_ad', 'coef_chd', 'rev_fap', 'adults', 'chd', 'pax', 'occ_pct'];
 const MEETING_EDITABLE_SUFFIXES = ['sold', 'dm_fap', 'coef_ad', 'coef_chd'];
+const MEETING_GERAL_LABOR_SUFFIXES = ['mo_clt', 'mo_extra', 'mo_total'];
+const MEETING_GERAL_LABOR_EDITABLE_SUFFIXES = ['mo_clt', 'mo_extra'];
 const getMeetingRows = (baseRows: BudgetRow[], prefix: string): BudgetRow[] => {
-    const mapped: (BudgetRow | null)[] = MEETING_ROW_SUFFIXES.map(suffix => {
+    const suffixes = prefix === 'geral' ? [...MEETING_ROW_SUFFIXES, ...MEETING_GERAL_LABOR_SUFFIXES] : MEETING_ROW_SUFFIXES;
+    const mapped: (BudgetRow | null)[] = suffixes.map(suffix => {
         const id = `${prefix}_${suffix}`;
         const base = baseRows.find(r => r.id === id);
         if (!base) return null;
-        const isEditable = prefix !== 'geral' && MEETING_EDITABLE_SUFFIXES.includes(suffix);
+        const isGeralLaborInput = prefix === 'geral' && MEETING_GERAL_LABOR_EDITABLE_SUFFIXES.includes(suffix);
+        const isEditable = isGeralLaborInput || (prefix !== 'geral' && MEETING_EDITABLE_SUFFIXES.includes(suffix));
         return { ...base, isInput: isEditable, isManualReal: isEditable, isCalculated: !isEditable };
     });
     return mapped.filter((r): r is BudgetRow => !!r);
@@ -332,6 +338,12 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
             const gRevFap = lzRevFap + evRevFap;
             set(`geral_rev_fap_${s}`, gRevFap);
             set(`geral_dm_fap_${s}`, gSold > 0 ? gRevFap / gSold : 0);
+
+            // Mão de obra só existe no nível Geral (não há quebra por Lazer/Eventos) — CLT e
+            // Extra são entrada manual direta aqui, Total é só a soma dos dois.
+            const gMoClt = get(`geral_mo_clt_${s}`);
+            const gMoExtra = get(`geral_mo_extra_${s}`);
+            set(`geral_mo_total_${s}`, gMoClt + gMoExtra);
         });
 
         return newData;

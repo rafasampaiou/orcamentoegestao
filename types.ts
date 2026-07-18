@@ -31,7 +31,8 @@ export interface User {
   email: string;
   role: UserRole;
   avatarUrl?: string;
-  hotelId?: string; // Link user to a specific Hotel/Entity
+  hotelId?: string; // Legacy single-hotel link — kept as hotelIds[0] for callers that only need one.
+  hotelIds?: string[]; // Hotel Principal/Unidade — a user can now be assigned to more than one.
   tempPassword?: string; // Storing temporary password for admin viewing
   responsiblePackages?: string[];
   responsibleRevenues?: string[];

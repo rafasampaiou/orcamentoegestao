@@ -54,6 +54,14 @@ const Header: React.FC<HeaderProps> = ({
     // Comparativo de ocupação has its own hotel filter (multi-select, view-only) — the global
     // Tipo/Categoria/Região/Hotel/Versão filters don't apply there anymore.
     const showFilters = currentView === 'dashboard';
+    const isUnrestrictedRole = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.DIRETORIA || currentUser?.role === UserRole.PACKAGE_MANAGER;
+    const userHotelIds = currentUser?.hotelIds && currentUser.hotelIds.length > 0
+        ? currentUser.hotelIds
+        : (currentUser?.hotelId ? [currentUser.hotelId] : []);
+    const userHotels = hotels.filter(h => userHotelIds.includes(h.id) || userHotelIds.includes(h.code));
+    // Restrito a 1 hotel só: mantém travado como sempre foi. Com várias unidades atribuídas, o
+    // select fica liberado, mas só entre elas (nunca a lista completa de hotéis do sistema).
+    const hotelSelectorDisabled = !isUnrestrictedRole && userHotels.length > 0 && userHotels.length <= 1;
     const selectedHotelObj = hotels.find(h => h.name === selectedHotel);
     const hotelCode = selectedHotelObj?.code || selectedHotel;
     const availableVersionsForHotel = versions?.filter(v => 
@@ -86,7 +94,7 @@ const Header: React.FC<HeaderProps> = ({
                                         setSelectedHotel(filtered[0].name);
                                     }
                                 }}
-                                disabled={currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.DIRETORIA && currentUser?.role !== UserRole.PACKAGE_MANAGER && !!currentUser?.hotelId}
+                                disabled={!isUnrestrictedRole && userHotelIds.length > 0}
                                 className="bg-transparent text-xs font-bold text-gray-700 focus:outline-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                             >
                                 <option value="Todos">Todos</option>
@@ -112,7 +120,7 @@ const Header: React.FC<HeaderProps> = ({
                                         setSelectedHotel(filtered[0].name);
                                     }
                                 }}
-                                disabled={currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.DIRETORIA && currentUser?.role !== UserRole.PACKAGE_MANAGER && !!currentUser?.hotelId}
+                                disabled={!isUnrestrictedRole && userHotelIds.length > 0}
                                 className="bg-transparent text-xs font-bold text-gray-700 focus:outline-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                             >
                                 <option value="Todas">Todas</option>
@@ -138,7 +146,7 @@ const Header: React.FC<HeaderProps> = ({
                                         setSelectedHotel(filtered[0].name);
                                     }
                                 }}
-                                disabled={currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.DIRETORIA && currentUser?.role !== UserRole.PACKAGE_MANAGER && !!currentUser?.hotelId}
+                                disabled={!isUnrestrictedRole && userHotelIds.length > 0}
                                 className="bg-transparent text-xs font-bold text-gray-700 focus:outline-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                             >
                                 <option value="Todas">Todas</option>
@@ -151,22 +159,22 @@ const Header: React.FC<HeaderProps> = ({
                         {/* Hotel Context Selector */}
                         <div className="flex items-center bg-indigo-50 px-4 py-2.5 rounded-lg border border-indigo-100 ml-2">
                             <Building2Icon className="text-indigo-600 mr-2" size={18} />
-                            <select 
-                                value={selectedHotel} 
+                            <select
+                                value={selectedHotel}
                                 onChange={(e) => setSelectedHotel(e.target.value)}
-                                disabled={currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.DIRETORIA && currentUser?.role !== UserRole.PACKAGE_MANAGER && !!currentUser?.hotelId}
+                                disabled={hotelSelectorDisabled}
                                 className="bg-transparent text-sm font-bold text-indigo-900 focus:outline-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                             >
-                                {hotels
-                                    .filter(h => 
+                                {(!isUnrestrictedRole && userHotels.length > 0
+                                    ? userHotels
+                                    : hotels.filter(h =>
                                         (selectedHotelType === 'Todos' || h.type === selectedHotelType) &&
                                         (selectedHotelCategory === 'Todas' || h.category === selectedHotelCategory) &&
                                         (selectedHotelRegion === 'Todas' || h.region === selectedHotelRegion)
                                     )
-                                    .map(h => (
-                                        <option key={h.id} value={h.name}>{h.name}</option>
-                                    ))
-                                }
+                                ).map(h => (
+                                    <option key={h.id} value={h.name}>{h.name}</option>
+                                ))}
                             </select>
                         </div>
 

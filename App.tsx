@@ -316,16 +316,23 @@ const App: React.FC = () => {
   const [hotelRegions, setHotelRegions] = useState<HotelRegion[]>([]);
 
   React.useEffect(() => {
-    if (hotels.length === 0 || !currentUser || !currentUser.hotelId) return;
-    
-    const isRestricted = currentUser.role !== UserRole.ADMIN && 
-                         currentUser.role !== UserRole.DIRETORIA && 
+    const userHotelIds = currentUser?.hotelIds && currentUser.hotelIds.length > 0
+      ? currentUser.hotelIds
+      : (currentUser?.hotelId ? [currentUser.hotelId] : []);
+    if (hotels.length === 0 || !currentUser || userHotelIds.length === 0) return;
+
+    const isRestricted = currentUser.role !== UserRole.ADMIN &&
+                         currentUser.role !== UserRole.DIRETORIA &&
                          currentUser.role !== UserRole.PACKAGE_MANAGER;
-                         
+
     if (isRestricted) {
-      const userHotel = hotels.find(h => h.id === currentUser.hotelId || h.code === currentUser.hotelId);
-      if (userHotel && selectedHotel !== userHotel.name) {
-        setSelectedHotel(userHotel.name);
+      const userHotels = userHotelIds
+        .map(id => hotels.find(h => h.id === id || h.code === id))
+        .filter((h): h is Hotel => !!h);
+      // Só força a troca quando o hotel selecionado não é nenhum dos atribuídos ao usuário —
+      // com várias unidades, ele pode escolher entre elas livremente (ver Header.tsx).
+      if (userHotels.length > 0 && !userHotels.some(h => h.name === selectedHotel)) {
+        setSelectedHotel(userHotels[0].name);
       }
     }
   }, [currentUser, hotels, selectedHotel]);
