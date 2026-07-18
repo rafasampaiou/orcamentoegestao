@@ -982,7 +982,13 @@ export const getForecastData = (
     const valRealImp = getRealOccValue('geral_impostos_forecast') || 0;
     const valPreviaImp = getRealOccValue('geral_impostos_previa') || 0;
     const valLYImp = getLYOccValue('geral_impostos_forecast') || 0;
-    rows.push(generateRow('REV-IMP', '1.05', 'Revenue', 'IMPOSTOS', valBudgetImp, valRealImp, valLYImp, valPreviaImp, true, true, 0));
+    rows.push(generateRow('REV-IMP', '1.05', 'Revenue', 'IMPOSTOS', valBudgetImp, valRealImp, valLYImp, valPreviaImp, true, true, 0, undefined, {
+        // % de imposto sobre a receita = Imposto / Receita Bruta Total — auto-calculado na
+        // Prévia a partir do % da Meta (ver recalculateTotals em ForecastTable.tsx), mas
+        // editável diretamente na célula de KPI (mesmo mecanismo das contas Variável).
+        kpiCalculation: { formula: '@[IMPOSTOS] / @[RECEITA BRUTA TOTAL]', format: 'percent' },
+        format: 'currency'
+    }));
 
     rows.push(generateRow('SPACER-AFTER-IMP', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
 

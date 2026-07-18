@@ -1229,11 +1229,14 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 // GOP R$ (com/sem impostos) always show KPI = GOP ÷ UH Disponível, even though
                                 // they're otherwise blue/total rows with KPIs hidden. GOP % rows stay blank.
                                 const isGopRsRow = row.id === 'RES-OP-COM-IMP' || row.id === 'RES-OP-SEM-IMP';
+                                // Impostos ("% de imposto sobre a receita" = Imposto ÷ Receita Bruta Total) also
+                                // carries a KPI even though it's a blue/total row — same exception as the GOP rows.
+                                const isImpostoKpiRow = row.id === 'REV-IMP';
                                 // Receitas Extras (Lazer/Eventos, and their "Receitas Extras" parent total) also
                                 // carry a KPI even though category 'Revenue' normally hides it — precomputed in
                                 // mockData.ts as Receita ÷ PAX do segmento (see rowConfig.precomputedKpi).
                                 const precomputedKpi = row.rowConfig?.precomputedKpi;
-                                const hideKpi = (!isGopRsRow && (isSectionHeader || isBlueHighlight || isTotal)) || row.category === 'Indicators' || (row.category === 'Revenue' && !precomputedKpi);
+                                const hideKpi = (!isGopRsRow && !isImpostoKpiRow && (isSectionHeader || isBlueHighlight || isTotal)) || row.category === 'Indicators' || (row.category === 'Revenue' && !precomputedKpi && !isImpostoKpiRow);
                                 // In the KPI columns, the only borders shown are top/bottom on every package
                                 // row and on "Custos e Despesas Operacionais" — everywhere else stays borderless.
                                 // The table uses border-collapse, where a wider border always wins the conflict
@@ -1246,7 +1249,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 const accountKpiCalc = (row.category === 'Costs' || row.category === 'Account') && row.rowConfig?.expenseType === 'Variável' ? row.rowConfig?.kpiCalculation : undefined;
                                 const packageKpiCalc = !hideKpi && row.category === 'Package' ? packageKpiConfigs[row.label.trim()] : undefined;
                                 const gopKpiCalc: KpiCalculation | undefined = isGopRsRow ? { formula: `@[${row.label}] / @[UH Disponível]`, format: 'number' } : undefined;
-                                const rowKpiCalc = accountKpiCalc || packageKpiCalc || gopKpiCalc;
+                                const impostoKpiCalc: KpiCalculation | undefined = isImpostoKpiRow ? row.rowConfig?.kpiCalculation : undefined;
+                                const rowKpiCalc = accountKpiCalc || packageKpiCalc || gopKpiCalc || impostoKpiCalc;
                                 const hasKpi = !!(rowKpiCalc || precomputedKpi);
                                 const kpiFormatType = precomputedKpi ? precomputedKpi.format : (rowKpiCalc?.format === 'percent' ? 'percent' : 'decimal');
                                 const kpiValue = (field: 'previa' | 'real' | 'budget') => {
@@ -1261,7 +1265,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 // The KPI can be typed directly (to adjust the underlying result) only when
                                 // its formula is a simple self ÷ denominator ratio — the same shape "Calcular
                                 // Forecast" already knows how to project, so it's cleanly invertible.
-                                const kpiSelfDenominator = accountKpiCalc ? parseSelfRatioDenominator(accountKpiCalc.formula, row.label) : null;
+                                const kpiSelfDenominator = accountKpiCalc
+                                    ? parseSelfRatioDenominator(accountKpiCalc.formula, row.label)
+                                    : (impostoKpiCalc ? parseSelfRatioDenominator(impostoKpiCalc.formula, row.label) : null);
                                 const isEditableKpi = !!kpiSelfDenominator && canEditForecast && !isLocked && isRowEditableForUser(row);
                                 // Receitas Extras (Lazer/Eventos) KPI Prévia is also invertible (Receita ÷ PAX,
                                 // with PAX carried in precomputedKpi.denominator) — but only the Prévia column,
@@ -2366,6 +2372,19 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
 
         // REV-TOTAL = REV-APT + REV-EXTRA + REV-TIME + REV-ISS
         sumAndSet('REV-TOTAL', [{ id: 'REV-APT' }, { id: 'REV-EXTRA' }, { id: 'REV-TIME' }, { id: 'REV-ISS' }], field);
+
+        // Impostos (Prévia): replica o % de imposto da Meta (Imposto ÷ Receita Bruta Total) sobre
+        // a Receita Bruta Total da própria Prévia, a cada vez que a receita muda — a não ser que
+        // o usuário já tenha digitado um valor manualmente nessa célula (mesma trava usada pelas
+        // contas Variável, isManualPreviaOverride).
+        if (field === 'previa') {
+            const impRow = rowMap.get('REV-IMP');
+            const revTotalRowForImp = rowMap.get('REV-TOTAL');
+            if (impRow && revTotalRowForImp && !impRow.isManualPreviaOverride) {
+                const impostoRate = revTotalRowForImp.budget ? (impRow.budget || 0) / revTotalRowForImp.budget : 0;
+                impRow.previa = impostoRate * (revTotalRowForImp.previa || 0);
+            }
+        }
 
         // REV-NET = REV-TOTAL - REV-IMP
         const revTotal = rowMap.get('REV-TOTAL')?.[field] || 0;
