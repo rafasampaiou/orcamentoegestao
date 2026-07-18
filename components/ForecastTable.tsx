@@ -2495,6 +2495,18 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
     }
 
     // --- REVENUE & RESULTS CALCULATIONS ---
+
+    // Receita (e Impostos, mesma category 'Revenue') na coluna Forecast sempre espelha a
+    // Prévia — diferente de Custos (que tem "Calcular Forecast"/KPI de conta), não existe uma
+    // fonte de dado separada para Receita durante a montagem do forecast. Cobre tanto as linhas
+    // de entrada (REV-APT-LAZER, REV-EXTRA-*, REV-TIME, REV-ISS, REV-IMP...) quanto os totais
+    // (REV-APT, REV-EXTRA, REV-TOTAL, REV-NET), já recalculados acima para todos os campos.
+    updatedRows.forEach(row => {
+        if (row.category === 'Revenue') {
+            row.real = row.previa || 0;
+        }
+    });
+
     ['real', 'budget', 'lastYear', 'previa'].forEach(f => {
         const field = f as 'real' | 'budget' | 'lastYear' | 'previa';
 
