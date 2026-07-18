@@ -187,6 +187,9 @@ export interface ForecastRow {
   deltaBudgetPct?: number;
   deltaLYVal?: number;
   deltaLYPct?: number;
+  // OTB (On the books) — só para Indicators/Revenue, só para Reunião de Ritmo/FCA N1/FCA N2;
+  // sem campos de delta, sem edição manual nesta primeira entrega.
+  otb?: number;
   // Previa Fields
   previa: number;
   deltaPreviaVal?: number;
@@ -298,6 +301,7 @@ export type ViewState =
 export type ModuleType = 'REAL';
 
 export interface ColumnVisibility {
+  otb: boolean;
   previa: boolean;
   real: boolean;
   budget: boolean;

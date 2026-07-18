@@ -18,6 +18,9 @@ interface OccupancyMonthlyRealViewProps {
     onSaveOccupancy?: () => void;
     activeProjectionType?: ProjectionType;
     setActiveProjectionType?: React.Dispatch<React.SetStateAction<ProjectionType>>;
+    // Sinalizado pelo wizard "Iniciar Projeção" (OTB) na DRE Forecast — semeia o modo "On the
+    // books" já ligado ao chegar aqui, mesmo padrão de activeProjectionType semeando `period`.
+    initialOtbMode?: boolean;
 }
 
 // Rótulo curto de cada Versão do Forecast pra exibir nos botões/badge (mesmo padrão do
@@ -59,6 +62,17 @@ const getMeetingRows = (baseRows: BudgetRow[], prefix: string): BudgetRow[] => {
     return mapped.filter((r): r is BudgetRow => !!r);
 };
 
+// "On the books" — mesma tabela restrita acima, mais Receita Extra Lazer/Evento (não existe em
+// Reunião de Ritmo/FCA N1/FCA N2 normal). Só Lazer/Eventos ganham a linha extra — em Geral,
+// "Receitas Extras" continua sendo a soma dos dois (igual Mão de obra Total), nunca editável ali.
+const getOtbRows = (baseRows: BudgetRow[], prefix: string): BudgetRow[] => {
+    const meetingRows = getMeetingRows(baseRows, prefix);
+    if (prefix === 'geral') return meetingRows;
+    const extraRow = baseRows.find(r => r.id === `${prefix}_extra_rev`);
+    if (!extraRow) return meetingRows;
+    return [...meetingRows, { ...extraRow, isInput: true, isManualReal: true, isCalculated: false }];
+};
+
 const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
     selectedYear,
     selectedHotel,
@@ -72,7 +86,8 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
     currentUser,
     onSaveOccupancy,
     activeProjectionType,
-    setActiveProjectionType
+    setActiveProjectionType,
+    initialOtbMode
 }) => {
     const canEditOccupancy = currentUser?.role === UserRole.ADMIN ||
         currentUser?.role === UserRole.ENTITY_MANAGER ||
@@ -92,8 +107,12 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
     // usando a tabela completa). "Realizado" fica de fora de propósito: é o único que continua
     // no balde original sem sufixo, preservando qualquer dado já existente.
     const usesProjectionSnapshot = OWN_SNAPSHOT_VERSIONS.includes(period);
+    // "On the books" é um MODO dentro de Reunião de Ritmo/FCA N1/FCA N2, não uma versão nova —
+    // cada versão guarda seu próprio OTB isolado (chave de contexto com sufixo extra "__OTB").
+    const [otbMode, setOtbMode] = useState(initialOtbMode || false);
     const handlePeriodChange = (value: OccupancyVersionOption) => {
         setPeriod(value);
+        if (!MEETING_VERSIONS.includes(value)) setOtbMode(false);
         if (setActiveProjectionType && value !== 'Meta' && value !== 'Ano anterior') {
             setActiveProjectionType(value);
         }
@@ -346,6 +365,15 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
             const gMoClt = get(`geral_mo_clt_${s}`);
             const gMoExtra = get(`geral_mo_extra_${s}`);
             set(`geral_mo_total_${s}`, gMoClt + gMoExtra);
+
+            // Receita Extra Lazer/Evento — só existe de verdade no modo "On the books", mas é
+            // seguro repassar sempre (dá zero quando não preenchido, e nada mais lê esses campos
+            // fora do modo OTB).
+            const lzExtra = get(`lazer_extra_rev_${s}`);
+            const evExtra = get(`event_extra_rev_${s}`);
+            set(`lazer_extra_rev_${s}`, lzExtra);
+            set(`event_extra_rev_${s}`, evExtra);
+            set(`geral_extra_rev_${s}`, lzExtra + evExtra);
         });
 
         return newData;
@@ -369,10 +397,13 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
 
         for (let i = 0; i < 12; i++) {
             // Reunião de Ritmo/FCA N1/FCA N2/Fechamento têm seu próprio snapshot isolado (sufixo
-            // pela versão), nunca misturado com o balde "Realizado" de sempre nem entre si.
-            const contextKey = usesProjectionSnapshot
-                ? `${selectedHotel}_${selectedYear}_${i + 1}_${activeRealVersionId || ''}__${period}`
-                : `${selectedHotel}_${targetYear}_${i + 1}_${activeRealVersionId || ''}`;
+            // pela versão), nunca misturado com o balde "Realizado" de sempre nem entre si. "On
+            // the books" ganha mais um sufixo em cima disso, também isolado por versão.
+            const contextKey = otbMode
+                ? `${selectedHotel}_${selectedYear}_${i + 1}_${activeRealVersionId || ''}__${period}__OTB`
+                : usesProjectionSnapshot
+                    ? `${selectedHotel}_${selectedYear}_${i + 1}_${activeRealVersionId || ''}__${period}`
+                    : `${selectedHotel}_${targetYear}_${i + 1}_${activeRealVersionId || ''}`;
             const rawMonthData = realOccupancyData?.[contextKey] || {};
             const monthData = isMeetingMode
                 ? recalculateMeetingProjectionForMonth(rawMonthData, i)
@@ -562,9 +593,11 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
 
         const targetYear = period === 'Ano anterior' ? selectedYear - 1 : selectedYear;
         const month = monthIndex + 1;
-        const contextKey = usesProjectionSnapshot
-            ? `${selectedHotel}_${selectedYear}_${month}_${activeRealVersionId || ''}__${period}`
-            : `${selectedHotel}_${targetYear}_${month}_${activeRealVersionId || ''}`;
+        const contextKey = otbMode
+            ? `${selectedHotel}_${selectedYear}_${month}_${activeRealVersionId || ''}__${period}__OTB`
+            : usesProjectionSnapshot
+                ? `${selectedHotel}_${selectedYear}_${month}_${activeRealVersionId || ''}__${period}`
+                : `${selectedHotel}_${targetYear}_${month}_${activeRealVersionId || ''}`;
 
         setRealOccupancyData(prev => {
             const contextData = prev[contextKey] || {};
@@ -629,7 +662,28 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
                         </button>
                     ))}
                 </div>
-                
+
+                {isMeetingMode && (
+                    <div className="flex items-center bg-gray-100 p-1 rounded-lg">
+                        <button
+                            onClick={() => setOtbMode(false)}
+                            className={`px-4 py-1.5 text-sm font-bold rounded-md transition-all ${
+                                !otbMode ? 'bg-white text-indigo-600 shadow-sm border border-gray-200' : 'text-gray-500 hover:text-gray-700'
+                            }`}
+                        >
+                            {PERIOD_LABELS[period]}
+                        </button>
+                        <button
+                            onClick={() => setOtbMode(true)}
+                            className={`px-4 py-1.5 text-sm font-bold rounded-md transition-all ${
+                                otbMode ? 'bg-white text-indigo-600 shadow-sm border border-gray-200' : 'text-gray-500 hover:text-gray-700'
+                            }`}
+                        >
+                            On the books
+                        </button>
+                    </div>
+                )}
+
                 <div className="h-6 w-px bg-gray-300"></div>
                 
                 <div className="flex items-center flex-wrap gap-1">
@@ -662,7 +716,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
 
             <BudgetOccupancyTable
                 title="Geral"
-                rows={isMeetingMode ? getMeetingRows(geralRows, 'geral') : geralRows}
+                rows={isMeetingMode ? (otbMode ? getOtbRows(geralRows, 'geral') : getMeetingRows(geralRows, 'geral')) : geralRows}
                 data={tableData}
                 onUpdate={handleUpdate}
                 decimalOverrides={decimalOverrides}
@@ -673,7 +727,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
             />
             <BudgetOccupancyTable
                 title="Lazer"
-                rows={isMeetingMode ? getMeetingRows(lazerRows, 'lazer') : lazerRows}
+                rows={isMeetingMode ? (otbMode ? getOtbRows(lazerRows, 'lazer') : getMeetingRows(lazerRows, 'lazer')) : lazerRows}
                 data={tableData}
                 onUpdate={handleUpdate}
                 decimalOverrides={decimalOverrides}
@@ -684,7 +738,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
             />
             <BudgetOccupancyTable
                 title="Eventos Corporativos"
-                rows={isMeetingMode ? getMeetingRows(eventRows, 'event') : eventRows}
+                rows={isMeetingMode ? (otbMode ? getOtbRows(eventRows, 'event') : getMeetingRows(eventRows, 'event')) : eventRows}
                 data={tableData}
                 onUpdate={handleUpdate}
                 decimalOverrides={decimalOverrides}

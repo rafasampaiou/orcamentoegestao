@@ -5,6 +5,7 @@ import { ExpenseDriver, ImportedRow, Account, CostPackage, Hotel, ForecastRow, F
 import { evaluateFormula } from '../utils/formulaEngine';
 import { supabaseService } from '../services/supabaseService';
 import { VersionInfoBanner } from './VersionInfoBanner';
+import { MEETING_VERSIONS } from './OccupancyView';
 import toast from 'react-hot-toast';
 
 interface ForecastTableProps {
@@ -21,6 +22,7 @@ interface ForecastTableProps {
     // Month Status Props
     isMonthClosed?: boolean;
     realOccupancyData?: Record<string, Record<string, number>>;
+    setRealOccupancyData?: React.Dispatch<React.SetStateAction<Record<string, Record<string, number>>>>;
 
     // Budget Props
     activeRealVersionId?: string;
@@ -35,7 +37,7 @@ interface ForecastTableProps {
     setValidations?: React.Dispatch<React.SetStateAction<import('../types').ValidationRecord[]>>;
     currentUser?: import('../types').User;
     dreConfigs?: Record<string, import('../types').DreSection[]>;
-    onNavigateToOccupancy?: () => void;
+    onNavigateToOccupancy?: (otbMode?: boolean) => void;
 }
 
 // --- UTILITÁRIOS MOVIDOS PARA FORA PARA EVITAR RE-RENDERIZAÇÕES DESNECESSÁRIAS ---
@@ -212,6 +214,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     hotels,
     isMonthClosed = false,
     realOccupancyData = {},
+    setRealOccupancyData,
     budgetOccupancyData = {},
     activeRealVersionId,
     activeRealVersionName,
@@ -283,6 +286,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     const [calculationBase, setCalculationBase] = useState<'forecast' | 'previa'>('forecast');
 
     const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>({
+        otb: true,
         previa: true,
         real: true,
         budget: true,
@@ -307,6 +311,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
         description: 300,
+        otb: 120,
         previa: 120,
         real: 120,
         budget: 120,
@@ -698,6 +703,36 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
     const monthName = new Date(selectedYear || 2024, (selectedMonth || 1) - 1).toLocaleString('pt-BR', { month: 'long' });
 
+    // Wizard "On the books" (OTB) — só existe para Reunião de Ritmo/FCA N1/FCA N2, cada versão
+    // com seu próprio dia de corte e snapshot isolado (sufixo extra "__OTB" na chave que já
+    // isola cada Versão do Forecast).
+    const [showOtbWizard, setShowOtbWizard] = useState(false);
+    const [otbDayPicked, setOtbDayPicked] = useState<number | null>(null);
+    const isMeetingVersion = !!activeProjectionType && MEETING_VERSIONS.includes(activeProjectionType as any);
+    const otbContextKey = `${selectedHotel}_${selectedYear}_${selectedMonth}_${activeRealVersionId || ''}__${activeProjectionType}__OTB`;
+    const otbDaySaved = realOccupancyData[otbContextKey]?.['__otb_day'];
+    const otbColumnLabel = otbDaySaved ? `OTBs ${String(otbDaySaved).padStart(2, '0')}/${String(selectedMonth || 1).padStart(2, '0')}` : 'OTBs';
+    const daysInSelectedMonth = new Date(selectedYear || 2024, selectedMonth || 1, 0).getDate();
+
+    const handleIniciarProjecao = () => {
+        if (isMeetingVersion && !otbDaySaved) {
+            setOtbDayPicked(null);
+            setShowOtbWizard(true);
+        } else {
+            onNavigateToOccupancy?.(isMeetingVersion && !!otbDaySaved);
+        }
+    };
+
+    const confirmOtbWizard = () => {
+        if (otbDayPicked == null || !setRealOccupancyData) return;
+        setRealOccupancyData(prev => ({
+            ...prev,
+            [otbContextKey]: { ...(prev[otbContextKey] || {}), '__otb_day': otbDayPicked }
+        }));
+        setShowOtbWizard(false);
+        onNavigateToOccupancy?.(true);
+    };
+
     const handleSaveResultsDirectly = () => {
         setShowConfirmModal(true);
     };
@@ -925,7 +960,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
                         {canEditForecast && onNavigateToOccupancy && (
                             <button
-                                onClick={onNavigateToOccupancy}
+                                onClick={handleIniciarProjecao}
                                 className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-base font-bold transition-colors border bg-white text-gray-600 border-gray-300 hover:bg-gray-50 shadow-sm"
                                 title="Ir para a aba Ocupação já filtrada nesta Versão do Forecast"
                             >
@@ -983,6 +1018,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             </div>
                             <div className="space-y-2">
                                 {[
+                                    ...(isMeetingVersion ? [{ key: 'otb', label: otbColumnLabel }] : []),
                                     { key: 'previa', label: isMonthClosed ? 'Real' : 'Prévia' },
                                     { key: 'real', label: 'Forecast (Real)' },
                                     { key: 'budget', label: 'Meta (Budget)' },
@@ -1024,6 +1060,19 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
                                     />
                                 </th>
+
+                                {columnVisibility.otb && isMeetingVersion && (
+                                    <th
+                                        style={{ width: columnWidths.otb }}
+                                        className="px-2 py-3 text-center bg-amber-100 text-amber-900 border-b border-amber-200 border-l border-amber-200 group relative"
+                                    >
+                                        {otbColumnLabel.toUpperCase()}
+                                        <div
+                                            onMouseDown={(e) => handleResizeStart(e, 'otb')}
+                                            className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-amber-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
+                                        />
+                                    </th>
+                                )}
 
                                 {columnVisibility.previa && (
                                     <th
@@ -1383,6 +1432,11 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
                                     return (
                                         <>
+                                            {columnVisibility.otb && isMeetingVersion && (
+                                                <td style={textStyle} className="px-2 py-1 text-right border-r border-gray-100 tabular-nums bg-amber-50/30 truncate">
+                                                    {(row.category === 'Indicators' || row.category === 'Revenue') ? formatValue(row.otb, formatType) : '-'}
+                                                </td>
+                                            )}
                                             {columnVisibility.previa && (
                                                 <td style={textStyle} className={`px-2 py-1 text-right border-r border-gray-100 tabular-nums ${previaBg} truncate`}>
                                                     {previaCellContent}
@@ -2121,6 +2175,62 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 </div>
             )}
 
+            {/* Wizard OTB (On the books) — passo único: mensagem + dia de corte do mês */}
+            {showOtbWizard && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95">
+                        <div className="flex items-center justify-between p-5 border-b border-gray-100 bg-indigo-50">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
+                                    <Activity size={24} />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold text-indigo-900">On the books (OTB)</h2>
+                                    <p className="text-sm text-indigo-700">{activeProjectionType}</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowOtbWizard(false)} className="text-indigo-400 hover:text-indigo-600 transition-colors p-2 hover:bg-indigo-100 rounded-full">
+                                <X size={24} />
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-6 bg-gray-50/50">
+                            <p className="text-sm text-gray-700 whitespace-pre-line leading-relaxed mb-5">
+                                {`Para o primeiro passo, vamos inserir os dados OTBs, ou seja, "On the books", que é o que tem vendido no sistema do início do período até a data atual. Como estamos montando a prévia do mês ${monthName}, são os dados do início do mês de ${monthName} até o dia que você informar no espaço abaixo.\n\nSendo assim, vamos inserir para você ter um parâmetro inicial. Até qual dia do mês você vai inserir os dados do sistema para iniciar sua prévia? (Considere a data de fechamento da remessa contábil, ocupação disponíveis no painel de controle e receitas no relatório consolidado)`}
+                            </p>
+                            <div className="grid grid-cols-7 gap-2">
+                                {Array.from({ length: daysInSelectedMonth }, (_, i) => i + 1).map(day => (
+                                    <button
+                                        key={day}
+                                        onClick={() => setOtbDayPicked(day)}
+                                        className={`py-2 rounded-lg text-sm font-bold transition-colors border ${
+                                            otbDayPicked === day
+                                                ? 'bg-indigo-600 text-white border-indigo-700'
+                                                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                                        }`}
+                                    >
+                                        {day}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="p-5 border-t border-gray-100 bg-white flex justify-end gap-3">
+                            <button onClick={() => setShowOtbWizard(false)} className="px-5 py-2.5 text-gray-600 font-bold hover:bg-gray-100 rounded-lg transition-colors">
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={confirmOtbWizard}
+                                disabled={otbDayPicked == null}
+                                className="px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-lg shadow-md hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Ir para o segundo passo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Custom Modals */}
             {showAlertModal && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
@@ -2427,6 +2537,27 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
         // Run Dynamic Formulas from Intelligent DRE
         runFormulas(field);
     });
+
+    // --- OTB (On the books) — só Receita/Impostos, despesas ficam de fora por enquanto ---
+    // Não estende os loops genéricos acima de propósito: se Custos não tiverem .otb, um GOP-otb
+    // calculado ali sairia com margem inflada (como se não houvesse despesa nenhuma), o que é
+    // enganoso — melhor deixar Resultado/GOP em branco na coluna OTB por ora.
+    {
+        const sumOtb = (ids: string[]) => ids.reduce((s, id) => s + (rowMap.get(id)?.otb || 0), 0);
+        const revAptRowOtb = rowMap.get('REV-APT');
+        if (revAptRowOtb) revAptRowOtb.otb = sumOtb(['REV-APT-LAZER', 'REV-APT-EVENTOS', 'REV-APT-INCLUSAS', 'REV-APT-OR']);
+        const revExtraRowOtb = rowMap.get('REV-EXTRA');
+        if (revExtraRowOtb) revExtraRowOtb.otb = sumOtb(['REV-EXTRA-LAZER', 'REV-EXTRA-EVENTOS', 'REV-EXTRA-OR']);
+        const revTotalRowOtb = rowMap.get('REV-TOTAL');
+        if (revTotalRowOtb) revTotalRowOtb.otb = sumOtb(['REV-APT', 'REV-EXTRA', 'REV-TIME', 'REV-ISS']);
+        const impRowOtb = rowMap.get('REV-IMP');
+        if (impRowOtb && revTotalRowOtb) {
+            const impostoRateOtb = revTotalRowOtb.budget ? (impRowOtb.budget || 0) / revTotalRowOtb.budget : 0;
+            impRowOtb.otb = impostoRateOtb * (revTotalRowOtb.otb || 0);
+        }
+        const revNetRowOtb = rowMap.get('REV-NET');
+        if (revNetRowOtb && revTotalRowOtb && impRowOtb) revNetRowOtb.otb = (revTotalRowOtb.otb || 0) - (impRowOtb.otb || 0);
+    }
 
     // --- VARIABLE CALCULATIONS FOR INDIVIDUAL ACCOUNTS ---
     const updatedRows = Array.from(rowMap.values());

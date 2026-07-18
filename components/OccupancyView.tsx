@@ -461,6 +461,7 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
                             currentUser?.role === UserRole.COST_ANALYST;
 
     const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>({
+        otb: false,
         previa: true,
         real: true,
         budget: true,

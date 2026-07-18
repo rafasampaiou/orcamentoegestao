@@ -58,6 +58,35 @@ function buildProjectionsSnapshot(
   return projections;
 }
 
+// OTB (On the books) — mesma ideia de buildProjectionsSnapshot, mas lendo a chave com o sufixo
+// extra "__OTB" (Reunião de Ritmo/FCA N1/FCA N2, cada uma com seu próprio OTB isolado;
+// Fechamento oficial não tem OTB). Guardado num campo IRMÃO (__otbProjections), não aninhado
+// dentro de __projections, pra não quebrar o formato Record<rowId, number[12]> que já existe lá.
+const OTB_VERSIONS: ProjectionType[] = ['Reunião de Ritmo', 'FCA N1', 'FCA N2'];
+function buildOtbProjectionsSnapshot(
+  realOccMap: Record<string, Record<string, number>>,
+  hotel: string,
+  year: number,
+  versionId: string
+): Record<string, Record<string, number[]>> {
+  const projections: Record<string, Record<string, number[]>> = {};
+  OTB_VERSIONS.forEach(pt => {
+    const rowsForType: Record<string, number[]> = {};
+    let hasAny = false;
+    for (let i = 0; i < 12; i++) {
+      const key = `${hotel}_${year}_${i + 1}_${versionId}__${pt}__OTB`;
+      const monthData = realOccMap[key] || {};
+      Object.keys(monthData).forEach(rowId => {
+        if (!rowsForType[rowId]) rowsForType[rowId] = Array(12).fill(0);
+        rowsForType[rowId][i] = monthData[rowId];
+        hasAny = true;
+      });
+    }
+    if (hasAny) projections[pt] = rowsForType;
+  });
+  return projections;
+}
+
 const App: React.FC = () => {
   const [currentModule, setCurrentModule] = useState<ModuleType>('REAL');
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
@@ -106,6 +135,10 @@ const App: React.FC = () => {
   // --- PROJECTION TYPE STATE ---
   const [activeProjectionType, setActiveProjectionType] = useState<ProjectionType>('Reunião de Ritmo');
   const [validations, setValidations] = useState<ValidationRecord[]>([]);
+  // Sinalizado pelo wizard "Iniciar Projeção" (OTB) na DRE Forecast — semeia o modo "On the
+  // books" já ligado ao chegar na Ocupação, mesmo mecanismo de activeProjectionType semeando
+  // `period` lá.
+  const [otbNavSignal, setOtbNavSignal] = useState(false);
 
   // --- REAL VERSIONING STATE ---
   const [realVersions, setRealVersions] = useState<BudgetVersion[]>([]);
@@ -267,7 +300,8 @@ const App: React.FC = () => {
         // Versão do Forecast está selecionada na tela agora — para nunca apagar o histórico de
         // Reunião de Ritmo/FCA N1/FCA N2/Fechamento com um autosave disparado por uma edição comum.
         const projections = buildProjectionsSnapshot(realOccupancyDataRef.current, selectedHotel, selectedDate.getFullYear(), activeRealVersionId);
-        const finalOccupancyData: any = { ...occupancyDataToSave, __projections: projections };
+        const otbProjections = buildOtbProjectionsSnapshot(realOccupancyDataRef.current, selectedHotel, selectedDate.getFullYear(), activeRealVersionId);
+        const finalOccupancyData: any = { ...occupancyDataToSave, __projections: projections, __otbProjections: otbProjections };
 
         if (hasData || Object.keys(occupancyDataToSave).length > 0 || Object.keys(projections).length > 0) {
           supabaseService.upsertBudgetVersion({ ...version, occupancyData: finalOccupancyData }).catch(console.error);
@@ -518,7 +552,7 @@ const App: React.FC = () => {
                   const contextKeyLY = `${hotelName}_${v.year - 1}_${i + 1}_${v.id}`;
                   const monthDataLY: Record<string, number> = {};
                   Object.keys(v.occupancyData).forEach(rowId => {
-                    if (rowId === '__projections') return; // handled separately below, not a month-array row
+                    if (rowId === '__projections' || rowId === '__otbProjections') return; // handled separately below, not a month-array row
                     if (rowId.endsWith('_LY')) {
                       const val = v.occupancyData![rowId][i];
                       if (val !== undefined && val !== null) {
@@ -547,6 +581,23 @@ const App: React.FC = () => {
                     const rowsForType = projections[projectionType];
                     for (let i = 0; i < 12; i++) {
                       const key = `${hotelName}_${v.year}_${i + 1}_${v.id}__${projectionType}`;
+                      const monthData: Record<string, number> = {};
+                      Object.keys(rowsForType).forEach(rowId => {
+                        const val = rowsForType[rowId][i];
+                        if (val !== undefined && val !== null) monthData[rowId] = val;
+                      });
+                      newRealOccMap[key] = monthData;
+                    }
+                  });
+                }
+
+                // OTB (On the books) — mesmo desempacotamento, chave com sufixo extra "__OTB".
+                const otbProjections = (v.occupancyData as any).__otbProjections as Record<string, Record<string, number[]>> | undefined;
+                if (otbProjections) {
+                  Object.keys(otbProjections).forEach(projectionType => {
+                    const rowsForType = otbProjections[projectionType];
+                    for (let i = 0; i < 12; i++) {
+                      const key = `${hotelName}_${v.year}_${i + 1}_${v.id}__${projectionType}__OTB`;
                       const monthData: Record<string, number> = {};
                       Object.keys(rowsForType).forEach(rowId => {
                         const val = rowsForType[rowId][i];
@@ -707,7 +758,8 @@ const App: React.FC = () => {
     // mapa completo — nunca só quando a versão ativa é uma das 4 — para o salvamento manual
     // também não apagar o histórico de outras Versões do Forecast.
     const projections = buildProjectionsSnapshot(realOccupancyData, selectedHotel, selectedDate.getFullYear(), activeRealVersionId);
-    const finalOccupancyData: any = { ...occupancyDataToSave, __projections: projections };
+    const otbProjections = buildOtbProjectionsSnapshot(realOccupancyData, selectedHotel, selectedDate.getFullYear(), activeRealVersionId);
+    const finalOccupancyData: any = { ...occupancyDataToSave, __projections: projections, __otbProjections: otbProjections };
 
     const updatedVersion = {
       ...version,
@@ -1085,6 +1137,7 @@ const App: React.FC = () => {
               hotels={hotels}
               isMonthClosed={isClosed}
               realOccupancyData={realOccupancyData}
+              setRealOccupancyData={setRealOccupancyData}
               budgetOccupancyData={budgetOccupancyDataMap[activeBudgetVersionId] || {}}
               activeRealVersionId={activeRealVersionId}
               activeRealVersionName={activeRealVersionName}
@@ -1094,7 +1147,7 @@ const App: React.FC = () => {
               validations={validations}
               setValidations={setValidations}
               currentUser={currentUser}
-              onNavigateToOccupancy={() => setCurrentView('occupancy_monthly')}
+              onNavigateToOccupancy={(otbMode) => { setOtbNavSignal(!!otbMode); setCurrentView('occupancy_monthly'); }}
             />
           </div>
         </div>
@@ -1135,6 +1188,7 @@ const App: React.FC = () => {
           currentUser={currentUser}
           activeProjectionType={activeProjectionType}
           setActiveProjectionType={setActiveProjectionType}
+          initialOtbMode={otbNavSignal}
         />
       );
       case 'comparatives': return <ComparativesView activeRealVersionName={activeRealVersionName} />;
