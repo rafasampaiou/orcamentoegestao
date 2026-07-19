@@ -655,6 +655,7 @@ export const getForecastData = (
             else if (scen === 'budget' || scen === 'meta' || scen === 'orcamento' || scen === 'orçamento') normScenario = 'BUDGET';
             else if (scen === 'previa' || scen === 'prévia' || scen === 'flash') normScenario = 'PREVIA';
             else if (scen === 'forecast' || scen === 'projeção') normScenario = 'FORECAST';
+            else if (scen === 'otb') normScenario = 'OTB';
             else return;
 
             // Filter by versionId if applicable (ONLY FOR CURRENT YEAR)
@@ -727,7 +728,7 @@ export const getForecastData = (
     }
 
     // Optimized Helper using Index
-    const getImportedValue = (accountName: string, targetYear: number | undefined, valueCategory: 'Real' | 'Budget' | 'Previa' | 'Forecast', crFilter?: string) => {
+    const getImportedValue = (accountName: string, targetYear: number | undefined, valueCategory: 'Real' | 'Budget' | 'Previa' | 'Forecast' | 'Otb', crFilter?: string) => {
         if (!selectedMonth || !targetYear) return 0;
 
         const targetName = normalizeAccountName(accountName);
@@ -736,6 +737,7 @@ export const getForecastData = (
         if (valueCategory === 'Real') targetScenario = 'REAL';
         else if (valueCategory === 'Budget') targetScenario = 'BUDGET';
         else if (valueCategory === 'Previa') targetScenario = 'PREVIA';
+        else if (valueCategory === 'Otb') targetScenario = 'OTB';
         else targetScenario = 'FORECAST';
 
         const keysToCheck = new Set<string>();
@@ -766,6 +768,12 @@ export const getForecastData = (
         const r = getImportedValue(accountName, targetYear, 'Real', crFilter);
         const p = getImportedValue(accountName, targetYear, 'Previa', crFilter);
         return r !== 0 ? r : p;
+    };
+
+    // Despesas do balancete importadas pro passo 3 do wizard OTB — scenario próprio ('OTB'),
+    // sem fallback pra outro scenario (diferente de getPreviaOrReal).
+    const getOtbImportedValue = (accountName: string, crFilter?: string) => {
+        return getImportedValue(accountName, selectedYear, 'Otb', crFilter);
     };
 
     // Reunião de Ritmo/FCA N1/FCA N2/Fechamento oficial têm cada um seu próprio snapshot isolado
@@ -1083,15 +1091,19 @@ export const getForecastData = (
         let pkgPrevia = 0;
         let pkgReal = 0;
         let pkgLY = 0;
+        let pkgOtb = 0;
 
         pkgAccs.forEach(acc => {
             pkgBudget += getImportedValue(acc.name, selectedYear, 'Budget');
             pkgPrevia += getPreviaOrReal(acc.name, selectedYear);
             pkgReal += getImportedValue(acc.name, selectedYear, 'Forecast');
             pkgLY += getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
+            pkgOtb += getOtbImportedValue(acc.name);
         });
-        
-        rows.push(generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Package', pkgName, pkgBudget, pkgReal, pkgLY, pkgPrevia, true, false, 1));
+
+        const pkgRow = generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Package', pkgName, pkgBudget, pkgReal, pkgLY, pkgPrevia, true, false, 1);
+        pkgRow.otb = pkgOtb;
+        rows.push(pkgRow);
 
         // Add individual accounts
         pkgAccs.forEach(acc => {
@@ -1099,8 +1111,9 @@ export const getForecastData = (
             const accPrevia = getPreviaOrReal(acc.name, selectedYear);
             const accReal = getImportedValue(acc.name, selectedYear, 'Forecast');
             const accLY = getImportedValue(acc.name, (selectedYear || 0) - 1, 'Real');
+            const accOtb = getOtbImportedValue(acc.name);
 
-            rows.push(generateRow(
+            const accRow = generateRow(
                 acc.id || `acc-${masterName}-${pkgName}-${normalizeAccountName(acc.name)}`,
                 acc.code || '',
                 'Account',
@@ -1115,7 +1128,9 @@ export const getForecastData = (
                     type: acc.expenseType,
                     kpiCalculation: acc.kpiCalculation
                 }
-            ));
+            );
+            accRow.otb = accOtb;
+            rows.push(accRow);
         });
     });
 
@@ -1252,6 +1267,7 @@ export const getDynamicForecastData = (
             else if (scen === 'budget' || scen === 'meta' || scen === 'orcamento' || scen === 'orçamento') normScenario = 'BUDGET';
             else if (scen === 'previa' || scen === 'prévia' || scen === 'flash') normScenario = 'PREVIA';
             else if (scen === 'forecast' || scen === 'projeção') normScenario = 'FORECAST';
+            else if (scen === 'otb') normScenario = 'OTB';
             else return;
             const isCurrentYear = (rYear === selectedYear);
             if (row.versionId && isCurrentYear) {

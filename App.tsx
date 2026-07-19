@@ -1151,6 +1151,7 @@ const App: React.FC = () => {
               setValidations={setValidations}
               currentUser={currentUser}
               onNavigateToOccupancy={(otbMode) => { setOtbNavSignal(!!otbMode); setOccupancyNavMonth(selectedDate.getMonth() + 1); setCurrentView('occupancy_monthly'); }}
+              onImportData={handleImportData}
             />
           </div>
         </div>
@@ -1193,6 +1194,8 @@ const App: React.FC = () => {
           setActiveProjectionType={setActiveProjectionType}
           initialOtbMode={otbNavSignal}
           initialSelectedMonth={occupancyNavMonth || undefined}
+          financialData={importedFinancialData}
+          validations={validations}
         />
       );
       case 'comparatives': return <ComparativesView activeRealVersionName={activeRealVersionName} />;

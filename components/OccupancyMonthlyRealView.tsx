@@ -1,8 +1,10 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Save, CheckCircle } from 'lucide-react';
-import { User, UserRole, ProjectionType } from '../types';
+import { User, UserRole, ProjectionType, ImportedRow, ValidationRecord } from '../types';
 import { BudgetRow, BudgetOccupancyTable, geralRows, lazerRows, eventRows, OccupancyVersionOption, MEETING_VERSIONS, OWN_SNAPSHOT_VERSIONS } from './OccupancyView';
 import { VersionInfoBanner } from './VersionInfoBanner';
+import OtbProgressTimeline from './OtbProgressTimeline';
+import { computeOtbProgress } from '../utils/otbProgress';
 
 interface OccupancyMonthlyRealViewProps {
     selectedYear: number;
@@ -24,6 +26,10 @@ interface OccupancyMonthlyRealViewProps {
     // Mês ativo na DRE Forecast no momento de "Iniciar Projeção" — semeia o filtro de meses já
     // mostrando só esse mês, em vez dos 12.
     initialSelectedMonth?: number;
+    // Só pra timeline dos 8 passos (computeOtbProgress) — o passo "despesas da Prévia" fica
+    // sempre pendente aqui, já que essa tela não tem acesso às linhas da DRE Forecast.
+    financialData?: ImportedRow[];
+    validations?: ValidationRecord[];
 }
 
 // Rótulo curto de cada Versão do Forecast pra exibir nos botões/badge (mesmo padrão do
@@ -91,7 +97,9 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
     activeProjectionType,
     setActiveProjectionType,
     initialOtbMode,
-    initialSelectedMonth
+    initialSelectedMonth,
+    financialData,
+    validations
 }) => {
     const canEditOccupancy = currentUser?.role === UserRole.ADMIN ||
         currentUser?.role === UserRole.ENTITY_MANAGER ||
@@ -118,6 +126,37 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
     // "On the books" é um MODO dentro de Reunião de Ritmo/FCA N1/FCA N2, não uma versão nova —
     // cada versão guarda seu próprio OTB isolado (chave de contexto com sufixo extra "__OTB").
     const [otbMode, setOtbMode] = useState(initialOtbMode || false);
+
+    // Timeline dos 8 passos — mesma condição de ForecastTable.tsx (baseada na Versão do Forecast
+    // ativa, não no toggle local "period", pra ficar consistente com a DRE Forecast).
+    const isMeetingVersion = !!activeProjectionType && MEETING_VERSIONS.includes(activeProjectionType);
+    const otbProgress = isMeetingVersion ? computeOtbProgress({
+        realOccupancyData,
+        financialData: financialData || [],
+        validations: validations || [],
+        hotel: selectedHotel,
+        year: selectedYear,
+        month: (initialSelectedMonth || 1),
+        versionId: activeRealVersionId || '',
+        projectionType: activeProjectionType!,
+    }) : [];
+    const handleOtbStepClick = (index: number) => {
+        if (index === 0) {
+            // Voltar pra DRE Forecast é o jeito de reabrir o wizard do dia OTB.
+            return;
+        }
+        if (index === 1) { setPeriod(activeProjectionType!); setOtbMode(true); }
+        else if (index === 3) { setPeriod(activeProjectionType!); setOtbMode(false); }
+        else if (index === 6) {
+            // Mesmo formato de chave que computeOtbProgress usa internamente (baseado em
+            // activeProjectionType, não no toggle local "period").
+            const key = `${selectedHotel}_${selectedYear}_${(initialSelectedMonth || 1)}_${activeRealVersionId || ''}__${activeProjectionType}__OTB`;
+            setRealOccupancyData(prev => {
+                const current = prev[key] || {};
+                return { ...prev, [key]: { ...current, '__validado_manual': current['__validado_manual'] ? 0 : 1 } };
+            });
+        }
+    };
     const handlePeriodChange = (value: OccupancyVersionOption) => {
         setPeriod(value);
         if (!MEETING_VERSIONS.includes(value)) setOtbMode(false);
@@ -728,6 +767,12 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
                         {visibleMonthsFilter.length === 12 ? 'Deselecionar Todos' : 'Selecionar Todos'}
                     </button>
                 </div>
+
+                {isMeetingVersion && (
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                        <OtbProgressTimeline completed={otbProgress} onStepClick={handleOtbStepClick} />
+                    </div>
+                )}
             </div>
         </div>
         </div>

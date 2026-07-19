@@ -6,6 +6,9 @@ import { evaluateFormula } from '../utils/formulaEngine';
 import { supabaseService } from '../services/supabaseService';
 import { VersionInfoBanner } from './VersionInfoBanner';
 import { MEETING_VERSIONS } from './OccupancyView';
+import OtbProgressTimeline from './OtbProgressTimeline';
+import BalanceteImportModal from './BalanceteImportModal';
+import { computeOtbProgress } from '../utils/otbProgress';
 import toast from 'react-hot-toast';
 
 interface ForecastTableProps {
@@ -38,6 +41,7 @@ interface ForecastTableProps {
     currentUser?: import('../types').User;
     dreConfigs?: Record<string, import('../types').DreSection[]>;
     onNavigateToOccupancy?: (otbMode?: boolean) => void;
+    onImportData?: (rows: ImportedRow[], mode: 'append' | 'replace') => void;
 }
 
 // --- UTILITÁRIOS MOVIDOS PARA FORA PARA EVITAR RE-RENDERIZAÇÕES DESNECESSÁRIAS ---
@@ -225,7 +229,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     setValidations,
     currentUser,
     dreConfigs,
-    onNavigateToOccupancy
+    onNavigateToOccupancy,
+    onImportData
 }) => {
     const canEditForecast = currentUser?.role === UserRole.ADMIN ||
         currentUser?.role === UserRole.ENTITY_MANAGER ||
@@ -733,6 +738,37 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         onNavigateToOccupancy?.(true);
     };
 
+    // Timeline dos 8 passos de montagem da projeção — só faz sentido pras 3 versões de reunião.
+    const [showBalanceteModal, setShowBalanceteModal] = useState(false);
+    const otbProgress = isMeetingVersion ? computeOtbProgress({
+        realOccupancyData,
+        financialData: financialData || [],
+        validations: validations || [],
+        forecastRows: data,
+        hotel: selectedHotel || '',
+        year: selectedYear || 0,
+        month: selectedMonth || 0,
+        versionId: activeRealVersionId || '',
+        projectionType: activeProjectionType!,
+    }) : [];
+
+    const handleOtbStepClick = (index: number) => {
+        if (index === 0 || index === 1) {
+            handleIniciarProjecao();
+        } else if (index === 2) {
+            setShowBalanceteModal(true);
+        } else if (index === 3) {
+            onNavigateToOccupancy?.(false);
+        } else if (index === 6) {
+            if (!setRealOccupancyData) return;
+            setRealOccupancyData(prev => {
+                const current = prev[otbContextKey] || {};
+                return { ...prev, [otbContextKey]: { ...current, '__validado_manual': current['__validado_manual'] ? 0 : 1 } };
+            });
+        }
+        // Passos 5 e 8 (índices 4 e 7) são só indicativos — a ação já está na própria tela.
+    };
+
     const handleSaveResultsDirectly = () => {
         setShowConfirmModal(true);
     };
@@ -877,6 +913,16 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             return recalculateTotals(newData, packages, accounts);
         });
 
+        // Marca o passo 6 da timeline OTB como concluído — só um sinalizador (não dá pra inferir
+        // "já calculou" a partir dos números, já que um valor calculado e um digitado manualmente
+        // ficam idênticos depois).
+        if (isMeetingVersion && setRealOccupancyData) {
+            setRealOccupancyData(prev => ({
+                ...prev,
+                [otbContextKey]: { ...(prev[otbContextKey] || {}), '__forecast_calculated': 1 }
+            }));
+        }
+
         setShowDetails(true);
         setShowAlertModal(true);
     };
@@ -1001,6 +1047,12 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                         )}
                     </div>
                 </div>
+
+                {isMeetingVersion && (
+                    <div className="px-5 py-2 border-b border-gray-200 bg-gray-50/50 shrink-0">
+                        <OtbProgressTimeline completed={otbProgress} onStepClick={handleOtbStepClick} />
+                    </div>
+                )}
 
                 {/* Bounded height so this box (not the whole page) scrolls internally — that's
                     what lets the sticky <thead> below actually stay pinned while scrolling
@@ -1434,7 +1486,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         <>
                                             {columnVisibility.otb && isMeetingVersion && (
                                                 <td style={textStyle} className="px-2 py-1 text-right border-r border-gray-100 tabular-nums bg-amber-50/30 truncate">
-                                                    {(row.category === 'Indicators' || row.category === 'Revenue') ? formatValue(row.otb, formatType) : '-'}
+                                                    {row.otb !== undefined ? formatValue(row.otb, formatType) : '-'}
                                                 </td>
                                             )}
                                             {columnVisibility.previa && (
@@ -2231,6 +2283,18 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 </div>
             )}
 
+            {showBalanceteModal && (
+                <BalanceteImportModal
+                    accounts={accounts}
+                    hotel={selectedHotel || ''}
+                    year={selectedYear || 0}
+                    month={selectedMonth || 0}
+                    versionId={activeRealVersionId || ''}
+                    onImportData={(rows, mode) => onImportData?.(rows, mode)}
+                    onClose={() => setShowBalanceteModal(false)}
+                />
+            )}
+
             {/* Custom Modals */}
             {showAlertModal && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
@@ -2625,6 +2689,24 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
         cstHead.budget = pkgRows.reduce((sum, p) => sum + p.budget, 0);
         cstHead.lastYear = pkgRows.reduce((sum, p) => sum + p.lastYear, 0);
         cstHead.previa = pkgRows.reduce((sum, p) => sum + (p.previa || 0), 0);
+        cstHead.otb = pkgRows.reduce((sum, p) => sum + (p.otb || 0), 0);
+    }
+
+    // GOP (com/sem dedução de impostos) na coluna OTB — só agora que CST-HEAD.otb (soma dos
+    // pacotes, alimentados pelo import do balancete) já está pronto. Mesma fórmula do bloco
+    // genérico de campos abaixo (RES-OP-*), só que fixo pro campo .otb.
+    {
+        const revTotalOtb = rowMap.get('REV-TOTAL')?.otb || 0;
+        const revImpOtb = rowMap.get('REV-IMP')?.otb || 0;
+        const cstHeadOtb = cstHead?.otb || 0;
+        const resOpSemImpOtb = rowMap.get('RES-OP-SEM-IMP');
+        if (resOpSemImpOtb) resOpSemImpOtb.otb = revTotalOtb - cstHeadOtb;
+        const resOpComImpOtb = rowMap.get('RES-OP-COM-IMP');
+        if (resOpComImpOtb) resOpComImpOtb.otb = revTotalOtb - revImpOtb - cstHeadOtb;
+        const resOpSemImpPctOtb = rowMap.get('RES-OP-SEM-IMP-PCT');
+        if (resOpSemImpPctOtb) resOpSemImpPctOtb.otb = revTotalOtb !== 0 ? ((revTotalOtb - cstHeadOtb) / revTotalOtb) * 100 : 0;
+        const resOpComImpPctOtb = rowMap.get('RES-OP-COM-IMP-PCT');
+        if (resOpComImpPctOtb) resOpComImpPctOtb.otb = revTotalOtb !== 0 ? ((revTotalOtb - revImpOtb - cstHeadOtb) / revTotalOtb) * 100 : 0;
     }
 
     // --- REVENUE & RESULTS CALCULATIONS ---
