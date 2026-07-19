@@ -100,8 +100,8 @@ const ValidationsView: React.FC<ValidationsViewProps> = ({ validations, hotels, 
               >
                 <option value="all">Todas</option>
                 <option value="Reunião de Ritmo">Reunião de Ritmo</option>
-                <option value="FCA N1">FCA N1</option>
                 <option value="FCA N2">FCA N2</option>
+                <option value="FCA N1">FCA N1</option>
                 <option value="Fechamento oficial">Fechamento oficial</option>
               </select>
             </div>

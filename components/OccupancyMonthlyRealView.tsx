@@ -21,6 +21,9 @@ interface OccupancyMonthlyRealViewProps {
     // Sinalizado pelo wizard "Iniciar Projeção" (OTB) na DRE Forecast — semeia o modo "On the
     // books" já ligado ao chegar aqui, mesmo padrão de activeProjectionType semeando `period`.
     initialOtbMode?: boolean;
+    // Mês ativo na DRE Forecast no momento de "Iniciar Projeção" — semeia o filtro de meses já
+    // mostrando só esse mês, em vez dos 12.
+    initialSelectedMonth?: number;
 }
 
 // Rótulo curto de cada Versão do Forecast pra exibir nos botões/badge (mesmo padrão do
@@ -87,7 +90,8 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
     onSaveOccupancy,
     activeProjectionType,
     setActiveProjectionType,
-    initialOtbMode
+    initialOtbMode,
+    initialSelectedMonth
 }) => {
     const canEditOccupancy = currentUser?.role === UserRole.ADMIN ||
         currentUser?.role === UserRole.ENTITY_MANAGER ||
@@ -95,7 +99,11 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
 
     const [decimalOverrides, setDecimalOverrides] = useState<Record<string, number>>({});
     const [savedIndicator, setSavedIndicator] = useState(false);
-    const [visibleMonthsFilter, setVisibleMonthsFilter] = useState<number[]>([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    // Semeado uma única vez a partir do mês ativo na DRE Forecast — assim "Iniciar Projeção" já
+    // chega aqui filtrado no mês certo, em vez de mostrar os 12 meses.
+    const [visibleMonthsFilter, setVisibleMonthsFilter] = useState<number[]>(
+        initialSelectedMonth ? [initialSelectedMonth - 1] : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    );
     // Semeado uma única vez a partir da Versão do Forecast ativa (mesmo padrão de
     // `initialSelectedHotel` em GMDView) — assim "Iniciar Projeção" na DRE Forecast já chega
     // aqui filtrado na versão certa.
@@ -646,7 +654,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
                 )}
             </div>
 
-            <div className="flex flex-wrap gap-4 mt-4 mb-6 items-center">
+            <div className="sticky top-0 z-20 -mx-8 px-8 py-3 mb-6 bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm flex flex-wrap gap-4 items-center">
                 <div className="flex items-center bg-gray-100 p-1 rounded-lg">
                     {PERIOD_ORDER.map(p => (
                         <button

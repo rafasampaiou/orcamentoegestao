@@ -139,6 +139,9 @@ const App: React.FC = () => {
   // books" já ligado ao chegar na Ocupação, mesmo mecanismo de activeProjectionType semeando
   // `period` lá.
   const [otbNavSignal, setOtbNavSignal] = useState(false);
+  // Mês que estava ativo na DRE Forecast no momento de "Iniciar Projeção" — semeia o filtro de
+  // meses da aba Ocupação, já mostrando só o mês em questão em vez dos 12.
+  const [occupancyNavMonth, setOccupancyNavMonth] = useState<number | null>(null);
 
   // --- REAL VERSIONING STATE ---
   const [realVersions, setRealVersions] = useState<BudgetVersion[]>([]);
@@ -1147,7 +1150,7 @@ const App: React.FC = () => {
               validations={validations}
               setValidations={setValidations}
               currentUser={currentUser}
-              onNavigateToOccupancy={(otbMode) => { setOtbNavSignal(!!otbMode); setCurrentView('occupancy_monthly'); }}
+              onNavigateToOccupancy={(otbMode) => { setOtbNavSignal(!!otbMode); setOccupancyNavMonth(selectedDate.getMonth() + 1); setCurrentView('occupancy_monthly'); }}
             />
           </div>
         </div>
@@ -1189,6 +1192,7 @@ const App: React.FC = () => {
           activeProjectionType={activeProjectionType}
           setActiveProjectionType={setActiveProjectionType}
           initialOtbMode={otbNavSignal}
+          initialSelectedMonth={occupancyNavMonth || undefined}
         />
       );
       case 'comparatives': return <ComparativesView activeRealVersionName={activeRealVersionName} />;

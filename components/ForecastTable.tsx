@@ -917,8 +917,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 className={`border rounded-md px-2 py-1 text-xs font-bold outline-none ${isMonthClosed ? 'bg-red-50 text-red-700 border-red-200' : 'bg-white border-gray-300 text-gray-700 focus:ring-0 focus:border-indigo-500'}`}
                             >
                                 <option value="Reunião de Ritmo">Reunião de Ritmo</option>
-                                <option value="FCA N1">FCA N1</option>
                                 <option value="FCA N2">FCA N2</option>
+                                <option value="FCA N1">FCA N1</option>
                                 <option value="Fechamento oficial">Fechamento</option>
                                 {currentUser?.role === UserRole.ADMIN && <option value="Realizado">Realizado</option>}
                             </select>

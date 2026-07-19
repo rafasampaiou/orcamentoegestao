@@ -3994,8 +3994,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[200px]"
               >
                 <option value="Reunião de Ritmo">Reunião de Ritmo</option>
-                <option value="FCA N1">FCA N1</option>
                 <option value="FCA N2">FCA N2</option>
+                <option value="FCA N1">FCA N1</option>
                 <option value="Fechamento oficial">Fechamento</option>
               </select>
             </div>
