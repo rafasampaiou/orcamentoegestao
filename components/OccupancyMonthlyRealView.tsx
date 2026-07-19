@@ -630,7 +630,10 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
         // (que, aninhado dentro do padding-top do <main> global, deixava uma fresta por onde uma
         // linha da tabela aparecia por cima do quadro). Aqui o cabeçalho nunca rola de verdade.
         <div className="h-full flex flex-col bg-gray-50">
-        <div className="px-8 pt-6 shrink-0">
+        {/* overflow-y hidden + scrollbar-gutter reserva o MESMO espaço da barra de rolagem real
+            da área abaixo (mesmo sem rolar aqui), pra ficar alinhado com ela em qualquer SO/navegador
+            em vez de chutar um valor fixo de pixels. */}
+        <div className="px-8 pt-6 shrink-0" style={{ overflowY: 'hidden', scrollbarGutter: 'stable both-edges' }}>
         <div className="max-w-[1600px] mx-auto px-8 pt-8 pb-6 bg-white shadow-sm border border-gray-200 rounded-2xl">
             <VersionInfoBanner versionName={activeRealVersionName} />
             <div className="mb-6 flex items-start justify-between">
@@ -729,7 +732,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
         </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-8 pt-6 pb-8">
+        <div className="flex-1 overflow-y-auto px-8 pt-6 pb-8" style={{ scrollbarGutter: 'stable both-edges' }}>
         <div className="max-w-[1600px] mx-auto">
 
             <BudgetOccupancyTable
