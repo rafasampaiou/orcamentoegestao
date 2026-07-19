@@ -626,8 +626,11 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
     };
 
     return (
-        <div className="p-8 max-w-[1600px] mx-auto">
-            <div className="sticky top-0 z-20 -mx-8 px-8 pt-8 -mt-8 pb-3 mb-6 bg-white border-b border-gray-200 shadow-sm">
+        // Cabeçalho + filtros ficam FORA da área que rola — evita depender de position:sticky
+        // (que, aninhado dentro do padding-top do <main> global, deixava uma fresta por onde uma
+        // linha da tabela aparecia por cima do quadro). Aqui o cabeçalho nunca rola de verdade.
+        <div className="h-full flex flex-col">
+        <div className="px-8 pt-8 shrink-0 w-full max-w-[1600px] mx-auto">
             <VersionInfoBanner versionName={activeRealVersionName} />
             <div className="mb-6 flex items-start justify-between">
                 <div>
@@ -722,7 +725,10 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
                     </button>
                 </div>
             </div>
-            </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-8 pb-8">
+        <div className="max-w-[1600px] mx-auto">
 
             <BudgetOccupancyTable
                 title="Geral"
@@ -757,6 +763,8 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
                 isRealMode={true}
                 visibleMonths={visibleMonthsFilter}
             />
+        </div>
+        </div>
         </div>
     );
 };
