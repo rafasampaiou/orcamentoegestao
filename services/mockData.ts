@@ -1014,7 +1014,11 @@ export const getForecastData = (
     const valRealTS = getRealOccValue('geral_cancel_ts_forecast') || 0;
     const valPreviaTS = getRealOccValue('geral_cancel_ts_previa') || 0;
     const valLYTS = getLYOccValue('geral_cancel_ts_forecast') || 0;
-    rows.push(generateRow('REV-TIME', '1.03', 'Revenue', 'CANCELAMENTO DE TIME SHARE', valBudgetTS, valRealTS, valLYTS, valPreviaTS, true, false, 1));
+    const revTimeRow = generateRow('REV-TIME', '1.03', 'Revenue', 'CANCELAMENTO DE TIME SHARE', valBudgetTS, valRealTS, valLYTS, valPreviaTS, true, false, 1);
+    // "Outras Receitas Hoteleiras" (3.01.03.01) do balancete importado (passo 3 do wizard OTB)
+    // alimenta esta linha direto na coluna OTB — sem esse import, fica sem valor mesmo.
+    revTimeRow.otb = getOtbOccValue('__balancete_time_share');
+    rows.push(revTimeRow);
 
     // 1.04 Receita de ISS
     const valBudgetISS = budgetOccupancyData['geral_iss_rev'] ? budgetOccupancyData['geral_iss_rev'][monthIdx] : 0;
@@ -1030,13 +1034,18 @@ export const getForecastData = (
     const valRealImp = getRealOccValue('geral_impostos_forecast') || 0;
     const valPreviaImp = getRealOccValue('geral_impostos_previa') || 0;
     const valLYImp = getLYOccValue('geral_impostos_forecast') || 0;
-    rows.push(generateRow('REV-IMP', '1.05', 'Revenue', 'IMPOSTOS', valBudgetImp, valRealImp, valLYImp, valPreviaImp, true, true, 0, undefined, {
+    const revImpRow = generateRow('REV-IMP', '1.05', 'Revenue', 'IMPOSTOS', valBudgetImp, valRealImp, valLYImp, valPreviaImp, true, true, 0, undefined, {
         // % de imposto sobre a receita = Imposto / Receita Bruta Total — auto-calculado na
         // Prévia a partir do % da Meta (ver recalculateTotals em ForecastTable.tsx), mas
         // editável diretamente na célula de KPI (mesmo mecanismo das contas Variável).
         kpiCalculation: { formula: '@[IMPOSTOS] / @[RECEITA BRUTA TOTAL]', format: 'percent' },
         format: 'currency'
-    }));
+    });
+    // "Imposto" (3.01.04.02) do balancete importado alimenta a coluna OTB direto — sem esse
+    // import, o bloco de recalculateTotals em ForecastTable.tsx cai pra uma estimativa (% da Meta).
+    const balanceteImposto = getOtbOccValue('__balancete_imposto');
+    if (balanceteImposto !== undefined) revImpRow.otb = balanceteImposto;
+    rows.push(revImpRow);
 
     rows.push(generateRow('SPACER-AFTER-IMP', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
 
@@ -1102,7 +1111,11 @@ export const getForecastData = (
         });
 
         const pkgRow = generateRow(`p-${masterName}-${pkgName}`, pkgCode, 'Package', pkgName, pkgBudget, pkgReal, pkgLY, pkgPrevia, true, false, 1);
-        pkgRow.otb = pkgOtb;
+        // O balancete pode trazer um lançamento direto no nível do Pacote (casado pelo código do
+        // pacote, não de uma conta individual) — quando existe, ele MANDA sozinho, nunca soma com
+        // as contas de baixo (senão contaria a mesma despesa duas vezes).
+        const pkgDirectOtb = getOtbImportedValue(pkgName);
+        pkgRow.otb = pkgDirectOtb || pkgOtb;
         rows.push(pkgRow);
 
         // Add individual accounts

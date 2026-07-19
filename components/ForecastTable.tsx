@@ -2295,15 +2295,19 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             )}
 
             {showBalanceteModal && (
-                <BalanceteImportModal
-                    accounts={accounts}
-                    hotel={selectedHotel || ''}
-                    year={selectedYear || 0}
-                    month={selectedMonth || 0}
-                    versionId={activeRealVersionId || ''}
-                    onImportData={(rows, mode) => onImportData?.(rows, mode)}
-                    onClose={() => setShowBalanceteModal(false)}
-                />
+                setRealOccupancyData && (
+                    <BalanceteImportModal
+                        accounts={accounts}
+                        hotel={selectedHotel || ''}
+                        year={selectedYear || 0}
+                        month={selectedMonth || 0}
+                        versionId={activeRealVersionId || ''}
+                        otbContextKey={otbContextKey}
+                        setRealOccupancyData={setRealOccupancyData}
+                        onImportData={(rows, mode) => onImportData?.(rows, mode)}
+                        onClose={() => setShowBalanceteModal(false)}
+                    />
+                )
             )}
 
             {/* Custom Modals */}
@@ -2626,7 +2630,9 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
         const revTotalRowOtb = rowMap.get('REV-TOTAL');
         if (revTotalRowOtb) revTotalRowOtb.otb = sumOtb(['REV-APT', 'REV-EXTRA', 'REV-TIME', 'REV-ISS']);
         const impRowOtb = rowMap.get('REV-IMP');
-        if (impRowOtb && revTotalRowOtb) {
+        if (impRowOtb && revTotalRowOtb && impRowOtb.otb === undefined) {
+            // Só cai pra essa estimativa (% da Meta) enquanto o balancete ainda não trouxe o
+            // valor real do Imposto (services/mockData.ts já preenche .otb direto quando existe).
             const impostoRateOtb = revTotalRowOtb.budget ? (impRowOtb.budget || 0) / revTotalRowOtb.budget : 0;
             impRowOtb.otb = impostoRateOtb * (revTotalRowOtb.otb || 0);
         }
