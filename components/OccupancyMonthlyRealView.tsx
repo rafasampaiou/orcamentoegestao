@@ -627,7 +627,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
 
     return (
         <div className="p-8 max-w-[1600px] mx-auto">
-            <div className="sticky top-0 z-20 -mx-8 px-8 pt-8 -mt-8 pb-3 mb-6 bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm">
+            <div className="sticky top-0 z-20 -mx-8 px-8 pt-8 -mt-8 pb-3 mb-6 bg-white border-b border-gray-200 shadow-sm">
             <VersionInfoBanner versionName={activeRealVersionName} />
             <div className="mb-6 flex items-start justify-between">
                 <div>
