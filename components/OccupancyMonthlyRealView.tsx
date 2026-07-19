@@ -627,6 +627,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
 
     return (
         <div className="p-8 max-w-[1600px] mx-auto">
+            <div className="sticky top-0 z-20 -mx-8 px-8 pt-8 -mt-8 pb-3 mb-6 bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm">
             <VersionInfoBanner versionName={activeRealVersionName} />
             <div className="mb-6 flex items-start justify-between">
                 <div>
@@ -654,7 +655,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
                 )}
             </div>
 
-            <div className="sticky top-0 z-20 -mx-8 px-8 py-3 mb-6 bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm flex flex-wrap gap-4 items-center">
+            <div className="flex flex-wrap gap-4 items-center">
                 <div className="flex items-center bg-gray-100 p-1 rounded-lg">
                     {PERIOD_ORDER.map(p => (
                         <button
@@ -720,6 +721,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
                         {visibleMonthsFilter.length === 12 ? 'Deselecionar Todos' : 'Selecionar Todos'}
                     </button>
                 </div>
+            </div>
             </div>
 
             <BudgetOccupancyTable
