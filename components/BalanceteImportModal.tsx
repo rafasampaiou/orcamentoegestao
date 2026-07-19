@@ -23,17 +23,23 @@ interface BalanceteImportModalProps {
 const IMPOSTO_CODE = '3.01.04.02';
 const TIME_SHARE_CODE = '3.01.03.01';
 
+// "Setores" (Pacotes Master) que ganham card de total próprio, além do total geral de despesas.
+const SECTOR_NAMES = ['Mais Tauá', 'Instituto Tauá', 'Pós Venda'];
+const normalizeName = (s: string) => s.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
 interface DespesaRow {
     hierarquico: string;
     descricao: string;
     movimento: number;
     matchLevel: 'account' | 'package' | 'master' | null;
     matchedName: string | null;
+    masterPackage: string | null;
 }
 
 interface ParsedBalancete {
     ativoTotal: number;
     passivoTotal: number;
+    receitaTotal: number;
     impostoVal: number;
     timeShareVal: number;
     despesas: DespesaRow[];
@@ -47,16 +53,20 @@ const findKey = (row: Record<string, any>, candidates: string[]): string | undef
     return keys.find(k => candidates.some(c => norm(k) === norm(c)));
 };
 
+// Só a quantidade de dígitos do código importa aqui (ignora os pontos) — um código raso demais
+// como "4.02" (3 dígitos) é um totalizador de pacote/master, não uma conta de fato.
+const digitCount = (code: string) => code.replace(/\D/g, '').length;
+
 // Casa o código pelo Plano de Contas em 3 níveis (conta > pacote > pacote master, nessa ordem de
 // prioridade) — os códigos de pacote/master são campos denormalizados em cada Account
 // (packageCode/masterPackageCode), não existe um cadastro de pacote separado.
-const matchByCode = (hierarquico: string, accounts: Account[]): { level: 'account' | 'package' | 'master'; name: string } | null => {
+const matchByCode = (hierarquico: string, accounts: Account[]): { level: 'account' | 'package' | 'master'; name: string; outOfScope: boolean; masterPackage: string | null } | null => {
     const acc = accounts.find(a => (a.code || '').trim() === hierarquico);
-    if (acc) return { level: 'account', name: acc.name };
+    if (acc) return { level: 'account', name: acc.name, outOfScope: !!acc.outOfScope, masterPackage: acc.masterPackage || null };
     const pkgAcc = accounts.find(a => (a.packageCode || '').trim() === hierarquico);
-    if (pkgAcc) return { level: 'package', name: pkgAcc.package || '' };
+    if (pkgAcc) return { level: 'package', name: pkgAcc.package || '', outOfScope: !!pkgAcc.outOfScope, masterPackage: pkgAcc.masterPackage || null };
     const masterAcc = accounts.find(a => (a.masterPackageCode || '').trim() === hierarquico);
-    if (masterAcc) return { level: 'master', name: masterAcc.masterPackage || '' };
+    if (masterAcc) return { level: 'master', name: masterAcc.masterPackage || '', outOfScope: !!masterAcc.outOfScope, masterPackage: masterAcc.masterPackage || null };
     return null;
 };
 
@@ -89,6 +99,7 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
 
         let ativoTotal = 0;
         let passivoTotal = 0;
+        let receitaTotal = 0;
         let impostoVal = 0;
         let timeShareVal = 0;
         const despesas: DespesaRow[] = [];
@@ -97,36 +108,57 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
             const hierarquico = String(r[hierKey] ?? '').trim();
             const descricao = String(r[descKey] ?? '').trim();
             const movimentoRaw = r[movKey];
-            const movimento = typeof movimentoRaw === 'number' ? movimentoRaw : parseFloat(String(movimentoRaw ?? '0').replace(',', '.')) || 0;
+            const rawMovimento = typeof movimentoRaw === 'number' ? movimentoRaw : parseFloat(String(movimentoRaw ?? '0').replace(',', '.')) || 0;
+            // O balancete vem com o sinal invertido em relação à DRE Forecast — já corrige aqui,
+            // pra tudo que aparece na tela (e o que é gravado) já estar no sinal certo.
+            const movimento = -rawMovimento;
             if (!hierarquico) return;
 
-            // 1 (Ativo) e 2 (Passivo) — só um resumo pra referência, não entram no import nem nos cards.
+            // 1 (Ativo) e 2 (Passivo) — só um resumo pra referência, não entram no import.
             if (hierarquico.startsWith('1')) { ativoTotal += movimento; return; }
             if (hierarquico.startsWith('2')) { passivoTotal += movimento; return; }
 
-            // 3 — só os 2 códigos fixos interessam (alimentam Imposto/Cancelamento de Time Share);
-            // qualquer outro código "3" é ignorado.
+            // 3 (Receita) — total geral é só referência; só os 2 códigos fixos abaixo alimentam
+            // linhas de verdade na DRE (Imposto / Cancelamento de Time Share).
             if (hierarquico.startsWith('3')) {
+                receitaTotal += movimento;
                 if (hierarquico === IMPOSTO_CODE) impostoVal += movimento;
                 else if (hierarquico === TIME_SHARE_CODE) timeShareVal += movimento;
                 return;
             }
 
-            // 4 — despesas do Plano de Contas, casadas por código (conta, pacote ou pacote master).
+            // 4 (Despesa) — casa pelo código no Plano de Contas (conta, pacote ou pacote master).
             if (hierarquico.startsWith('4')) {
+                if (digitCount(hierarquico) <= 3) return; // código raso (ex.: "4.02"), ignora
                 const match = matchByCode(hierarquico, accounts);
-                despesas.push({ hierarquico, descricao, movimento, matchLevel: match?.level || null, matchedName: match?.name || null });
+                if (match?.outOfScope) return; // conta/pacote marcado "Fora do escopo", nem mostra
+                despesas.push({
+                    hierarquico,
+                    descricao,
+                    movimento,
+                    matchLevel: match?.level || null,
+                    matchedName: match?.name || null,
+                    masterPackage: match?.masterPackage || null,
+                });
                 return;
             }
             // Outros prefixos (5, 6...): fora do escopo pedido, ignorados.
         });
 
-        setParsed({ ativoTotal, passivoTotal, impostoVal, timeShareVal, despesas });
+        setParsed({ ativoTotal, passivoTotal, receitaTotal, impostoVal, timeShareVal, despesas });
     };
 
     const matchedDespesas = parsed?.despesas.filter(r => r.matchLevel) || [];
     const unmatchedCount = (parsed?.despesas.length || 0) - matchedDespesas.length;
     const despesasTotal = matchedDespesas.reduce((s, r) => s + r.movimento, 0);
+
+    const sectorTotals: Record<string, number> = {};
+    SECTOR_NAMES.forEach(name => { sectorTotals[name] = 0; });
+    matchedDespesas.forEach(r => {
+        if (!r.masterPackage) return;
+        const match = SECTOR_NAMES.find(name => normalizeName(name) === normalizeName(r.masterPackage!));
+        if (match) sectorTotals[match] += r.movimento;
+    });
 
     const levelLabel = (level: DespesaRow['matchLevel']) => {
         if (level === 'account') return 'Conta';
@@ -209,6 +241,14 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
                                     <span className="text-[10px] text-emerald-400">Linha Cancelamento de Time Share, coluna OTB</span>
                                 </div>
                             </div>
+                            <div className="grid grid-cols-3 gap-4">
+                                {SECTOR_NAMES.map(name => (
+                                    <div key={name} className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                                        <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wide">Setor {name}</span>
+                                        <div className="text-xl font-bold text-gray-800 tabular-nums mt-1">{sectorTotals[name].toLocaleString('pt-BR')}</div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     ) : !parsed ? (
                         <label className="flex flex-col items-center justify-center gap-3 border-2 border-dashed border-gray-300 rounded-xl p-10 cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/30 transition-colors">
@@ -232,7 +272,7 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
                                 )}
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3 mb-4 text-xs">
+                            <div className="grid grid-cols-4 gap-3 mb-4 text-xs">
                                 <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
                                     <span className="text-gray-500 font-bold uppercase">1 Ativo</span>
                                     <div className="tabular-nums font-medium text-gray-700">{parsed.ativoTotal.toLocaleString('pt-BR')}</div>
@@ -240,6 +280,14 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
                                 <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
                                     <span className="text-gray-500 font-bold uppercase">2 Passivo</span>
                                     <div className="tabular-nums font-medium text-gray-700">{parsed.passivoTotal.toLocaleString('pt-BR')}</div>
+                                </div>
+                                <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                                    <span className="text-gray-500 font-bold uppercase">3 Receita</span>
+                                    <div className="tabular-nums font-medium text-gray-700">{parsed.receitaTotal.toLocaleString('pt-BR')}</div>
+                                </div>
+                                <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                                    <span className="text-gray-500 font-bold uppercase">4 Despesa (escopo)</span>
+                                    <div className="tabular-nums font-medium text-gray-700">{despesasTotal.toLocaleString('pt-BR')}</div>
                                 </div>
                             </div>
 
