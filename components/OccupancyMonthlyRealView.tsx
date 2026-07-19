@@ -30,6 +30,9 @@ interface OccupancyMonthlyRealViewProps {
     // sempre pendente aqui, já que essa tela não tem acesso às linhas da DRE Forecast.
     financialData?: ImportedRow[];
     validations?: ValidationRecord[];
+    // Passos da timeline que só existem na DRE Forecast (balancete, despesas da Prévia, Calcular
+    // Forecast, Salvar Projeção) navegam pra lá quando clicados a partir daqui.
+    onNavigateToForecast?: () => void;
 }
 
 // Rótulo curto de cada Versão do Forecast pra exibir nos botões/badge (mesmo padrão do
@@ -99,7 +102,8 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
     initialOtbMode,
     initialSelectedMonth,
     financialData,
-    validations
+    validations,
+    onNavigateToForecast
 }) => {
     const canEditOccupancy = currentUser?.role === UserRole.ADMIN ||
         currentUser?.role === UserRole.ENTITY_MANAGER ||
@@ -140,9 +144,12 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
         versionId: activeRealVersionId || '',
         projectionType: activeProjectionType!,
     }) : [];
+    // Nenhum passo é bloqueado por ordem — clicável a qualquer momento. Passos 1, 3 e 7 vivem
+    // aqui na Ocupação; os outros (dia OTB, balancete, despesas da Prévia, Calcular Forecast,
+    // Salvar Projeção) vivem na DRE Forecast, então navegam pra lá.
     const handleOtbStepClick = (index: number) => {
-        if (index === 0) {
-            // Voltar pra DRE Forecast é o jeito de reabrir o wizard do dia OTB.
+        if (index === 0 || index === 2 || index === 4 || index === 5 || index === 7) {
+            onNavigateToForecast?.();
             return;
         }
         if (index === 1) { setPeriod(activeProjectionType!); setOtbMode(true); }
@@ -770,7 +777,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
 
                 {isMeetingVersion && (
                     <div className="mt-3 pt-3 border-t border-gray-100">
-                        <OtbProgressTimeline completed={otbProgress} onStepClick={handleOtbStepClick} />
+                        <OtbProgressTimeline completed={otbProgress} onStepClick={handleOtbStepClick} title="Status da prévia" />
                     </div>
                 )}
             </div>

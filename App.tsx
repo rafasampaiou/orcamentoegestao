@@ -1196,6 +1196,7 @@ const App: React.FC = () => {
           initialSelectedMonth={occupancyNavMonth || undefined}
           financialData={importedFinancialData}
           validations={validations}
+          onNavigateToForecast={() => setCurrentView('dashboard')}
         />
       );
       case 'comparatives': return <ComparativesView activeRealVersionName={activeRealVersionName} />;

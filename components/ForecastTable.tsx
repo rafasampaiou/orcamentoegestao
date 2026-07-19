@@ -752,21 +752,32 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         projectionType: activeProjectionType!,
     }) : [];
 
+    // Nenhum passo é bloqueado por ordem — o usuário pode clicar em qualquer etapa a qualquer
+    // momento pra editar/refazer, mesmo fora de sequência.
     const handleOtbStepClick = (index: number) => {
-        if (index === 0 || index === 1) {
-            handleIniciarProjecao();
+        if (index === 0) {
+            // Sempre reabre o wizard (mesmo se o dia já tiver sido escolhido antes) pra dar pra
+            // trocar o dia de corte quando quiser.
+            setOtbDayPicked(otbDaySaved ?? null);
+            setShowOtbWizard(true);
+        } else if (index === 1) {
+            onNavigateToOccupancy?.(true);
         } else if (index === 2) {
             setShowBalanceteModal(true);
         } else if (index === 3) {
             onNavigateToOccupancy?.(false);
+        } else if (index === 5) {
+            handleCalcularForecast();
         } else if (index === 6) {
             if (!setRealOccupancyData) return;
             setRealOccupancyData(prev => {
                 const current = prev[otbContextKey] || {};
                 return { ...prev, [otbContextKey]: { ...current, '__validado_manual': current['__validado_manual'] ? 0 : 1 } };
             });
+        } else if (index === 7) {
+            handleSaveResultsDirectly();
         }
-        // Passos 5 e 8 (índices 4 e 7) são só indicativos — a ação já está na própria tela.
+        // Passo 5 (índice 4, despesas da Prévia) não navega — já está nesta mesma tela.
     };
 
     const handleSaveResultsDirectly = () => {
@@ -1050,7 +1061,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
                 {isMeetingVersion && (
                     <div className="px-5 py-2 border-b border-gray-200 bg-gray-50/50 shrink-0">
-                        <OtbProgressTimeline completed={otbProgress} onStepClick={handleOtbStepClick} />
+                        <OtbProgressTimeline completed={otbProgress} onStepClick={handleOtbStepClick} title="Status da prévia" />
                     </div>
                 )}
 
