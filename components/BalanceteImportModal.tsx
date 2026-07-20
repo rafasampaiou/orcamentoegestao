@@ -176,9 +176,22 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
         if (!parsed) return;
         setIsSaving(true);
         try {
-            // A coluna import_id em financial_data é do tipo uuid — "otb-balancete-<timestamp>"
-            // dava erro de sintaxe inválida no Postgres, precisa ser um UUID de verdade.
-            const importId = crypto.randomUUID();
+            // financial_data.import_id tem uma foreign key pra import_history — não basta gerar
+            // um UUID solto (violava a constraint), precisa existir de fato um registro lá antes,
+            // igual todo outro import do sistema já faz (recordImportHistory).
+            const monthName = new Date(2024, (month || 1) - 1).toLocaleString('pt-BR', { month: 'short' });
+            const valorTotal = matchedDespesas.reduce((s, r) => s + Math.abs(r.movimento), 0) + Math.abs(parsed.impostoVal) + Math.abs(parsed.timeShareVal);
+            const [historyEntry] = await supabaseService.saveImportHistory([{
+                hotel,
+                tipo: 'Despesa',
+                ano: year,
+                meses: monthName,
+                version_id: versionId || null,
+                user_id: null,
+                valor_total: valorTotal,
+            }]);
+            const importId = historyEntry.id;
+
             // Só as linhas "4" com correspondência no Plano de Contas viram lançamento — sem
             // conta/pacote pra atribuir, o valor fica de fora (mas continua visível na prévia).
             const importedRows: ImportedRow[] = matchedDespesas.map(r => ({
