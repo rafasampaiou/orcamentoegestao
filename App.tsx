@@ -1349,6 +1349,7 @@ const App: React.FC = () => {
 
   return (
     <div className="flex bg-gray-50 min-h-screen font-['Inter',sans-serif]">
+      <Toaster position="top-right" />
       <Sidebar
         currentView={currentView}
         currentModule={currentModule}
