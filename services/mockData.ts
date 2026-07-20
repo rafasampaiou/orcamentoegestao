@@ -863,9 +863,10 @@ export const getForecastData = (
     const gMoTotalPrevia = gMoCltPrevia + gMoExtraPrevia;
     const gMoTotalLY = gMoCltLY + gMoExtraLY;
 
-    // OTB (On the books) — mesmo padrão dos outros indicadores acima.
-    const gMoCltOtb = getOtbOccValue('geral_mo_clt_previa') ?? 0;
-    const gMoExtraOtb = getOtbOccValue('geral_mo_extra_previa') ?? 0;
+    // OTB (On the books) — Mão de obra parte da Meta igual Real/Prévia acima (diferente dos
+    // demais indicadores OTB, que exigem preenchimento de verdade).
+    const gMoCltOtb = getOtbOccValue('geral_mo_clt_previa') ?? moCltMetaFallback;
+    const gMoExtraOtb = getOtbOccValue('geral_mo_extra_previa') ?? moExtraMetaFallback;
     const gMoTotalOtb = gMoCltOtb + gMoExtraOtb;
 
     // Retrieve budget values from budgetOccupancyData based on the selectedMonth (0-indexed)
@@ -909,7 +910,9 @@ export const getForecastData = (
     const trevparReal = getRealOccValue('geral_trevpar_forecast') ?? 0;
     const trevparLY = getLYOccValue('geral_trevpar_forecast') ?? 0;
 
-    rows.push(generateRow('IND-DAYS', '', 'Indicators', 'Dias do mês', gDaysBudget, gDaysBudget, gDaysBudget, gDaysBudget, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS'));
+    const rowIndDays = generateRow('IND-DAYS', '', 'Indicators', 'Dias do mês', gDaysBudget, gDaysBudget, gDaysBudget, gDaysBudget, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS');
+    rowIndDays.otb = gDaysBudget;
+    rows.push(rowIndDays);
     const rowInd1 = generateRow('IND-1', '', 'Indicators', 'UH Disponível', gAvailBudget, gAvailReal, gAvailLY, gAvailPrevia, false, false, 0, undefined, { format: 'integer' }, 'INDICADORES GERAIS');
     rowInd1.otb = gAvailOtb;
     rows.push(rowInd1);
@@ -1048,7 +1051,12 @@ export const getForecastData = (
     const valRealISS = getRealOccValue('geral_iss_rev_forecast') || 0;
     const valPreviaISS = getRealOccValue('geral_iss_rev_previa') || 0;
     const valLYISS = getLYOccValue('geral_iss_rev_forecast') || 0;
-    rows.push(generateRow('REV-ISS', '1.04', 'Revenue', 'RECEITA DE ISS', valBudgetISS, valRealISS, valLYISS, valPreviaISS, true, false, 1));
+    const revIssRow = generateRow('REV-ISS', '1.04', 'Revenue', 'RECEITA DE ISS', valBudgetISS, valRealISS, valLYISS, valPreviaISS, true, false, 1);
+    // "Receitas de ISS" (3.01.01.02.008) do balancete importado alimenta esta linha direto na
+    // coluna OTB — mesmo padrão de Imposto/Time Share acima.
+    const balanceteIss = getOtbOccValue('__balancete_iss');
+    if (balanceteIss !== undefined) revIssRow.otb = balanceteIss;
+    rows.push(revIssRow);
 
     rows.push(generateRow('SPACER-BEFORE-IMP', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
 

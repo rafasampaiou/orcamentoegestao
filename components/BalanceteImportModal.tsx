@@ -22,6 +22,7 @@ interface BalanceteImportModalProps {
 // em vez de ficarem misturados no total genérico de despesas.
 const IMPOSTO_CODE = '3.01.04.02';
 const TIME_SHARE_CODE = '3.01.03.01';
+const ISS_CODE = '3.01.01.02.008';
 
 // "Setores" (Pacotes Master) que ganham card de total próprio, além do total geral de despesas.
 const SECTOR_NAMES = ['Mais Tauá', 'Instituto Tauá', 'Pós Venda'];
@@ -42,6 +43,7 @@ interface ParsedBalancete {
     receitaTotal: number;
     impostoVal: number;
     timeShareVal: number;
+    issVal: number;
     despesas: DespesaRow[];
 }
 
@@ -102,6 +104,7 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
         let receitaTotal = 0;
         let impostoVal = 0;
         let timeShareVal = 0;
+        let issVal = 0;
         const despesas: DespesaRow[] = [];
 
         json.forEach(r => {
@@ -118,9 +121,10 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
             if (hierarquico.startsWith('1')) { ativoTotal += movimento; return; }
             if (hierarquico.startsWith('2')) { passivoTotal += movimento; return; }
 
-            // 3 (Receita) — total geral é só referência; só os 2 códigos fixos abaixo alimentam
-            // linhas de verdade na DRE (Imposto / Cancelamento de Time Share). "Outras Receitas
-            // Hoteleiras" (Time Share) é a única exceção que NÃO inverte o sinal do balancete.
+            // 3 (Receita) — total geral é só referência; só os 3 códigos fixos abaixo alimentam
+            // linhas de verdade na DRE (Imposto / Cancelamento de Time Share / Receita de ISS).
+            // "Outras Receitas Hoteleiras" (Time Share) é a única exceção que NÃO inverte o sinal
+            // do balancete.
             if (hierarquico.startsWith('3')) {
                 if (hierarquico === TIME_SHARE_CODE) {
                     receitaTotal += rawMovimento;
@@ -128,6 +132,7 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
                 } else {
                     receitaTotal += movimento;
                     if (hierarquico === IMPOSTO_CODE) impostoVal += movimento;
+                    if (hierarquico === ISS_CODE) issVal += movimento;
                 }
                 return;
             }
@@ -150,7 +155,7 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
             // Outros prefixos (5, 6...): fora do escopo pedido, ignorados.
         });
 
-        setParsed({ ativoTotal, passivoTotal, receitaTotal, impostoVal, timeShareVal, despesas });
+        setParsed({ ativoTotal, passivoTotal, receitaTotal, impostoVal, timeShareVal, issVal, despesas });
     };
 
     const matchedDespesas = parsed?.despesas.filter(r => r.matchLevel) || [];
@@ -180,7 +185,7 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
             // um UUID solto (violava a constraint), precisa existir de fato um registro lá antes,
             // igual todo outro import do sistema já faz (recordImportHistory).
             const monthName = new Date(2024, (month || 1) - 1).toLocaleString('pt-BR', { month: 'short' });
-            const valorTotal = matchedDespesas.reduce((s, r) => s + Math.abs(r.movimento), 0) + Math.abs(parsed.impostoVal) + Math.abs(parsed.timeShareVal);
+            const valorTotal = matchedDespesas.reduce((s, r) => s + Math.abs(r.movimento), 0) + Math.abs(parsed.impostoVal) + Math.abs(parsed.timeShareVal) + Math.abs(parsed.issVal);
             const [historyEntry] = await supabaseService.saveImportHistory([{
                 hotel,
                 tipo: 'Despesa',
@@ -212,14 +217,15 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
                 onImportData(importedRows, 'append');
             }
 
-            // Imposto e Cancelamento de Time Share não são "contas" — vão direto no mesmo bucket
-            // do dia OTB, de onde a DRE Forecast lê o valor pronto pra essas 2 linhas específicas.
+            // Imposto, Cancelamento de Time Share e Receita de ISS não são "contas" — vão direto no
+            // mesmo bucket do dia OTB, de onde a DRE Forecast lê o valor pronto pra essas 3 linhas.
             setRealOccupancyData(prev => ({
                 ...prev,
                 [otbContextKey]: {
                     ...(prev[otbContextKey] || {}),
                     '__balancete_imposto': parsed.impostoVal,
                     '__balancete_time_share': parsed.timeShareVal,
+                    '__balancete_iss': parsed.issVal,
                 }
             }));
 
@@ -244,7 +250,7 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
                     {imported && parsed ? (
                         <div className="space-y-4">
                             <p className="text-sm text-gray-600">Balancete importado com sucesso. Resumo do que foi para a DRE Forecast (coluna OTB):</p>
-                            <div className="grid grid-cols-3 gap-4">
+                            <div className="grid grid-cols-4 gap-4">
                                 <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
                                     <span className="text-[10px] text-indigo-500 font-bold uppercase tracking-wide">Total despesas (código 4)</span>
                                     <div className="text-xl font-bold text-indigo-900 tabular-nums mt-1">{despesasTotal.toLocaleString('pt-BR')}</div>
@@ -259,6 +265,11 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
                                     <span className="text-[10px] text-emerald-500 font-bold uppercase tracking-wide">Outras Receitas Hoteleiras ({TIME_SHARE_CODE})</span>
                                     <div className="text-xl font-bold text-emerald-900 tabular-nums mt-1">{parsed.timeShareVal.toLocaleString('pt-BR')}</div>
                                     <span className="text-[10px] text-emerald-400">Linha Cancelamento de Time Share, coluna OTB</span>
+                                </div>
+                                <div className="bg-teal-50 border border-teal-200 rounded-xl p-4">
+                                    <span className="text-[10px] text-teal-500 font-bold uppercase tracking-wide">Receitas de ISS ({ISS_CODE})</span>
+                                    <div className="text-xl font-bold text-teal-900 tabular-nums mt-1">{parsed.issVal.toLocaleString('pt-BR')}</div>
+                                    <span className="text-[10px] text-teal-400">Linha Receita de ISS, coluna OTB</span>
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 gap-4">
@@ -333,6 +344,12 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
                                             <td className="px-3 py-1.5">OUTRAS RECEITAS HOTELEIRAS</td>
                                             <td className="px-3 py-1.5 text-sky-700 font-bold">Cancelamento de Time Share (DRE, coluna OTB)</td>
                                             <td className="px-3 py-1.5 text-right tabular-nums">{parsed.timeShareVal.toLocaleString('pt-BR')}</td>
+                                        </tr>
+                                        <tr className="bg-sky-50">
+                                            <td className="px-3 py-1.5 font-mono">{ISS_CODE}</td>
+                                            <td className="px-3 py-1.5">RECEITAS DE ISS</td>
+                                            <td className="px-3 py-1.5 text-sky-700 font-bold">Receita de ISS (DRE, coluna OTB)</td>
+                                            <td className="px-3 py-1.5 text-right tabular-nums">{parsed.issVal.toLocaleString('pt-BR')}</td>
                                         </tr>
                                         {parsed.despesas.map((r, i) => (
                                             <tr key={i} className={r.matchLevel ? '' : 'bg-amber-50'}>

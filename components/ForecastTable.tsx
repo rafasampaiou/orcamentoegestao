@@ -2755,6 +2755,19 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
         }
         const revNetRowOtb = rowMap.get('REV-NET');
         if (revNetRowOtb && revTotalRowOtb && impRowOtb) revNetRowOtb.otb = (revTotalRowOtb.otb || 0) - (impRowOtb.otb || 0);
+
+        // REVPAR/TREVPOR/TREVPAR na coluna OTB — mesma fórmula do bloco real/budget/previa acima,
+        // só que usando os indicadores/receitas já somados em .otb nesta mesma seção.
+        const availOtb = rowMap.get('IND-1')?.otb || 0;
+        const occOtb = rowMap.get('IND-2')?.otb || 0;
+        const revAptOtbVal = revAptRowOtb?.otb || 0;
+        const revExtraOtbVal = revExtraRowOtb?.otb || 0;
+        const revparRowOtb = rowMap.get('IND-6');
+        if (revparRowOtb) revparRowOtb.otb = availOtb > 0 ? revAptOtbVal / availOtb : 0;
+        const trevporRowOtb = rowMap.get('IND-TREVPOR');
+        if (trevporRowOtb) trevporRowOtb.otb = occOtb > 0 ? (revAptOtbVal + revExtraOtbVal) / occOtb : 0;
+        const trevparRowOtb = rowMap.get('IND-TREVPAR');
+        if (trevparRowOtb) trevparRowOtb.otb = availOtb > 0 ? (revAptOtbVal + revExtraOtbVal) / availOtb : 0;
     }
 
     // --- VARIABLE CALCULATIONS FOR INDIVIDUAL ACCOUNTS ---
