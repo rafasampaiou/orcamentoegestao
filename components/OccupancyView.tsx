@@ -474,6 +474,7 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
         lastYear: true,
         deltaLY: true,
         deltaLYPct: true,
+        driverOtb: false,
         driverPrevia: false,
         driverForecast: false,
         driverBudget: false,

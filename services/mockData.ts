@@ -992,36 +992,40 @@ export const getForecastData = (
     // KPI for Lazer/Eventos = Receita ÷ PAX do segmento. Precomputed directly (instead of via the
     // @[Label] formula engine) because "Lazer"/"Eventos" labels collide with Receita de
     // Apartamentos' own Lazer/Eventos rows, which would make a label lookup ambiguous.
-    const revExtraKpiSum = { previa: 0, real: 0, budget: 0 };
+    const revExtraKpiSum = { previa: 0, real: 0, budget: 0, otb: 0 };
 
     const revExtraItemRows = revExtraItems.map(item => {
         const valBudget = budgetOccupancyData[item.sourceId] ? budgetOccupancyData[item.sourceId][monthIdx] : 0;
         const valReal = getRealOccValue(`${item.sourceId}_forecast`) || 0;
         const valPrevia = getRealOccValue(`${item.sourceId}_previa`) || 0;
+        const valOtb = getOtbOccValue(`${item.sourceId}_previa`) || 0;
 
         let valLY = getLYOccValue(`${item.sourceId}_forecast`) || 0;
 
-        let precomputedKpi: { previa: number; real: number; budget: number; format: 'decimal'; denominator: { previa: number; real: number; budget: number } } | undefined;
+        let precomputedKpi: { previa: number; real: number; budget: number; otb: number; format: 'decimal'; denominator: { previa: number; real: number; budget: number; otb: number } } | undefined;
         if (item.paxSourceId) {
             const paxBudget = budgetOccupancyData[item.paxSourceId] ? budgetOccupancyData[item.paxSourceId][monthIdx] : 0;
             const paxReal = getRealOccValue(`${item.paxSourceId}_forecast`) || 0;
             const paxPrevia = getRealOccValue(`${item.paxSourceId}_previa`) || 0;
+            const paxOtb = getOtbOccValue(`${item.paxSourceId}_previa`) || 0;
 
             precomputedKpi = {
                 previa: paxPrevia > 0 ? valPrevia / paxPrevia : 0,
                 real: paxReal > 0 ? valReal / paxReal : 0,
                 budget: paxBudget > 0 ? valBudget / paxBudget : 0,
+                otb: paxOtb > 0 ? valOtb / paxOtb : 0,
                 format: 'decimal',
-                denominator: { previa: paxPrevia, real: paxReal, budget: paxBudget }
+                denominator: { previa: paxPrevia, real: paxReal, budget: paxBudget, otb: paxOtb }
             };
 
             revExtraKpiSum.previa += precomputedKpi.previa;
             revExtraKpiSum.real += precomputedKpi.real;
             revExtraKpiSum.budget += precomputedKpi.budget;
+            revExtraKpiSum.otb += precomputedKpi.otb;
         }
 
         const rowExtraItem = generateRow(item.id, item.code, 'Revenue', item.label, valBudget, valReal, valLY, valPrevia, false, false, 2, undefined, precomputedKpi ? { precomputedKpi } : undefined);
-        rowExtraItem.otb = getOtbOccValue(`${item.sourceId}_previa`) || 0;
+        rowExtraItem.otb = valOtb;
         return rowExtraItem;
     });
 

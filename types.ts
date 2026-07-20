@@ -219,11 +219,11 @@ export interface ForecastRow {
     // label collides with another row's label (e.g. "Lazer" appears both under Receita de
     // Apartamentos and Receitas Extras), so a formula-string lookup by label would be ambiguous.
     precomputedKpi?: {
-      previa: number; real: number; budget: number;
+      previa: number; real: number; budget: number; otb?: number;
       format: 'currency' | 'percent' | 'integer' | 'decimal';
       // Present only on rows whose KPI is a single ratio (value ÷ denominator) — lets the KPI
       // Prévia cell be typed directly, back-solving the row's own Prévia from denominator.previa.
-      denominator?: { previa: number; real: number; budget: number };
+      denominator?: { previa: number; real: number; budget: number; otb?: number };
     };
   };
   
@@ -314,6 +314,7 @@ export interface ColumnVisibility {
   lastYear: boolean;
   deltaLY: boolean;
   deltaLYPct: boolean;
+  driverOtb: boolean;
   driverPrevia: boolean;
   driverForecast: boolean;
   driverBudget: boolean;

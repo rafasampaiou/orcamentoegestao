@@ -308,6 +308,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         lastYear: true,
         deltaLY: true,
         deltaLYPct: true,
+        driverOtb: true,
         driverPrevia: true,
         driverForecast: true,
         driverBudget: true,
@@ -331,6 +332,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         lastYear: 120,
         deltaLY: 120,
         deltaLYPct: 120,
+        driverOtb: 70,
         driverPrevia: 70,
         driverForecast: 70,
         driverBudget: 70,
@@ -399,6 +401,18 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     const [showValidationModal, setShowValidationModal] = useState(false);
     const [justifications, setJustifications] = useState<Record<string, string>>({});
 
+    // Flags de controle da timeline OTB (__otb_day, __forecast_calculated, __validado_manual,
+    // __balancete_imposto, __balancete_time_share) moram dentro de realOccupancyData pra ficarem
+    // visíveis também na tela de Ocupação, mas nenhuma delas entra no cálculo de getForecastData —
+    // por isso não podem disparar um recomputo de derivedData. Sem essa exclusão, marcar
+    // "Calcular Forecast" concluído (que grava __forecast_calculated no exato momento em que os
+    // valores recém-calculados de Custos acabaram de ser aplicados em `data`) fazia esse mesmo
+    // clique disparar um recomputo que sobrescrevia `data` de volta com os valores originais —
+    // como se o cálculo nunca tivesse acontecido.
+    const occupancySignature = useMemo(() => {
+        return JSON.stringify(realOccupancyData, (key, value) => (key.startsWith('__') ? undefined : value));
+    }, [realOccupancyData]);
+
     const derivedData = useMemo(() => {
         const forecastStructure = dreConfigs?.['Forecast'] || [];
 
@@ -418,7 +432,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             };
         });
         return recalculateTotals(initializedData, packages, accounts);
-    }, [selectedMonth, selectedYear, financialData, selectedHotel, packages, accounts, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, budgetOccupancyData, dreConfigs, isMonthClosed, activeProjectionType]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedMonth, selectedYear, financialData, selectedHotel, packages, accounts, hotels, occupancySignature, activeRealVersionId, activeBudgetVersionId, budgetOccupancyData, dreConfigs, isMonthClosed, activeProjectionType]);
 
     useEffect(() => {
         setData(derivedData);
@@ -1162,6 +1177,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     { key: 'lastYear', label: 'Ano anterior' },
                                     { key: 'deltaLY', label: `Δ ${selectedYear} x Ano anterior R$` },
                                     { key: 'deltaLYPct', label: `Δ ${selectedYear} x Ano anterior %` },
+                                    ...(isMeetingVersion ? [{ key: 'driverOtb', label: 'KPI (OTB)' }] : []),
                                     { key: 'driverPrevia', label: isMonthClosed ? 'Driver (Real)' : 'Driver (Prévia)' },
                                     { key: 'driverForecast', label: 'Driver (Forecast)' },
                                     { key: 'driverBudget', label: 'Driver (Meta)' },
@@ -1337,8 +1353,21 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     </th>
                                 )}
 
-                                {(columnVisibility.driverPrevia || columnVisibility.driverForecast || columnVisibility.driverBudget) && (
+                                {(columnVisibility.driverOtb || columnVisibility.driverPrevia || columnVisibility.driverForecast || columnVisibility.driverBudget) && (
                                     <th className="w-4 bg-white p-0 relative" style={{ borderStyle: 'hidden' }}></th>
+                                )}
+
+                                {columnVisibility.driverOtb && isMeetingVersion && (
+                                    <th
+                                        style={{ width: columnWidths.driverOtb }}
+                                        className="px-2 py-3 text-center bg-amber-50 text-amber-900 border-b border-amber-200 border-l border-amber-200 group relative text-xs"
+                                    >
+                                        KPI<br />(OTB)
+                                        <div
+                                            onMouseDown={(e) => handleResizeStart(e, 'driverOtb')}
+                                            className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-amber-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
+                                        />
+                                    </th>
                                 )}
 
                                 {columnVisibility.driverPrevia && (
@@ -1388,9 +1417,10 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     return (
                                         <tr key={row.id} className="bg-transparent border-none">
                                             <td colSpan={visibleBaseCols} className="h-6 bg-white"></td>
-                                            {(columnVisibility.driverPrevia || columnVisibility.driverForecast || columnVisibility.driverBudget) && (
+                                            {(columnVisibility.driverOtb || columnVisibility.driverPrevia || columnVisibility.driverForecast || columnVisibility.driverBudget) && (
                                                 <td className="w-4 bg-white p-0 relative" style={{ borderStyle: 'hidden' }}></td>
                                             )}
+                                            {columnVisibility.driverOtb && isMeetingVersion && <td className="bg-white" style={{ borderStyle: 'hidden' }}></td>}
                                             {columnVisibility.driverPrevia && <td className="bg-white" style={{ borderStyle: 'hidden' }}></td>}
                                             {columnVisibility.driverForecast && <td className="bg-white" style={{ borderStyle: 'hidden' }}></td>}
                                             {columnVisibility.driverBudget && <td className="bg-white" style={{ borderStyle: 'hidden' }}></td>}
@@ -1435,8 +1465,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 const rowKpiCalc = accountKpiCalc || packageKpiCalc || gopKpiCalc || impostoKpiCalc;
                                 const hasKpi = !!(rowKpiCalc || precomputedKpi);
                                 const kpiFormatType = precomputedKpi ? precomputedKpi.format : (rowKpiCalc?.format === 'percent' ? 'percent' : 'decimal');
-                                const kpiValue = (field: 'previa' | 'real' | 'budget') => {
-                                    if (precomputedKpi) return precomputedKpi[field];
+                                const kpiValue = (field: 'previa' | 'real' | 'budget' | 'otb') => {
+                                    if (precomputedKpi) return precomputedKpi[field] || 0;
                                     const raw = evaluateKpiCalculation(rowKpiCalc, data, field);
                                     return rowKpiCalc?.format === 'percent' ? raw * 100 : raw;
                                 };
@@ -1630,8 +1660,17 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                                 </td>
                                             )}
 
-                                            {(columnVisibility.driverPrevia || columnVisibility.driverForecast || columnVisibility.driverBudget) && (
+                                            {(columnVisibility.driverOtb || columnVisibility.driverPrevia || columnVisibility.driverForecast || columnVisibility.driverBudget) && (
                                                 <td className="w-4 bg-white p-0 relative" style={{ borderStyle: 'hidden' }}></td>
+                                            )}
+
+                                            {columnVisibility.driverOtb && isMeetingVersion && (
+                                                <td
+                                                    title={!hideKpi ? kpiFormulaTooltip : undefined}
+                                                    style={kpiBorderStyle}
+                                                    className={`px-1 text-center tabular-nums text-xs truncate ${kpiBorderClass} ${hideKpi || !hasKpi ? 'bg-white text-transparent' : 'text-amber-700 bg-amber-50/40 cursor-help'}`}>
+                                                    {!hideKpi && hasKpi ? formatValue(kpiValue('otb'), kpiFormatType) : ''}
+                                                </td>
                                             )}
 
                                             {columnVisibility.driverPrevia && (
@@ -2501,11 +2540,14 @@ function getDriverValue(driver: string | undefined, allRows: ForecastRow[], base
 // same Plano de Contas driver — otherwise there is no single unit to divide the total by.
 // Resolves the value of any freely-picked KPI calculation term (an account, package, indicator
 // or revenue/result line, matched by its DRE row label) for a given scenario field.
-function resolveKpiTerm(termLabel: string | undefined, allRows: ForecastRow[], field: 'previa' | 'real' | 'budget'): number {
+function resolveKpiTerm(termLabel: string | undefined, allRows: ForecastRow[], field: 'previa' | 'real' | 'budget' | 'otb'): number {
     if (!termLabel) return 0;
     const target = termLabel.trim().toLowerCase();
     const row = allRows.find(r => r.label.trim().toLowerCase() === target);
     if (!row) return 0;
+    // OTB reads the row's own OTB snapshot directly — no Meta substitution, since the whole point
+    // is to reflect what was actually entered as of the cutoff day (or nothing, if not yet filled).
+    if (field === 'otb') return row.otb || 0;
     // Forecast always projects off the Meta (budget) quantity for indicator/Receita Bruta lines,
     // since there's no separately-tracked "forecast occupancy" distinct from the plan.
     const usesMetaOnForecast = row.category === 'Indicators' || row.id === 'REV-TOTAL';
@@ -2517,7 +2559,7 @@ function resolveKpiTerm(termLabel: string | undefined, allRows: ForecastRow[], f
 
 // The KPI formula is a free spreadsheet-style expression ("@[Line A] + @[Line B] / @[Line C]"),
 // evaluated with the same engine already used for Intelligent DRE calculated rows.
-function evaluateKpiCalculation(calc: KpiCalculation | undefined, allRows: ForecastRow[], field: 'previa' | 'real' | 'budget'): number {
+function evaluateKpiCalculation(calc: KpiCalculation | undefined, allRows: ForecastRow[], field: 'previa' | 'real' | 'budget' | 'otb'): number {
     if (!calc || !calc.formula || !calc.formula.trim()) return 0;
     const context = { getValue: (name: string) => resolveKpiTerm(name, allRows, field) };
     return evaluateFormula(calc.formula, context);
