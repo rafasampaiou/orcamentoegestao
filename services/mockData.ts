@@ -841,12 +841,20 @@ export const getForecastData = (
     const gCoefChdOtb = getOtbOccValue('geral_coef_chd_previa') ?? 0;
     const gOccPctOtb = gAvailOtb > 0 ? (gOccOtb / gAvailOtb) * 100 : 0;
 
-    const gMoCltReal = getRealOccValue('geral_mo_clt_forecast') ?? 0;
-    const gMoCltPrevia = getRealOccValue('geral_mo_clt_previa') ?? 0;
+    // Nas versões de prévia (Reunião de Ritmo/FCA N1/FCA N2), Mão de obra parte do valor da Meta
+    // enquanto o usuário não tiver digitado o próprio número na Ocupação — mesmo padrão de default
+    // usado em Coef. Occ Adultos/CHD ali (get*Otb acima não entra nessa regra: OTB precisa ser
+    // preenchido de verdade, sem herdar a Meta).
+    const isMeetingVersionForLabor = activeProjectionType === 'Reunião de Ritmo' || activeProjectionType === 'FCA N1' || activeProjectionType === 'FCA N2';
+    const moCltMetaFallback = isMeetingVersionForLabor ? (budgetOccupancyData['geral_mo_clt']?.[selectedMonth ? selectedMonth - 1 : 0] ?? 0) : 0;
+    const moExtraMetaFallback = isMeetingVersionForLabor ? (budgetOccupancyData['geral_mo_extra']?.[selectedMonth ? selectedMonth - 1 : 0] ?? 0) : 0;
+
+    const gMoCltReal = getRealOccValue('geral_mo_clt_forecast') ?? moCltMetaFallback;
+    const gMoCltPrevia = getRealOccValue('geral_mo_clt_previa') ?? moCltMetaFallback;
     const gMoCltLY = getLYOccValue('geral_mo_clt_forecast') ?? 0;
 
-    const gMoExtraReal = getRealOccValue('geral_mo_extra_forecast') ?? 0;
-    const gMoExtraPrevia = getRealOccValue('geral_mo_extra_previa') ?? 0;
+    const gMoExtraReal = getRealOccValue('geral_mo_extra_forecast') ?? moExtraMetaFallback;
+    const gMoExtraPrevia = getRealOccValue('geral_mo_extra_previa') ?? moExtraMetaFallback;
     const gMoExtraLY = getLYOccValue('geral_mo_extra_forecast') ?? 0;
 
     // Total is always derived from CLT + Extra, never read from a stored field — this

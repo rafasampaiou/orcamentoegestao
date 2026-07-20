@@ -438,10 +438,16 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
             set(`geral_rev_fap_${s}`, gRevFap);
             set(`geral_dm_fap_${s}`, gSold > 0 ? gRevFap / gSold : 0);
 
-            // Mão de obra só existe no nível Geral (não há quebra por Lazer/Eventos) — CLT e
-            // Extra são entrada manual direta aqui, Total é só a soma dos dois.
-            const gMoClt = get(`geral_mo_clt_${s}`);
-            const gMoExtra = get(`geral_mo_extra_${s}`);
+            // Mão de obra só existe no nível Geral (não há quebra por Lazer/Eventos) — CLT e Extra
+            // partem do valor da Meta enquanto o usuário não tiver digitado o próprio número (mesmo
+            // default usado em Coef. Occ Adultos/CHD acima), mas continuam editáveis; Total é só a
+            // soma dos dois.
+            const metaMoClt = metaGet('geral_mo_clt');
+            const metaMoExtra = metaGet('geral_mo_extra');
+            const gMoClt = currentData[`geral_mo_clt_${s}`] !== undefined ? currentData[`geral_mo_clt_${s}`] : metaMoClt;
+            const gMoExtra = currentData[`geral_mo_extra_${s}`] !== undefined ? currentData[`geral_mo_extra_${s}`] : metaMoExtra;
+            set(`geral_mo_clt_${s}`, gMoClt);
+            set(`geral_mo_extra_${s}`, gMoExtra);
             set(`geral_mo_total_${s}`, gMoClt + gMoExtra);
 
             // Receita Extra Lazer/Evento — só existe de verdade no modo "On the books", mas é
