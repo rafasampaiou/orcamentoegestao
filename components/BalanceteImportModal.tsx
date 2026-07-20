@@ -24,8 +24,10 @@ const IMPOSTO_CODE = '3.01.04.02';
 const TIME_SHARE_CODE = '3.01.03.01';
 const ISS_CODE = '3.01.01.02.008';
 
-// "Setores" (Pacotes Master) que ganham card de total próprio, além do total geral de despesas.
-const SECTOR_NAMES = ['Mais Tauá', 'Instituto Tauá', 'Pós Venda'];
+// "Setores" que ganham card de total próprio, além do total geral de despesas — são centros de
+// custo corporativos, fora do escopo do Plano de Contas do hotel (por isso nunca casam por
+// código como uma conta/pacote normal). Identificados pela própria Descricao do balancete.
+const SECTOR_NAMES = ['Mais Tauá', 'Vip Club', 'Pós Venda', 'Instituto Tauá', 'Propriedades', 'Obras', 'Novos Negócios'];
 const normalizeName = (s: string) => s.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
 interface DespesaRow {
@@ -44,6 +46,7 @@ interface ParsedBalancete {
     impostoVal: number;
     timeShareVal: number;
     issVal: number;
+    sectorTotals: Record<string, number>;
     despesas: DespesaRow[];
 }
 
@@ -105,6 +108,8 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
         let impostoVal = 0;
         let timeShareVal = 0;
         let issVal = 0;
+        const sectorTotals: Record<string, number> = {};
+        SECTOR_NAMES.forEach(name => { sectorTotals[name] = 0; });
         const despesas: DespesaRow[] = [];
 
         json.forEach(r => {
@@ -117,22 +122,33 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
             const movimento = -rawMovimento;
             if (!hierarquico) return;
 
+            // Setores corporativos (Mais Tauá, Vip Club, Pós Venda, Instituto Tauá, Propriedades,
+            // Obras, Novos Negócios) são centros de custo, não contas do Plano de Contas do hotel —
+            // nunca vão casar por código. São identificados pela própria Descricao, então são
+            // capturados ANTES de qualquer filtro por código/profundidade (que só faz sentido pras
+            // contas do hotel) — senão um código raso desses setores seria descartado sem nunca
+            // alimentar o card do setor.
+            const normDesc = normalizeName(descricao);
+            const sectorMatch = SECTOR_NAMES.find(name => normDesc.includes(normalizeName(name)));
+            if (sectorMatch) { sectorTotals[sectorMatch] += movimento; return; }
+
             // 1 (Ativo) e 2 (Passivo) — só um resumo pra referência, não entram no import.
             if (hierarquico.startsWith('1')) { ativoTotal += movimento; return; }
             if (hierarquico.startsWith('2')) { passivoTotal += movimento; return; }
 
             // 3 (Receita) — total geral é só referência; só os 3 códigos fixos abaixo alimentam
             // linhas de verdade na DRE (Imposto / Cancelamento de Time Share / Receita de ISS).
-            // "Outras Receitas Hoteleiras" (Time Share) é a única exceção que NÃO inverte o sinal
-            // do balancete.
+            // Time Share e Receita de ISS são as duas exceções que NÃO invertem o sinal do balancete.
             if (hierarquico.startsWith('3')) {
                 if (hierarquico === TIME_SHARE_CODE) {
                     receitaTotal += rawMovimento;
                     timeShareVal += rawMovimento;
+                } else if (hierarquico === ISS_CODE) {
+                    receitaTotal += rawMovimento;
+                    issVal += rawMovimento;
                 } else {
                     receitaTotal += movimento;
                     if (hierarquico === IMPOSTO_CODE) impostoVal += movimento;
-                    if (hierarquico === ISS_CODE) issVal += movimento;
                 }
                 return;
             }
@@ -155,20 +171,13 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
             // Outros prefixos (5, 6...): fora do escopo pedido, ignorados.
         });
 
-        setParsed({ ativoTotal, passivoTotal, receitaTotal, impostoVal, timeShareVal, issVal, despesas });
+        setParsed({ ativoTotal, passivoTotal, receitaTotal, impostoVal, timeShareVal, issVal, sectorTotals, despesas });
     };
 
     const matchedDespesas = parsed?.despesas.filter(r => r.matchLevel) || [];
     const unmatchedCount = (parsed?.despesas.length || 0) - matchedDespesas.length;
     const despesasTotal = matchedDespesas.reduce((s, r) => s + r.movimento, 0);
-
-    const sectorTotals: Record<string, number> = {};
-    SECTOR_NAMES.forEach(name => { sectorTotals[name] = 0; });
-    matchedDespesas.forEach(r => {
-        if (!r.masterPackage) return;
-        const match = SECTOR_NAMES.find(name => normalizeName(name) === normalizeName(r.masterPackage!));
-        if (match) sectorTotals[match] += r.movimento;
-    });
+    const sectorTotals = parsed?.sectorTotals || {};
 
     const levelLabel = (level: DespesaRow['matchLevel']) => {
         if (level === 'account') return 'Conta';
@@ -272,11 +281,11 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
                                     <span className="text-[10px] text-teal-400">Linha Receita de ISS, coluna OTB</span>
                                 </div>
                             </div>
-                            <div className="grid grid-cols-3 gap-4">
+                            <div className="grid grid-cols-4 gap-4">
                                 {SECTOR_NAMES.map(name => (
                                     <div key={name} className="bg-gray-50 border border-gray-200 rounded-xl p-4">
                                         <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wide">Setor {name}</span>
-                                        <div className="text-xl font-bold text-gray-800 tabular-nums mt-1">{sectorTotals[name].toLocaleString('pt-BR')}</div>
+                                        <div className="text-xl font-bold text-gray-800 tabular-nums mt-1">{(sectorTotals[name] || 0).toLocaleString('pt-BR')}</div>
                                     </div>
                                 ))}
                             </div>
@@ -320,6 +329,16 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
                                     <span className="text-gray-500 font-bold uppercase">4 Despesa (escopo)</span>
                                     <div className="tabular-nums font-medium text-gray-700">{despesasTotal.toLocaleString('pt-BR')}</div>
                                 </div>
+                            </div>
+
+                            <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-2">Setores fora do escopo</p>
+                            <div className="grid grid-cols-4 gap-3 mb-4 text-xs">
+                                {SECTOR_NAMES.map(name => (
+                                    <div key={name} className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                                        <span className="text-gray-500 font-bold uppercase">{name}</span>
+                                        <div className="tabular-nums font-medium text-gray-700">{(sectorTotals[name] || 0).toLocaleString('pt-BR')}</div>
+                                    </div>
+                                ))}
                             </div>
 
                             <div className="border border-gray-200 rounded-lg overflow-hidden">
