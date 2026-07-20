@@ -119,11 +119,16 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
             if (hierarquico.startsWith('2')) { passivoTotal += movimento; return; }
 
             // 3 (Receita) — total geral é só referência; só os 2 códigos fixos abaixo alimentam
-            // linhas de verdade na DRE (Imposto / Cancelamento de Time Share).
+            // linhas de verdade na DRE (Imposto / Cancelamento de Time Share). "Outras Receitas
+            // Hoteleiras" (Time Share) é a única exceção que NÃO inverte o sinal do balancete.
             if (hierarquico.startsWith('3')) {
-                receitaTotal += movimento;
-                if (hierarquico === IMPOSTO_CODE) impostoVal += movimento;
-                else if (hierarquico === TIME_SHARE_CODE) timeShareVal += movimento;
+                if (hierarquico === TIME_SHARE_CODE) {
+                    receitaTotal += rawMovimento;
+                    timeShareVal += rawMovimento;
+                } else {
+                    receitaTotal += movimento;
+                    if (hierarquico === IMPOSTO_CODE) impostoVal += movimento;
+                }
                 return;
             }
 
@@ -171,7 +176,9 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
         if (!parsed) return;
         setIsSaving(true);
         try {
-            const importId = `otb-balancete-${Date.now()}`;
+            // A coluna import_id em financial_data é do tipo uuid — "otb-balancete-<timestamp>"
+            // dava erro de sintaxe inválida no Postgres, precisa ser um UUID de verdade.
+            const importId = crypto.randomUUID();
             // Só as linhas "4" com correspondência no Plano de Contas viram lançamento — sem
             // conta/pacote pra atribuir, o valor fica de fora (mas continua visível na prévia).
             const importedRows: ImportedRow[] = matchedDespesas.map(r => ({
