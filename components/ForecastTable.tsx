@@ -956,6 +956,11 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                     // Forecast/Prévia column's OWN indicator value (not Meta's), so the projection
                     // actually varies with whatever occupancy was entered for that column.
                     const selfDenominator = parseSelfRatioDenominator(account.kpiCalculation?.formula, account.name);
+                    // Muita conta do Plano de Contas está sem "Tipo de Despesa" salvo (nem
+                    // Variável nem Fixo) — a tela de administração já mostra "Fixo" como padrão
+                    // visual pra essas, então aqui tratamos qualquer coisa que não seja
+                    // explicitamente "Variável" como comportamento Fixo (replica a Meta).
+                    const isFixedLike = account.expenseType !== 'Variável';
 
                     if (account.expenseType === 'Variável' && selfDenominator) {
                         // Looked up directly (not via resolveKpiTerm) so Indicators/Receita Bruta
@@ -976,9 +981,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                         else updatedRow.previa = projected;
 
                         return updatedRow;
-                    } else if (account.expenseType === 'Fixo' && calculationBase === 'forecast') {
-                        // Fixed accounts have no ratio to project — the Forecast column simply
-                        // replicates whatever was entered in Meta.
+                    } else if (isFixedLike && calculationBase === 'forecast') {
+                        // Fixed accounts (e explícitas Variável sem driver — não têm proporção
+                        // pra projetar) — o Forecast simplesmente replica o que está na Meta.
                         const newConfig = {
                             ...currentConfig,
                             method: 'Fixed' as const,
@@ -989,7 +994,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             forecastConfig: newConfig,
                             real: row.budget
                         };
-                    } else if (account.expenseType === 'Fixo' || (account.expenseType === 'Variável' && !selfDenominator)) {
+                    } else if (isFixedLike || (account.expenseType === 'Variável' && !selfDenominator)) {
                         // Fixed accounts on the Prévia base, or Variável accounts whose KPI formula
                         // isn't a simple self-referencing ratio, can't be auto-projected — leave for manual entry.
                         const newConfig = {
