@@ -5,8 +5,8 @@ export const OTB_STEP_LABELS = [
     'Inserir a ocupação On the books',
     'Inserir despesas do balancete',
     'Inserir a ocupação e receita do Forecast',
-    'Inserir despesas da coluna Prévia',
     'Calcular Forecast',
+    'Incluir despesas da prévia',
     'Validar informações',
     'Salvar projeção',
 ];
@@ -52,8 +52,10 @@ export function computeOtbProgress(params: ComputeOtbProgressParams): boolean[] 
         (r.hotel || '').trim().toUpperCase() === hotelUpper
     );
     const step4 = hasOccupancyData(normalData);
-    const step5 = !!forecastRows?.some(r => r.category === 'Costs' && (r.previa || 0) !== 0);
-    const step6 = !!otbData['__forecast_calculated'];
+    // Ordem trocada a pedido: passo 5 é "Calcular Forecast" (flag manual), passo 6 é
+    // "Incluir despesas da prévia" (detectado pelas linhas de Custos com Prévia preenchida).
+    const step5 = !!otbData['__forecast_calculated'];
+    const step6 = !!forecastRows?.some(r => r.category === 'Costs' && (r.previa || 0) !== 0);
     const step7 = !!otbData['__validado_manual'];
     const step8 = validations.some(v =>
         v.projectionType === projectionType && v.month === month && v.year === year && v.hotelId === hotel

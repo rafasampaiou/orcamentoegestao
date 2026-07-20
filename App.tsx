@@ -694,6 +694,37 @@ const App: React.FC = () => {
     setImportedFinancialData(prevData => prevData.filter(row => row.importId !== id));
   };
 
+  // "Resetar etapa" do balancete OTB (passo 3 do timeline de projeção) — remove os lançamentos
+  // daquele contexto tanto do Supabase quanto do estado local, pra ficar como se nunca tivesse
+  // sido importado.
+  const handleDeleteOtbBalancete = async (hotel: string, year: number, month: number, versionId: string) => {
+    try {
+      await supabaseService.deleteFinancialDataByContext(hotel, year, month, versionId, 'OTB');
+      setImportedFinancialData(prevData => prevData.filter(row =>
+        !(row.hotel.trim().toUpperCase() === hotel.trim().toUpperCase() &&
+          row.ano === String(year) && row.mes === String(month) &&
+          (row.versionId || '') === versionId &&
+          (row.cenario || '').trim().toUpperCase() === 'OTB')
+      ));
+    } catch (err) {
+      console.error('Failed to reset balancete OTB:', err);
+      toast.error('Erro ao resetar as despesas do balancete importado.');
+    }
+  };
+
+  // "Resetar etapa" de Salvar projeção (passo 8) — desfaz a validação daquele contexto.
+  const handleResetValidation = async (hotelId: string, year: number, month: number, projectionType: ProjectionType) => {
+    try {
+      await supabaseService.deleteValidationByContext(hotelId, year, month, projectionType);
+      setValidations(prev => prev.filter(v =>
+        !(v.hotelId === hotelId && v.year === year && v.month === month && v.projectionType === projectionType)
+      ));
+    } catch (err) {
+      console.error('Failed to reset validation:', err);
+      toast.error('Erro ao resetar a validação salva.');
+    }
+  };
+
   const handleMonthChange = (direction: 'prev' | 'next') => {
     const newDate = new Date(selectedDate);
     if (direction === 'prev') {
@@ -1152,6 +1183,8 @@ const App: React.FC = () => {
               currentUser={currentUser}
               onNavigateToOccupancy={(otbMode) => { setOtbNavSignal(!!otbMode); setOccupancyNavMonth(selectedDate.getMonth() + 1); setCurrentView('occupancy_monthly'); }}
               onImportData={handleImportData}
+              onDeleteOtbBalancete={handleDeleteOtbBalancete}
+              onResetValidation={handleResetValidation}
             />
           </div>
         </div>

@@ -164,6 +164,30 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
             });
         }
     };
+
+    // "Resetar etapa" — só as 3 etapas que vivem nesta tela (as outras 5 vivem na DRE Forecast,
+    // então o clique nelas continua só navegando pra lá, sem oferecer a escolha Revisar/Resetar).
+    const handleOtbStepReset = (index: number) => {
+        if (!setRealOccupancyData) return;
+        const otbKey = `${selectedHotel}_${selectedYear}_${(initialSelectedMonth || 1)}_${activeRealVersionId || ''}__${activeProjectionType}__OTB`;
+        const normalKey = `${selectedHotel}_${selectedYear}_${(initialSelectedMonth || 1)}_${activeRealVersionId || ''}__${activeProjectionType}`;
+        if (index === 1) {
+            setRealOccupancyData(prev => {
+                const current = prev[otbKey] || {};
+                const cleaned: Record<string, number> = {};
+                Object.keys(current).forEach(k => { if (k.startsWith('__')) cleaned[k] = current[k]; });
+                return { ...prev, [otbKey]: cleaned };
+            });
+        } else if (index === 3) {
+            setRealOccupancyData(prev => ({ ...prev, [normalKey]: {} }));
+        } else if (index === 6) {
+            setRealOccupancyData(prev => {
+                const current = { ...(prev[otbKey] || {}) };
+                delete current['__validado_manual'];
+                return { ...prev, [otbKey]: current };
+            });
+        }
+    };
     const handlePeriodChange = (value: OccupancyVersionOption) => {
         setPeriod(value);
         if (!MEETING_VERSIONS.includes(value)) setOtbMode(false);
@@ -777,7 +801,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
 
                 {isMeetingVersion && (
                     <div className="mt-3 pt-3 border-t border-gray-100">
-                        <OtbProgressTimeline completed={otbProgress} onStepClick={handleOtbStepClick} title="Status da prévia" />
+                        <OtbProgressTimeline completed={otbProgress} onStepClick={handleOtbStepClick} onStepReset={handleOtbStepReset} resettableSteps={[1, 3, 6]} title="Status da prévia" />
                     </div>
                 )}
             </div>

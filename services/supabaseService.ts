@@ -664,6 +664,20 @@ export const supabaseService = {
     if (error) throw error;
   },
 
+  // Usado pelo "Resetar etapa" do balancete OTB — remove só os lançamentos daquele contexto
+  // específico (hotel/ano/mês/versão/cenário), sem tocar no resto dos dados da versão.
+  async deleteFinancialDataByContext(hotel: string, year: number, month: number, versionId: string, scenario: string): Promise<void> {
+    const { error } = await supabase
+      .from('financial_data')
+      .delete()
+      .eq('hotel', hotel)
+      .eq('year', year)
+      .eq('month', month)
+      .eq('version_id', versionId)
+      .eq('scenario', scenario);
+    if (error) throw error;
+  },
+
   async getFinancialDataByVersion(versionId: string): Promise<ImportedRow[]> {
     let allData: any[] = [];
     let from = 0;
@@ -879,6 +893,18 @@ export const supabaseService = {
         validated_at: record.validatedAt,
         status: record.status
       });
+    if (error) throw error;
+  },
+
+  // Usado pelo "Resetar etapa" de Salvar projeção — desfaz a validação daquele contexto específico.
+  async deleteValidationByContext(hotelId: string, year: number, month: number, projectionType: string): Promise<void> {
+    const { error } = await supabase
+      .from('validations')
+      .delete()
+      .eq('hotel_id', hotelId)
+      .eq('year', year)
+      .eq('month', month)
+      .eq('projection_type', projectionType);
     if (error) throw error;
   },
 

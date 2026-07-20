@@ -855,6 +855,11 @@ export const getForecastData = (
     const gMoTotalPrevia = gMoCltPrevia + gMoExtraPrevia;
     const gMoTotalLY = gMoCltLY + gMoExtraLY;
 
+    // OTB (On the books) — mesmo padrão dos outros indicadores acima.
+    const gMoCltOtb = getOtbOccValue('geral_mo_clt_previa') ?? 0;
+    const gMoExtraOtb = getOtbOccValue('geral_mo_extra_previa') ?? 0;
+    const gMoTotalOtb = gMoCltOtb + gMoExtraOtb;
+
     // Retrieve budget values from budgetOccupancyData based on the selectedMonth (0-indexed)
     const monthIdx = selectedMonth ? selectedMonth - 1 : 0;
     const gDaysBudget = budgetOccupancyData['days_month'] ? budgetOccupancyData['days_month'][monthIdx] : 0;
@@ -931,9 +936,15 @@ export const getForecastData = (
     rows.push(generateRow('SPACER-IND-REV', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
 
     // 1.5 MÃO DE OBRA (pulls straight from the Ocupação tab, read-only here)
-    rows.push(generateRow('LABOR-TOTAL', '', 'Labor', 'Mão de obra (Total)', gMoTotalBudget, gMoTotalReal, gMoTotalLY, gMoTotalPrevia, true, true, 0, undefined, { format: 'integer' }));
-    rows.push(generateRow('LABOR-CLT', '', 'Labor', 'Mão de obra (CLT)', gMoCltBudget, gMoCltReal, gMoCltLY, gMoCltPrevia, false, false, 1, undefined, { format: 'integer' }));
-    rows.push(generateRow('LABOR-EXTRA', '', 'Labor', 'Mão de obra (Extra)', gMoExtraBudget, gMoExtraReal, gMoExtraLY, gMoExtraPrevia, false, false, 1, undefined, { format: 'integer' }));
+    const rowLaborTotal = generateRow('LABOR-TOTAL', '', 'Labor', 'Mão de obra (Total)', gMoTotalBudget, gMoTotalReal, gMoTotalLY, gMoTotalPrevia, true, true, 0, undefined, { format: 'integer' });
+    rowLaborTotal.otb = gMoTotalOtb;
+    rows.push(rowLaborTotal);
+    const rowLaborClt = generateRow('LABOR-CLT', '', 'Labor', 'Mão de obra (CLT)', gMoCltBudget, gMoCltReal, gMoCltLY, gMoCltPrevia, false, false, 1, undefined, { format: 'integer' });
+    rowLaborClt.otb = gMoCltOtb;
+    rows.push(rowLaborClt);
+    const rowLaborExtra = generateRow('LABOR-EXTRA', '', 'Labor', 'Mão de obra (Extra)', gMoExtraBudget, gMoExtraReal, gMoExtraLY, gMoExtraPrevia, false, false, 1, undefined, { format: 'integer' });
+    rowLaborExtra.otb = gMoExtraOtb;
+    rows.push(rowLaborExtra);
 
     rows.push(generateRow('SPACER-LABOR-REV', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
 

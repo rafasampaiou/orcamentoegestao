@@ -42,6 +42,8 @@ interface ForecastTableProps {
     dreConfigs?: Record<string, import('../types').DreSection[]>;
     onNavigateToOccupancy?: (otbMode?: boolean) => void;
     onImportData?: (rows: ImportedRow[], mode: 'append' | 'replace') => void;
+    onDeleteOtbBalancete?: (hotel: string, year: number, month: number, versionId: string) => void;
+    onResetValidation?: (hotelId: string, year: number, month: number, projectionType: import('../types').ProjectionType) => void;
 }
 
 // --- UTILITÁRIOS MOVIDOS PARA FORA PARA EVITAR RE-RENDERIZAÇÕES DESNECESSÁRIAS ---
@@ -230,7 +232,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     currentUser,
     dreConfigs,
     onNavigateToOccupancy,
-    onImportData
+    onImportData,
+    onDeleteOtbBalancete,
+    onResetValidation
 }) => {
     const canEditForecast = currentUser?.role === UserRole.ADMIN ||
         currentUser?.role === UserRole.ENTITY_MANAGER ||
@@ -766,7 +770,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             setShowBalanceteModal(true);
         } else if (index === 3) {
             onNavigateToOccupancy?.(false);
-        } else if (index === 5) {
+        } else if (index === 4) {
             handleCalcularForecast();
         } else if (index === 6) {
             if (!setRealOccupancyData) return;
@@ -777,7 +781,73 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         } else if (index === 7) {
             handleSaveResultsDirectly();
         }
-        // Passo 5 (índice 4, despesas da Prévia) não navega — já está nesta mesma tela.
+        // Passo 6 (índice 5, despesas da Prévia) não navega — já está nesta mesma tela.
+    };
+
+    // "Resetar etapa" — desfaz o que a etapa marca como concluída, pra dar pra refazer do zero.
+    const handleOtbStepReset = (index: number) => {
+        if (index === 0) {
+            if (!setRealOccupancyData) return;
+            setRealOccupancyData(prev => {
+                const current = { ...(prev[otbContextKey] || {}) };
+                delete current['__otb_day'];
+                return { ...prev, [otbContextKey]: current };
+            });
+        } else if (index === 1) {
+            // Ocupação On the books — limpa os valores preenchidos, mantendo só as flags internas
+            // (que começam com "__", como o dia do OTB) do mesmo bucket.
+            if (!setRealOccupancyData) return;
+            setRealOccupancyData(prev => {
+                const current = prev[otbContextKey] || {};
+                const cleaned: Record<string, number> = {};
+                Object.keys(current).forEach(k => { if (k.startsWith('__')) cleaned[k] = current[k]; });
+                return { ...prev, [otbContextKey]: cleaned };
+            });
+        } else if (index === 2) {
+            onDeleteOtbBalancete?.(selectedHotel || '', selectedYear || 0, selectedMonth || 0, activeRealVersionId || '');
+            if (setRealOccupancyData) {
+                setRealOccupancyData(prev => {
+                    const current = { ...(prev[otbContextKey] || {}) };
+                    delete current['__balancete_imposto'];
+                    delete current['__balancete_time_share'];
+                    return { ...prev, [otbContextKey]: current };
+                });
+            }
+        } else if (index === 3) {
+            if (!setRealOccupancyData) return;
+            const normalKey = `${selectedHotel}_${selectedYear}_${selectedMonth}_${activeRealVersionId || ''}__${activeProjectionType}`;
+            setRealOccupancyData(prev => ({ ...prev, [normalKey]: {} }));
+        } else if (index === 4) {
+            if (!setRealOccupancyData) return;
+            setRealOccupancyData(prev => {
+                const current = { ...(prev[otbContextKey] || {}) };
+                delete current['__forecast_calculated'];
+                return { ...prev, [otbContextKey]: current };
+            });
+        } else if (index === 5) {
+            // Despesas da Prévia — volta as linhas de Custos/Contas que tinham Prévia preenchida
+            // pra zero, como se ainda não tivesse sido preenchida.
+            setData(prevData => recalculateTotals(prevData.map(row => {
+                if ((row.category === 'Costs' || row.category === 'Account') && (row.previa || 0) !== 0) {
+                    return {
+                        ...row,
+                        previa: 0,
+                        isManualPreviaOverride: false,
+                        previaConfig: { ...(row.previaConfig || { method: 'Fixed' as const }), manualValue: 0 }
+                    };
+                }
+                return row;
+            }), packages, accounts));
+        } else if (index === 6) {
+            if (!setRealOccupancyData) return;
+            setRealOccupancyData(prev => {
+                const current = { ...(prev[otbContextKey] || {}) };
+                delete current['__validado_manual'];
+                return { ...prev, [otbContextKey]: current };
+            });
+        } else if (index === 7) {
+            onResetValidation?.(selectedHotel || '', selectedYear || 0, selectedMonth || 0, activeProjectionType || 'Reunião de Ritmo');
+        }
     };
 
     const handleSaveResultsDirectly = () => {
@@ -1061,7 +1131,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
                 {isMeetingVersion && (
                     <div className="px-5 py-2 border-b border-gray-200 bg-gray-50/50 shrink-0">
-                        <OtbProgressTimeline completed={otbProgress} onStepClick={handleOtbStepClick} title="Status da prévia" />
+                        <OtbProgressTimeline completed={otbProgress} onStepClick={handleOtbStepClick} onStepReset={handleOtbStepReset} title="Status da prévia" />
                     </div>
                 )}
 
