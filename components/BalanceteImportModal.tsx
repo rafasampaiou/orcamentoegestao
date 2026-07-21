@@ -185,6 +185,16 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
         const despesas: DespesaRow[] = [];
         const foraDoEscopo: DespesaRow[] = [];
 
+        // Balancete "por CR": o mesmo Hierarquico (nível de conta) se repete várias vezes — uma
+        // linha "base" com a Descricao igual ao nome da própria conta (o total daquela conta) e
+        // uma linha por CR que lançou nela, com a Descricao sendo o nome do CR. A linha base é só
+        // um subtotal das linhas de CR — contar as duas juntas duplica o valor. Por isso as contas
+        // "4" ficam guardadas aqui, agrupadas por código, até decidir quais linhas realmente contam.
+        const hierGroups = new Map<string, {
+            match: { level: 'account' | 'package' | 'master'; name: string; outOfScope: boolean; masterPackage: string | null };
+            rows: { descricao: string; movimento: number; isBaseLine: boolean }[];
+        }>();
+
         json.forEach(r => {
             const hierarquico = String(r[hierKey] ?? '').trim();
             const descricao = String(r[descKey] ?? '').trim();
@@ -216,49 +226,42 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
                 return;
             }
 
-            // 4 (Despesa) — casa pelo código no Plano de Contas (conta, pacote ou pacote master).
+            // 4 (Despesa) — casa pelo código no Plano de Contas. Só nível de CONTA CONTÁBIL entra
+            // no import — pacote e pacote master são somados automaticamente a partir das contas
+            // (services/mockData.ts), então uma linha de pacote/master aqui só duplicaria esse total.
             if (hierarquico.startsWith('4')) {
                 if (digitCount(hierarquico) <= 3) return; // código raso (ex.: "4.02"), ignora
                 const match = matchByCode(hierarquico, accounts);
+                if (!match || match.level !== 'account') return;
 
-                // Balancete "por CR": o mesmo Hierarquico se repete várias vezes — uma linha com a
-                // Descricao igual ao nome da própria conta/pacote (o lançamento sem CR específico,
-                // ou o total) e uma linha por CR que lançou nessa conta, com a Descricao sendo o
-                // nome do CR em vez do nome da conta. Não tem coluna separada de CR — o jeito de
-                // saber é comparar a Descricao com o nome já casado.
-                const matchName = match?.name || null;
-                const isBaseLine = !!matchName && normalizeName(descricao) === normalizeName(matchName);
-                const crCode: string | null = null;
-                const crName = isBaseLine ? null : (descricao || null);
-
-                if (match?.outOfScope) {
-                    // Casou por código, mas a conta/pacote está marcada "Fora do escopo" — não
-                    // entra no import nem no total de despesas, mas fica visível à parte.
-                    foraDoEscopo.push({
-                        hierarquico,
-                        descricao,
-                        movimento,
-                        matchLevel: match.level,
-                        matchedName: match.name,
-                        masterPackage: match.masterPackage || null,
-                        crCode,
-                        crName,
-                    });
-                    return;
-                }
-                despesas.push({
-                    hierarquico,
-                    descricao,
-                    movimento,
-                    matchLevel: match?.level || null,
-                    matchedName: match?.name || null,
-                    masterPackage: match?.masterPackage || null,
-                    crCode,
-                    crName,
-                });
+                const isBaseLine = normalizeName(descricao) === normalizeName(match.name);
+                if (!hierGroups.has(hierarquico)) hierGroups.set(hierarquico, { match, rows: [] });
+                hierGroups.get(hierarquico)!.rows.push({ descricao, movimento, isBaseLine });
                 return;
             }
             // Outros prefixos (5, 6...): fora do escopo pedido, ignorados.
+        });
+
+        // Só agora decide quais linhas de cada conta realmente contam: se existe alguma linha de
+        // CR (não-base), a linha base é descartada (era só o subtotal); senão, ela é a única
+        // informação que existe pra essa conta e conta sozinha.
+        hierGroups.forEach((group, hierarquico) => {
+            const { match, rows } = group;
+            const hasCrBreakdown = rows.some(r => !r.isBaseLine);
+            const countedRows = hasCrBreakdown ? rows.filter(r => !r.isBaseLine) : rows;
+            const target = match.outOfScope ? foraDoEscopo : despesas;
+            countedRows.forEach(r => {
+                target.push({
+                    hierarquico,
+                    descricao: r.descricao,
+                    movimento: r.movimento,
+                    matchLevel: match.level,
+                    matchedName: match.name,
+                    masterPackage: match.masterPackage || null,
+                    crCode: null,
+                    crName: r.isBaseLine ? null : r.descricao,
+                });
+            });
         });
 
         setParsed({ ativoTotal, passivoTotal, receitaTotal, impostoVal, timeShareVal, issVal, despesas, foraDoEscopo });
