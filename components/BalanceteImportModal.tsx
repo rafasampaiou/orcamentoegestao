@@ -87,12 +87,16 @@ const matchByCode = (hierarquico: string, accounts: Account[]): { level: 'accoun
 // (herda overflow-x:auto junto, então qualquer coisa que vazasse do card ficava invisível).
 const ForaDoEscopoCard: React.FC<{ name: string; total: number; items: DespesaRow[]; large?: boolean }> = ({ name, total, items, large }) => {
     const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
-    const TOOLTIP_WIDTH = 320;
+    const TOOLTIP_WIDTH = 360;
 
     const handleEnter = (e: React.MouseEvent<HTMLDivElement>) => {
         const rect = e.currentTarget.getBoundingClientRect();
-        const left = Math.min(rect.left, window.innerWidth - TOOLTIP_WIDTH - 12);
-        setPos({ top: rect.bottom + 4, left: Math.max(12, left) });
+        // Abre alinhado à esquerda do card; se não couber (perto da borda direita da tela), abre
+        // alinhado pela direita do card em vez disso — nunca alinhado pela esquerda deslocado, que
+        // deixava o balão apertado contra a borda com pouca sobra pro conteúdo.
+        const fitsLeftAligned = rect.left + TOOLTIP_WIDTH + 12 <= window.innerWidth;
+        const left = fitsLeftAligned ? rect.left : Math.max(12, rect.right - TOOLTIP_WIDTH);
+        setPos({ top: rect.bottom + 4, left });
     };
 
     return (
@@ -110,9 +114,12 @@ const ForaDoEscopoCard: React.FC<{ name: string; total: number; items: DespesaRo
                 >
                     <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Contas contábeis fora do escopo</p>
                     {items.map((r, i) => (
-                        <div key={i} className="flex justify-between gap-2 text-[11px] py-1 border-b border-gray-50 last:border-0">
-                            <span className="text-gray-600 truncate">{r.matchedName} <span className="text-gray-400 font-mono">({r.hierarquico})</span></span>
-                            <span className="tabular-nums text-gray-700 shrink-0">{r.movimento.toLocaleString('pt-BR')}</span>
+                        // min-w-0 é o que faz o flex item aceitar encolher o suficiente pra
+                        // quebrar linha (sem isso, um nome comprido empurrava o valor pra fora da
+                        // área visível do balão em vez de só quebrar/truncar).
+                        <div key={i} className="flex justify-between items-start gap-2 text-[11px] py-1 border-b border-gray-50 last:border-0">
+                            <span className="text-gray-600 min-w-0">{r.matchedName} <span className="text-gray-400 font-mono">({r.hierarquico})</span></span>
+                            <span className="tabular-nums text-gray-700 shrink-0 text-right">{r.movimento.toLocaleString('pt-BR')}</span>
                         </div>
                     ))}
                 </div>,
