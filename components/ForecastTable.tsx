@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { getForecastData, getDynamicForecastData } from '../services/mockData';
 import { Upload, ListFilter, LayoutList, Settings2, ChevronUp, Activity, TrendingUp, Lock, LockOpen, CheckCircle2, X, FileSpreadsheet, AlertCircle, CheckCircle, ChevronRight, ChevronDown } from 'lucide-react';
-import { ExpenseDriver, ImportedRow, Account, CostPackage, Hotel, ForecastRow, ForecastConfig, ForecastOperator, ColumnVisibility, UserRole, KpiCalculation } from '../types';
+import { ExpenseDriver, ImportedRow, Account, CostCenter, CostPackage, Hotel, ForecastRow, ForecastConfig, ForecastOperator, ColumnVisibility, UserRole, KpiCalculation } from '../types';
 import { evaluateFormula } from '../utils/formulaEngine';
 import { supabaseService } from '../services/supabaseService';
 import { VersionInfoBanner } from './VersionInfoBanner';
@@ -18,6 +18,7 @@ interface ForecastTableProps {
     selectedHotel?: string;
     // New props for dynamic structure
     accounts: Account[];
+    costCenters?: CostCenter[];
     packages: CostPackage[];
     packageKpiConfigs?: Record<string, KpiCalculation>;
     hotels: Hotel[];
@@ -215,6 +216,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     financialData,
     selectedHotel,
     accounts,
+    costCenters = [],
     packages,
     packageKpiConfigs = {},
     hotels,
@@ -2412,6 +2414,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 setRealOccupancyData && (
                     <BalanceteImportModal
                         accounts={accounts}
+                        costCenters={costCenters}
                         hotel={selectedHotel || ''}
                         year={selectedYear || 0}
                         month={selectedMonth || 0}

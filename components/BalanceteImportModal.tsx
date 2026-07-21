@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import * as XLSX from 'xlsx';
 import { X, Upload, CheckCircle2, AlertTriangle } from 'lucide-react';
-import { Account, ImportedRow } from '../types';
+import { Account, CostCenter, ImportedRow } from '../types';
 import { supabaseService } from '../services/supabaseService';
 import toast from 'react-hot-toast';
 
 interface BalanceteImportModalProps {
     accounts: Account[];
+    costCenters: CostCenter[];
     hotel: string;
     year: number;
     month: number;
@@ -38,6 +39,11 @@ interface DespesaRow {
     matchLevel: 'account' | 'package' | 'master' | null;
     matchedName: string | null;
     masterPackage: string | null;
+    // Coluna "Cod_CentroResultado" do balancete — o CR/setor que lançou a despesa. crName vem do
+    // cadastro de Centros de Custo (mesmo código, filtrado pelo hotel atual); sem match, mostra o
+    // código cru mesmo.
+    crCode: string | null;
+    crName: string | null;
 }
 
 interface ParsedBalancete {
@@ -78,14 +84,19 @@ const matchByCode = (hierarquico: string, accounts: Account[]): { level: 'accoun
     return null;
 };
 
-// Card de um Pacote Master fora do escopo — passar o mouse mostra as contas contábeis
-// individuais (com o código Hierarquico) que compõem aquele total. O balancete não traz uma
-// coluna de CR/Centro de Custo (só Hierarquico/Descricao/Movimento), então o balão mostra a
-// conta contábil casada, não o CR.
-// O balão é renderizado via portal em document.body (position: fixed, calculado a partir do
-// retângulo do card) — dentro do card ele ficava cortado pelo overflow-y-auto do corpo do modal
-// (herda overflow-x:auto junto, então qualquer coisa que vazasse do card ficava invisível).
+// Card de um Pacote Master fora do escopo — passar o mouse mostra, agrupado por conta contábil,
+// os CRs (Centro de Resultado) que lançaram naquela conta. O balão é renderizado via portal em
+// document.body (position: fixed, calculado a partir do retângulo do card) — dentro do card ele
+// ficava cortado pelo overflow-y-auto do corpo do modal (herda overflow-x:auto junto, então
+// qualquer coisa que vazasse do card ficava invisível).
 const ForaDoEscopoCard: React.FC<{ name: string; total: number; items: DespesaRow[]; large?: boolean }> = ({ name, total, items, large }) => {
+    const grouped: { accName: string; hierarquico: string; rows: DespesaRow[] }[] = [];
+    items.forEach(r => {
+        const accName = r.matchedName || '(conta não identificada)';
+        let group = grouped.find(g => g.accName === accName);
+        if (!group) { group = { accName, hierarquico: r.hierarquico, rows: [] }; grouped.push(group); }
+        group.rows.push(r);
+    });
     const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
     const TOOLTIP_WIDTH = 360;
 
@@ -113,13 +124,20 @@ const ForaDoEscopoCard: React.FC<{ name: string; total: number; items: DespesaRo
                     className="z-[200] max-h-72 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-2xl p-3 text-left normal-case"
                 >
                     <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Contas contábeis fora do escopo</p>
-                    {items.map((r, i) => (
-                        // min-w-0 é o que faz o flex item aceitar encolher o suficiente pra
-                        // quebrar linha (sem isso, um nome comprido empurrava o valor pra fora da
-                        // área visível do balão em vez de só quebrar/truncar).
-                        <div key={i} className="flex justify-between items-start gap-2 text-[11px] py-1 border-b border-gray-50 last:border-0">
-                            <span className="text-gray-600 min-w-0">{r.matchedName} <span className="text-gray-400 font-mono">({r.hierarquico})</span></span>
-                            <span className="tabular-nums text-gray-700 shrink-0 text-right">{r.movimento.toLocaleString('pt-BR')}</span>
+                    {grouped.map((g, gi) => (
+                        <div key={gi} className="mb-2 last:mb-0">
+                            <p className="text-[11px] font-bold text-gray-700 min-w-0">
+                                {g.accName} <span className="text-gray-400 font-normal font-mono">({g.hierarquico})</span>
+                            </p>
+                            {g.rows.map((r, i) => (
+                                // min-w-0 é o que faz o flex item aceitar encolher o suficiente pra
+                                // quebrar linha (sem isso, um nome comprido empurrava o valor pra
+                                // fora da área visível do balão em vez de só quebrar/truncar).
+                                <div key={i} className="flex justify-between items-start gap-2 pl-2 text-[11px] py-0.5 border-b border-gray-50 last:border-0">
+                                    <span className="text-gray-500 min-w-0">{r.crName || 'CR não identificado'}</span>
+                                    <span className="tabular-nums text-gray-700 shrink-0 text-right">{r.movimento.toLocaleString('pt-BR')}</span>
+                                </div>
+                            ))}
                         </div>
                     ))}
                 </div>,
@@ -129,7 +147,7 @@ const ForaDoEscopoCard: React.FC<{ name: string; total: number; items: DespesaRo
     );
 };
 
-const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, hotel, year, month, versionId, onImportData, otbContextKey, setRealOccupancyData, onClose }) => {
+const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, costCenters, hotel, year, month, versionId, onImportData, otbContextKey, setRealOccupancyData, onClose }) => {
     const [parsed, setParsed] = useState<ParsedBalancete | null>(null);
     const [fileName, setFileName] = useState('');
     const [isSaving, setIsSaving] = useState(false);
@@ -150,6 +168,9 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
         const hierKey = findKey(json[0], ['Hierarquico', 'Hierárquico']);
         const descKey = findKey(json[0], ['Descricao', 'Descrição']);
         const movKey = findKey(json[0], ['Movimento']);
+        // Opcional — nem todo balancete traz essa coluna. Quando existe, é o código do Centro de
+        // Custo/Resultado (CR) que fez o lançamento, casado contra o cadastro pelo código + hotel.
+        const crKey = findKey(json[0], ['Cod_CentroResultado', 'CodCentroResultado', 'Centro Resultado', 'Cod_CR', 'Centro de Custo', 'CR']);
 
         if (!hierKey || !descKey || !movKey) {
             toast.error('Não encontrei as colunas Hierarquico/Descricao/Movimento nessa planilha.');
@@ -174,6 +195,13 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
             // pra tudo que aparece na tela (e o que é gravado) já estar no sinal certo.
             const movimento = -rawMovimento;
             if (!hierarquico) return;
+
+            const crCode = crKey ? String(r[crKey] ?? '').trim() || null : null;
+            const crName = crCode
+                ? (costCenters.find(c => c.code === crCode && c.hotelName === hotel)?.name
+                    || costCenters.find(c => c.code === crCode)?.name
+                    || crCode)
+                : null;
 
             // 1 (Ativo) e 2 (Passivo) — só um resumo pra referência, não entram no import.
             if (hierarquico.startsWith('1')) { ativoTotal += movimento; return; }
@@ -210,6 +238,8 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
                         matchLevel: match.level,
                         matchedName: match.name,
                         masterPackage: match.masterPackage || null,
+                        crCode,
+                        crName,
                     });
                     return;
                 }
@@ -220,6 +250,8 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
                     matchLevel: match?.level || null,
                     matchedName: match?.name || null,
                     masterPackage: match?.masterPackage || null,
+                    crCode,
+                    crName,
                 });
                 return;
             }
