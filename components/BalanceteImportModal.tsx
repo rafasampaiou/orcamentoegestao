@@ -122,16 +122,6 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
             const movimento = -rawMovimento;
             if (!hierarquico) return;
 
-            // Setores corporativos (Mais Tauá, Vip Club, Pós Venda, Instituto Tauá, Propriedades,
-            // Obras, Novos Negócios) são centros de custo, não contas do Plano de Contas do hotel —
-            // nunca vão casar por código. São identificados pela própria Descricao, então são
-            // capturados ANTES de qualquer filtro por código/profundidade (que só faz sentido pras
-            // contas do hotel) — senão um código raso desses setores seria descartado sem nunca
-            // alimentar o card do setor.
-            const normDesc = normalizeName(descricao);
-            const sectorMatch = SECTOR_NAMES.find(name => normDesc.includes(normalizeName(name)));
-            if (sectorMatch) { sectorTotals[sectorMatch] += movimento; return; }
-
             // 1 (Ativo) e 2 (Passivo) — só um resumo pra referência, não entram no import.
             if (hierarquico.startsWith('1')) { ativoTotal += movimento; return; }
             if (hierarquico.startsWith('2')) { passivoTotal += movimento; return; }
@@ -155,6 +145,16 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
 
             // 4 (Despesa) — casa pelo código no Plano de Contas (conta, pacote ou pacote master).
             if (hierarquico.startsWith('4')) {
+                // Setores corporativos (Mais Tauá, Vip Club, Pós Venda, Instituto Tauá,
+                // Propriedades, Obras, Novos Negócios) são centros de custo, não contas do Plano de
+                // Contas do hotel — nunca vão casar por código, só pela própria Descricao. Mesmo
+                // escopo do resto da despesa (só prefixo 4), mas capturados antes do filtro de
+                // profundidade — senão um código raso desses setores seria descartado sem nunca
+                // alimentar o card do setor.
+                const normDesc = normalizeName(descricao);
+                const sectorMatch = SECTOR_NAMES.find(name => normDesc.includes(normalizeName(name)));
+                if (sectorMatch) { sectorTotals[sectorMatch] += movimento; return; }
+
                 if (digitCount(hierarquico) <= 3) return; // código raso (ex.: "4.02"), ignora
                 const match = matchByCode(hierarquico, accounts);
                 if (match?.outOfScope) return; // conta/pacote marcado "Fora do escopo", nem mostra
