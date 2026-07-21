@@ -30,6 +30,11 @@ const ISS_CODE = '3.01.01.02.008';
 // código como uma conta/pacote normal). Identificados pela própria Descricao do balancete.
 const SECTOR_NAMES = ['Mais Tauá', 'Vip Club', 'Pós Venda', 'Instituto Tauá', 'Propriedades', 'Obras', 'Novos Negócios'];
 const normalizeName = (s: string) => s.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+// Ignora também espaço/hífen/pontuação — "PJ - MEI" e "PJ-MEI" têm que bater. A comparação
+// exata (normalizeName) já falhava pra reconhecer a linha "base" de uma conta por causa de
+// diferenças assim entre o texto do balancete e o nome cadastrado no Plano de Contas, o que
+// fazia a linha base nunca ser descartada e duplicava o valor (base + soma dos CRs).
+const normalizeLoose = (s: string) => normalizeName(s).replace(/[^a-z0-9]/g, '');
 
 interface DespesaRow {
     hierarquico: string;
@@ -234,7 +239,7 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
                 const match = matchByCode(hierarquico, accounts);
                 if (!match || match.level !== 'account') return;
 
-                const isBaseLine = normalizeName(descricao) === normalizeName(match.name);
+                const isBaseLine = normalizeLoose(descricao) === normalizeLoose(match.name);
                 if (!hierGroups.has(hierarquico)) hierGroups.set(hierarquico, { match, rows: [] });
                 hierGroups.get(hierarquico)!.rows.push({ descricao, movimento, isBaseLine });
                 return;
@@ -247,9 +252,18 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
         // informação que existe pra essa conta e conta sozinha.
         hierGroups.forEach((group, hierarquico) => {
             const { match, rows } = group;
-            const hasCrBreakdown = rows.some(r => !r.isBaseLine);
-            const countedRows = hasCrBreakdown ? rows.filter(r => !r.isBaseLine) : rows;
+            let baseIdx = rows.findIndex(r => r.isBaseLine);
+            // Rede de segurança: se nenhuma linha bateu pelo texto (pode ter alguma diferença de
+            // formatação que a normalização não previu) mas o valor de uma linha é exatamente a
+            // soma das outras, ela é o subtotal de qualquer forma — sem isso, uma pequena
+            // diferença de texto faria o valor entrar dobrado sem nenhum aviso.
+            if (baseIdx === -1 && rows.length > 1) {
+                const total = rows.reduce((s, r) => s + r.movimento, 0);
+                baseIdx = rows.findIndex(r => Math.abs(2 * r.movimento - total) < Math.max(0.05, Math.abs(total) * 0.0005));
+            }
+            const countedRows = baseIdx === -1 ? rows : rows.filter((_, i) => i !== baseIdx);
             const target = match.outOfScope ? foraDoEscopo : despesas;
+            const hasCrBreakdown = baseIdx !== -1 || countedRows.length > 1;
             countedRows.forEach(r => {
                 target.push({
                     hierarquico,
@@ -259,7 +273,7 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
                     matchedName: match.name,
                     masterPackage: match.masterPackage || null,
                     crCode: null,
-                    crName: r.isBaseLine ? null : r.descricao,
+                    crName: hasCrBreakdown ? r.descricao : null,
                 });
             });
         });
