@@ -829,9 +829,16 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 });
             }
         } else if (index === 3) {
+            // Resetar a ocupação/receita do Forecast invalida qualquer cálculo já feito em cima
+            // dela — a flag de "Calcular Forecast" (passo 5) é resetada junto (o próprio popup de
+            // confirmação já avisa disso antes de chegar aqui).
             if (!setRealOccupancyData) return;
             const normalKey = `${selectedHotel}_${selectedYear}_${selectedMonth}_${activeRealVersionId || ''}__${activeProjectionType}`;
-            setRealOccupancyData(prev => ({ ...prev, [normalKey]: {} }));
+            setRealOccupancyData(prev => {
+                const currentOtb = { ...(prev[otbContextKey] || {}) };
+                delete currentOtb['__forecast_calculated'];
+                return { ...prev, [normalKey]: {}, [otbContextKey]: currentOtb };
+            });
         } else if (index === 4) {
             if (!setRealOccupancyData) return;
             setRealOccupancyData(prev => {

@@ -179,7 +179,14 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
                 return { ...prev, [otbKey]: cleaned };
             });
         } else if (index === 3) {
-            setRealOccupancyData(prev => ({ ...prev, [normalKey]: {} }));
+            // Resetar a ocupação/receita do Forecast invalida o cálculo já feito em cima dela — a
+            // flag de "Calcular Forecast" (passo 5) é resetada junto (o próprio popup de
+            // confirmação já avisa disso antes de chegar aqui).
+            setRealOccupancyData(prev => {
+                const currentOtb = { ...(prev[otbKey] || {}) };
+                delete currentOtb['__forecast_calculated'];
+                return { ...prev, [normalKey]: {}, [otbKey]: currentOtb };
+            });
         } else if (index === 6) {
             setRealOccupancyData(prev => {
                 const current = { ...(prev[otbKey] || {}) };

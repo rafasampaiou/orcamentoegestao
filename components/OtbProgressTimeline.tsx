@@ -13,6 +13,12 @@ interface OtbProgressTimelineProps {
     title?: string;
 }
 
+// Resetar uma etapa às vezes invalida o que já foi feito na etapa seguinte — pede uma confirmação
+// extra nesses casos, avisando qual outra etapa também será desfeita junto.
+const CASCADE_ON_RESET: Record<number, number> = {
+    3: 4, // Inserir a ocupação e receita do Forecast -> reseta Calcular Forecast também
+};
+
 // Checklist compacto dos 8 passos de montagem de uma projeção (Reunião de Ritmo/FCA N1/FCA N2)
 // — mesmo padrão visual de badge numerado do "Cronograma de Elaboração" em
 // UnifiedAdministrationView.tsx, só que horizontal/compacto pra caber no topo da tela. Todo passo
@@ -20,6 +26,7 @@ interface OtbProgressTimelineProps {
 // se já foi feito, pergunta se o usuário quer revisar (mesma navegação) ou resetar (desfazer).
 const OtbProgressTimeline: React.FC<OtbProgressTimelineProps> = ({ completed, onStepClick, onStepReset, resettableSteps, title }) => {
     const [confirmIndex, setConfirmIndex] = useState<number | null>(null);
+    const [pendingReset, setPendingReset] = useState<number | null>(null);
     const doneCount = completed.filter(Boolean).length;
 
     const handleBadgeClick = (idx: number) => {
@@ -29,6 +36,15 @@ const OtbProgressTimeline: React.FC<OtbProgressTimelineProps> = ({ completed, on
             setConfirmIndex(idx);
         } else {
             onStepClick?.(idx);
+        }
+    };
+
+    const requestReset = (idx: number) => {
+        setConfirmIndex(null);
+        if (CASCADE_ON_RESET[idx] !== undefined) {
+            setPendingReset(idx);
+        } else {
+            onStepReset?.(idx);
         }
     };
 
@@ -95,7 +111,7 @@ const OtbProgressTimeline: React.FC<OtbProgressTimelineProps> = ({ completed, on
                             </button>
                             <button
                                 type="button"
-                                onClick={() => { onStepReset?.(confirmIndex); setConfirmIndex(null); }}
+                                onClick={() => requestReset(confirmIndex)}
                                 className="w-full px-4 py-2 rounded-lg bg-red-50 text-red-600 border border-red-200 text-sm font-bold hover:bg-red-100 transition-colors"
                             >
                                 Resetar etapa
@@ -104,6 +120,39 @@ const OtbProgressTimeline: React.FC<OtbProgressTimelineProps> = ({ completed, on
                                 type="button"
                                 onClick={() => setConfirmIndex(null)}
                                 className="w-full px-4 py-1 text-xs text-gray-400 hover:text-gray-600"
+                            >
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {pendingReset !== null && (
+                <div
+                    className="fixed inset-0 bg-black/40 z-[200] flex items-center justify-center"
+                    onClick={() => setPendingReset(null)}
+                >
+                    <div
+                        className="bg-white rounded-xl shadow-2xl p-5 w-96"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <p className="font-bold text-gray-800 mb-3">
+                            Caso resetar a etapa "{OTB_STEP_LABELS[pendingReset]}", a próxima etapa "{OTB_STEP_LABELS[CASCADE_ON_RESET[pendingReset]]}" será resetada também.
+                        </p>
+                        <p className="text-sm text-gray-500 mb-4">Tem certeza que deseja resetar?</p>
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => { onStepReset?.(pendingReset); setPendingReset(null); }}
+                                className="flex-1 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition-colors"
+                            >
+                                Sim, resetar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setPendingReset(null)}
+                                className="flex-1 px-4 py-2 rounded-lg bg-gray-100 text-gray-600 text-sm font-bold hover:bg-gray-200 transition-colors"
                             >
                                 Cancelar
                             </button>
