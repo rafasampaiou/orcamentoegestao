@@ -792,8 +792,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             handleCalcularForecast();
         } else if (index === 5) {
             // Incluir despesas da prévia — expande os pacotes de Custos, mostra as contas (caso
-            // estivessem ocultas) e rola/sinaliza a primeira conta contábil na coluna Prévia,
-            // indicando por onde começar a preencher.
+            // estivessem ocultas), rola até "CUSTOS E DESPESAS OPERACIONAIS" (encostando no
+            // cabeçalho) e sinaliza a célula de Prévia da primeira conta contábil, indicando por
+            // onde começar a preencher.
             setShowDetails(true);
             const firstAccountRow = data.find(r => r.category === 'Account');
             if (firstAccountRow) {
@@ -801,7 +802,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 setExpandedPackages(new Set(allPackageIds));
                 setHighlightRowId(firstAccountRow.id);
                 setTimeout(() => {
-                    document.getElementById(`dre-row-${firstAccountRow.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    document.getElementById('dre-row-CST-HEAD')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }, 50);
                 setTimeout(() => setHighlightRowId(prev => (prev === firstAccountRow.id ? null : prev)), 5000);
             }
@@ -1776,7 +1777,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     const textClass = isBlueHighlight ? "text-sky-900" : "text-slate-800";
 
                                     return (
-                                        <tr key={row.id} className={rowClass}>
+                                        <tr key={row.id} id={`dre-row-${row.id}`} className={rowClass}>
                                             <td className={`px-2 py-3 text-sm font-bold ${textClass} uppercase tracking-wide flex items-center truncate sticky left-0 z-20 ${stickyClass}`}>
                                                 {!isBlueHighlight && <div className="w-1 h-4 bg-indigo-500 mr-2 rounded-full"></div>}
                                                 {row.label}
@@ -1834,7 +1835,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         key={row.id}
                                         id={`dre-row-${row.id}`}
                                         style={{ backgroundColor: row.bgColor || undefined }}
-                                        className={`transition-colors text-slate-700 hover:bg-indigo-50/30 ${isTotal ? 'bg-indigo-50 font-bold border-y-2 border-gray-300 text-indigo-900' : 'border-b border-gray-100'} ${row.id === 'REV-IMP' ? 'bg-sky-100 border-y-2 border-sky-300 font-bold text-sky-950 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.5)]' : ''} ${row.id === highlightRowId ? 'ring-2 ring-inset ring-amber-400 animate-pulse' : ''}`}
+                                        className={`transition-colors text-slate-700 hover:bg-indigo-50/30 ${isTotal ? 'bg-indigo-50 font-bold border-y-2 border-gray-300 text-indigo-900' : 'border-b border-gray-100'} ${row.id === 'REV-IMP' ? 'bg-sky-100 border-y-2 border-sky-300 font-bold text-sky-950 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.5)]' : ''}`}
                                     >
                                         <td
                                             style={rowTextStyle}
