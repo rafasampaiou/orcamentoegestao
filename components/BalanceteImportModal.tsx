@@ -38,8 +38,10 @@ interface DespesaRow {
     matchLevel: 'account' | 'package' | 'master' | null;
     matchedName: string | null;
     masterPackage: string | null;
-    // Coluna "Cod_CentroResultado" do balancete — o CR/setor que lançou a despesa. crName vem do
-    // vem direto do balancete (não casa contra nenhum cadastro — os códigos não batem).
+    // Este balancete é "por CR": o mesmo Hierarquico se repete uma vez por CR que lançou naquela
+    // conta, com a Descricao sendo o nome do CR em vez do nome da conta — crCode fica sempre null
+    // (não existe uma coluna de código separada), crName é null na linha "base" da própria conta
+    // e o nome do CR (extraído da Descricao) nas demais.
     crCode: string | null;
     crName: string | null;
 }
@@ -52,9 +54,6 @@ interface ParsedBalancete {
     timeShareVal: number;
     issVal: number;
     despesas: DespesaRow[];
-    // Se a planilha não tem uma coluna de CR reconhecível — usado pra avisar na tela em vez de só
-    // mostrar "CR não identificado" sem dizer por quê.
-    hasCrColumn: boolean;
     // Contas/pacotes casados por código, mas marcados "Fora do escopo" no Plano de Contas — hoje
     // são só descartados do import; guardados à parte pra dar pra mostrar quanto isso representa.
     foraDoEscopo: DespesaRow[];
@@ -137,7 +136,7 @@ const ForaDoEscopoCard: React.FC<{ name: string; total: number; items: DespesaRo
                                 // quebrar linha (sem isso, um nome comprido empurrava o valor pra
                                 // fora da área visível do balão em vez de só quebrar/truncar).
                                 <div key={i} className="flex justify-between items-start gap-2 pl-2 text-[11px] py-0.5 border-b border-gray-50 last:border-0">
-                                    <span className="text-gray-500 min-w-0">{r.crName || 'CR não identificado'}</span>
+                                    <span className="text-gray-500 min-w-0">{r.crName || 'Sem CR específico'}</span>
                                     <span className="tabular-nums text-gray-700 shrink-0 text-right">{r.movimento.toLocaleString('pt-BR')}</span>
                                 </div>
                             ))}
@@ -171,14 +170,6 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
         const hierKey = findKey(json[0], ['Hierarquico', 'Hierárquico']);
         const descKey = findKey(json[0], ['Descricao', 'Descrição']);
         const movKey = findKey(json[0], ['Movimento']);
-        // Opcional — nem todo balancete traz essa coluna. Quando existe, é o código do Centro de
-        // Custo/Resultado (CR) que fez o lançamento. Se o nome exato não bater com nenhum
-        // candidato, cai pra qualquer cabeçalho que contenha "centro" + "resultado"/"custo".
-        const crKey = findKey(json[0], ['Cod_CentroResultado', 'CodCentroResultado', 'Centro Resultado', 'Cod_CR', 'Centro de Custo', 'CR'])
-            || Object.keys(json[0]).find(k => {
-                const n = k.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
-                return n.includes('centro') && (n.includes('resultado') || n.includes('custo'));
-            });
 
         if (!hierKey || !descKey || !movKey) {
             toast.error('Não encontrei as colunas Hierarquico/Descricao/Movimento nessa planilha.');
@@ -203,11 +194,6 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
             // pra tudo que aparece na tela (e o que é gravado) já estar no sinal certo.
             const movimento = -rawMovimento;
             if (!hierarquico) return;
-
-            // O código do balancete não bate com o cadastro de Centros de Custo (bases diferentes),
-            // então nem tenta casar — mostra direto o valor que já vem na própria planilha.
-            const crCode = crKey ? String(r[crKey] ?? '').trim() || null : null;
-            const crName = crCode;
 
             // 1 (Ativo) e 2 (Passivo) — só um resumo pra referência, não entram no import.
             if (hierarquico.startsWith('1')) { ativoTotal += movimento; return; }
@@ -234,6 +220,17 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
             if (hierarquico.startsWith('4')) {
                 if (digitCount(hierarquico) <= 3) return; // código raso (ex.: "4.02"), ignora
                 const match = matchByCode(hierarquico, accounts);
+
+                // Balancete "por CR": o mesmo Hierarquico se repete várias vezes — uma linha com a
+                // Descricao igual ao nome da própria conta/pacote (o lançamento sem CR específico,
+                // ou o total) e uma linha por CR que lançou nessa conta, com a Descricao sendo o
+                // nome do CR em vez do nome da conta. Não tem coluna separada de CR — o jeito de
+                // saber é comparar a Descricao com o nome já casado.
+                const matchName = match?.name || null;
+                const isBaseLine = !!matchName && normalizeName(descricao) === normalizeName(matchName);
+                const crCode: string | null = null;
+                const crName = isBaseLine ? null : (descricao || null);
+
                 if (match?.outOfScope) {
                     // Casou por código, mas a conta/pacote está marcada "Fora do escopo" — não
                     // entra no import nem no total de despesas, mas fica visível à parte.
@@ -264,7 +261,7 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
             // Outros prefixos (5, 6...): fora do escopo pedido, ignorados.
         });
 
-        setParsed({ ativoTotal, passivoTotal, receitaTotal, impostoVal, timeShareVal, issVal, despesas, foraDoEscopo, hasCrColumn: !!crKey });
+        setParsed({ ativoTotal, passivoTotal, receitaTotal, impostoVal, timeShareVal, issVal, despesas, foraDoEscopo });
     };
 
     const matchedDespesas = parsed?.despesas.filter(r => r.matchLevel) || [];
@@ -417,21 +414,16 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
                             </div>
 
                             {Object.keys(foraDoEscopoPorMaster).length > 0 && (
-                                <>
-                                    {!parsed.hasCrColumn && (
-                                        <p className="text-xs text-amber-600 mb-2">Não encontrei uma coluna de CR/Centro de Resultado nessa planilha — por isso o balão mostra "CR não identificado".</p>
-                                    )}
-                                    <div className="grid grid-cols-4 gap-4">
-                                        <div className="bg-rose-50 border border-rose-200 rounded-xl p-4">
-                                            <span className="text-[10px] text-rose-500 font-bold uppercase tracking-wide">Total fora do escopo</span>
-                                            <div className="text-xl font-bold text-rose-800 tabular-nums mt-1">{foraDoEscopoTotal.toLocaleString('pt-BR')}</div>
-                                            <span className="text-[10px] text-rose-400">{parsed.foraDoEscopo.length} lançamentos</span>
-                                        </div>
-                                        {Object.entries(foraDoEscopoPorMaster).map(([name, total]) => (
-                                            <ForaDoEscopoCard key={name} name={name} total={total} items={foraDoEscopoItemsPorMaster[name] || []} large />
-                                        ))}
+                                <div className="grid grid-cols-4 gap-4">
+                                    <div className="bg-rose-50 border border-rose-200 rounded-xl p-4">
+                                        <span className="text-[10px] text-rose-500 font-bold uppercase tracking-wide">Total fora do escopo</span>
+                                        <div className="text-xl font-bold text-rose-800 tabular-nums mt-1">{foraDoEscopoTotal.toLocaleString('pt-BR')}</div>
+                                        <span className="text-[10px] text-rose-400">{parsed.foraDoEscopo.length} lançamentos</span>
                                     </div>
-                                </>
+                                    {Object.entries(foraDoEscopoPorMaster).map(([name, total]) => (
+                                        <ForaDoEscopoCard key={name} name={name} total={total} items={foraDoEscopoItemsPorMaster[name] || []} large />
+                                    ))}
+                                </div>
                             )}
                         </div>
                     ) : !parsed ? (
@@ -488,9 +480,6 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
                             {Object.keys(foraDoEscopoPorMaster).length > 0 && (
                                 <>
                                     <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-2">Despesas fora do escopo (Plano de Contas)</p>
-                                    {!parsed.hasCrColumn && (
-                                        <p className="text-xs text-amber-600 mb-2">Não encontrei uma coluna de CR/Centro de Resultado nessa planilha — por isso o balão mostra "CR não identificado".</p>
-                                    )}
                                     <div className="grid grid-cols-4 gap-3 mb-4 text-xs">
                                         <div className="bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
                                             <span className="text-rose-500 font-bold uppercase">Total fora do escopo</span>
