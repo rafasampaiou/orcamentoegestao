@@ -2507,11 +2507,11 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="text-xs text-gray-500 uppercase font-bold border-b border-gray-200">
-                                        <th className="text-left py-2">Indicador</th>
-                                        <th className="text-right py-2">Prévia</th>
-                                        <th className="text-right py-2">Forecast</th>
-                                        <th className="text-right py-2">Meta</th>
-                                        <th className="text-right py-2">Ano anterior</th>
+                                        <th className="text-left py-2 pr-3">Indicador</th>
+                                        <th className="text-right py-2 px-3 border-l border-gray-200">Prévia</th>
+                                        <th className="text-right py-2 px-3 border-l border-gray-200">Forecast</th>
+                                        <th className="text-right py-2 px-3 border-l border-gray-200">Meta</th>
+                                        <th className="text-right py-2 pl-3 border-l border-gray-200">Ano anterior</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-50">
@@ -2522,11 +2522,11 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         const fmt = row.rowConfig?.format || 'currency';
                                         return (
                                             <tr key={item.id} className={item.bold ? 'font-bold text-gray-900' : 'text-gray-600'}>
-                                                <td className="py-2">{item.label}</td>
-                                                <td className="py-2 text-right tabular-nums">{formatValue(row.previa, fmt)}</td>
-                                                <td className="py-2 text-right tabular-nums">{formatValue(row.real, fmt)}</td>
-                                                <td className="py-2 text-right tabular-nums">{formatValue(row.budget, fmt)}</td>
-                                                <td className="py-2 text-right tabular-nums">{formatValue(row.lastYear, fmt)}</td>
+                                                <td className="py-2 pr-3">{item.label}</td>
+                                                <td className="py-2 px-3 text-right tabular-nums border-l border-gray-100">{formatValue(row.previa, fmt)}</td>
+                                                <td className="py-2 px-3 text-right tabular-nums border-l border-gray-100">{formatValue(row.real, fmt)}</td>
+                                                <td className="py-2 px-3 text-right tabular-nums border-l border-gray-100">{formatValue(row.budget, fmt)}</td>
+                                                <td className="py-2 pl-3 text-right tabular-nums border-l border-gray-100">{formatValue(row.lastYear, fmt)}</td>
                                             </tr>
                                         );
                                     })}
