@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import * as XLSX from 'xlsx';
 import { X, Upload, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Account, ImportedRow } from '../types';
@@ -81,21 +82,45 @@ const matchByCode = (hierarquico: string, accounts: Account[]): { level: 'accoun
 // individuais (com o código Hierarquico) que compõem aquele total. O balancete não traz uma
 // coluna de CR/Centro de Custo (só Hierarquico/Descricao/Movimento), então o balão mostra a
 // conta contábil casada, não o CR.
-const ForaDoEscopoCard: React.FC<{ name: string; total: number; items: DespesaRow[]; large?: boolean }> = ({ name, total, items, large }) => (
-    <div className={`bg-gray-50 border border-gray-200 rounded-lg relative group cursor-help ${large ? 'p-4' : 'px-3 py-2'}`}>
-        <span className={`text-gray-500 font-bold uppercase tracking-wide ${large ? 'text-[10px]' : 'text-xs'}`}>{name}</span>
-        <div className={`font-bold text-gray-800 tabular-nums ${large ? 'text-xl mt-1' : 'font-medium'}`}>{total.toLocaleString('pt-BR')}</div>
-        <div className="hidden group-hover:block absolute z-50 left-0 top-full mt-1 w-80 max-h-60 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-xl p-3 text-left normal-case">
-            <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Contas contábeis fora do escopo</p>
-            {items.map((r, i) => (
-                <div key={i} className="flex justify-between gap-2 text-[11px] py-1 border-b border-gray-50 last:border-0">
-                    <span className="text-gray-600 truncate">{r.matchedName} <span className="text-gray-400 font-mono">({r.hierarquico})</span></span>
-                    <span className="tabular-nums text-gray-700 shrink-0">{r.movimento.toLocaleString('pt-BR')}</span>
-                </div>
-            ))}
+// O balão é renderizado via portal em document.body (position: fixed, calculado a partir do
+// retângulo do card) — dentro do card ele ficava cortado pelo overflow-y-auto do corpo do modal
+// (herda overflow-x:auto junto, então qualquer coisa que vazasse do card ficava invisível).
+const ForaDoEscopoCard: React.FC<{ name: string; total: number; items: DespesaRow[]; large?: boolean }> = ({ name, total, items, large }) => {
+    const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+    const TOOLTIP_WIDTH = 320;
+
+    const handleEnter = (e: React.MouseEvent<HTMLDivElement>) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const left = Math.min(rect.left, window.innerWidth - TOOLTIP_WIDTH - 12);
+        setPos({ top: rect.bottom + 4, left: Math.max(12, left) });
+    };
+
+    return (
+        <div
+            className={`bg-gray-50 border border-gray-200 rounded-lg relative cursor-help ${large ? 'p-4' : 'px-3 py-2'}`}
+            onMouseEnter={handleEnter}
+            onMouseLeave={() => setPos(null)}
+        >
+            <span className={`text-gray-500 font-bold uppercase tracking-wide ${large ? 'text-[10px]' : 'text-xs'}`}>{name}</span>
+            <div className={`font-bold text-gray-800 tabular-nums ${large ? 'text-xl mt-1' : 'font-medium'}`}>{total.toLocaleString('pt-BR')}</div>
+            {pos && createPortal(
+                <div
+                    style={{ position: 'fixed', top: pos.top, left: pos.left, width: TOOLTIP_WIDTH }}
+                    className="z-[200] max-h-72 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-2xl p-3 text-left normal-case"
+                >
+                    <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Contas contábeis fora do escopo</p>
+                    {items.map((r, i) => (
+                        <div key={i} className="flex justify-between gap-2 text-[11px] py-1 border-b border-gray-50 last:border-0">
+                            <span className="text-gray-600 truncate">{r.matchedName} <span className="text-gray-400 font-mono">({r.hierarquico})</span></span>
+                            <span className="tabular-nums text-gray-700 shrink-0">{r.movimento.toLocaleString('pt-BR')}</span>
+                        </div>
+                    ))}
+                </div>,
+                document.body
+            )}
         </div>
-    </div>
-);
+    );
+};
 
 const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, hotel, year, month, versionId, onImportData, otbContextKey, setRealOccupancyData, onClose }) => {
     const [parsed, setParsed] = useState<ParsedBalancete | null>(null);
