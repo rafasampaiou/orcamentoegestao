@@ -47,6 +47,9 @@ interface ParsedBalancete {
     timeShareVal: number;
     issVal: number;
     despesas: DespesaRow[];
+    // Contas/pacotes casados por código, mas marcados "Fora do escopo" no Plano de Contas — hoje
+    // são só descartados do import; guardados à parte pra dar pra mostrar quanto isso representa.
+    foraDoEscopo: DespesaRow[];
 }
 
 // Aceita o cabeçalho com pequenas variações de acento/caixa, já que arquivos de balancete
@@ -108,6 +111,7 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
         let timeShareVal = 0;
         let issVal = 0;
         const despesas: DespesaRow[] = [];
+        const foraDoEscopo: DespesaRow[] = [];
 
         json.forEach(r => {
             const hierarquico = String(r[hierKey] ?? '').trim();
@@ -144,7 +148,19 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
             if (hierarquico.startsWith('4')) {
                 if (digitCount(hierarquico) <= 3) return; // código raso (ex.: "4.02"), ignora
                 const match = matchByCode(hierarquico, accounts);
-                if (match?.outOfScope) return; // conta/pacote marcado "Fora do escopo", nem mostra
+                if (match?.outOfScope) {
+                    // Casou por código, mas a conta/pacote está marcada "Fora do escopo" — não
+                    // entra no import nem no total de despesas, mas fica visível à parte.
+                    foraDoEscopo.push({
+                        hierarquico,
+                        descricao,
+                        movimento,
+                        matchLevel: match.level,
+                        matchedName: match.name,
+                        masterPackage: match.masterPackage || null,
+                    });
+                    return;
+                }
                 despesas.push({
                     hierarquico,
                     descricao,
@@ -158,12 +174,22 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
             // Outros prefixos (5, 6...): fora do escopo pedido, ignorados.
         });
 
-        setParsed({ ativoTotal, passivoTotal, receitaTotal, impostoVal, timeShareVal, issVal, despesas });
+        setParsed({ ativoTotal, passivoTotal, receitaTotal, impostoVal, timeShareVal, issVal, despesas, foraDoEscopo });
     };
 
     const matchedDespesas = parsed?.despesas.filter(r => r.matchLevel) || [];
     const unmatchedCount = (parsed?.despesas.length || 0) - matchedDespesas.length;
     const despesasTotal = matchedDespesas.reduce((s, r) => s + r.movimento, 0);
+
+    // Contas/pacotes marcados "Fora do escopo" no Plano de Contas — um card por Pacote Master,
+    // pra dar visibilidade de quanto ficou de fora do total de despesas sem precisar abrir o
+    // Plano de Contas pra conferir.
+    const foraDoEscopoTotal = (parsed?.foraDoEscopo || []).reduce((s, r) => s + r.movimento, 0);
+    const foraDoEscopoPorMaster: Record<string, number> = {};
+    (parsed?.foraDoEscopo || []).forEach(r => {
+        const key = r.masterPackage || 'Sem Pacote Master';
+        foraDoEscopoPorMaster[key] = (foraDoEscopoPorMaster[key] || 0) + r.movimento;
+    });
 
     // Setores (Mais Tauá, Vip Club, Pós Venda, Instituto Tauá, Propriedades, Obras, Novos
     // Negócios) são identificados pela Descricao, mas só contam despesas de verdade: prefixo 4,
@@ -289,6 +315,22 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
                                     </div>
                                 ))}
                             </div>
+
+                            {Object.keys(foraDoEscopoPorMaster).length > 0 && (
+                                <div className="grid grid-cols-4 gap-4">
+                                    <div className="bg-rose-50 border border-rose-200 rounded-xl p-4">
+                                        <span className="text-[10px] text-rose-500 font-bold uppercase tracking-wide">Total fora do escopo</span>
+                                        <div className="text-xl font-bold text-rose-800 tabular-nums mt-1">{foraDoEscopoTotal.toLocaleString('pt-BR')}</div>
+                                        <span className="text-[10px] text-rose-400">{parsed.foraDoEscopo.length} lançamentos</span>
+                                    </div>
+                                    {Object.entries(foraDoEscopoPorMaster).map(([name, total]) => (
+                                        <div key={name} className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                                            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wide">{name}</span>
+                                            <div className="text-xl font-bold text-gray-800 tabular-nums mt-1">{total.toLocaleString('pt-BR')}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     ) : !parsed ? (
                         <label className="flex flex-col items-center justify-center gap-3 border-2 border-dashed border-gray-300 rounded-xl p-10 cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/30 transition-colors">
@@ -340,6 +382,25 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
                                     </div>
                                 ))}
                             </div>
+
+                            {Object.keys(foraDoEscopoPorMaster).length > 0 && (
+                                <>
+                                    <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-2">Despesas fora do escopo (Plano de Contas)</p>
+                                    <div className="grid grid-cols-4 gap-3 mb-4 text-xs">
+                                        <div className="bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
+                                            <span className="text-rose-500 font-bold uppercase">Total fora do escopo</span>
+                                            <div className="tabular-nums font-medium text-rose-700">{foraDoEscopoTotal.toLocaleString('pt-BR')}</div>
+                                            <span className="text-[10px] text-rose-400">{parsed.foraDoEscopo.length} lançamentos</span>
+                                        </div>
+                                        {Object.entries(foraDoEscopoPorMaster).map(([name, total]) => (
+                                            <div key={name} className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                                                <span className="text-gray-500 font-bold uppercase">{name}</span>
+                                                <div className="tabular-nums font-medium text-gray-700">{total.toLocaleString('pt-BR')}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
 
                             <div className="border border-gray-200 rounded-lg overflow-hidden">
                                 <table className="w-full text-xs">
