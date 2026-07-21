@@ -255,6 +255,10 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
             }]);
             const importId = historyEntry.id;
 
+            // Reimportar o mesmo mês/hotel/versão substitui o que foi importado antes (em vez de
+            // acumular lançamento em cima de lançamento a cada nova importação do mesmo período).
+            await supabaseService.deleteFinancialDataByContext(hotel, year, month, versionId || '', 'OTB');
+
             // Só as linhas "4" com correspondência no Plano de Contas viram lançamento — sem
             // conta/pacote pra atribuir, o valor fica de fora (mas continua visível na prévia).
             const importedRows: ImportedRow[] = matchedDespesas.map(r => ({
@@ -270,9 +274,12 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
                 versionId,
                 importId,
             }));
+            // 'replace' troca só o que já existia pra esse mesmo contexto (hotel/ano/mês/cenário
+            // OTB/versão) — se não houver nenhuma linha casada dessa vez, ainda assim precisa
+            // "substituir" (zerar) o que tinha antes, então roda mesmo com a lista vazia.
+            onImportData(importedRows, 'replace');
             if (importedRows.length > 0) {
                 await supabaseService.saveFinancialData(importedRows, importId);
-                onImportData(importedRows, 'append');
             }
 
             // Imposto, Cancelamento de Time Share e Receita de ISS não são "contas" — vão direto no
@@ -298,7 +305,7 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[85vh] flex flex-col">
                 <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200">
                     <h2 className="text-lg font-bold text-gray-800">Importar despesas do balancete</h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
