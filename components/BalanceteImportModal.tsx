@@ -46,7 +46,6 @@ interface ParsedBalancete {
     impostoVal: number;
     timeShareVal: number;
     issVal: number;
-    sectorTotals: Record<string, number>;
     despesas: DespesaRow[];
 }
 
@@ -108,8 +107,6 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
         let impostoVal = 0;
         let timeShareVal = 0;
         let issVal = 0;
-        const sectorTotals: Record<string, number> = {};
-        SECTOR_NAMES.forEach(name => { sectorTotals[name] = 0; });
         const despesas: DespesaRow[] = [];
 
         json.forEach(r => {
@@ -145,16 +142,6 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
 
             // 4 (Despesa) — casa pelo código no Plano de Contas (conta, pacote ou pacote master).
             if (hierarquico.startsWith('4')) {
-                // Setores corporativos (Mais Tauá, Vip Club, Pós Venda, Instituto Tauá,
-                // Propriedades, Obras, Novos Negócios) são centros de custo, não contas do Plano de
-                // Contas do hotel — nunca vão casar por código, só pela própria Descricao. Mesmo
-                // escopo do resto da despesa (só prefixo 4), mas capturados antes do filtro de
-                // profundidade — senão um código raso desses setores seria descartado sem nunca
-                // alimentar o card do setor.
-                const normDesc = normalizeName(descricao);
-                const sectorMatch = SECTOR_NAMES.find(name => normDesc.includes(normalizeName(name)));
-                if (sectorMatch) { sectorTotals[sectorMatch] += movimento; return; }
-
                 if (digitCount(hierarquico) <= 3) return; // código raso (ex.: "4.02"), ignora
                 const match = matchByCode(hierarquico, accounts);
                 if (match?.outOfScope) return; // conta/pacote marcado "Fora do escopo", nem mostra
@@ -171,13 +158,26 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
             // Outros prefixos (5, 6...): fora do escopo pedido, ignorados.
         });
 
-        setParsed({ ativoTotal, passivoTotal, receitaTotal, impostoVal, timeShareVal, issVal, sectorTotals, despesas });
+        setParsed({ ativoTotal, passivoTotal, receitaTotal, impostoVal, timeShareVal, issVal, despesas });
     };
 
     const matchedDespesas = parsed?.despesas.filter(r => r.matchLevel) || [];
     const unmatchedCount = (parsed?.despesas.length || 0) - matchedDespesas.length;
     const despesasTotal = matchedDespesas.reduce((s, r) => s + r.movimento, 0);
-    const sectorTotals = parsed?.sectorTotals || {};
+
+    // Setores (Mais Tauá, Vip Club, Pós Venda, Instituto Tauá, Propriedades, Obras, Novos
+    // Negócios) são identificados pela Descricao, mas só contam despesas de verdade: prefixo 4,
+    // no escopo do Plano de Contas (já garantido por matchedDespesas) e casadas numa CONTA
+    // contábil de fato — não num Pacote/Pacote Master (rollup), só a conta-folha mesmo.
+    const sectorTotals: Record<string, number> = {};
+    SECTOR_NAMES.forEach(name => { sectorTotals[name] = 0; });
+    matchedDespesas
+        .filter(r => r.matchLevel === 'account')
+        .forEach(r => {
+            const normDesc = normalizeName(r.descricao);
+            const match = SECTOR_NAMES.find(name => normDesc.includes(normalizeName(name)));
+            if (match) sectorTotals[match] += r.movimento;
+        });
 
     const levelLabel = (level: DespesaRow['matchLevel']) => {
         if (level === 'account') return 'Conta';
