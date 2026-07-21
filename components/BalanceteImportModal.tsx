@@ -268,17 +268,17 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
     const unmatchedCount = (parsed?.despesas.length || 0) - matchedDespesas.length;
     const despesasTotal = matchedDespesas.reduce((s, r) => s + r.movimento, 0);
 
-    // Contas/pacotes marcados "Fora do escopo" no Plano de Contas — um card por Pacote Master,
+    // Contas/pacotes marcados "Fora do escopo" no Plano de Contas — um card por conta contábil,
     // pra dar visibilidade de quanto ficou de fora do total de despesas sem precisar abrir o
     // Plano de Contas pra conferir.
     const foraDoEscopoTotal = (parsed?.foraDoEscopo || []).reduce((s, r) => s + r.movimento, 0);
-    const foraDoEscopoPorMaster: Record<string, number> = {};
-    const foraDoEscopoItemsPorMaster: Record<string, DespesaRow[]> = {};
+    const foraDoEscopoPorConta: Record<string, number> = {};
+    const foraDoEscopoItemsPorConta: Record<string, DespesaRow[]> = {};
     (parsed?.foraDoEscopo || []).forEach(r => {
-        const key = r.masterPackage || 'Sem Pacote Master';
-        foraDoEscopoPorMaster[key] = (foraDoEscopoPorMaster[key] || 0) + r.movimento;
-        if (!foraDoEscopoItemsPorMaster[key]) foraDoEscopoItemsPorMaster[key] = [];
-        foraDoEscopoItemsPorMaster[key].push(r);
+        const key = r.matchedName || 'Conta não identificada';
+        foraDoEscopoPorConta[key] = (foraDoEscopoPorConta[key] || 0) + r.movimento;
+        if (!foraDoEscopoItemsPorConta[key]) foraDoEscopoItemsPorConta[key] = [];
+        foraDoEscopoItemsPorConta[key].push(r);
     });
 
     // Setores (Mais Tauá, Vip Club, Pós Venda, Instituto Tauá, Propriedades, Obras, Novos
@@ -382,6 +382,8 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
                     {imported && parsed ? (
                         <div className="space-y-4">
                             <p className="text-sm text-gray-600">Balancete importado com sucesso. Resumo do que foi para a DRE Forecast (coluna OTB):</p>
+
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Resumo</p>
                             <div className="grid grid-cols-4 gap-4">
                                 <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
                                     <span className="text-[10px] text-indigo-500 font-bold uppercase tracking-wide">Total despesas (código 4)</span>
@@ -404,26 +406,31 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
                                     <span className="text-[10px] text-teal-400">Linha Receita de ISS, coluna OTB</span>
                                 </div>
                             </div>
+
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Setores fora do escopo</p>
                             <div className="grid grid-cols-4 gap-4">
                                 {SECTOR_NAMES.map(name => (
                                     <div key={name} className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-                                        <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wide">Setor {name}</span>
+                                        <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wide">{name}</span>
                                         <div className="text-xl font-bold text-gray-800 tabular-nums mt-1">{(sectorTotals[name] || 0).toLocaleString('pt-BR')}</div>
                                     </div>
                                 ))}
                             </div>
 
-                            {Object.keys(foraDoEscopoPorMaster).length > 0 && (
-                                <div className="grid grid-cols-4 gap-4">
-                                    <div className="bg-rose-50 border border-rose-200 rounded-xl p-4">
-                                        <span className="text-[10px] text-rose-500 font-bold uppercase tracking-wide">Total fora do escopo</span>
-                                        <div className="text-xl font-bold text-rose-800 tabular-nums mt-1">{foraDoEscopoTotal.toLocaleString('pt-BR')}</div>
-                                        <span className="text-[10px] text-rose-400">{parsed.foraDoEscopo.length} lançamentos</span>
+                            {Object.keys(foraDoEscopoPorConta).length > 0 && (
+                                <>
+                                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Contas contábeis fora do escopo</p>
+                                    <div className="grid grid-cols-4 gap-4">
+                                        <div className="bg-rose-50 border border-rose-200 rounded-xl p-4">
+                                            <span className="text-[10px] text-rose-500 font-bold uppercase tracking-wide">Total fora do escopo</span>
+                                            <div className="text-xl font-bold text-rose-800 tabular-nums mt-1">{foraDoEscopoTotal.toLocaleString('pt-BR')}</div>
+                                            <span className="text-[10px] text-rose-400">{parsed.foraDoEscopo.length} lançamentos</span>
+                                        </div>
+                                        {Object.entries(foraDoEscopoPorConta).map(([name, total]) => (
+                                            <ForaDoEscopoCard key={name} name={name} total={total} items={foraDoEscopoItemsPorConta[name] || []} large />
+                                        ))}
                                     </div>
-                                    {Object.entries(foraDoEscopoPorMaster).map(([name, total]) => (
-                                        <ForaDoEscopoCard key={name} name={name} total={total} items={foraDoEscopoItemsPorMaster[name] || []} large />
-                                    ))}
-                                </div>
+                                </>
                             )}
                         </div>
                     ) : !parsed ? (
@@ -448,6 +455,7 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
                                 )}
                             </div>
 
+                            <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-2">Resumo</p>
                             <div className="grid grid-cols-4 gap-3 mb-4 text-xs">
                                 <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
                                     <span className="text-gray-500 font-bold uppercase">1 Ativo</span>
@@ -477,17 +485,17 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
                                 ))}
                             </div>
 
-                            {Object.keys(foraDoEscopoPorMaster).length > 0 && (
+                            {Object.keys(foraDoEscopoPorConta).length > 0 && (
                                 <>
-                                    <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-2">Despesas fora do escopo (Plano de Contas)</p>
+                                    <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-2">Contas contábeis fora do escopo</p>
                                     <div className="grid grid-cols-4 gap-3 mb-4 text-xs">
                                         <div className="bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
                                             <span className="text-rose-500 font-bold uppercase">Total fora do escopo</span>
                                             <div className="tabular-nums font-medium text-rose-700">{foraDoEscopoTotal.toLocaleString('pt-BR')}</div>
                                             <span className="text-[10px] text-rose-400">{parsed.foraDoEscopo.length} lançamentos</span>
                                         </div>
-                                        {Object.entries(foraDoEscopoPorMaster).map(([name, total]) => (
-                                            <ForaDoEscopoCard key={name} name={name} total={total} items={foraDoEscopoItemsPorMaster[name] || []} />
+                                        {Object.entries(foraDoEscopoPorConta).map(([name, total]) => (
+                                            <ForaDoEscopoCard key={name} name={name} total={total} items={foraDoEscopoItemsPorConta[name] || []} />
                                         ))}
                                     </div>
                                 </>
