@@ -82,6 +82,27 @@ const formatPointsDiff = (val: number | undefined) => {
 
 const blueRowIds = ['REV-TOTAL', 'REV-NET', 'CST-HEAD', 'RES-OP', 'RES-PCT', 'REV-IMP', 'RES-OP-SEM-IMP', 'RES-OP-COM-IMP', 'RES-OP-SEM-IMP-PCT', 'RES-OP-COM-IMP-PCT', 'LABOR-TOTAL'];
 
+// Linhas mostradas no resumo do passo 7 (Validar informações) do timeline OTB — null vira uma
+// linha em branco separando os grupos.
+const VALIDATION_SUMMARY_ROWS: ({ id: string; label: string; bold?: boolean } | null)[] = [
+    { id: 'IND-3', label: '% OCC' },
+    { id: 'IND-5', label: 'PAX' },
+    { id: 'IND-4', label: 'DM BRUTA' },
+    { id: 'IND-6', label: 'REVPAR' },
+    null,
+    { id: 'LABOR-TOTAL', label: 'MÃO DE OBRA (TOTAL)' },
+    null,
+    { id: 'REV-TOTAL', label: 'RECEITA BRUTA TOTAL', bold: true },
+    { id: 'REV-IMP', label: 'IMPOSTOS' },
+    { id: 'CST-HEAD', label: 'CUSTOS E DESPESAS OPERACIONAIS' },
+    null,
+    { id: 'RES-OP-COM-IMP', label: 'GOP COM DEDUÇÃO DE IMPOSTOS (R$)', bold: true },
+    { id: 'RES-OP-COM-IMP-PCT', label: 'GOP COM DEDUÇÃO DE IMPOSTOS (%)' },
+    null,
+    { id: 'RES-OP-SEM-IMP', label: 'GOP SEM DEDUÇÃO DE IMPOSTOS (R$)', bold: true },
+    { id: 'RES-OP-SEM-IMP-PCT', label: 'GOP SEM DEDUÇÃO DE IMPOSTOS (%)' },
+];
+
 // For a revenue row, coming in ABOVE the comparison period is good (green). For a cost/tax row
 // (Custos e Despesas Operacionais and its packages/accounts, plus the Impostos deduction line —
 // which is category 'Revenue' in the data model despite behaving like a cost), it's the opposite:
@@ -762,6 +783,15 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     // Sinaliza (por alguns segundos) a linha de conta contábil por onde começar a preencher a
     // Prévia — usado pelo passo 6 do timeline pra apontar onde o usuário deve ir.
     const [highlightRowId, setHighlightRowId] = useState<string | null>(null);
+    // Resumo mostrado no passo 7 (Validar informações) do timeline.
+    const [showValidationSummaryModal, setShowValidationSummaryModal] = useState(false);
+    const toggleValidadoManual = () => {
+        if (!setRealOccupancyData) return;
+        setRealOccupancyData(prev => {
+            const current = prev[otbContextKey] || {};
+            return { ...prev, [otbContextKey]: { ...current, '__validado_manual': current['__validado_manual'] ? 0 : 1 } };
+        });
+    };
     const otbProgress = isMeetingVersion ? computeOtbProgress({
         realOccupancyData,
         financialData: financialData || [],
@@ -802,16 +832,25 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 setExpandedPackages(new Set(allPackageIds));
                 setHighlightRowId(firstAccountRow.id);
                 setTimeout(() => {
-                    document.getElementById('dre-row-CST-HEAD')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    // scrollIntoView({block:'start'}) alinha o topo da linha com o topo do
+                    // container — mas o <thead> é sticky e fica por cima dessa mesma faixa, então
+                    // "CUSTOS E DESPESAS OPERACIONAIS" ficava escondido atrás dele. Ajusta o
+                    // scroll manualmente descontando a altura do cabeçalho, pra ela ficar visível
+                    // logo abaixo dele em vez de embaixo.
+                    const container = document.getElementById('dre-scroll-container');
+                    const target = document.getElementById('dre-row-CST-HEAD');
+                    if (container && target) {
+                        const headerHeight = container.querySelector('thead')?.getBoundingClientRect().height || 0;
+                        const offset = target.getBoundingClientRect().top - container.getBoundingClientRect().top - headerHeight;
+                        container.scrollBy({ top: offset, behavior: 'smooth' });
+                    }
                 }, 50);
                 setTimeout(() => setHighlightRowId(prev => (prev === firstAccountRow.id ? null : prev)), 5000);
             }
         } else if (index === 6) {
-            if (!setRealOccupancyData) return;
-            setRealOccupancyData(prev => {
-                const current = prev[otbContextKey] || {};
-                return { ...prev, [otbContextKey]: { ...current, '__validado_manual': current['__validado_manual'] ? 0 : 1 } };
-            });
+            // Validar informações — mostra um resumo dos principais indicadores (Prévia/Forecast/
+            // Meta/Ano anterior) antes de marcar a etapa como validada.
+            setShowValidationSummaryModal(true);
         } else if (index === 7) {
             handleSaveResultsDirectly();
         }
@@ -1186,7 +1225,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                     through rows, no matter how far down (e.g. into Despesas) you are. The
                     Transformação/Reatividade cards sit below this box in normal page flow,
                     still reachable with a simple page scroll. */}
-                <div className="overflow-auto max-h-[75vh] bg-white relative">
+                <div id="dre-scroll-container" className="overflow-auto max-h-[75vh] bg-white relative">
                     {showColumnSettings && (
                         <div className="absolute right-4 top-4 z-50 bg-white border border-gray-200 shadow-xl rounded-xl p-4 w-64 animate-in fade-in slide-in-from-top-2">
                             <div className="flex justify-between items-center mb-3">
@@ -2449,6 +2488,62 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                         onClose={() => setShowBalanceteModal(false)}
                     />
                 )
+            )}
+
+            {showValidationSummaryModal && (
+                <div
+                    className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4"
+                    onClick={() => setShowValidationSummaryModal(false)}
+                >
+                    <div
+                        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200">
+                            <h2 className="text-lg font-bold text-gray-800">Validar informações — resumo da prévia</h2>
+                            <button onClick={() => setShowValidationSummaryModal(false)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+                        </div>
+                        <div className="p-6 overflow-y-auto flex-1">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="text-xs text-gray-500 uppercase font-bold border-b border-gray-200">
+                                        <th className="text-left py-2">Indicador</th>
+                                        <th className="text-right py-2">Prévia</th>
+                                        <th className="text-right py-2">Forecast</th>
+                                        <th className="text-right py-2">Meta</th>
+                                        <th className="text-right py-2">Ano anterior</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {VALIDATION_SUMMARY_ROWS.map((item, i) => {
+                                        if (!item) return <tr key={`spacer-${i}`}><td colSpan={5} className="h-3"></td></tr>;
+                                        const row = data.find(r => r.id === item.id);
+                                        if (!row) return null;
+                                        const fmt = row.rowConfig?.format || 'currency';
+                                        return (
+                                            <tr key={item.id} className={item.bold ? 'font-bold text-gray-900' : 'text-gray-600'}>
+                                                <td className="py-2">{item.label}</td>
+                                                <td className="py-2 text-right tabular-nums">{formatValue(row.previa, fmt)}</td>
+                                                <td className="py-2 text-right tabular-nums">{formatValue(row.real, fmt)}</td>
+                                                <td className="py-2 text-right tabular-nums">{formatValue(row.budget, fmt)}</td>
+                                                <td className="py-2 text-right tabular-nums">{formatValue(row.lastYear, fmt)}</td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div className="flex justify-end items-center gap-3 px-6 py-4 border-t border-gray-200">
+                            <button onClick={() => setShowValidationSummaryModal(false)} className="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-lg">Fechar</button>
+                            <button
+                                onClick={() => { toggleValidadoManual(); setShowValidationSummaryModal(false); }}
+                                className="px-5 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg"
+                            >
+                                {realOccupancyData[otbContextKey]?.['__validado_manual'] ? 'Desmarcar validado' : 'Marcar como validado'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {/* Custom Modals */}
