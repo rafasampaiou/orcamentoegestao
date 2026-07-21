@@ -2,13 +2,12 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import * as XLSX from 'xlsx';
 import { X, Upload, CheckCircle2, AlertTriangle } from 'lucide-react';
-import { Account, CostCenter, ImportedRow } from '../types';
+import { Account, ImportedRow } from '../types';
 import { supabaseService } from '../services/supabaseService';
 import toast from 'react-hot-toast';
 
 interface BalanceteImportModalProps {
     accounts: Account[];
-    costCenters: CostCenter[];
     hotel: string;
     year: number;
     month: number;
@@ -147,7 +146,7 @@ const ForaDoEscopoCard: React.FC<{ name: string; total: number; items: DespesaRo
     );
 };
 
-const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, costCenters, hotel, year, month, versionId, onImportData, otbContextKey, setRealOccupancyData, onClose }) => {
+const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, hotel, year, month, versionId, onImportData, otbContextKey, setRealOccupancyData, onClose }) => {
     const [parsed, setParsed] = useState<ParsedBalancete | null>(null);
     const [fileName, setFileName] = useState('');
     const [isSaving, setIsSaving] = useState(false);
@@ -196,12 +195,10 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, c
             const movimento = -rawMovimento;
             if (!hierarquico) return;
 
+            // O código do balancete não bate com o cadastro de Centros de Custo (bases diferentes),
+            // então nem tenta casar — mostra direto o valor que já vem na própria planilha.
             const crCode = crKey ? String(r[crKey] ?? '').trim() || null : null;
-            const crName = crCode
-                ? (costCenters.find(c => c.code === crCode && c.hotelName === hotel)?.name
-                    || costCenters.find(c => c.code === crCode)?.name
-                    || crCode)
-                : null;
+            const crName = crCode;
 
             // 1 (Ativo) e 2 (Passivo) — só um resumo pra referência, não entram no import.
             if (hierarquico.startsWith('1')) { ativoTotal += movimento; return; }

@@ -1166,7 +1166,6 @@ const App: React.FC = () => {
               financialData={importedFinancialData}
               selectedHotel={selectedHotel}
               accounts={accounts}
-              costCenters={costCenters}
               packages={packages}
               packageKpiConfigs={packageKpiConfigs}
               hotels={hotels}
