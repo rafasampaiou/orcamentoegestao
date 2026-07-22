@@ -536,6 +536,26 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     }
   };
 
+  // Setores/Contas são cadastros (sem ano/mês/valor de verdade) — registra um item
+  // simplificado no mesmo histórico, usando "valor_total" pra guardar a quantidade.
+  const recordCadastralImportHistory = async (tipo: 'Setor' | 'Conta', hotel: string, quantidade: number) => {
+    try {
+      await supabaseService.saveImportHistory([{
+        hotel,
+        tipo,
+        cenario: null,
+        ano: new Date().getFullYear(),
+        meses: '—',
+        version_id: null,
+        user_id: null,
+        valor_total: quantidade,
+      }]);
+      fetchImportHistory();
+    } catch (e) {
+      console.error(`Falha ao salvar histórico de importação de ${tipo}`, e);
+    }
+  };
+
   const handleDeleteImportHistory = async (id: string) => {
     console.log('[DEBUG] Exclusão confirmada no modal. Iniciando deleção para o ID:', id);
     try {
@@ -612,7 +632,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                       <td className="px-4 py-3 whitespace-nowrap text-center text-gray-600 font-medium">{log.ano}</td>
                       <td className="px-4 py-3 text-gray-500 max-w-[150px] truncate" title={log.meses}>{log.meses}</td>
                       <td className="px-4 py-3 whitespace-nowrap text-right font-mono font-bold text-indigo-900 bg-indigo-50/30">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(log.valor_total || 0)}
+                        {log.tipo === 'Setor' || log.tipo === 'Conta'
+                          ? `${log.valor_total || 0} itens`
+                          : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(log.valor_total || 0)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-right">
                         <button
@@ -2144,6 +2166,10 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         });
       }
 
+      const ccHotelNames = Array.from(new Set(newCostCenters.map(cc => cc.hotelName).filter(Boolean)));
+      const ccHotelLabel = ccHotelNames.length === 1 ? ccHotelNames[0]! : ccHotelNames.length > 1 ? 'Vários hotéis' : 'Todos os hotéis';
+      await recordCadastralImportHistory('Setor', ccHotelLabel, validData.length);
+
       setCcImportStep('input');
       setCcParsedData([]);
       setImportText('');
@@ -2312,6 +2338,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         setAccounts(merged);
         await supabaseService.upsertAccounts(uniqueNewAccounts);
       }
+      await recordCadastralImportHistory('Conta', 'Todos os hotéis', uniqueNewAccounts.length);
       alert(`Sucesso! ${uniqueNewAccounts.length} contas foram processadas.`);
     } catch (err: any) {
       console.error("Erro ao salvar no Supabase:", err);
@@ -5693,7 +5720,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 flex items-center justify-end">
                 <div className="flex items-center gap-3">
                   <button
-                    onClick={() => { setActiveImportTab('financial'); }}
+                    onClick={() => { setActiveImportTab('financial'); fetchImportHistory(); }}
                     className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${activeImportTab === 'financial' || ['occupancy', 'revenue', 'taxes', 'expenses'].includes(activeImportTab) ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
                   >
                     Despesas
@@ -5705,13 +5732,13 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                     Receitas
                   </button>
                   <button
-                    onClick={() => { setActiveImportTab('costCenters'); }}
+                    onClick={() => { setActiveImportTab('costCenters'); fetchImportHistory(); }}
                     className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${activeImportTab === 'costCenters' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
                   >
                     Setores
                   </button>
                   <button
-                    onClick={() => { setActiveImportTab('accounts'); }}
+                    onClick={() => { setActiveImportTab('accounts'); fetchImportHistory(); }}
                     className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${activeImportTab === 'accounts' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
                   >
                     Contas
@@ -5734,19 +5761,43 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               {/* Conditional Rendering based on Scenario and Tab */}
               {importScenario === 'REAL' ? (
                 <>
-                  {activeImportTab === 'costCenters' && renderCostCenterImport()}
-                  {activeImportTab === 'accounts' && renderAccountImport()}
+                  {activeImportTab === 'costCenters' && (
+                    <>
+                      {renderCostCenterImport()}
+                      {renderImportHistoryTable({
+                        filter: log => log.tipo === 'Setor',
+                        title: 'Histórico de Importações de Setores',
+                      })}
+                    </>
+                  )}
+                  {activeImportTab === 'accounts' && (
+                    <>
+                      {renderAccountImport()}
+                      {renderImportHistoryTable({
+                        filter: log => log.tipo === 'Conta',
+                        title: 'Histórico de Importações de Contas',
+                      })}
+                    </>
+                  )}
                   {activeImportTab === 'history' && renderImportHistoryTable()}
                   {activeImportTab === 'revenueStandalone' && (
                     <>
                       <RevenueStandaloneImportModal hotels={hotels} accounts={accounts} costCenters={costCenters} realVersions={realVersions} onImported={fetchImportHistory} />
                       {renderImportHistoryTable({
-                        filter: log => log.tipo?.toLowerCase().includes('receita'),
+                        filter: log => log.tipo === 'Receita' || log.tipo === 'Receita (independente)',
                         title: 'Histórico de Importações de Receitas',
                       })}
                     </>
                   )}
-                  {activeImportTab !== 'costCenters' && activeImportTab !== 'accounts' && activeImportTab !== 'history' && activeImportTab !== 'revenueStandalone' && renderRealImportInterface()}
+                  {activeImportTab !== 'costCenters' && activeImportTab !== 'accounts' && activeImportTab !== 'history' && activeImportTab !== 'revenueStandalone' && (
+                    <>
+                      {renderRealImportInterface()}
+                      {renderImportHistoryTable({
+                        filter: log => log.tipo === 'Despesa' || log.tipo === 'Imposto' || log.tipo === 'Ocupação' || log.tipo === 'Meta',
+                        title: 'Histórico de Importações de Despesas',
+                      })}
+                    </>
+                  )}
                 </>
               ) : (
                 renderBudgetImportInterface()
