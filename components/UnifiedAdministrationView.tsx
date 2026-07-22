@@ -4224,7 +4224,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
             </div>
           </div>
         )}
-        {renderImportHistoryTable()}
+        {renderImportHistoryTable({
+          filter: log => log.tipo === 'Despesa' || log.tipo === 'Imposto' || log.tipo === 'Ocupação' || log.tipo === 'Meta',
+        })}
       </div>
     );
   };
@@ -5789,15 +5791,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                       })}
                     </>
                   )}
-                  {activeImportTab !== 'costCenters' && activeImportTab !== 'accounts' && activeImportTab !== 'history' && activeImportTab !== 'revenueStandalone' && (
-                    <>
-                      {renderRealImportInterface()}
-                      {renderImportHistoryTable({
-                        filter: log => log.tipo === 'Despesa' || log.tipo === 'Imposto' || log.tipo === 'Ocupação' || log.tipo === 'Meta',
-                        title: 'Histórico de Importações de Despesas',
-                      })}
-                    </>
-                  )}
+                  {activeImportTab !== 'costCenters' && activeImportTab !== 'accounts' && activeImportTab !== 'history' && activeImportTab !== 'revenueStandalone' && renderRealImportInterface()}
                 </>
               ) : (
                 renderBudgetImportInterface()
