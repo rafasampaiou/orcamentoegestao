@@ -529,7 +529,12 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
                 const val = monthData[`${id}_forecast`];
                 if (val !== undefined) {
                     result[id][i] = val;
-                } else if (budgetData && budgetData[id] && budgetData[id][i] !== undefined) {
+                } else if (!isMeetingMode && budgetData && budgetData[id] && budgetData[id][i] !== undefined) {
+                    // No modo restrito (Reunião de Ritmo/FCA N1/FCA N2), quem decide o que parte
+                    // da Meta é só recalculateMeetingProjectionForMonth (Mão de obra, Coef. Occ) —
+                    // esse fallback genérico pra qualquer campo sem valor (Aptos vendidos, DM
+                    // bruta...) não deveria existir aqui, senão a célula mostra a Meta mas o
+                    // cálculo (que lê o mesmo campo sem esse fallback) continua em zero.
                     result[id][i] = budgetData[id][i];
                 }
             });
