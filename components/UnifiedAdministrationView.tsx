@@ -7,6 +7,7 @@ import KpiCalculationEditor from './KpiCalculationEditor';
 import TimelineView from './TimelineView';
 import ReplicateBudgetModal, { ReplicationOptions } from './ReplicateBudgetModal';
 import { VersionInfoBanner } from './VersionInfoBanner';
+import RevenueStandaloneImportModal from './RevenueStandaloneImportModal';
 import { supabaseService } from '../services/supabaseService';
 import { supabaseTemp } from '../services/supabaseClient';
 import { toast } from 'react-hot-toast';
@@ -444,7 +445,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const [isSavingRegistry, setIsSavingRegistry] = useState(false);
 
   // Import Sub-tabs
-  const [activeImportTab, setActiveImportTab] = useState<'financial' | 'revenue' | 'occupancy' | 'costCenters' | 'accounts' | 'history'>('financial');
+  const [activeImportTab, setActiveImportTab] = useState<'financial' | 'revenue' | 'occupancy' | 'costCenters' | 'accounts' | 'history' | 'revenueStandalone'>('financial');
   const [importScenario, setImportScenario] = useState<'REAL' | 'BUDGET'>('REAL');
   const [importRealTarget, setImportRealTarget] = useState<'PREVIA' | 'META' | 'ANO_ANTERIOR'>('PREVIA');
   const [importHistory, setImportHistory] = useState<any[]>([]);
@@ -5686,7 +5687,13 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                     onClick={() => { setActiveImportTab('financial'); }}
                     className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${activeImportTab === 'financial' || ['occupancy', 'revenue', 'taxes', 'expenses'].includes(activeImportTab) ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
                   >
-                    Financeiro
+                    Despesas
+                  </button>
+                  <button
+                    onClick={() => { setActiveImportTab('revenueStandalone'); }}
+                    className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${activeImportTab === 'revenueStandalone' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                  >
+                    Receitas
                   </button>
                   <button
                     onClick={() => { setActiveImportTab('costCenters'); }}
@@ -5721,7 +5728,10 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                   {activeImportTab === 'costCenters' && renderCostCenterImport()}
                   {activeImportTab === 'accounts' && renderAccountImport()}
                   {activeImportTab === 'history' && renderImportHistoryTable()}
-                  {activeImportTab !== 'costCenters' && activeImportTab !== 'accounts' && activeImportTab !== 'history' && renderRealImportInterface()}
+                  {activeImportTab === 'revenueStandalone' && (
+                    <RevenueStandaloneImportModal hotels={hotels} accounts={accounts} costCenters={costCenters} />
+                  )}
+                  {activeImportTab !== 'costCenters' && activeImportTab !== 'accounts' && activeImportTab !== 'history' && activeImportTab !== 'revenueStandalone' && renderRealImportInterface()}
                 </>
               ) : (
                 renderBudgetImportInterface()

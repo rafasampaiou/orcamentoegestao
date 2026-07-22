@@ -664,6 +664,45 @@ export const supabaseService = {
     if (error) throw error;
   },
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // REVENUE IMPORT (Receitas) — tabela própria, independente de financial_data.
+  // Por pedido explícito: essa importação não deve alimentar DRE Forecast nem
+  // nenhum outro cálculo agora — só fica salva pra uso futuro.
+  // ═══════════════════════════════════════════════════════════════════════════
+  async saveRevenueImportData(rows: {
+    hotel: string; hotelRaw: string; year: number; month: number; tipo: string; cenario: string;
+    escopo: string; cr: string; crMatched: string | null; departamento: string; conta: string;
+    contaMatched: string | null; value: number;
+  }[], importId?: string): Promise<void> {
+    if (rows.length === 0) return;
+    const records = rows.map(r => ({
+      hotel: r.hotel,
+      hotel_raw: r.hotelRaw,
+      year: r.year,
+      month: r.month,
+      tipo: r.tipo,
+      cenario: r.cenario,
+      escopo: r.escopo,
+      cr: r.cr,
+      cr_matched: r.crMatched,
+      departamento: r.departamento,
+      conta: r.conta,
+      conta_matched: r.contaMatched,
+      value: r.value,
+      import_id: importId || null,
+    }));
+    const batchSize = 500;
+    for (let i = 0; i < records.length; i += batchSize) {
+      const batch = records.slice(i, i + batchSize);
+      const { error } = await supabase.from('revenue_import_data').insert(batch);
+      if (error) throw error;
+    }
+  },
+
+  async getRevenueImportData(): Promise<any[]> {
+    return fetchAllRows('revenue_import_data');
+  },
+
   // Usado pelo "Resetar etapa" do balancete OTB — remove só os lançamentos daquele contexto
   // específico (hotel/ano/mês/versão/cenário), sem tocar no resto dos dados da versão.
   async deleteFinancialDataByContext(hotel: string, year: number, month: number, versionId: string, scenario: string): Promise<void> {
