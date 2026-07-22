@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
 import { Upload, CheckCircle2, AlertTriangle } from 'lucide-react';
-import { Account, CostCenter, Hotel } from '../types';
+import { Account, BudgetVersion, CostCenter, Hotel } from '../types';
 import { supabaseService } from '../services/supabaseService';
 import toast from 'react-hot-toast';
 
@@ -9,7 +9,14 @@ interface RevenueStandaloneImportProps {
     hotels: Hotel[];
     accounts: Account[];
     costCenters: CostCenter[];
+    realVersions: BudgetVersion[];
 }
+
+const DESTINO_OPTIONS: { value: 'PREVIA' | 'META' | 'ANO_ANTERIOR'; label: string }[] = [
+    { value: 'PREVIA', label: 'Prévia (Fechamento)' },
+    { value: 'META', label: 'Meta' },
+    { value: 'ANO_ANTERIOR', label: 'Ano Anterior' },
+];
 
 const normalize = (s: string) => (s || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
@@ -38,20 +45,22 @@ interface ParsedRevenueRow {
 // Importação independente de Receitas — por pedido explícito, essa planilha não alimenta
 // financial_data nem nenhum cálculo do DRE Forecast agora. Fica só salva numa tabela própria
 // (revenue_import_data) pra decidir depois o que fazer com ela.
-const RevenueStandaloneImportModal: React.FC<RevenueStandaloneImportProps> = ({ hotels, accounts, costCenters }) => {
-    const currentYear = new Date().getFullYear();
+const RevenueStandaloneImportModal: React.FC<RevenueStandaloneImportProps> = ({ hotels, accounts, costCenters, realVersions }) => {
     const [selectedHotelId, setSelectedHotelId] = useState('');
-    const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+    const [selectedVersionId, setSelectedVersionId] = useState('');
+    const [destino, setDestino] = useState<'PREVIA' | 'META' | 'ANO_ANTERIOR'>('PREVIA');
     const [fileName, setFileName] = useState('');
     const [rows, setRows] = useState<ParsedRevenueRow[] | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [imported, setImported] = useState(false);
 
     const selectedHotel = hotels.find(h => h.id === selectedHotelId);
+    const versionsForHotel = realVersions.filter(v => !selectedHotelId || v.hotelId === selectedHotelId);
+    const selectedVersion = versionsForHotel.find(v => v.id === selectedVersionId);
 
     const handleFile = async (file: File) => {
-        if (!selectedHotel) {
-            toast.error('Selecione o hotel antes de anexar a planilha.');
+        if (!selectedHotel || !selectedVersion) {
+            toast.error('Selecione o hotel e a versão de destino antes de anexar a planilha.');
             return;
         }
         setFileName(file.name);
@@ -121,7 +130,7 @@ const RevenueStandaloneImportModal: React.FC<RevenueStandaloneImportProps> = ({ 
     const hotelMismatchCount = (rows || []).filter(r => !r.hotelMatchesSelected).length;
 
     const handleConfirm = async () => {
-        if (!rows || !selectedHotel) return;
+        if (!rows || !selectedHotel || !selectedVersion) return;
         setIsSaving(true);
         try {
             const monthName = new Date(2024, 0).toLocaleString('pt-BR', { month: 'short' });
@@ -129,7 +138,7 @@ const RevenueStandaloneImportModal: React.FC<RevenueStandaloneImportProps> = ({ 
             const [historyEntry] = await supabaseService.saveImportHistory([{
                 hotel: selectedHotel.name,
                 tipo: 'Receita (independente)',
-                ano: selectedYear,
+                ano: selectedVersion.year,
                 meses: monthName,
                 version_id: null,
                 user_id: null,
@@ -140,7 +149,7 @@ const RevenueStandaloneImportModal: React.FC<RevenueStandaloneImportProps> = ({ 
             await supabaseService.saveRevenueImportData(rows.map(r => ({
                 hotel: selectedHotel.name,
                 hotelRaw: r.hotelRaw,
-                year: selectedYear,
+                year: selectedVersion.year,
                 month: r.month,
                 tipo: r.tipo,
                 cenario: r.cenario,
@@ -151,6 +160,8 @@ const RevenueStandaloneImportModal: React.FC<RevenueStandaloneImportProps> = ({ 
                 conta: r.contaRaw,
                 contaMatched: r.contaMatched,
                 value: r.value,
+                versionId: selectedVersion.id,
+                destino,
             })), importId);
 
             toast.success(`${rows.length} lançamentos de receita salvos.`);
@@ -182,49 +193,61 @@ const RevenueStandaloneImportModal: React.FC<RevenueStandaloneImportProps> = ({ 
                 <code>Receita / Despesa | Real / Meta | Escopo | Empresa | CR Certo | Departamento | Descrição da Conta | Mês | Valor</code>
             </div>
 
-            <div className="flex items-end gap-4">
+            <div className="flex flex-wrap items-end gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
                 <div className="flex flex-col gap-1">
                     <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Hotel</label>
                     <select
                         value={selectedHotelId}
-                        onChange={e => { setSelectedHotelId(e.target.value); handleReset(); }}
-                        className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[220px]"
+                        onChange={e => { setSelectedHotelId(e.target.value); setSelectedVersionId(''); handleReset(); }}
+                        className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[200px]"
                     >
                         <option value="">Selecione...</option>
                         {hotels.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
                     </select>
                 </div>
                 <div className="flex flex-col gap-1">
-                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Ano</label>
-                    <input
-                        type="number"
-                        value={selectedYear}
-                        onChange={e => setSelectedYear(parseInt(e.target.value, 10) || currentYear)}
-                        className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none w-28"
-                    />
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Versão de Destino</label>
+                    <select
+                        value={selectedVersionId}
+                        onChange={e => { setSelectedVersionId(e.target.value); handleReset(); }}
+                        className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[200px]"
+                    >
+                        <option value="">Selecione a versão...</option>
+                        {versionsForHotel.map(v => <option key={v.id} value={v.id}>{v.name} - {v.hotel} ({v.year})</option>)}
+                    </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Destino</label>
+                    <select
+                        value={destino}
+                        onChange={e => setDestino(e.target.value as any)}
+                        className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[200px]"
+                    >
+                        {DESTINO_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
                 </div>
             </div>
 
             {imported && rows ? (
                 <div className="space-y-3">
                     <div className="flex items-center gap-2 text-emerald-600 font-bold text-sm">
-                        <CheckCircle2 size={16} /> {rows.length} lançamentos importados com sucesso para {selectedHotel?.name} / {selectedYear}.
+                        <CheckCircle2 size={16} /> {rows.length} lançamentos importados com sucesso para {selectedHotel?.name} / {selectedVersion?.name} ({selectedVersion?.year}).
                     </div>
                     <button onClick={handleReset} className="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-lg border border-gray-200">
                         Importar outra planilha
                     </button>
                 </div>
             ) : !rows ? (
-                <label className={`flex flex-col items-center justify-center gap-3 border-2 border-dashed rounded-xl p-10 transition-colors ${selectedHotel ? 'border-gray-300 cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/30' : 'border-gray-200 opacity-50 cursor-not-allowed'}`}>
+                <label className={`flex flex-col items-center justify-center gap-3 border-2 border-dashed rounded-xl p-10 transition-colors ${selectedHotel && selectedVersion ? 'border-gray-300 cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/30' : 'border-gray-200 opacity-50 cursor-not-allowed'}`}>
                     <Upload size={32} className="text-gray-400" />
                     <span className="text-sm font-medium text-gray-600">
-                        {selectedHotel ? 'Clique para selecionar o arquivo .xlsx de receitas' : 'Selecione o hotel primeiro'}
+                        {selectedHotel && selectedVersion ? 'Clique para selecionar o arquivo .xlsx de receitas' : 'Selecione o hotel e a versão de destino primeiro'}
                     </span>
                     <input
                         type="file"
                         accept=".xlsx,.xls"
                         className="hidden"
-                        disabled={!selectedHotel}
+                        disabled={!selectedHotel || !selectedVersion}
                         onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
                     />
                 </label>

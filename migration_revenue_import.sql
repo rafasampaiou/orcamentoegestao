@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS public.revenue_import_data (
     conta TEXT,                      -- "Descrição da Conta" bruta, como veio na planilha
     conta_matched TEXT,              -- nome da conta contábil casada no cadastro (se achou)
     value NUMERIC DEFAULT 0,
+    version_id TEXT,                 -- Versão de Destino escolhida no import (só contexto/tag)
+    destino TEXT,                    -- "PREVIA", "META" ou "ANO_ANTERIOR" (só contexto/tag)
     import_id TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );

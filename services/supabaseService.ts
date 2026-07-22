@@ -674,7 +674,7 @@ export const supabaseService = {
   async saveRevenueImportData(rows: {
     hotel: string; hotelRaw: string; year: number; month: number; tipo: string; cenario: string;
     escopo: string; cr: string; crMatched: string | null; departamento: string; conta: string;
-    contaMatched: string | null; value: number;
+    contaMatched: string | null; value: number; versionId?: string; destino?: string;
   }[], importId?: string): Promise<void> {
     if (rows.length === 0) return;
     const records = rows.map(r => ({
@@ -691,6 +691,8 @@ export const supabaseService = {
       conta: r.conta,
       conta_matched: r.contaMatched,
       value: r.value,
+      version_id: r.versionId || null,
+      destino: r.destino || null,
       import_id: importId || null,
     }));
     const batchSize = 500;

@@ -5734,7 +5734,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                   {activeImportTab === 'accounts' && renderAccountImport()}
                   {activeImportTab === 'history' && renderImportHistoryTable()}
                   {activeImportTab === 'revenueStandalone' && (
-                    <RevenueStandaloneImportModal hotels={hotels} accounts={accounts} costCenters={costCenters} />
+                    <RevenueStandaloneImportModal hotels={hotels} accounts={accounts} costCenters={costCenters} realVersions={realVersions} />
                   )}
                   {activeImportTab !== 'costCenters' && activeImportTab !== 'accounts' && activeImportTab !== 'history' && activeImportTab !== 'revenueStandalone' && renderRealImportInterface()}
                 </>
