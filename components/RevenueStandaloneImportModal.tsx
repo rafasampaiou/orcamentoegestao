@@ -12,12 +12,6 @@ interface RevenueStandaloneImportProps {
     realVersions: BudgetVersion[];
 }
 
-const DESTINO_OPTIONS: { value: 'PREVIA' | 'META' | 'ANO_ANTERIOR'; label: string }[] = [
-    { value: 'PREVIA', label: 'Prévia (Fechamento)' },
-    { value: 'META', label: 'Meta' },
-    { value: 'ANO_ANTERIOR', label: 'Ano Anterior' },
-];
-
 const normalize = (s: string) => (s || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
 // Aceita o cabeçalho com pequenas variações de nome/acento/caixa.
@@ -38,6 +32,7 @@ interface ParsedRevenueRow {
     departamento: string;
     contaRaw: string;
     contaMatched: string | null;
+    year: number;
     month: number;
     value: number;
 }
@@ -48,7 +43,6 @@ interface ParsedRevenueRow {
 const RevenueStandaloneImportModal: React.FC<RevenueStandaloneImportProps> = ({ hotels, accounts, costCenters, realVersions }) => {
     const [selectedHotelId, setSelectedHotelId] = useState('');
     const [selectedVersionId, setSelectedVersionId] = useState('');
-    const [destino, setDestino] = useState<'PREVIA' | 'META' | 'ANO_ANTERIOR'>('PREVIA');
     const [fileName, setFileName] = useState('');
     const [rows, setRows] = useState<ParsedRevenueRow[] | null>(null);
     const [isSaving, setIsSaving] = useState(false);
@@ -76,6 +70,7 @@ const RevenueStandaloneImportModal: React.FC<RevenueStandaloneImportProps> = ({ 
 
         const tipoKey = findKey(json[0], ['Receita / Despesa', 'Receita/Despesa', 'Receita Despesa', 'Tipo']);
         const cenarioKey = findKey(json[0], ['Real / Meta', 'Real/Meta', 'Real Meta', 'Cenario', 'Cenário']);
+        const anoKey = findKey(json[0], ['Ano', 'Year']);
         const escopoKey = findKey(json[0], ['Escopo']);
         const empresaKey = findKey(json[0], ['Empresa', 'Hotel']);
         const crKey = findKey(json[0], ['CR Certo', 'CR']);
@@ -84,8 +79,8 @@ const RevenueStandaloneImportModal: React.FC<RevenueStandaloneImportProps> = ({ 
         const mesKey = findKey(json[0], ['Mes', 'Mês']);
         const valorKey = findKey(json[0], ['Valor']);
 
-        if (!tipoKey || !cenarioKey || !escopoKey || !empresaKey || !crKey || !deptoKey || !contaKey || !mesKey || !valorKey) {
-            toast.error('Não encontrei todas as colunas esperadas (Receita/Despesa, Real/Meta, Escopo, Empresa, CR Certo, Departamento, Descrição da Conta, Mês, Valor).');
+        if (!tipoKey || !cenarioKey || !anoKey || !escopoKey || !empresaKey || !crKey || !deptoKey || !contaKey || !mesKey || !valorKey) {
+            toast.error('Não encontrei todas as colunas esperadas (Receita/Despesa, Real/Meta, Ano, Escopo, Empresa, CR Certo, Departamento, Descrição da Conta, Mês, Valor).');
             return;
         }
 
@@ -98,6 +93,7 @@ const RevenueStandaloneImportModal: React.FC<RevenueStandaloneImportProps> = ({ 
             const valorRaw = r[valorKey];
             const value = typeof valorRaw === 'number' ? valorRaw : parseFloat(String(valorRaw ?? '0').replace(/\./g, '').replace(',', '.')) || 0;
             const month = parseInt(String(r[mesKey] ?? '').trim(), 10) || 0;
+            const year = parseInt(String(r[anoKey] ?? '').trim(), 10) || 0;
 
             // CR: procura primeiro entre os CRs do hotel selecionado, senão em qualquer hotel —
             // em cada nível, pelo nome oficial primeiro e pelos nomes secundários (aliases)
@@ -118,6 +114,7 @@ const RevenueStandaloneImportModal: React.FC<RevenueStandaloneImportProps> = ({ 
                 departamento: String(r[deptoKey] ?? '').trim(),
                 contaRaw,
                 contaMatched: contaMatch?.name || null,
+                year,
                 month,
                 value,
             };
@@ -128,6 +125,7 @@ const RevenueStandaloneImportModal: React.FC<RevenueStandaloneImportProps> = ({ 
 
     const matchedCount = (rows || []).filter(r => r.contaMatched && r.crMatched).length;
     const hotelMismatchCount = (rows || []).filter(r => !r.hotelMatchesSelected).length;
+    const semAnoCount = (rows || []).filter(r => !r.year).length;
 
     const handleConfirm = async () => {
         if (!rows || !selectedHotel || !selectedVersion) return;
@@ -138,7 +136,7 @@ const RevenueStandaloneImportModal: React.FC<RevenueStandaloneImportProps> = ({ 
             const [historyEntry] = await supabaseService.saveImportHistory([{
                 hotel: selectedHotel.name,
                 tipo: 'Receita (independente)',
-                ano: selectedVersion.year,
+                ano: rows[0]?.year || selectedVersion.year,
                 meses: monthName,
                 version_id: null,
                 user_id: null,
@@ -149,7 +147,7 @@ const RevenueStandaloneImportModal: React.FC<RevenueStandaloneImportProps> = ({ 
             await supabaseService.saveRevenueImportData(rows.map(r => ({
                 hotel: selectedHotel.name,
                 hotelRaw: r.hotelRaw,
-                year: selectedVersion.year,
+                year: r.year,
                 month: r.month,
                 tipo: r.tipo,
                 cenario: r.cenario,
@@ -161,7 +159,6 @@ const RevenueStandaloneImportModal: React.FC<RevenueStandaloneImportProps> = ({ 
                 contaMatched: r.contaMatched,
                 value: r.value,
                 versionId: selectedVersion.id,
-                destino,
             })), importId);
 
             toast.success(`${rows.length} lançamentos de receita salvos.`);
@@ -190,7 +187,7 @@ const RevenueStandaloneImportModal: React.FC<RevenueStandaloneImportProps> = ({ 
 
             <div className="bg-amber-50 border border-amber-100 p-4 rounded-xl text-xs text-amber-800">
                 <p className="font-bold mb-1">Colunas esperadas na planilha (.xlsx):</p>
-                <code>Receita / Despesa | Real / Meta | Escopo | Empresa | CR Certo | Departamento | Descrição da Conta | Mês | Valor</code>
+                <code>Receita / Despesa | Real / Meta | Ano | Escopo | Empresa | CR Certo | Departamento | Descrição da Conta | Mês | Valor</code>
             </div>
 
             <div className="flex flex-wrap items-end gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
@@ -214,16 +211,6 @@ const RevenueStandaloneImportModal: React.FC<RevenueStandaloneImportProps> = ({ 
                     >
                         <option value="">Selecione a versão...</option>
                         {versionsForHotel.map(v => <option key={v.id} value={v.id}>{v.name} - {v.hotel} ({v.year})</option>)}
-                    </select>
-                </div>
-                <div className="flex flex-col gap-1">
-                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Destino</label>
-                    <select
-                        value={destino}
-                        onChange={e => setDestino(e.target.value as any)}
-                        className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[200px]"
-                    >
-                        {DESTINO_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
                 </div>
             </div>
@@ -259,6 +246,9 @@ const RevenueStandaloneImportModal: React.FC<RevenueStandaloneImportProps> = ({ 
                         {hotelMismatchCount > 0 && (
                             <span className="flex items-center gap-1 text-amber-600 font-bold"><AlertTriangle size={14} /> {hotelMismatchCount} com Empresa diferente de {selectedHotel?.name}</span>
                         )}
+                        {semAnoCount > 0 && (
+                            <span className="flex items-center gap-1 text-amber-600 font-bold"><AlertTriangle size={14} /> {semAnoCount} sem Ano reconhecido</span>
+                        )}
                     </div>
 
                     <div className="border border-gray-200 rounded-lg overflow-hidden max-h-[50vh] overflow-y-auto">
@@ -272,13 +262,14 @@ const RevenueStandaloneImportModal: React.FC<RevenueStandaloneImportProps> = ({ 
                                     <th className="px-3 py-2 text-left">CR Certo</th>
                                     <th className="px-3 py-2 text-left">Departamento</th>
                                     <th className="px-3 py-2 text-left">Conta</th>
+                                    <th className="px-3 py-2 text-center">Ano</th>
                                     <th className="px-3 py-2 text-center">Mês</th>
                                     <th className="px-3 py-2 text-right">Valor</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {rows.map((r, i) => (
-                                    <tr key={i} className={!r.hotelMatchesSelected || !r.crMatched || !r.contaMatched ? 'bg-amber-50' : ''}>
+                                    <tr key={i} className={!r.hotelMatchesSelected || !r.crMatched || !r.contaMatched || !r.year ? 'bg-amber-50' : ''}>
                                         <td className="px-3 py-1.5">{r.tipo}</td>
                                         <td className="px-3 py-1.5">{r.cenario}</td>
                                         <td className="px-3 py-1.5">{r.escopo}</td>
@@ -286,6 +277,7 @@ const RevenueStandaloneImportModal: React.FC<RevenueStandaloneImportProps> = ({ 
                                         <td className="px-3 py-1.5">{r.crMatched || <span className="text-amber-600 italic">{r.crRaw || '(vazio)'} — não encontrado</span>}</td>
                                         <td className="px-3 py-1.5">{r.departamento}</td>
                                         <td className="px-3 py-1.5">{r.contaMatched || <span className="text-amber-600 italic">{r.contaRaw || '(vazio)'} — não encontrada</span>}</td>
+                                        <td className="px-3 py-1.5 text-center">{r.year || <span className="text-amber-600 italic">?</span>}</td>
                                         <td className="px-3 py-1.5 text-center">{r.month}</td>
                                         <td className="px-3 py-1.5 text-right tabular-nums">{r.value.toLocaleString('pt-BR')}</td>
                                     </tr>
