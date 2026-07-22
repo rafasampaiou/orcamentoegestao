@@ -132,29 +132,32 @@ const RevenueStandaloneImportModal: React.FC<RevenueStandaloneImportProps> = ({ 
         if (!rows || !selectedHotel || !selectedVersion) return;
         setIsSaving(true);
         try {
-            // Agrupa por ano — um mesmo excel de Receitas pode trazer anos diferentes,
-            // e cada ano vira uma linha própria no Histórico de Importações (mesmo
-            // padrão já usado na importação de Despesas), com os meses e cenários
-            // (Real/Meta/Ano anterior) daquele ano juntados numa lista.
-            const byYear = new Map<number, ParsedRevenueRow[]>();
+            // Agrupa por (ano, cenário) — um mesmo excel de Receitas pode trazer anos e
+            // cenários diferentes (Real/Meta/Ano anterior), e cada combinação vira uma
+            // linha própria no Histórico de Importações, ex: "Real 2025", "Real 2026",
+            // "Meta 2026", cada uma com todos os meses daquela combinação.
+            const byYearCenario = new Map<string, { year: number; cenario: string; items: ParsedRevenueRow[] }>();
             rows.forEach(r => {
                 const y = r.year || selectedVersion.year;
-                if (!byYear.has(y)) byYear.set(y, []);
-                byYear.get(y)!.push(r);
+                const c = r.cenario || '(sem cenário)';
+                const key = `${y}__${c}`;
+                if (!byYearCenario.has(key)) byYearCenario.set(key, { year: y, cenario: c, items: [] });
+                byYearCenario.get(key)!.items.push(r);
             });
 
-            for (const [year, yearRows] of Array.from(byYear.entries()).sort((a, b) => a[0] - b[0])) {
-                const monthNames = Array.from(new Set(yearRows.map(r => r.month).filter(m => m >= 1 && m <= 12)))
+            const groups = Array.from(byYearCenario.values()).sort((a, b) => a.year - b.year || a.cenario.localeCompare(b.cenario));
+
+            for (const { year, cenario, items } of groups) {
+                const monthNames = Array.from(new Set(items.map(r => r.month).filter(m => m >= 1 && m <= 12)))
                     .sort((a, b) => a - b)
                     .map(m => new Date(2024, m - 1).toLocaleString('pt-BR', { month: 'short' }))
                     .join(', ');
-                const cenarios = Array.from(new Set(yearRows.map(r => r.cenario).filter(Boolean))).join(', ');
-                const valorTotal = yearRows.reduce((s, r) => s + Math.abs(r.value), 0);
+                const valorTotal = items.reduce((s, r) => s + Math.abs(r.value), 0);
 
                 const [historyEntry] = await supabaseService.saveImportHistory([{
                     hotel: selectedHotel.name,
                     tipo: 'Receita (independente)',
-                    cenario: cenarios,
+                    cenario,
                     ano: year,
                     meses: monthNames || '1-12',
                     version_id: selectedVersion.id,
@@ -163,7 +166,7 @@ const RevenueStandaloneImportModal: React.FC<RevenueStandaloneImportProps> = ({ 
                 }]);
                 const importId = historyEntry.id;
 
-                await supabaseService.saveRevenueImportData(yearRows.map(r => ({
+                await supabaseService.saveRevenueImportData(items.map(r => ({
                     hotel: selectedHotel.name,
                     hotelRaw: r.hotelRaw,
                     year: r.year,
