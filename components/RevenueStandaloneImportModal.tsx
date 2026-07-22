@@ -90,9 +90,11 @@ const RevenueStandaloneImportModal: React.FC<RevenueStandaloneImportProps> = ({ 
             const value = typeof valorRaw === 'number' ? valorRaw : parseFloat(String(valorRaw ?? '0').replace(/\./g, '').replace(',', '.')) || 0;
             const month = parseInt(String(r[mesKey] ?? '').trim(), 10) || 0;
 
-            // CR: procura primeiro entre os CRs do hotel selecionado, senão em qualquer hotel.
-            const crMatch = hotelCandidates.find(c => normalize(c.name) === normalize(crRaw))
-                || costCenters.find(c => normalize(c.name) === normalize(crRaw));
+            // CR: procura primeiro entre os CRs do hotel selecionado, senão em qualquer hotel —
+            // em cada nível, pelo nome oficial primeiro e pelos nomes secundários (aliases)
+            // depois, já que a mesma base pode chamar o setor de um jeito ligeiramente diferente.
+            const matchesCr = (c: CostCenter) => normalize(c.name) === normalize(crRaw) || (c.aliases || []).some(a => normalize(a) === normalize(crRaw));
+            const crMatch = hotelCandidates.find(matchesCr) || costCenters.find(matchesCr);
 
             const contaMatch = accounts.find(a => normalize(a.name) === normalize(contaRaw));
 

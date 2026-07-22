@@ -145,7 +145,8 @@ export const supabaseService = {
       department: cc.department,
       hotelName: cc.hotel_name,
       hierarchicalCode: cc.hierarchical_code,
-      companyCode: cc.company_code
+      companyCode: cc.company_code,
+      aliases: Array.isArray(cc.aliases) ? cc.aliases : []
     })) as CostCenter[];
   },
 
@@ -160,6 +161,7 @@ export const supabaseService = {
       hotel_name: cc.hotelName,
       hierarchical_code: cc.hierarchicalCode,
       company_code: cc.companyCode,
+      aliases: cc.aliases || [],
       updated_at: new Date().toISOString()
     }));
 

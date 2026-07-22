@@ -98,6 +98,10 @@ export interface CostCenter {
   hotelName?: string;
   hierarchicalCode?: string;
   companyCode?: string;
+  // Nomes alternativos pelos quais esse setor aparece em outras bases importadas (ex.: "Jota
+  // Candy" numa planilha, cadastrado aqui como "Jota Candy e Cafe") — usado pra casar por nome
+  // na hora de importar, sem precisar renomear o cadastro oficial.
+  aliases?: string[];
 }
 
 export interface Account {
