@@ -558,12 +558,14 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     }
   };
 
-  const renderImportHistoryTable = () => (
+  const renderImportHistoryTable = (opts?: { filter?: (log: any) => boolean; title?: string }) => {
+    const historyList = opts?.filter ? importHistory.filter(opts.filter) : importHistory;
+    return (
     <div className="mt-8 pt-8 border-t border-gray-100">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
           <Database className="text-indigo-600" size={20} />
-          Histórico de Importações Recentes
+          {opts?.title || 'Histórico de Importações Recentes'}
         </h3>
         <button
           onClick={fetchImportHistory}
@@ -593,18 +595,19 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200 text-xs">
-                {importHistory.length > 0 ? (
-                  importHistory.map(log => (
+                {historyList.length > 0 ? (
+                  historyList.map(log => (
                     <tr key={log.id} className="hover:bg-indigo-50/30 transition-colors">
                       <td className="px-4 py-3 whitespace-nowrap text-gray-500">
                         {new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(log.created_at))}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap font-bold text-gray-700">{log.hotel}</td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${log.tipo === 'Receita' ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${log.tipo?.toLowerCase().includes('receita') ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'
                           }`}>
                           {log.tipo}
                         </span>
+                        {log.cenario && <div className="text-[10px] text-gray-400 mt-1">{log.cenario}</div>}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-center text-gray-600 font-medium">{log.ano}</td>
                       <td className="px-4 py-3 text-gray-500 max-w-[150px] truncate" title={log.meses}>{log.meses}</td>
@@ -630,7 +633,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="px-4 py-12 text-center text-gray-400 italic text-sm">Nenhum registro de importação encontrado.</td>
+                    <td colSpan={7} className="px-4 py-12 text-center text-gray-400 italic text-sm">Nenhum registro de importação encontrado.</td>
                   </tr>
                 )}
               </tbody>
@@ -639,7 +642,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         </div>
       )}
     </div>
-  );
+    );
+  };
 
   const [userLogs, setUserLogs] = useState([
     { id: '1', userId: 'u1', userName: 'Carlos Silva', userUnit: 'Tauá Resort Caeté', action: 'Atualizou Forecast DRE', timestamp: new Date(Date.now() - 3600000).toISOString() },
@@ -5695,7 +5699,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                     Despesas
                   </button>
                   <button
-                    onClick={() => { setActiveImportTab('revenueStandalone'); }}
+                    onClick={() => { setActiveImportTab('revenueStandalone'); fetchImportHistory(); }}
                     className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${activeImportTab === 'revenueStandalone' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
                   >
                     Receitas
@@ -5734,7 +5738,13 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                   {activeImportTab === 'accounts' && renderAccountImport()}
                   {activeImportTab === 'history' && renderImportHistoryTable()}
                   {activeImportTab === 'revenueStandalone' && (
-                    <RevenueStandaloneImportModal hotels={hotels} accounts={accounts} costCenters={costCenters} realVersions={realVersions} />
+                    <>
+                      <RevenueStandaloneImportModal hotels={hotels} accounts={accounts} costCenters={costCenters} realVersions={realVersions} onImported={fetchImportHistory} />
+                      {renderImportHistoryTable({
+                        filter: log => log.tipo?.toLowerCase().includes('receita'),
+                        title: 'Histórico de Importações de Receitas',
+                      })}
+                    </>
                   )}
                   {activeImportTab !== 'costCenters' && activeImportTab !== 'accounts' && activeImportTab !== 'history' && activeImportTab !== 'revenueStandalone' && renderRealImportInterface()}
                 </>

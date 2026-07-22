@@ -10,6 +10,7 @@ interface RevenueStandaloneImportProps {
     accounts: Account[];
     costCenters: CostCenter[];
     realVersions: BudgetVersion[];
+    onImported?: () => void;
 }
 
 const normalize = (s: string) => (s || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -40,7 +41,7 @@ interface ParsedRevenueRow {
 // Importação independente de Receitas — por pedido explícito, essa planilha não alimenta
 // financial_data nem nenhum cálculo do DRE Forecast agora. Fica só salva numa tabela própria
 // (revenue_import_data) pra decidir depois o que fazer com ela.
-const RevenueStandaloneImportModal: React.FC<RevenueStandaloneImportProps> = ({ hotels, accounts, costCenters, realVersions }) => {
+const RevenueStandaloneImportModal: React.FC<RevenueStandaloneImportProps> = ({ hotels, accounts, costCenters, realVersions, onImported }) => {
     const [selectedHotelId, setSelectedHotelId] = useState('');
     const [selectedVersionId, setSelectedVersionId] = useState('');
     const [fileName, setFileName] = useState('');
@@ -131,38 +132,58 @@ const RevenueStandaloneImportModal: React.FC<RevenueStandaloneImportProps> = ({ 
         if (!rows || !selectedHotel || !selectedVersion) return;
         setIsSaving(true);
         try {
-            const monthName = new Date(2024, 0).toLocaleString('pt-BR', { month: 'short' });
-            const valorTotal = rows.reduce((s, r) => s + Math.abs(r.value), 0);
-            const [historyEntry] = await supabaseService.saveImportHistory([{
-                hotel: selectedHotel.name,
-                tipo: 'Receita (independente)',
-                ano: rows[0]?.year || selectedVersion.year,
-                meses: monthName,
-                version_id: null,
-                user_id: null,
-                valor_total: valorTotal,
-            }]);
-            const importId = historyEntry.id;
+            // Agrupa por ano — um mesmo excel de Receitas pode trazer anos diferentes,
+            // e cada ano vira uma linha própria no Histórico de Importações (mesmo
+            // padrão já usado na importação de Despesas), com os meses e cenários
+            // (Real/Meta/Ano anterior) daquele ano juntados numa lista.
+            const byYear = new Map<number, ParsedRevenueRow[]>();
+            rows.forEach(r => {
+                const y = r.year || selectedVersion.year;
+                if (!byYear.has(y)) byYear.set(y, []);
+                byYear.get(y)!.push(r);
+            });
 
-            await supabaseService.saveRevenueImportData(rows.map(r => ({
-                hotel: selectedHotel.name,
-                hotelRaw: r.hotelRaw,
-                year: r.year,
-                month: r.month,
-                tipo: r.tipo,
-                cenario: r.cenario,
-                escopo: r.escopo,
-                cr: r.crRaw,
-                crMatched: r.crMatched,
-                departamento: r.departamento,
-                conta: r.contaRaw,
-                contaMatched: r.contaMatched,
-                value: r.value,
-                versionId: selectedVersion.id,
-            })), importId);
+            for (const [year, yearRows] of Array.from(byYear.entries()).sort((a, b) => a[0] - b[0])) {
+                const monthNames = Array.from(new Set(yearRows.map(r => r.month).filter(m => m >= 1 && m <= 12)))
+                    .sort((a, b) => a - b)
+                    .map(m => new Date(2024, m - 1).toLocaleString('pt-BR', { month: 'short' }))
+                    .join(', ');
+                const cenarios = Array.from(new Set(yearRows.map(r => r.cenario).filter(Boolean))).join(', ');
+                const valorTotal = yearRows.reduce((s, r) => s + Math.abs(r.value), 0);
+
+                const [historyEntry] = await supabaseService.saveImportHistory([{
+                    hotel: selectedHotel.name,
+                    tipo: 'Receita (independente)',
+                    cenario: cenarios,
+                    ano: year,
+                    meses: monthNames || '1-12',
+                    version_id: selectedVersion.id,
+                    user_id: null,
+                    valor_total: valorTotal,
+                }]);
+                const importId = historyEntry.id;
+
+                await supabaseService.saveRevenueImportData(yearRows.map(r => ({
+                    hotel: selectedHotel.name,
+                    hotelRaw: r.hotelRaw,
+                    year: r.year,
+                    month: r.month,
+                    tipo: r.tipo,
+                    cenario: r.cenario,
+                    escopo: r.escopo,
+                    cr: r.crRaw,
+                    crMatched: r.crMatched,
+                    departamento: r.departamento,
+                    conta: r.contaRaw,
+                    contaMatched: r.contaMatched,
+                    value: r.value,
+                    versionId: selectedVersion.id,
+                })), importId);
+            }
 
             toast.success(`${rows.length} lançamentos de receita salvos.`);
             setImported(true);
+            onImported?.();
         } catch (err: any) {
             toast.error('Erro ao importar receitas: ' + (err?.message || String(err)));
         } finally {
