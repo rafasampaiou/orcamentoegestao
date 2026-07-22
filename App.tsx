@@ -39,16 +39,21 @@ function buildProjectionsSnapshot(
   hotel: string,
   year: number,
   versionId: string
-): Record<string, Record<string, number[]>> {
-  const projections: Record<string, Record<string, number[]>> = {};
+): Record<string, Record<string, (number | null)[]>> {
+  const projections: Record<string, Record<string, (number | null)[]>> = {};
   PROJECTION_TYPES.forEach(pt => {
-    const rowsForType: Record<string, number[]> = {};
+    const rowsForType: Record<string, (number | null)[]> = {};
     let hasAny = false;
     for (let i = 0; i < 12; i++) {
       const key = `${hotel}_${year}_${i + 1}_${versionId}__${pt}`;
       const monthData = realOccMap[key] || {};
       Object.keys(monthData).forEach(rowId => {
-        if (!rowsForType[rowId]) rowsForType[rowId] = Array(12).fill(0);
+        // O preenchimento tem que ser null, não 0 — um mês nunca tocado (null) é diferente de um
+        // mês resetado/digitado como 0 de propósito. Com 0 aqui, um campo com dado real em
+        // qualquer outro mês fazia esse mês "voltar" como zero explícito ao recarregar (em vez de
+        // sumir de vez), reintroduzindo depois de um reset o mesmo valor que deveria ter zerado —
+        // já que "0 salvo" e "nunca preenchido" bloqueiam do mesmo jeito o fallback pra Meta.
+        if (!rowsForType[rowId]) rowsForType[rowId] = Array(12).fill(null);
         rowsForType[rowId][i] = monthData[rowId];
         hasAny = true;
       });
@@ -68,16 +73,21 @@ function buildOtbProjectionsSnapshot(
   hotel: string,
   year: number,
   versionId: string
-): Record<string, Record<string, number[]>> {
-  const projections: Record<string, Record<string, number[]>> = {};
+): Record<string, Record<string, (number | null)[]>> {
+  const projections: Record<string, Record<string, (number | null)[]>> = {};
   OTB_VERSIONS.forEach(pt => {
-    const rowsForType: Record<string, number[]> = {};
+    const rowsForType: Record<string, (number | null)[]> = {};
     let hasAny = false;
     for (let i = 0; i < 12; i++) {
       const key = `${hotel}_${year}_${i + 1}_${versionId}__${pt}__OTB`;
       const monthData = realOccMap[key] || {};
       Object.keys(monthData).forEach(rowId => {
-        if (!rowsForType[rowId]) rowsForType[rowId] = Array(12).fill(0);
+        // O preenchimento tem que ser null, não 0 — um mês nunca tocado (null) é diferente de um
+        // mês resetado/digitado como 0 de propósito. Com 0 aqui, um campo com dado real em
+        // qualquer outro mês fazia esse mês "voltar" como zero explícito ao recarregar (em vez de
+        // sumir de vez), reintroduzindo depois de um reset o mesmo valor que deveria ter zerado —
+        // já que "0 salvo" e "nunca preenchido" bloqueiam do mesmo jeito o fallback pra Meta.
+        if (!rowsForType[rowId]) rowsForType[rowId] = Array(12).fill(null);
         rowsForType[rowId][i] = monthData[rowId];
         hasAny = true;
       });
