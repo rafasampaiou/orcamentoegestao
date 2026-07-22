@@ -898,12 +898,26 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 return { ...prev, [normalKey]: {}, [otbContextKey]: currentOtb };
             });
         } else if (index === 4) {
-            if (!setRealOccupancyData) return;
-            setRealOccupancyData(prev => {
-                const current = { ...(prev[otbContextKey] || {}) };
-                delete current['__forecast_calculated'];
-                return { ...prev, [otbContextKey]: current };
-            });
+            // Calcular Forecast — zera as despesas de Custos/Contas que foram projetadas por esse
+            // cálculo (coluna Forecast), como se o botão nunca tivesse sido clicado.
+            setData(prevData => recalculateTotals(prevData.map(row => {
+                if ((row.category === 'Costs' || row.category === 'Account') && (row.real || 0) !== 0) {
+                    return {
+                        ...row,
+                        real: 0,
+                        isManualOverride: false,
+                        forecastConfig: { ...(row.forecastConfig || { method: 'Fixed' as const }), manualValue: 0 }
+                    };
+                }
+                return row;
+            }), packages, accounts));
+            if (setRealOccupancyData) {
+                setRealOccupancyData(prev => {
+                    const current = { ...(prev[otbContextKey] || {}) };
+                    delete current['__forecast_calculated'];
+                    return { ...prev, [otbContextKey]: current };
+                });
+            }
         } else if (index === 5) {
             // Despesas da Prévia — volta as linhas de Custos/Contas que tinham Prévia preenchida
             // pra zero, como se ainda não tivesse sido preenchida.
