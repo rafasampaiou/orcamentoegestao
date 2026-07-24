@@ -178,7 +178,7 @@ const IMPORT_LABEL_MAP: Record<string, string> = {
     'outras provisoes': '__label__',
 };
 
-const parseNum = (s: string): number => {
+export const parseNum = (s: string): number => {
     if (!s || s.trim() === '' || s.trim() === '-') return 0;
     // Handle both comma-decimal (pt-BR) and dot-decimal formats
     const cleaned = s.trim().replace(/[R$\s]/g, '').replace(/\./g, '').replace(',', '.');
@@ -283,20 +283,11 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     }, [selectedHotel, selectedMonth, selectedYear, activeProjectionType]);
     const isLocked = isMonthClosed && isAlreadyValidated && !forceUnlockValidated;
 
-    const [data, setData] = useState<ForecastRow[]>(() => {
-        const forecastStructure = dreConfigs?.['Forecast'] || [];
-        const initialData = getDynamicForecastData(forecastStructure, selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData);
-
-        const initializedData = initialData.map(row => {
-            const finalPrevia = row.previa;
-            return {
-                ...row,
-                previa: finalPrevia,
-                previaConfig: row.previaConfig || { method: 'Fixed', manualValue: finalPrevia }
-            };
-        });
-        return recalculateTotals(initializedData, packages, accounts);
-    });
+    const [data, setData] = useState<ForecastRow[]>(() => buildForecastRows(
+        dreConfigs, selectedMonth, selectedYear, financialData, selectedHotel, hotels,
+        realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages,
+        budgetOccupancyData, activeProjectionType
+    ));
 
     const [showDetails, setShowDetails] = useState(false);
     const [expandedPackages, setExpandedPackages] = useState<Set<string>>(new Set());
@@ -435,24 +426,11 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     }, [realOccupancyData]);
 
     const derivedData = useMemo(() => {
-        const forecastStructure = dreConfigs?.['Forecast'] || [];
-
-        let newData: ForecastRow[];
-        if (forecastStructure.length > 0) {
-            newData = getDynamicForecastData(forecastStructure, selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData);
-        } else {
-            newData = getForecastData(selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData, activeProjectionType);
-        }
-
-        const initializedData = newData.map(row => {
-            const finalPrevia = row.previa;
-            return {
-                ...row,
-                previa: finalPrevia,
-                previaConfig: row.previaConfig || { method: 'Fixed', manualValue: finalPrevia }
-            };
-        });
-        return recalculateTotals(initializedData, packages, accounts);
+        return buildForecastRows(
+            dreConfigs, selectedMonth, selectedYear, financialData, selectedHotel, hotels,
+            realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages,
+            budgetOccupancyData, activeProjectionType
+        );
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedMonth, selectedYear, financialData, selectedHotel, packages, accounts, hotels, occupancySignature, activeRealVersionId, activeBudgetVersionId, budgetOccupancyData, dreConfigs, isMonthClosed, activeProjectionType]);
 
@@ -3096,3 +3074,42 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
 
     return Array.from(rowMap.values());
 }
+
+// Extraída do useState inicial / derivedData desta tela para ser reaproveitada por outras telas
+// (ex.: Análise de A&B) sem duplicar a lógica de escolha de estrutura + recálculo de totais.
+export function buildForecastRows(
+    dreConfigs: Record<string, import('../types').DreSection[]> | undefined,
+    selectedMonth: number | undefined,
+    selectedYear: number | undefined,
+    financialData: ImportedRow[] | undefined,
+    selectedHotel: string | undefined,
+    hotels: Hotel[],
+    realOccupancyData: Record<string, Record<string, number>>,
+    activeRealVersionId: string | undefined,
+    activeBudgetVersionId: string | undefined,
+    accounts: Account[],
+    packages: CostPackage[],
+    budgetOccupancyData: Record<string, number[]>,
+    activeProjectionType: import('../types').ProjectionType | undefined
+): ForecastRow[] {
+    const forecastStructure = dreConfigs?.['Forecast'] || [];
+
+    let newData: ForecastRow[];
+    if (forecastStructure.length > 0) {
+        newData = getDynamicForecastData(forecastStructure, selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData);
+    } else {
+        newData = getForecastData(selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData, activeProjectionType);
+    }
+
+    const initializedData = newData.map(row => {
+        const finalPrevia = row.previa;
+        return {
+            ...row,
+            previa: finalPrevia,
+            previaConfig: row.previaConfig || { method: 'Fixed', manualValue: finalPrevia }
+        };
+    });
+    return recalculateTotals(initializedData, packages, accounts);
+}
+
+export { formatValue, formatPercentDiff, formatPointsDiff };

@@ -53,7 +53,7 @@ const Header: React.FC<HeaderProps> = ({
 }) => {
     // Comparativo de ocupação has its own hotel filter (multi-select, view-only) — the global
     // Tipo/Categoria/Região/Hotel/Versão filters don't apply there anymore.
-    const showFilters = currentView === 'dashboard';
+    const showFilters = currentView === 'dashboard' || currentView === 'ab_analysis';
     const isUnrestrictedRole = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.DIRETORIA || currentUser?.role === UserRole.PACKAGE_MANAGER;
     const userHotelIds = currentUser?.hotelIds && currentUser.hotelIds.length > 0
         ? currentUser.hotelIds

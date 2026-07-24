@@ -707,6 +707,38 @@ export const supabaseService = {
     return fetchAllRows('revenue_import_data');
   },
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // AB ANALYSIS OVERRIDES (Análise de A&B) — valores de receita editados manualmente
+  // por cima do que veio da importação de Receitas, por (hotel/ano/mês/versão/linha/cenário).
+  // ═══════════════════════════════════════════════════════════════════════════
+  async getAbAnalysisOverrides(): Promise<any[]> {
+    return fetchAllRows('ab_analysis_overrides');
+  },
+
+  async upsertAbAnalysisOverrides(rows: {
+    hotel: string; year: number; month: number; versionId: string | null;
+    lineKey: string; scenario: string; value: number;
+  }[]): Promise<void> {
+    if (rows.length === 0) return;
+    // version_id vai vazio (nunca null) na chave de conflito — coluna UNIQUE com NULL não
+    // deduplica no Postgres (cada NULL conta como distinto), o que faria o upsert duplicar
+    // linhas em vez de atualizar quando não houver versão ativa.
+    const records = rows.map(r => ({
+      hotel: r.hotel,
+      year: r.year,
+      month: r.month,
+      version_id: r.versionId || '',
+      line_key: r.lineKey,
+      scenario: r.scenario,
+      value: r.value,
+      updated_at: new Date().toISOString(),
+    }));
+    const { error } = await supabase
+      .from('ab_analysis_overrides')
+      .upsert(records, { onConflict: 'hotel,year,month,version_id,line_key,scenario' });
+    if (error) throw error;
+  },
+
   // Usado pelo "Resetar etapa" do balancete OTB — remove só os lançamentos daquele contexto
   // específico (hotel/ano/mês/versão/cenário), sem tocar no resto dos dados da versão.
   async deleteFinancialDataByContext(hotel: string, year: number, month: number, versionId: string, scenario: string): Promise<void> {

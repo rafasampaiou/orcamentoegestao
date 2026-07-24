@@ -258,7 +258,8 @@ export type ViewState =
   | 'real_home'
   | 'dashboard' // Forecast
   | 'occupancy_monthly' 
-  | 'occupancy_real' 
+  | 'occupancy_real'
+  | 'ab_analysis'
   | 'comparatives'
   | 'gmd'
   | 'validations'

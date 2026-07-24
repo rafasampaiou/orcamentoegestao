@@ -3,7 +3,8 @@ import {
   Users, Settings, LogOut, Building2, BarChart2,
   BedDouble, CheckCircle2, ChevronDown, ChevronRight,
   TrendingUp, Database, PieChart, FileText, Upload,
-  Calendar, GanttChartSquare, Layers, ShieldCheck, Package
+  Calendar, GanttChartSquare, Layers, ShieldCheck, Package,
+  UtensilsCrossed
 } from 'lucide-react';
 import { ViewState, ModuleType, User, UserRole } from '../types';
 
@@ -159,6 +160,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <NavItem depth={1} label="Ocupação"           icon={Calendar}      active={currentView === 'occupancy_monthly'} onClick={() => go('occupancy_monthly', 'REAL')} />
             <NavItem depth={1} label="Comparativo de ocupação" icon={BedDouble}     active={currentView === 'occupancy_real'}  onClick={() => go('occupancy_real', 'REAL')} />
             <NavItem depth={1} label="DRE Forecast"   icon={BarChart2}     active={currentView === 'dashboard'}       onClick={() => go('dashboard', 'REAL')} />
+            <NavItem depth={1} label="Análise de A&B" icon={UtensilsCrossed} active={currentView === 'ab_analysis'}   onClick={() => go('ab_analysis', 'REAL')} />
             <NavItem depth={1} label="Comparativos"   icon={PieChart}      active={currentView === 'comparatives'}    onClick={() => go('comparatives', 'REAL')} />
             <NavItem depth={1} label="Metas GMD"      icon={Users}         active={currentView === 'gmd'}             onClick={() => go('gmd', 'REAL')} />
             {isAdmin && <NavItem depth={1} label="Validações" icon={CheckCircle2} active={currentView === 'validations'} onClick={() => go('validations', 'REAL')} />}

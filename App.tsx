@@ -8,6 +8,7 @@ import GMDView from './components/GMDView';
 import OccupancyView from './components/OccupancyView';
 import OccupancyMonthlyRealView from './components/OccupancyMonthlyRealView';
 import ComparativesView from './components/ComparativesView';
+import AnaliseABView from './components/AnaliseABView';
 import BudgetLaborView from './components/BudgetLaborView';
 import BudgetExtraRevView from './components/BudgetExtraRevView';
 import BudgetDREView from './components/BudgetDREView';
@@ -1198,6 +1199,23 @@ const App: React.FC = () => {
             />
           </div>
         </div>
+      );
+      case 'ab_analysis': return (
+        <AnaliseABView
+          selectedMonth={selectedDate.getMonth() + 1}
+          selectedYear={selectedDate.getFullYear()}
+          financialData={importedFinancialData}
+          selectedHotel={selectedHotel}
+          accounts={accounts}
+          packages={packages}
+          hotels={hotels}
+          realOccupancyData={realOccupancyData}
+          activeRealVersionId={activeRealVersionId}
+          activeRealVersionName={activeRealVersionName}
+          activeBudgetVersionId={activeBudgetVersionId}
+          budgetOccupancyData={budgetOccupancyDataMap[activeBudgetVersionId] || {}}
+          activeProjectionType={activeProjectionType}
+        />
       );
       case 'occupancy_real': return (
         <OccupancyView
