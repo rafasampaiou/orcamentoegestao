@@ -436,8 +436,8 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
         realizado: get(realizado), meta: get(meta), anoAnterior: get(anoAnterior),
     });
 
-    // Painel do resumo mensal (Real/Meta/Diferença lado a lado por mês) — componente isolado,
-    // não reaproveita Row/TableShell pra não arriscar afetar as tabelas principais da tela.
+    // Painel do resumo mensal (um mês por linha, Real/Meta/Diferença em colunas) — componente
+    // isolado, não reaproveita Row/TableShell pra não arriscar afetar as tabelas principais da tela.
     const MonthlyStripTable: React.FC<{ title: string; format: RowFormat; kind: RowKind; getMonth: (monthIdx: number) => { real: number; meta: number } }> = ({ title, format, kind, getMonth }) => (
         <div>
             <div className="text-xs font-black text-gray-500 uppercase tracking-wide mb-1 px-1">{title}</div>
@@ -445,34 +445,25 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                 <table className="text-xs" style={{ fontFamily: 'Calibri, sans-serif' }}>
                     <thead className="bg-gray-50 text-gray-500 uppercase font-bold sticky top-0">
                         <tr>
-                            {MONTH_LABELS.map(m => (
-                                <th key={m} colSpan={3} className="px-2 py-1 text-center border-l border-gray-200 first:border-l-0">{m}</th>
-                            ))}
-                        </tr>
-                        <tr>
-                            {MONTH_LABELS.map(m => (
-                                <React.Fragment key={m}>
-                                    <th className="px-1.5 py-1 text-right font-bold border-l border-gray-200">Real</th>
-                                    <th className="px-1.5 py-1 text-right font-bold">Meta</th>
-                                    <th className="px-1.5 py-1 text-right font-bold">Dif.</th>
-                                </React.Fragment>
-                            ))}
+                            <th className="px-2 py-1 text-left">Mês</th>
+                            <th className="px-2 py-1 text-right">Real</th>
+                            <th className="px-2 py-1 text-right">Meta</th>
+                            <th className="px-2 py-1 text-right">Dif.</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr>
-                            {ALL_MONTHS.map(m => {
-                                const { real, meta } = getMonth(m - 1);
-                                const diff = real - meta;
-                                return (
-                                    <React.Fragment key={m}>
-                                        <td className="px-1.5 py-1 text-right tabular-nums whitespace-nowrap font-semibold text-gray-800 border-l border-gray-100">{formatByType(real, format)}</td>
-                                        <td className="px-1.5 py-1 text-right tabular-nums whitespace-nowrap text-gray-600">{formatByType(meta, format)}</td>
-                                        <td className={diffCellClass(diff, kind)}>{formatDiff(diff, format)}</td>
-                                    </React.Fragment>
-                                );
-                            })}
-                        </tr>
+                        {ALL_MONTHS.map((m, idx) => {
+                            const { real, meta } = getMonth(idx);
+                            const diff = real - meta;
+                            return (
+                                <tr key={m} className="border-b border-gray-100 last:border-b-0 hover:bg-gray-50/50">
+                                    <td className="px-2 py-1 text-left text-gray-600 font-semibold">{MONTH_LABELS[idx]}</td>
+                                    <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap font-semibold text-gray-800">{formatByType(real, format)}</td>
+                                    <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap text-gray-600">{formatByType(meta, format)}</td>
+                                    <td className={diffCellClass(diff, kind)}>{formatDiff(diff, format)}</td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
                 </table>
             </div>
