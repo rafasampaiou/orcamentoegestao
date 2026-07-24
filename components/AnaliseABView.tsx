@@ -466,6 +466,12 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                 <div className="text-xs font-black text-gray-500 uppercase tracking-wide mb-1 px-1">{title}</div>
                 <div className="inline-block max-w-full overflow-x-auto border border-gray-200 rounded-xl align-top">
                     <table className="text-xs" style={{ fontFamily: 'Calibri, sans-serif' }}>
+                        <colgroup>
+                            <col style={{ width: '100px' }} />
+                            <col style={{ width: '100px' }} />
+                            <col style={{ width: '100px' }} />
+                            <col style={{ width: '90px' }} />
+                        </colgroup>
                         <thead className="bg-gray-50 text-gray-500 uppercase font-bold sticky top-0">
                             <tr>
                                 <th className="px-2 py-1 text-left">Mês</th>
