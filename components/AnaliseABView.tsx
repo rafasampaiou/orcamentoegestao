@@ -92,7 +92,7 @@ const EditableCell: React.FC<{ value: number; onCommit: (v: number) => void }> =
     return (
         <input
             type="text"
-            className="w-full bg-transparent text-right tabular-nums outline-none border-b border-dashed border-gray-300 focus:border-indigo-500 text-indigo-900 font-semibold"
+            className="w-full bg-transparent text-right tabular-nums outline-none text-indigo-900 font-semibold focus:bg-indigo-50/40 rounded px-1"
             value={text}
             onFocus={() => setFocused(true)}
             onChange={e => setText(e.target.value)}
@@ -322,7 +322,7 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                 {isLoading && <div className="py-6 text-center text-gray-400 italic text-sm">Carregando...</div>}
 
                 <div className="overflow-x-auto border border-gray-200 rounded-xl">
-                    <table className="text-sm">
+                    <table className="text-sm" style={{ fontFamily: 'Calibri, sans-serif' }}>
                         <colgroup>
                             <col style={{ width: '260px' }} />
                             <col style={{ width: '110px' }} />
@@ -331,7 +331,7 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                             <col style={{ width: '110px' }} />
                             <col style={{ width: '95px' }} />
                         </colgroup>
-                        <thead className="bg-gray-50 text-gray-500 uppercase font-bold text-[10px] sticky top-0">
+                        <thead className="bg-gray-50 text-gray-500 uppercase font-bold text-xs sticky top-0">
                             <tr>
                                 <th className="px-3 py-1.5 text-left">Linha</th>
                                 <th className="px-2 py-1.5 text-right">Realizado</th>
@@ -364,7 +364,7 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                                 <Row key={row.id} label={row.label} indent={1} kind="despesa" values={vals(r => r.custoBebidasItems[i] || 0)} />
                             ))}
 
-                            <SectionHeader label="Alimentos (considerando o crédito de outros custos)" />
+                            <SectionHeader label="Alimentos (com o crédito)" />
                             <Row label="Custo por PAX" format="currency2" kind="despesa" values={vals(r => r.custoPaxAlimentos)} />
                             <Row label="CMV %" format="percent" kind="despesa" values={vals(r => r.cmvAlimentos)} />
 
@@ -372,7 +372,7 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                             <Row label="Custo por PAX" format="currency2" kind="despesa" values={vals(r => r.custoPaxBebidas)} />
                             <Row label="CMV %" format="percent" kind="despesa" values={vals(r => r.cmvBebidas)} />
 
-                            <SectionHeader label="Alimentos e Bebidas (considerando o crédito de outros custos)" />
+                            <SectionHeader label="Alimentos e Bebidas (com o crédito)" />
                             <Row label="Custo por PAX" format="currency2" kind="despesa" values={vals(r => r.custoPaxAB)} />
                             <Row label="CMV %" format="percent" kind="despesa" values={vals(r => r.cmvAB)} />
                         </tbody>
