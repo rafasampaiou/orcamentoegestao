@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { ArrowLeft, ArrowRight, Calendar } from 'lucide-react';
 import { Account, CostPackage, Hotel, ImportedRow, ProjectionType, ForecastRow } from '../types';
 import { buildForecastRows, formatValue, formatPointsDiff, parseNum } from './ForecastTable';
 import { normalizeAccountName } from '../services/mockData';
@@ -20,7 +21,22 @@ interface AnaliseABViewProps {
     activeBudgetVersionId?: string;
     budgetOccupancyData?: Record<string, number[]>;
     activeProjectionType?: ProjectionType;
+    setActiveProjectionType?: React.Dispatch<React.SetStateAction<ProjectionType>>;
+    formattedDate?: string;
+    onMonthChange?: (direction: 'prev' | 'next') => void;
 }
+
+// Mesmas 5 versões que já existem no resto do app (Reunião de Ritmo/FCA N1/FCA N2/Fechamento/
+// Realizado) — é esse seletor, e não o filtro genérico de Tipo/Categoria/Região do topo, que
+// define de qual versão a Análise de A&B está puxando os dados (inclusive os que vêm da DRE
+// Forecast), igual ao padrão já usado na aba Ocupação.
+const PROJECTION_TYPE_OPTIONS: { value: ProjectionType; label: string }[] = [
+    { value: 'Reunião de Ritmo', label: 'Reunião de Ritmo' },
+    { value: 'FCA N2', label: 'FCA N2' },
+    { value: 'FCA N1', label: 'FCA N1' },
+    { value: 'Fechamento oficial', label: 'Fechamento' },
+    { value: 'Realizado', label: 'Realizado' },
+];
 
 type Scenario = 'REALIZADO' | 'META' | 'ANO_ANTERIOR';
 const SCENARIOS: Scenario[] = ['REALIZADO', 'META', 'ANO_ANTERIOR'];
@@ -49,11 +65,15 @@ const scenarioBucket = (cenario: string): Scenario => {
     return 'REALIZADO';
 };
 
-const dreFieldForScenario = (row: ForecastRow | undefined, scenario: Scenario): number => {
+// As despesas (Custo de Alimentos/Bebidas) puxam o Realizado da coluna Prévia/Fechamento da DRE
+// Forecast (row.previa), não da coluna Forecast (row.real) — pedido explícito, já que é a Prévia
+// quem reflete o valor sendo trabalhado/fechado. Hóspedes (Adultos/CHD) continuam vindo de
+// row.real, que é o campo que a própria DRE usa pra essas linhas de indicador.
+const dreFieldForScenario = (row: ForecastRow | undefined, scenario: Scenario, realizadoField: 'real' | 'previa' = 'real'): number => {
     if (!row) return 0;
     if (scenario === 'META') return row.budget || 0;
     if (scenario === 'ANO_ANTERIOR') return row.lastYear || 0;
-    return row.real || 0;
+    return (realizadoField === 'previa' ? row.previa : row.real) || 0;
 };
 
 type RowFormat = 'currency' | 'percent' | 'integer' | 'currency2';
@@ -107,7 +127,7 @@ const EditableCell: React.FC<{ value: number; onCommit: (v: number) => void }> =
 const AnaliseABView: React.FC<AnaliseABViewProps> = ({
     selectedMonth, selectedYear, financialData, selectedHotel, accounts, packages, hotels,
     realOccupancyData, activeRealVersionId, activeRealVersionName, activeBudgetVersionId,
-    budgetOccupancyData, activeProjectionType,
+    budgetOccupancyData, activeProjectionType, setActiveProjectionType, formattedDate, onMonthChange,
 }) => {
     const [revenueRows, setRevenueRows] = useState<any[]>([]);
     const [overrides, setOverrides] = useState<any[]>([]);
@@ -250,9 +270,9 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
         const chd = dreFieldForScenario(chdRow, scenario);
         const hospedes = adultos + chd;
 
-        const custoAlimentosItems = custoAlimentosRows.map(r => dreFieldForScenario(r, scenario));
+        const custoAlimentosItems = custoAlimentosRows.map(r => dreFieldForScenario(r, scenario, 'previa'));
         const custoAlimentos = custoAlimentosItems.reduce((a, b) => a + b, 0);
-        const custoBebidasItems = custoBebidasRows.map(r => dreFieldForScenario(r, scenario));
+        const custoBebidasItems = custoBebidasRows.map(r => dreFieldForScenario(r, scenario, 'previa'));
         const custoBebidas = custoBebidasItems.reduce((a, b) => a + b, 0);
 
         return {
@@ -354,7 +374,39 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
             <div className="inline-block bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-6">
                 <VersionInfoBanner versionName={activeRealVersionName} />
                 <h2 className="text-xl font-black text-gray-900 mb-1">Análise de A&B</h2>
-                <p className="text-sm text-gray-500 mb-6 max-w-md">CMV e Custo por PAX de Alimentos e Bebidas — Receitas editáveis vêm da importação de Receitas; Hóspedes e Custos são os mesmos valores da DRE Forecast.</p>
+                <p className="text-sm text-gray-500 mb-4 max-w-md">CMV e Custo por PAX de Alimentos e Bebidas — Receitas editáveis vêm da importação de Receitas; Hóspedes e Custos são os mesmos valores da DRE Forecast.</p>
+
+                <div className="flex flex-wrap items-center gap-4 mb-6">
+                    <div className="flex items-center bg-gray-100 p-1 rounded-lg">
+                        {PROJECTION_TYPE_OPTIONS.map(opt => (
+                            <button
+                                key={opt.value}
+                                onClick={() => setActiveProjectionType?.(opt.value)}
+                                className={`px-4 py-1.5 text-sm font-bold rounded-md transition-all ${activeProjectionType === opt.value
+                                    ? 'bg-white text-indigo-600 shadow-sm border border-gray-200'
+                                    : 'text-gray-500 hover:text-gray-700'
+                                    }`}
+                            >
+                                {opt.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    {onMonthChange && (
+                        <div className="flex items-center gap-3 bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
+                            <button onClick={() => onMonthChange('prev')} className="p-1.5 hover:bg-gray-100 rounded text-gray-500">
+                                <ArrowLeft size={18} />
+                            </button>
+                            <div className="flex items-center gap-2 text-sm text-gray-700 w-36 justify-center font-bold capitalize">
+                                <Calendar size={16} className="text-indigo-500" />
+                                <span>{formattedDate}</span>
+                            </div>
+                            <button onClick={() => onMonthChange('next')} className="p-1.5 hover:bg-gray-100 rounded text-gray-500">
+                                <ArrowRight size={18} />
+                            </button>
+                        </div>
+                    )}
+                </div>
 
                 {isLoading && <div className="py-6 text-center text-gray-400 italic text-sm">Carregando...</div>}
 
