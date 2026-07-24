@@ -337,8 +337,8 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
 
     const Row: React.FC<{
         label: string; indent?: number; bold?: boolean; asHeader?: boolean; format?: RowFormat; kind?: RowKind;
-        values: RowValues; editableLineKey?: string; editableScenarios?: Scenario[];
-    }> = ({ label, indent = 0, bold, asHeader, format = 'currency', kind = 'neutral', values, editableLineKey, editableScenarios }) => {
+        values: RowValues; editableLineKey?: string; editableScenarios?: Scenario[]; hideLabel?: boolean;
+    }> = ({ label, indent = 0, bold, asHeader, format = 'currency', kind = 'neutral', values, editableLineKey, editableScenarios, hideLabel }) => {
         const diff1 = values.realizado - values.meta;
         const diff2 = values.realizado - values.anoAnterior;
         const isBold = bold || asHeader;
@@ -352,9 +352,11 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
         };
         return (
             <tr className={asHeader ? 'bg-indigo-50/60' : 'border-b border-gray-100 hover:bg-gray-50/50'}>
-                <td className={`px-3 py-1 truncate ${asHeader ? 'font-black text-indigo-900 text-xs uppercase tracking-wide' : (isBold ? 'font-black text-gray-900' : 'text-gray-600')}`} style={{ paddingLeft: `${12 + indent * 20}px` }}>
-                    {label}
-                </td>
+                {!hideLabel && (
+                    <td className={`px-3 py-1 truncate ${asHeader ? 'font-black text-indigo-900 text-xs uppercase tracking-wide' : (isBold ? 'font-black text-gray-900' : 'text-gray-600')}`} style={{ paddingLeft: `${12 + indent * 20}px` }}>
+                        {label}
+                    </td>
+                )}
                 <td className={cellClass}>{renderCell('REALIZADO', values.realizado)}</td>
                 <td className={cellClass}>{renderCell('META', values.meta)}</td>
                 <td className={diffCellClass(diff1, kind)}>{formatDiff(diff1, format)}</td>
@@ -370,13 +372,17 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
         </tr>
     );
 
-    const TableShell: React.FC<{ title?: string; children: React.ReactNode }> = ({ title, children }) => (
+    const TableShell: React.FC<{ title?: string; reserveTitleSpace?: boolean; hideLabelColumn?: boolean; children: React.ReactNode }> = ({ title, reserveTitleSpace, hideLabelColumn, children }) => (
         <div>
-            {title && <div className="text-xs font-black text-gray-500 uppercase tracking-wide mb-1 px-1">{title}</div>}
+            {title ? (
+                <div className="text-xs font-black text-gray-500 uppercase tracking-wide mb-1 px-1">{title}</div>
+            ) : reserveTitleSpace ? (
+                <div className="text-xs font-black mb-1 px-1 invisible">.</div>
+            ) : null}
             <div className="overflow-x-auto border border-gray-200 rounded-xl">
                 <table className="text-sm" style={{ fontFamily: 'Calibri, sans-serif' }}>
                     <colgroup>
-                        <col style={{ width: '260px' }} />
+                        {!hideLabelColumn && <col style={{ width: '260px' }} />}
                         <col style={{ width: '110px' }} />
                         <col style={{ width: '110px' }} />
                         <col style={{ width: '95px' }} />
@@ -385,7 +391,7 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                     </colgroup>
                     <thead className="bg-gray-50 text-gray-500 uppercase font-bold text-xs sticky top-0">
                         <tr>
-                            <th className="px-3 py-1 text-left">Linha</th>
+                            {!hideLabelColumn && <th className="px-3 py-1 text-left">Linha</th>}
                             <th className="px-2 py-1 text-right">Realizado</th>
                             <th className="px-2 py-1 text-right">Meta</th>
                             <th className="px-2 py-1 text-right">Diferença</th>
@@ -482,31 +488,31 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                     </TableShell>
 
                     <div className="flex items-start gap-4 flex-wrap">
-                        <TableShell>
+                        <TableShell reserveTitleSpace>
                             <Row label="Custo de Alimentos" asHeader kind="despesa" values={vals(r => r.custoAlimentos)} />
                             {custoAlimentosRows.map((row, i) => (
                                 <Row key={row.id} label={row.label} indent={1} kind="despesa" values={vals(r => r.custoAlimentosItems[i] || 0)} />
                             ))}
                         </TableShell>
-                        <TableShell title="Por PAX">
-                            <Row label="Custo de Alimentos" asHeader format="currency2" kind="despesa" values={vals(r => r.custoPaxAlimentos)} />
+                        <TableShell title="Por PAX" hideLabelColumn>
+                            <Row label="" hideLabel asHeader format="currency2" kind="despesa" values={vals(r => r.custoPaxAlimentos)} />
                             {custoAlimentosRows.map((row, i) => (
-                                <Row key={row.id} label={row.label} indent={1} format="currency2" kind="despesa" values={itemPax('custoAlimentosItems', i)} />
+                                <Row key={row.id} label="" hideLabel indent={1} format="currency2" kind="despesa" values={itemPax('custoAlimentosItems', i)} />
                             ))}
                         </TableShell>
                     </div>
 
                     <div className="flex items-start gap-4 flex-wrap">
-                        <TableShell>
+                        <TableShell reserveTitleSpace>
                             <Row label="Custos de Bebidas" asHeader kind="despesa" values={vals(r => r.custoBebidas)} />
                             {custoBebidasRows.map((row, i) => (
                                 <Row key={row.id} label={row.label} indent={1} kind="despesa" values={vals(r => r.custoBebidasItems[i] || 0)} />
                             ))}
                         </TableShell>
-                        <TableShell title="Por PAX">
-                            <Row label="Custos de Bebidas" asHeader format="currency2" kind="despesa" values={vals(r => r.custoPaxBebidas)} />
+                        <TableShell title="Por PAX" hideLabelColumn>
+                            <Row label="" hideLabel asHeader format="currency2" kind="despesa" values={vals(r => r.custoPaxBebidas)} />
                             {custoBebidasRows.map((row, i) => (
-                                <Row key={row.id} label={row.label} indent={1} format="currency2" kind="despesa" values={itemPax('custoBebidasItems', i)} />
+                                <Row key={row.id} label="" hideLabel indent={1} format="currency2" kind="despesa" values={itemPax('custoBebidasItems', i)} />
                             ))}
                         </TableShell>
                     </div>
