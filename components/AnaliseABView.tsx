@@ -24,6 +24,7 @@ interface AnaliseABViewProps {
 }
 
 const MONTH_LABELS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+const ALL_MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
 interface AggregatedFields { real: number; budget: number; lastYear: number; previa: number; }
 const emptyAgg = (): AggregatedFields => ({ real: 0, budget: 0, lastYear: 0, previa: 0 });
@@ -195,6 +196,32 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
     const custoBebidasAgg = useMemo(() => CUSTO_BEBIDAS_ACCOUNTS.map(name =>
         monthlyDreRows.reduce((acc, rows) => addAgg(acc, findAccountRowIn(rows, name)), emptyAgg())
     ), [monthlyDreRows]);
+
+    // Resumo mensal (painel à direita) — SEMPRE os 12 meses do ano, independente do filtro
+    // "Filtrar Meses" acima (que só afeta as tabelas principais). Cálculo isolado, não reaproveita
+    // nem altera monthlyDreRows/visibleMonths, pra não interferir no restante da tela.
+    const allMonthsDreRows = useMemo(() => ALL_MONTHS.map(m => buildForecastRows(
+        undefined, m, selectedYear, financialData, selectedHotel, hotels,
+        realOccupancyData || {}, activeRealVersionId, activeBudgetVersionId, accounts, packages,
+        budgetOccupancyData || {}, activeProjectionType
+    )), [selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData, activeProjectionType]);
+
+    const monthlySummary = useMemo(() => allMonthsDreRows.map(rows => {
+        const adultosRow = rows.find(r => r.id === 'IND-ADULTOS');
+        const chdRow = rows.find(r => r.id === 'IND-CHD');
+        const paxReal = (adultosRow?.real || 0) + (chdRow?.real || 0);
+        const paxMeta = (adultosRow?.budget || 0) + (chdRow?.budget || 0);
+
+        const custoRows = CUSTO_ALIMENTOS_ACCOUNTS.map(name => findAccountRowIn(rows, name));
+        const custoReal = custoRows.reduce((s, r) => s + (r?.previa || 0), 0);
+        const custoMeta = custoRows.reduce((s, r) => s + (r?.budget || 0), 0);
+
+        return {
+            pax: { real: paxReal, meta: paxMeta },
+            custoAlimentos: { real: custoReal, meta: custoMeta },
+            custoPorPax: { real: paxReal ? custoReal / paxReal : 0, meta: paxMeta ? custoMeta / paxMeta : 0 },
+        };
+    }), [allMonthsDreRows]);
 
     // Linhas de receita importadas (Administração > Importação > Receitas), filtradas pro
     // contexto atual (hotel + meses selecionados). O ano é conferido por linha: Realizado/Meta
@@ -409,8 +436,51 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
         realizado: get(realizado), meta: get(meta), anoAnterior: get(anoAnterior),
     });
 
+    // Painel do resumo mensal (Real/Meta/Diferença lado a lado por mês) — componente isolado,
+    // não reaproveita Row/TableShell pra não arriscar afetar as tabelas principais da tela.
+    const MonthlyStripTable: React.FC<{ title: string; format: RowFormat; kind: RowKind; getMonth: (monthIdx: number) => { real: number; meta: number } }> = ({ title, format, kind, getMonth }) => (
+        <div>
+            <div className="text-xs font-black text-gray-500 uppercase tracking-wide mb-1 px-1">{title}</div>
+            <div className="inline-block max-w-full overflow-x-auto border border-gray-200 rounded-xl align-top">
+                <table className="text-xs" style={{ fontFamily: 'Calibri, sans-serif' }}>
+                    <thead className="bg-gray-50 text-gray-500 uppercase font-bold sticky top-0">
+                        <tr>
+                            {MONTH_LABELS.map(m => (
+                                <th key={m} colSpan={3} className="px-2 py-1 text-center border-l border-gray-200 first:border-l-0">{m}</th>
+                            ))}
+                        </tr>
+                        <tr>
+                            {MONTH_LABELS.map(m => (
+                                <React.Fragment key={m}>
+                                    <th className="px-1.5 py-1 text-right font-bold border-l border-gray-200">Real</th>
+                                    <th className="px-1.5 py-1 text-right font-bold">Meta</th>
+                                    <th className="px-1.5 py-1 text-right font-bold">Dif.</th>
+                                </React.Fragment>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            {ALL_MONTHS.map(m => {
+                                const { real, meta } = getMonth(m - 1);
+                                const diff = real - meta;
+                                return (
+                                    <React.Fragment key={m}>
+                                        <td className="px-1.5 py-1 text-right tabular-nums whitespace-nowrap font-semibold text-gray-800 border-l border-gray-100">{formatByType(real, format)}</td>
+                                        <td className="px-1.5 py-1 text-right tabular-nums whitespace-nowrap text-gray-600">{formatByType(meta, format)}</td>
+                                        <td className={diffCellClass(diff, kind)}>{formatDiff(diff, format)}</td>
+                                    </React.Fragment>
+                                );
+                            })}
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+
     return (
-        <div className="px-4 py-6 min-h-[calc(100vh-5rem)]">
+        <div className="px-4 py-6 min-h-[calc(100vh-5rem)] flex items-start gap-4 flex-wrap">
             <div className="inline-block bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-6">
                 <VersionInfoBanner versionName={activeRealVersionName} />
                 <h2 className="text-xl font-black text-gray-900 mb-1">Análise de A&B</h2>
@@ -531,6 +601,16 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                         <Row label="CMV %" format="percent" kind="despesa" values={vals(r => r.cmvAB)} />
                     </TableShell>
                 </div>
+            </div>
+
+            <div className="inline-block bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-6 space-y-4">
+                <div>
+                    <h3 className="text-sm font-black text-gray-900 mb-1">Resumo mensal — Custo por PAX</h3>
+                    <p className="text-xs text-gray-500 max-w-xs">Mês a mês, direto da DRE Forecast (hotel/versão selecionados) — sempre os 12 meses, independente do filtro de meses ao lado.</p>
+                </div>
+                <MonthlyStripTable title="PAX" format="integer" kind="neutral" getMonth={idx => monthlySummary[idx]?.pax || { real: 0, meta: 0 }} />
+                <MonthlyStripTable title="Custo de Alimentos" format="currency" kind="despesa" getMonth={idx => monthlySummary[idx]?.custoAlimentos || { real: 0, meta: 0 }} />
+                <MonthlyStripTable title="Custo por PAX" format="currency2" kind="despesa" getMonth={idx => monthlySummary[idx]?.custoPorPax || { real: 0, meta: 0 }} />
             </div>
         </div>
     );
