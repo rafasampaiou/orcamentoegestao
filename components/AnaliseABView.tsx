@@ -75,7 +75,7 @@ const formatDiff = (diff: number, format: RowFormat) => {
 // é bom (verde); para linhas de despesa/custo, "maior" é ruim (vermelho) — o oposto.
 type RowKind = 'receita' | 'despesa' | 'neutral';
 const diffCellClass = (diff: number, kind: RowKind) => {
-    const base = 'px-2 py-1.5 text-right tabular-nums whitespace-nowrap';
+    const base = 'px-2 py-1 text-right tabular-nums whitespace-nowrap';
     if (kind === 'neutral' || !diff) return `${base} text-gray-500`;
     const isGood = kind === 'receita' ? diff > 0 : diff < 0;
     return `${base} ${isGood ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`;
@@ -273,6 +273,14 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
     const meta = computeForScenario('META');
     const anoAnterior = computeForScenario('ANO_ANTERIOR');
 
+    // Custo por PAX de uma linha contábil específica (não do pacote inteiro): custo da própria
+    // linha dividido pelo total de Hóspedes do mesmo cenário.
+    const itemPax = (kind: 'custoAlimentosItems' | 'custoBebidasItems', idx: number): RowValues => ({
+        realizado: realizado.hospedes ? (realizado[kind][idx] || 0) / realizado.hospedes : 0,
+        meta: meta.hospedes ? (meta[kind][idx] || 0) / meta.hospedes : 0,
+        anoAnterior: anoAnterior.hospedes ? (anoAnterior[kind][idx] || 0) / anoAnterior.hospedes : 0,
+    });
+
     const Row: React.FC<{
         label: string; indent?: number; bold?: boolean; asHeader?: boolean; format?: RowFormat; kind?: RowKind;
         values: RowValues; editableLineKey?: string; editableScenarios?: Scenario[];
@@ -281,7 +289,7 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
         const diff2 = values.realizado - values.anoAnterior;
         const isBold = bold || asHeader;
         const textClass = asHeader ? 'text-indigo-900' : (isBold ? 'text-gray-900' : 'text-gray-700');
-        const cellClass = `px-2 py-1.5 text-right tabular-nums whitespace-nowrap ${isBold ? `font-black ${textClass}` : textClass}`;
+        const cellClass = `px-2 py-1 text-right tabular-nums whitespace-nowrap ${isBold ? `font-black ${textClass}` : textClass}`;
         const renderCell = (scenario: Scenario, value: number) => {
             if (editableLineKey && (!editableScenarios || editableScenarios.includes(scenario))) {
                 return <EditableCell value={value} onCommit={v => handleCommitCell(editableLineKey, scenario, v)} />;
@@ -290,7 +298,7 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
         };
         return (
             <tr className={asHeader ? 'bg-indigo-50/60' : 'border-b border-gray-100 hover:bg-gray-50/50'}>
-                <td className={`px-3 py-1.5 truncate ${asHeader ? 'font-black text-indigo-900 text-xs uppercase tracking-wide' : (isBold ? 'font-black text-gray-900' : 'text-gray-600')}`} style={{ paddingLeft: `${12 + indent * 20}px` }}>
+                <td className={`px-3 py-1 truncate ${asHeader ? 'font-black text-indigo-900 text-xs uppercase tracking-wide' : (isBold ? 'font-black text-gray-900' : 'text-gray-600')}`} style={{ paddingLeft: `${12 + indent * 20}px` }}>
                     {label}
                 </td>
                 <td className={cellClass}>{renderCell('REALIZADO', values.realizado)}</td>
@@ -304,8 +312,37 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
 
     const SectionHeader: React.FC<{ label: string }> = ({ label }) => (
         <tr className="bg-indigo-50/60">
-            <td colSpan={6} className="px-3 py-1.5 font-black text-indigo-900 text-xs uppercase tracking-wide">{label}</td>
+            <td colSpan={6} className="px-3 py-1 font-black text-indigo-900 text-xs uppercase tracking-wide">{label}</td>
         </tr>
+    );
+
+    const TableShell: React.FC<{ title?: string; children: React.ReactNode }> = ({ title, children }) => (
+        <div>
+            {title && <div className="text-xs font-black text-gray-500 uppercase tracking-wide mb-1 px-1">{title}</div>}
+            <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                <table className="text-sm" style={{ fontFamily: 'Calibri, sans-serif' }}>
+                    <colgroup>
+                        <col style={{ width: '260px' }} />
+                        <col style={{ width: '110px' }} />
+                        <col style={{ width: '110px' }} />
+                        <col style={{ width: '95px' }} />
+                        <col style={{ width: '110px' }} />
+                        <col style={{ width: '95px' }} />
+                    </colgroup>
+                    <thead className="bg-gray-50 text-gray-500 uppercase font-bold text-xs sticky top-0">
+                        <tr>
+                            <th className="px-3 py-1 text-left">Linha</th>
+                            <th className="px-2 py-1 text-right">Realizado</th>
+                            <th className="px-2 py-1 text-right">Meta</th>
+                            <th className="px-2 py-1 text-right">Diferença</th>
+                            <th className="px-2 py-1 text-right">Ano anterior</th>
+                            <th className="px-2 py-1 text-right">Diferença</th>
+                        </tr>
+                    </thead>
+                    <tbody>{children}</tbody>
+                </table>
+            </div>
+        </div>
     );
 
     const vals = (get: (r: ReturnType<typeof computeForScenario>) => number): RowValues => ({
@@ -321,62 +358,64 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
 
                 {isLoading && <div className="py-6 text-center text-gray-400 italic text-sm">Carregando...</div>}
 
-                <div className="overflow-x-auto border border-gray-200 rounded-xl">
-                    <table className="text-sm" style={{ fontFamily: 'Calibri, sans-serif' }}>
-                        <colgroup>
-                            <col style={{ width: '260px' }} />
-                            <col style={{ width: '110px' }} />
-                            <col style={{ width: '110px' }} />
-                            <col style={{ width: '95px' }} />
-                            <col style={{ width: '110px' }} />
-                            <col style={{ width: '95px' }} />
-                        </colgroup>
-                        <thead className="bg-gray-50 text-gray-500 uppercase font-bold text-xs sticky top-0">
-                            <tr>
-                                <th className="px-3 py-1.5 text-left">Linha</th>
-                                <th className="px-2 py-1.5 text-right">Realizado</th>
-                                <th className="px-2 py-1.5 text-right">Meta</th>
-                                <th className="px-2 py-1.5 text-right">Diferença</th>
-                                <th className="px-2 py-1.5 text-right">Ano anterior</th>
-                                <th className="px-2 py-1.5 text-right">Diferença</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <Row label="Receita de Alimentos (total)" asHeader kind="receita" values={vals(r => r.receitaAlimentos)} />
-                            <Row label="Inclusos" indent={1} kind="receita" values={vals(r => r.alimentosInclusos)} editableLineKey="alimentos_inclusos" />
-                            <Row label="Extras" indent={1} kind="receita" values={vals(r => r.alimentosExtras)} editableLineKey="alimentos_extras" />
+                <div className="space-y-4">
+                    <TableShell>
+                        <Row label="Receita de Alimentos" asHeader kind="receita" values={vals(r => r.receitaAlimentos)} />
+                        <Row label="Inclusos" indent={1} kind="receita" values={vals(r => r.alimentosInclusos)} editableLineKey="alimentos_inclusos" />
+                        <Row label="Extras" indent={1} kind="receita" values={vals(r => r.alimentosExtras)} editableLineKey="alimentos_extras" />
 
-                            <Row label="Receita de Bebidas (total)" asHeader kind="receita" values={vals(r => r.receitaBebidas)} />
-                            <Row label="Inclusas" indent={1} kind="receita" values={vals(r => r.bebidasInclusas)} editableLineKey="bebidas_inclusas" />
-                            <Row label="Extras" indent={1} kind="receita" values={vals(r => r.bebidasExtras)} editableLineKey="bebidas_extras" />
+                        <Row label="Receita de Bebidas" asHeader kind="receita" values={vals(r => r.receitaBebidas)} />
+                        <Row label="Inclusas" indent={1} kind="receita" values={vals(r => r.bebidasInclusas)} editableLineKey="bebidas_inclusas" />
+                        <Row label="Extras" indent={1} kind="receita" values={vals(r => r.bebidasExtras)} editableLineKey="bebidas_extras" />
 
-                            <Row label="Hóspedes (total)" asHeader format="integer" values={vals(r => r.hospedes)} />
-                            <Row label="Adultos" indent={1} format="integer" values={vals(r => r.adultos)} />
-                            <Row label="CHD" indent={1} format="integer" values={vals(r => r.chd)} />
+                        <Row label="Hóspedes" asHeader format="integer" values={vals(r => r.hospedes)} />
+                        <Row label="Adultos" indent={1} format="integer" values={vals(r => r.adultos)} />
+                        <Row label="CHD" indent={1} format="integer" values={vals(r => r.chd)} />
+                    </TableShell>
 
-                            <Row label="Custo de Alimentos (total)" asHeader kind="despesa" values={vals(r => r.custoAlimentos)} />
+                    <div className="flex items-start gap-4 flex-wrap">
+                        <TableShell title="Custo de Alimentos">
+                            <Row label="Custo de Alimentos" asHeader kind="despesa" values={vals(r => r.custoAlimentos)} />
                             {custoAlimentosRows.map((row, i) => (
                                 <Row key={row.id} label={row.label} indent={1} kind="despesa" values={vals(r => r.custoAlimentosItems[i] || 0)} />
                             ))}
+                        </TableShell>
+                        <TableShell title="Custo de Alimentos — Custo por PAX">
+                            <Row label="Custo de Alimentos" asHeader format="currency2" kind="despesa" values={vals(r => r.custoPaxAlimentos)} />
+                            {custoAlimentosRows.map((row, i) => (
+                                <Row key={row.id} label={row.label} indent={1} format="currency2" kind="despesa" values={itemPax('custoAlimentosItems', i)} />
+                            ))}
+                        </TableShell>
+                    </div>
 
-                            <Row label="Custos de Bebidas (total)" asHeader kind="despesa" values={vals(r => r.custoBebidas)} />
+                    <div className="flex items-start gap-4 flex-wrap">
+                        <TableShell title="Custos de Bebidas">
+                            <Row label="Custos de Bebidas" asHeader kind="despesa" values={vals(r => r.custoBebidas)} />
                             {custoBebidasRows.map((row, i) => (
                                 <Row key={row.id} label={row.label} indent={1} kind="despesa" values={vals(r => r.custoBebidasItems[i] || 0)} />
                             ))}
+                        </TableShell>
+                        <TableShell title="Custos de Bebidas — Custo por PAX">
+                            <Row label="Custos de Bebidas" asHeader format="currency2" kind="despesa" values={vals(r => r.custoPaxBebidas)} />
+                            {custoBebidasRows.map((row, i) => (
+                                <Row key={row.id} label={row.label} indent={1} format="currency2" kind="despesa" values={itemPax('custoBebidasItems', i)} />
+                            ))}
+                        </TableShell>
+                    </div>
 
-                            <SectionHeader label="Alimentos (com o crédito)" />
-                            <Row label="Custo por PAX" format="currency2" kind="despesa" values={vals(r => r.custoPaxAlimentos)} />
-                            <Row label="CMV %" format="percent" kind="despesa" values={vals(r => r.cmvAlimentos)} />
+                    <TableShell>
+                        <SectionHeader label="Alimentos (com o crédito)" />
+                        <Row label="Custo por PAX" format="currency2" kind="despesa" values={vals(r => r.custoPaxAlimentos)} />
+                        <Row label="CMV %" format="percent" kind="despesa" values={vals(r => r.cmvAlimentos)} />
 
-                            <SectionHeader label="Bebidas" />
-                            <Row label="Custo por PAX" format="currency2" kind="despesa" values={vals(r => r.custoPaxBebidas)} />
-                            <Row label="CMV %" format="percent" kind="despesa" values={vals(r => r.cmvBebidas)} />
+                        <SectionHeader label="Bebidas" />
+                        <Row label="Custo por PAX" format="currency2" kind="despesa" values={vals(r => r.custoPaxBebidas)} />
+                        <Row label="CMV %" format="percent" kind="despesa" values={vals(r => r.cmvBebidas)} />
 
-                            <SectionHeader label="Alimentos e Bebidas (com o crédito)" />
-                            <Row label="Custo por PAX" format="currency2" kind="despesa" values={vals(r => r.custoPaxAB)} />
-                            <Row label="CMV %" format="percent" kind="despesa" values={vals(r => r.cmvAB)} />
-                        </tbody>
-                    </table>
+                        <SectionHeader label="Alimentos e Bebidas (com o crédito)" />
+                        <Row label="Custo por PAX" format="currency2" kind="despesa" values={vals(r => r.custoPaxAB)} />
+                        <Row label="CMV %" format="percent" kind="despesa" values={vals(r => r.cmvAB)} />
+                    </TableShell>
                 </div>
             </div>
         </div>
