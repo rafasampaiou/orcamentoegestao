@@ -436,39 +436,62 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
         realizado: get(realizado), meta: get(meta), anoAnterior: get(anoAnterior),
     });
 
-    // Painel do resumo mensal (um mês por linha, Real/Meta/Diferença em colunas) — componente
-    // isolado, não reaproveita Row/TableShell pra não arriscar afetar as tabelas principais da tela.
-    const MonthlyStripTable: React.FC<{ title: string; format: RowFormat; kind: RowKind; getMonth: (monthIdx: number) => { real: number; meta: number } }> = ({ title, format, kind, getMonth }) => (
-        <div>
-            <div className="text-xs font-black text-gray-500 uppercase tracking-wide mb-1 px-1">{title}</div>
-            <div className="inline-block max-w-full overflow-x-auto border border-gray-200 rounded-xl align-top">
-                <table className="text-xs" style={{ fontFamily: 'Calibri, sans-serif' }}>
-                    <thead className="bg-gray-50 text-gray-500 uppercase font-bold sticky top-0">
-                        <tr>
-                            <th className="px-2 py-1 text-left">Mês</th>
-                            <th className="px-2 py-1 text-right">Real</th>
-                            <th className="px-2 py-1 text-right">Meta</th>
-                            <th className="px-2 py-1 text-right">Dif.</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {ALL_MONTHS.map((m, idx) => {
-                            const { real, meta } = getMonth(idx);
-                            const diff = real - meta;
-                            return (
-                                <tr key={m} className="border-b border-gray-100 last:border-b-0 hover:bg-gray-50/50">
-                                    <td className="px-2 py-1 text-left text-gray-600 font-semibold">{MONTH_LABELS[idx]}</td>
-                                    <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap font-semibold text-gray-800">{formatByType(real, format)}</td>
-                                    <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap text-gray-600">{formatByType(meta, format)}</td>
-                                    <td className={diffCellClass(diff, kind)}>{formatDiff(diff, format)}</td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
+    // Painel do resumo mensal (um mês por linha, Real/Meta/Diferença em colunas), separado por
+    // semestre com subtotal de cada um e total do ano — componente isolado, não reaproveita
+    // Row/TableShell pra não arriscar afetar as tabelas principais da tela. A largura (colgroup)
+    // é a mesma soma de largura das tabelas de Custo de Alimentos/Bebidas (780px).
+    const MonthlyStripTable: React.FC<{ title: string; format: RowFormat; kind: RowKind; getMonth: (monthIdx: number) => { real: number; meta: number } }> = ({ title, format, kind, getMonth }) => {
+        const months = ALL_MONTHS.map((_, idx) => ({ idx, ...getMonth(idx) }));
+        const sem1 = months.slice(0, 6);
+        const sem2 = months.slice(6, 12);
+        const sumOf = (arr: { real: number; meta: number }[]) => arr.reduce((acc, d) => ({ real: acc.real + d.real, meta: acc.meta + d.meta }), { real: 0, meta: 0 });
+        const sem1Sum = sumOf(sem1);
+        const sem2Sum = sumOf(sem2);
+        const yearSum = { real: sem1Sum.real + sem2Sum.real, meta: sem1Sum.meta + sem2Sum.meta };
+
+        const renderRow = (label: string, real: number, meta: number, bold?: boolean) => {
+            const diff = real - meta;
+            return (
+                <tr key={label} className={bold ? 'bg-indigo-50/60' : 'border-b border-gray-100 last:border-b-0 hover:bg-gray-50/50'}>
+                    <td className={`px-2 py-1 text-left ${bold ? 'font-black text-indigo-900 text-[11px] uppercase tracking-wide' : 'text-gray-600 font-semibold'}`}>{label}</td>
+                    <td className={`px-2 py-1 text-right tabular-nums whitespace-nowrap ${bold ? 'font-black text-indigo-900' : 'font-semibold text-gray-800'}`}>{formatByType(real, format)}</td>
+                    <td className={`px-2 py-1 text-right tabular-nums whitespace-nowrap ${bold ? 'font-black text-indigo-900' : 'text-gray-600'}`}>{formatByType(meta, format)}</td>
+                    <td className={diffCellClass(diff, kind)}>{formatDiff(diff, format)}</td>
+                </tr>
+            );
+        };
+
+        return (
+            <div>
+                <div className="text-xs font-black text-gray-500 uppercase tracking-wide mb-1 px-1">{title}</div>
+                <div className="inline-block max-w-full overflow-x-auto border border-gray-200 rounded-xl align-top">
+                    <table className="text-xs" style={{ fontFamily: 'Calibri, sans-serif' }}>
+                        <colgroup>
+                            <col style={{ width: '180px' }} />
+                            <col style={{ width: '220px' }} />
+                            <col style={{ width: '220px' }} />
+                            <col style={{ width: '160px' }} />
+                        </colgroup>
+                        <thead className="bg-gray-50 text-gray-500 uppercase font-bold sticky top-0">
+                            <tr>
+                                <th className="px-2 py-1 text-left">Mês</th>
+                                <th className="px-2 py-1 text-right">Real</th>
+                                <th className="px-2 py-1 text-right">Meta</th>
+                                <th className="px-2 py-1 text-right">Dif.</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {sem1.map(d => renderRow(MONTH_LABELS[d.idx], d.real, d.meta))}
+                            {renderRow('1º Semestre', sem1Sum.real, sem1Sum.meta, true)}
+                            {sem2.map(d => renderRow(MONTH_LABELS[d.idx], d.real, d.meta))}
+                            {renderRow('2º Semestre', sem2Sum.real, sem2Sum.meta, true)}
+                            {renderRow('Total Ano', yearSum.real, yearSum.meta, true)}
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        </div>
-    );
+        );
+    };
 
     return (
         <div className="px-4 py-6 min-h-[calc(100vh-5rem)] flex items-start gap-4 flex-wrap">
