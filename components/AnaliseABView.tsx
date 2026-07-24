@@ -261,7 +261,8 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
     }> = ({ label, indent = 0, bold, format = 'currency', values, editableLineKey, editableScenarios }) => {
         const diff1 = values.realizado - values.meta;
         const diff2 = values.realizado - values.anoAnterior;
-        const cellClass = `px-3 py-2 text-right tabular-nums ${bold ? 'font-black text-gray-900' : 'text-gray-700'}`;
+        const cellClass = `px-2 py-2 text-right tabular-nums whitespace-nowrap ${bold ? 'font-black text-gray-900' : 'text-gray-700'}`;
+        const diffCellClass = "px-2 py-2 text-right tabular-nums whitespace-nowrap text-gray-500";
         const renderCell = (scenario: Scenario, value: number) => {
             if (editableLineKey && (!editableScenarios || editableScenarios.includes(scenario))) {
                 return <EditableCell value={value} onCommit={v => handleCommitCell(editableLineKey, scenario, v)} />;
@@ -270,14 +271,14 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
         };
         return (
             <tr className="border-b border-gray-100 hover:bg-gray-50/50">
-                <td className={`px-3 py-2 ${bold ? 'font-black text-gray-900' : 'text-gray-600'}`} style={{ paddingLeft: `${12 + indent * 20}px` }}>
+                <td className={`px-3 py-2 truncate ${bold ? 'font-black text-gray-900' : 'text-gray-600'}`} style={{ paddingLeft: `${12 + indent * 20}px` }}>
                     {label}
                 </td>
                 <td className={cellClass}>{renderCell('REALIZADO', values.realizado)}</td>
                 <td className={cellClass}>{renderCell('META', values.meta)}</td>
-                <td className="px-3 py-2 text-right tabular-nums text-gray-500">{formatDiff(diff1, format)}</td>
+                <td className={diffCellClass}>{formatDiff(diff1, format)}</td>
                 <td className={cellClass}>{renderCell('ANO_ANTERIOR', values.anoAnterior)}</td>
-                <td className="px-3 py-2 text-right tabular-nums text-gray-500">{formatDiff(diff2, format)}</td>
+                <td className={diffCellClass}>{formatDiff(diff2, format)}</td>
             </tr>
         );
     };
@@ -293,24 +294,32 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
     });
 
     return (
-        <div className="max-w-[98%] mx-auto px-4 py-6 min-h-[calc(100vh-5rem)]">
-            <div className="bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-6">
+        <div className="px-4 py-6 min-h-[calc(100vh-5rem)]">
+            <div className="inline-block bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-6">
                 <VersionInfoBanner versionName={activeRealVersionName} />
                 <h2 className="text-xl font-black text-gray-900 mb-1">Análise de A&B</h2>
-                <p className="text-sm text-gray-500 mb-6">CMV e Custo por PAX de Alimentos e Bebidas — Receitas editáveis vêm da importação de Receitas; Hóspedes e Custos são os mesmos valores da DRE Forecast.</p>
+                <p className="text-sm text-gray-500 mb-6 max-w-md">CMV e Custo por PAX de Alimentos e Bebidas — Receitas editáveis vêm da importação de Receitas; Hóspedes e Custos são os mesmos valores da DRE Forecast.</p>
 
                 {isLoading && <div className="py-6 text-center text-gray-400 italic text-sm">Carregando...</div>}
 
                 <div className="overflow-x-auto border border-gray-200 rounded-xl">
-                    <table className="w-full text-sm">
+                    <table className="text-sm">
+                        <colgroup>
+                            <col style={{ width: '240px' }} />
+                            <col style={{ width: '90px' }} />
+                            <col style={{ width: '90px' }} />
+                            <col style={{ width: '80px' }} />
+                            <col style={{ width: '90px' }} />
+                            <col style={{ width: '80px' }} />
+                        </colgroup>
                         <thead className="bg-gray-50 text-gray-500 uppercase font-bold text-[10px] sticky top-0">
                             <tr>
                                 <th className="px-3 py-2 text-left">Linha</th>
-                                <th className="px-3 py-2 text-right">Realizado</th>
-                                <th className="px-3 py-2 text-right">Meta</th>
-                                <th className="px-3 py-2 text-right">Diferença</th>
-                                <th className="px-3 py-2 text-right">Ano anterior</th>
-                                <th className="px-3 py-2 text-right">Diferença</th>
+                                <th className="px-2 py-2 text-right">Realizado</th>
+                                <th className="px-2 py-2 text-right">Meta</th>
+                                <th className="px-2 py-2 text-right">Diferença</th>
+                                <th className="px-2 py-2 text-right">Ano anterior</th>
+                                <th className="px-2 py-2 text-right">Diferença</th>
                             </tr>
                         </thead>
                         <tbody>
