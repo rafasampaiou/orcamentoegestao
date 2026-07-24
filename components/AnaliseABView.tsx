@@ -379,7 +379,7 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
             ) : reserveTitleSpace ? (
                 <div className="text-xs font-black mb-1 px-1 invisible">.</div>
             ) : null}
-            <div className="overflow-x-auto border border-gray-200 rounded-xl">
+            <div className="inline-block max-w-full overflow-x-auto border border-gray-200 rounded-xl align-top">
                 <table className="text-sm" style={{ fontFamily: 'Calibri, sans-serif' }}>
                     <colgroup>
                         {!hideLabelColumn && <col style={{ width: '260px' }} />}
