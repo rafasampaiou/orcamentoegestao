@@ -438,8 +438,8 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
 
     // Painel do resumo mensal (um mês por linha, Real/Meta/Diferença em colunas), separado por
     // semestre com subtotal de cada um e total do ano — componente isolado, não reaproveita
-    // Row/TableShell pra não arriscar afetar as tabelas principais da tela. A largura (colgroup)
-    // é a mesma soma de largura das tabelas de Custo de Alimentos/Bebidas (780px).
+    // Row/TableShell pra não arriscar afetar as tabelas principais da tela. Sem colgroup — a
+    // largura fica no tamanho natural do conteúdo (mais estreita que as tabelas da esquerda).
     const MonthlyStripTable: React.FC<{ title: string; format: RowFormat; kind: RowKind; getMonth: (monthIdx: number) => { real: number; meta: number } }> = ({ title, format, kind, getMonth }) => {
         const months = ALL_MONTHS.map((_, idx) => ({ idx, ...getMonth(idx) }));
         const sem1 = months.slice(0, 6);
@@ -466,12 +466,6 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                 <div className="text-xs font-black text-gray-500 uppercase tracking-wide mb-1 px-1">{title}</div>
                 <div className="inline-block max-w-full overflow-x-auto border border-gray-200 rounded-xl align-top">
                     <table className="text-xs" style={{ fontFamily: 'Calibri, sans-serif' }}>
-                        <colgroup>
-                            <col style={{ width: '180px' }} />
-                            <col style={{ width: '220px' }} />
-                            <col style={{ width: '220px' }} />
-                            <col style={{ width: '160px' }} />
-                        </colgroup>
                         <thead className="bg-gray-50 text-gray-500 uppercase font-bold sticky top-0">
                             <tr>
                                 <th className="px-2 py-1 text-left">Mês</th>
