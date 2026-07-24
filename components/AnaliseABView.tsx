@@ -56,11 +56,29 @@ const dreFieldForScenario = (row: ForecastRow | undefined, scenario: Scenario): 
     return row.real || 0;
 };
 
-const formatDiff = (diff: number, format: 'currency' | 'percent' | 'integer') => {
+type RowFormat = 'currency' | 'percent' | 'integer' | 'currency2';
+
+// Custo por PAX é sempre em R$ com 2 casas decimais — os demais formatos (valores grandes de
+// receita/custo, %, contagem de hóspedes) seguem o padrão sem decimais já usado na DRE Forecast.
+const formatCurrency2 = (val: number) => `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+const formatByType = (val: number, format: RowFormat) => format === 'currency2' ? formatCurrency2(val) : formatValue(val, format);
+
+const formatDiff = (diff: number, format: RowFormat) => {
     if (format === 'percent') return formatPointsDiff(diff);
     if (!diff) return '-';
     const sign = diff > 0 ? '+' : '-';
-    return `${sign}${formatValue(Math.abs(diff), format)}`;
+    return `${sign}${formatByType(Math.abs(diff), format)}`;
+};
+
+// Cor da coluna Diferença representa se o desvio é bom ou ruim: para linhas de receita, "maior"
+// é bom (verde); para linhas de despesa/custo, "maior" é ruim (vermelho) — o oposto.
+type RowKind = 'receita' | 'despesa' | 'neutral';
+const diffCellClass = (diff: number, kind: RowKind) => {
+    const base = 'px-2 py-1.5 text-right tabular-nums whitespace-nowrap';
+    if (kind === 'neutral' || !diff) return `${base} text-gray-500`;
+    const isGood = kind === 'receita' ? diff > 0 : diff < 0;
+    return `${base} ${isGood ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`;
 };
 
 interface RowValues { realizado: number; meta: number; anoAnterior: number; }
@@ -256,38 +274,37 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
     const anoAnterior = computeForScenario('ANO_ANTERIOR');
 
     const Row: React.FC<{
-        label: string; indent?: number; bold?: boolean; asHeader?: boolean; format?: 'currency' | 'percent' | 'integer';
+        label: string; indent?: number; bold?: boolean; asHeader?: boolean; format?: RowFormat; kind?: RowKind;
         values: RowValues; editableLineKey?: string; editableScenarios?: Scenario[];
-    }> = ({ label, indent = 0, bold, asHeader, format = 'currency', values, editableLineKey, editableScenarios }) => {
+    }> = ({ label, indent = 0, bold, asHeader, format = 'currency', kind = 'neutral', values, editableLineKey, editableScenarios }) => {
         const diff1 = values.realizado - values.meta;
         const diff2 = values.realizado - values.anoAnterior;
         const isBold = bold || asHeader;
         const textClass = asHeader ? 'text-indigo-900' : (isBold ? 'text-gray-900' : 'text-gray-700');
-        const cellClass = `px-2 py-2 text-right tabular-nums whitespace-nowrap ${isBold ? `font-black ${textClass}` : textClass}`;
-        const diffCellClass = `px-2 py-2 text-right tabular-nums whitespace-nowrap ${asHeader ? 'text-indigo-700' : 'text-gray-500'}`;
+        const cellClass = `px-2 py-1.5 text-right tabular-nums whitespace-nowrap ${isBold ? `font-black ${textClass}` : textClass}`;
         const renderCell = (scenario: Scenario, value: number) => {
             if (editableLineKey && (!editableScenarios || editableScenarios.includes(scenario))) {
                 return <EditableCell value={value} onCommit={v => handleCommitCell(editableLineKey, scenario, v)} />;
             }
-            return <>{formatValue(value, format)}</>;
+            return <>{formatByType(value, format)}</>;
         };
         return (
             <tr className={asHeader ? 'bg-indigo-50/60' : 'border-b border-gray-100 hover:bg-gray-50/50'}>
-                <td className={`px-3 py-2 truncate ${asHeader ? 'font-black text-indigo-900 text-xs uppercase tracking-wide' : (isBold ? 'font-black text-gray-900' : 'text-gray-600')}`} style={{ paddingLeft: `${12 + indent * 20}px` }}>
+                <td className={`px-3 py-1.5 truncate ${asHeader ? 'font-black text-indigo-900 text-xs uppercase tracking-wide' : (isBold ? 'font-black text-gray-900' : 'text-gray-600')}`} style={{ paddingLeft: `${12 + indent * 20}px` }}>
                     {label}
                 </td>
                 <td className={cellClass}>{renderCell('REALIZADO', values.realizado)}</td>
                 <td className={cellClass}>{renderCell('META', values.meta)}</td>
-                <td className={diffCellClass}>{formatDiff(diff1, format)}</td>
+                <td className={diffCellClass(diff1, kind)}>{formatDiff(diff1, format)}</td>
                 <td className={cellClass}>{renderCell('ANO_ANTERIOR', values.anoAnterior)}</td>
-                <td className={diffCellClass}>{formatDiff(diff2, format)}</td>
+                <td className={diffCellClass(diff2, kind)}>{formatDiff(diff2, format)}</td>
             </tr>
         );
     };
 
     const SectionHeader: React.FC<{ label: string }> = ({ label }) => (
         <tr className="bg-indigo-50/60">
-            <td colSpan={6} className="px-3 py-2 font-black text-indigo-900 text-xs uppercase tracking-wide">{label}</td>
+            <td colSpan={6} className="px-3 py-1.5 font-black text-indigo-900 text-xs uppercase tracking-wide">{label}</td>
         </tr>
     );
 
@@ -307,57 +324,57 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                 <div className="overflow-x-auto border border-gray-200 rounded-xl">
                     <table className="text-sm">
                         <colgroup>
-                            <col style={{ width: '240px' }} />
-                            <col style={{ width: '90px' }} />
-                            <col style={{ width: '90px' }} />
-                            <col style={{ width: '80px' }} />
-                            <col style={{ width: '90px' }} />
-                            <col style={{ width: '80px' }} />
+                            <col style={{ width: '260px' }} />
+                            <col style={{ width: '110px' }} />
+                            <col style={{ width: '110px' }} />
+                            <col style={{ width: '95px' }} />
+                            <col style={{ width: '110px' }} />
+                            <col style={{ width: '95px' }} />
                         </colgroup>
                         <thead className="bg-gray-50 text-gray-500 uppercase font-bold text-[10px] sticky top-0">
                             <tr>
-                                <th className="px-3 py-2 text-left">Linha</th>
-                                <th className="px-2 py-2 text-right">Realizado</th>
-                                <th className="px-2 py-2 text-right">Meta</th>
-                                <th className="px-2 py-2 text-right">Diferença</th>
-                                <th className="px-2 py-2 text-right">Ano anterior</th>
-                                <th className="px-2 py-2 text-right">Diferença</th>
+                                <th className="px-3 py-1.5 text-left">Linha</th>
+                                <th className="px-2 py-1.5 text-right">Realizado</th>
+                                <th className="px-2 py-1.5 text-right">Meta</th>
+                                <th className="px-2 py-1.5 text-right">Diferença</th>
+                                <th className="px-2 py-1.5 text-right">Ano anterior</th>
+                                <th className="px-2 py-1.5 text-right">Diferença</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <Row label="Receita de Alimentos (total)" asHeader values={vals(r => r.receitaAlimentos)} />
-                            <Row label="Inclusos" indent={1} values={vals(r => r.alimentosInclusos)} editableLineKey="alimentos_inclusos" />
-                            <Row label="Extras" indent={1} values={vals(r => r.alimentosExtras)} editableLineKey="alimentos_extras" />
+                            <Row label="Receita de Alimentos (total)" asHeader kind="receita" values={vals(r => r.receitaAlimentos)} />
+                            <Row label="Inclusos" indent={1} kind="receita" values={vals(r => r.alimentosInclusos)} editableLineKey="alimentos_inclusos" />
+                            <Row label="Extras" indent={1} kind="receita" values={vals(r => r.alimentosExtras)} editableLineKey="alimentos_extras" />
 
-                            <Row label="Receita de Bebidas (total)" asHeader values={vals(r => r.receitaBebidas)} />
-                            <Row label="Inclusas" indent={1} values={vals(r => r.bebidasInclusas)} editableLineKey="bebidas_inclusas" />
-                            <Row label="Extras" indent={1} values={vals(r => r.bebidasExtras)} editableLineKey="bebidas_extras" />
+                            <Row label="Receita de Bebidas (total)" asHeader kind="receita" values={vals(r => r.receitaBebidas)} />
+                            <Row label="Inclusas" indent={1} kind="receita" values={vals(r => r.bebidasInclusas)} editableLineKey="bebidas_inclusas" />
+                            <Row label="Extras" indent={1} kind="receita" values={vals(r => r.bebidasExtras)} editableLineKey="bebidas_extras" />
 
                             <Row label="Hóspedes (total)" asHeader format="integer" values={vals(r => r.hospedes)} />
                             <Row label="Adultos" indent={1} format="integer" values={vals(r => r.adultos)} />
                             <Row label="CHD" indent={1} format="integer" values={vals(r => r.chd)} />
 
-                            <Row label="Custo de Alimentos (total)" asHeader values={vals(r => r.custoAlimentos)} />
+                            <Row label="Custo de Alimentos (total)" asHeader kind="despesa" values={vals(r => r.custoAlimentos)} />
                             {custoAlimentosRows.map((row, i) => (
-                                <Row key={row.id} label={row.label} indent={1} values={vals(r => r.custoAlimentosItems[i] || 0)} />
+                                <Row key={row.id} label={row.label} indent={1} kind="despesa" values={vals(r => r.custoAlimentosItems[i] || 0)} />
                             ))}
 
-                            <Row label="Custos de Bebidas (total)" asHeader values={vals(r => r.custoBebidas)} />
+                            <Row label="Custos de Bebidas (total)" asHeader kind="despesa" values={vals(r => r.custoBebidas)} />
                             {custoBebidasRows.map((row, i) => (
-                                <Row key={row.id} label={row.label} indent={1} values={vals(r => r.custoBebidasItems[i] || 0)} />
+                                <Row key={row.id} label={row.label} indent={1} kind="despesa" values={vals(r => r.custoBebidasItems[i] || 0)} />
                             ))}
 
                             <SectionHeader label="Alimentos (considerando o crédito de outros custos)" />
-                            <Row label="Custo por PAX" values={vals(r => r.custoPaxAlimentos)} />
-                            <Row label="CMV %" format="percent" values={vals(r => r.cmvAlimentos)} />
+                            <Row label="Custo por PAX" format="currency2" kind="despesa" values={vals(r => r.custoPaxAlimentos)} />
+                            <Row label="CMV %" format="percent" kind="despesa" values={vals(r => r.cmvAlimentos)} />
 
                             <SectionHeader label="Bebidas" />
-                            <Row label="Custo por PAX" values={vals(r => r.custoPaxBebidas)} />
-                            <Row label="CMV %" format="percent" values={vals(r => r.cmvBebidas)} />
+                            <Row label="Custo por PAX" format="currency2" kind="despesa" values={vals(r => r.custoPaxBebidas)} />
+                            <Row label="CMV %" format="percent" kind="despesa" values={vals(r => r.cmvBebidas)} />
 
                             <SectionHeader label="Alimentos e Bebidas (considerando o crédito de outros custos)" />
-                            <Row label="Custo por PAX" values={vals(r => r.custoPaxAB)} />
-                            <Row label="CMV %" format="percent" values={vals(r => r.cmvAB)} />
+                            <Row label="Custo por PAX" format="currency2" kind="despesa" values={vals(r => r.custoPaxAB)} />
+                            <Row label="CMV %" format="percent" kind="despesa" values={vals(r => r.cmvAB)} />
                         </tbody>
                     </table>
                 </div>
