@@ -256,13 +256,15 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
     const anoAnterior = computeForScenario('ANO_ANTERIOR');
 
     const Row: React.FC<{
-        label: string; indent?: number; bold?: boolean; format?: 'currency' | 'percent' | 'integer';
+        label: string; indent?: number; bold?: boolean; asHeader?: boolean; format?: 'currency' | 'percent' | 'integer';
         values: RowValues; editableLineKey?: string; editableScenarios?: Scenario[];
-    }> = ({ label, indent = 0, bold, format = 'currency', values, editableLineKey, editableScenarios }) => {
+    }> = ({ label, indent = 0, bold, asHeader, format = 'currency', values, editableLineKey, editableScenarios }) => {
         const diff1 = values.realizado - values.meta;
         const diff2 = values.realizado - values.anoAnterior;
-        const cellClass = `px-2 py-2 text-right tabular-nums whitespace-nowrap ${bold ? 'font-black text-gray-900' : 'text-gray-700'}`;
-        const diffCellClass = "px-2 py-2 text-right tabular-nums whitespace-nowrap text-gray-500";
+        const isBold = bold || asHeader;
+        const textClass = asHeader ? 'text-indigo-900' : (isBold ? 'text-gray-900' : 'text-gray-700');
+        const cellClass = `px-2 py-2 text-right tabular-nums whitespace-nowrap ${isBold ? `font-black ${textClass}` : textClass}`;
+        const diffCellClass = `px-2 py-2 text-right tabular-nums whitespace-nowrap ${asHeader ? 'text-indigo-700' : 'text-gray-500'}`;
         const renderCell = (scenario: Scenario, value: number) => {
             if (editableLineKey && (!editableScenarios || editableScenarios.includes(scenario))) {
                 return <EditableCell value={value} onCommit={v => handleCommitCell(editableLineKey, scenario, v)} />;
@@ -270,8 +272,8 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
             return <>{formatValue(value, format)}</>;
         };
         return (
-            <tr className="border-b border-gray-100 hover:bg-gray-50/50">
-                <td className={`px-3 py-2 truncate ${bold ? 'font-black text-gray-900' : 'text-gray-600'}`} style={{ paddingLeft: `${12 + indent * 20}px` }}>
+            <tr className={asHeader ? 'bg-indigo-50/60' : 'border-b border-gray-100 hover:bg-gray-50/50'}>
+                <td className={`px-3 py-2 truncate ${asHeader ? 'font-black text-indigo-900 text-xs uppercase tracking-wide' : (isBold ? 'font-black text-gray-900' : 'text-gray-600')}`} style={{ paddingLeft: `${12 + indent * 20}px` }}>
                     {label}
                 </td>
                 <td className={cellClass}>{renderCell('REALIZADO', values.realizado)}</td>
@@ -323,29 +325,24 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                             </tr>
                         </thead>
                         <tbody>
-                            <SectionHeader label="Receita de Alimentos" />
-                            <Row label="Receita de Alimentos (total)" bold values={vals(r => r.receitaAlimentos)} />
+                            <Row label="Receita de Alimentos (total)" asHeader values={vals(r => r.receitaAlimentos)} />
                             <Row label="Inclusos" indent={1} values={vals(r => r.alimentosInclusos)} editableLineKey="alimentos_inclusos" />
                             <Row label="Extras" indent={1} values={vals(r => r.alimentosExtras)} editableLineKey="alimentos_extras" />
 
-                            <SectionHeader label="Receita de Bebidas" />
-                            <Row label="Receita de Bebidas (total)" bold values={vals(r => r.receitaBebidas)} />
+                            <Row label="Receita de Bebidas (total)" asHeader values={vals(r => r.receitaBebidas)} />
                             <Row label="Inclusas" indent={1} values={vals(r => r.bebidasInclusas)} editableLineKey="bebidas_inclusas" />
                             <Row label="Extras" indent={1} values={vals(r => r.bebidasExtras)} editableLineKey="bebidas_extras" />
 
-                            <SectionHeader label="Hóspedes" />
-                            <Row label="Hóspedes (total)" bold format="integer" values={vals(r => r.hospedes)} />
+                            <Row label="Hóspedes (total)" asHeader format="integer" values={vals(r => r.hospedes)} />
                             <Row label="Adultos" indent={1} format="integer" values={vals(r => r.adultos)} />
                             <Row label="CHD" indent={1} format="integer" values={vals(r => r.chd)} />
 
-                            <SectionHeader label="Custo de Alimentos" />
-                            <Row label="Custo de Alimentos (total)" bold values={vals(r => r.custoAlimentos)} />
+                            <Row label="Custo de Alimentos (total)" asHeader values={vals(r => r.custoAlimentos)} />
                             {custoAlimentosRows.map((row, i) => (
                                 <Row key={row.id} label={row.label} indent={1} values={vals(r => r.custoAlimentosItems[i] || 0)} />
                             ))}
 
-                            <SectionHeader label="Custos de Bebidas" />
-                            <Row label="Custos de Bebidas (total)" bold values={vals(r => r.custoBebidas)} />
+                            <Row label="Custos de Bebidas (total)" asHeader values={vals(r => r.custoBebidas)} />
                             {custoBebidasRows.map((row, i) => (
                                 <Row key={row.id} label={row.label} indent={1} values={vals(r => r.custoBebidasItems[i] || 0)} />
                             ))}
