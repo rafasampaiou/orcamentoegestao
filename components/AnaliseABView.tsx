@@ -482,13 +482,13 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                     </TableShell>
 
                     <div className="flex items-start gap-4 flex-wrap">
-                        <TableShell title="Custo de Alimentos">
+                        <TableShell>
                             <Row label="Custo de Alimentos" asHeader kind="despesa" values={vals(r => r.custoAlimentos)} />
                             {custoAlimentosRows.map((row, i) => (
                                 <Row key={row.id} label={row.label} indent={1} kind="despesa" values={vals(r => r.custoAlimentosItems[i] || 0)} />
                             ))}
                         </TableShell>
-                        <TableShell title="Custo de Alimentos — Custo por PAX">
+                        <TableShell title="Por PAX">
                             <Row label="Custo de Alimentos" asHeader format="currency2" kind="despesa" values={vals(r => r.custoPaxAlimentos)} />
                             {custoAlimentosRows.map((row, i) => (
                                 <Row key={row.id} label={row.label} indent={1} format="currency2" kind="despesa" values={itemPax('custoAlimentosItems', i)} />
@@ -497,13 +497,13 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                     </div>
 
                     <div className="flex items-start gap-4 flex-wrap">
-                        <TableShell title="Custos de Bebidas">
+                        <TableShell>
                             <Row label="Custos de Bebidas" asHeader kind="despesa" values={vals(r => r.custoBebidas)} />
                             {custoBebidasRows.map((row, i) => (
                                 <Row key={row.id} label={row.label} indent={1} kind="despesa" values={vals(r => r.custoBebidasItems[i] || 0)} />
                             ))}
                         </TableShell>
-                        <TableShell title="Custos de Bebidas — Custo por PAX">
+                        <TableShell title="Por PAX">
                             <Row label="Custos de Bebidas" asHeader format="currency2" kind="despesa" values={vals(r => r.custoPaxBebidas)} />
                             {custoBebidasRows.map((row, i) => (
                                 <Row key={row.id} label={row.label} indent={1} format="currency2" kind="despesa" values={itemPax('custoBebidasItems', i)} />
