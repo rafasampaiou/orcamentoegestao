@@ -380,7 +380,7 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
         return (
             <tr className={asHeader ? 'bg-indigo-50/60' : 'border-b border-gray-100 hover:bg-gray-50/50'}>
                 {!hideLabel && (
-                    <td className={`px-3 py-1 truncate ${asHeader ? 'font-black text-indigo-900 text-xs uppercase tracking-wide' : (isBold ? 'font-black text-gray-900' : 'text-gray-600')}`} style={{ paddingLeft: `${12 + indent * 20}px` }}>
+                    <td className={`px-3 py-1 truncate ${asHeader ? 'font-black text-indigo-900 text-sm uppercase tracking-wide' : (isBold ? 'font-black text-gray-900' : 'text-gray-600')}`} style={{ paddingLeft: `${12 + indent * 20}px` }}>
                         {label}
                     </td>
                 )}
@@ -395,28 +395,28 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
 
     const SectionHeader: React.FC<{ label: string }> = ({ label }) => (
         <tr className="bg-indigo-50/60">
-            <td colSpan={6} className="px-3 py-1 font-black text-indigo-900 text-xs uppercase tracking-wide">{label}</td>
+            <td colSpan={6} className="px-3 py-1 font-black text-indigo-900 text-sm uppercase tracking-wide">{label}</td>
         </tr>
     );
 
     const TableShell: React.FC<{ title?: string; reserveTitleSpace?: boolean; hideLabelColumn?: boolean; children: React.ReactNode }> = ({ title, reserveTitleSpace, hideLabelColumn, children }) => (
         <div>
             {title ? (
-                <div className="text-xs font-black text-gray-500 uppercase tracking-wide mb-1 px-1">{title}</div>
+                <div className="text-sm font-black text-gray-500 uppercase tracking-wide mb-1 px-1">{title}</div>
             ) : reserveTitleSpace ? (
-                <div className="text-xs font-black mb-1 px-1 invisible">.</div>
+                <div className="text-sm font-black mb-1 px-1 invisible">.</div>
             ) : null}
             <div className="inline-block max-w-full overflow-x-auto border border-gray-200 rounded-xl align-top">
-                <table className="text-sm" style={{ fontFamily: 'Calibri, sans-serif' }}>
+                <table className="text-base" style={{ fontFamily: 'Calibri, sans-serif' }}>
                     <colgroup>
-                        {!hideLabelColumn && <col style={{ width: '260px' }} />}
-                        <col style={{ width: '110px' }} />
-                        <col style={{ width: '110px' }} />
-                        <col style={{ width: '95px' }} />
-                        <col style={{ width: '110px' }} />
-                        <col style={{ width: '95px' }} />
+                        {!hideLabelColumn && <col style={{ width: '270px' }} />}
+                        <col style={{ width: '120px' }} />
+                        <col style={{ width: '120px' }} />
+                        <col style={{ width: '105px' }} />
+                        <col style={{ width: '120px' }} />
+                        <col style={{ width: '105px' }} />
                     </colgroup>
-                    <thead className="bg-gray-50 text-gray-500 uppercase font-bold text-xs sticky top-0">
+                    <thead className="bg-gray-50 text-gray-500 uppercase font-bold text-sm sticky top-0">
                         <tr>
                             {!hideLabelColumn && <th className="px-3 py-1 text-left">Linha</th>}
                             <th className="px-2 py-1 text-right">Realizado</th>
@@ -453,7 +453,7 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
             const diff = real - meta;
             return (
                 <tr key={label} className={bold ? 'bg-indigo-50/60' : 'border-b border-gray-100 last:border-b-0 hover:bg-gray-50/50'}>
-                    <td className={`px-2 py-1 text-left ${bold ? 'font-black text-indigo-900 text-[11px] uppercase tracking-wide' : 'text-gray-600 font-semibold'}`}>{label}</td>
+                    <td className={`px-2 py-1 text-left ${bold ? 'font-black text-indigo-900 text-xs uppercase tracking-wide' : 'text-gray-600 font-semibold'}`}>{label}</td>
                     <td className={`px-2 py-1 text-right tabular-nums whitespace-nowrap ${bold ? 'font-black text-indigo-900' : 'font-semibold text-gray-800'}`}>{formatByType(real, format)}</td>
                     <td className={`px-2 py-1 text-right tabular-nums whitespace-nowrap ${bold ? 'font-black text-indigo-900' : 'text-gray-600'}`}>{formatByType(meta, format)}</td>
                     <td className={diffCellClass(diff, kind)}>{formatDiff(diff, format)}</td>
@@ -463,14 +463,14 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
 
         return (
             <div>
-                <div className="text-xs font-black text-gray-500 uppercase tracking-wide mb-1 px-1">{title}</div>
+                <div className="text-sm font-black text-gray-500 uppercase tracking-wide mb-1 px-1">{title}</div>
                 <div className="inline-block max-w-full overflow-x-auto border border-gray-200 rounded-xl align-top">
-                    <table className="text-xs" style={{ fontFamily: 'Calibri, sans-serif' }}>
+                    <table className="text-sm" style={{ fontFamily: 'Calibri, sans-serif' }}>
                         <colgroup>
-                            <col style={{ width: '100px' }} />
-                            <col style={{ width: '100px' }} />
-                            <col style={{ width: '100px' }} />
-                            <col style={{ width: '90px' }} />
+                            <col style={{ width: '110px' }} />
+                            <col style={{ width: '110px' }} />
+                            <col style={{ width: '110px' }} />
+                            <col style={{ width: '95px' }} />
                         </colgroup>
                         <thead className="bg-gray-50 text-gray-500 uppercase font-bold sticky top-0">
                             <tr>
@@ -498,7 +498,7 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
             <div className="inline-block bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-6">
                 <VersionInfoBanner versionName={activeRealVersionName} />
                 <h2 className="text-xl font-black text-gray-900 mb-1">Análise de A&B</h2>
-                <p className="text-sm text-gray-500 mb-4 max-w-md">CMV e Custo por PAX de Alimentos e Bebidas — Receitas editáveis vêm da importação de Receitas; Hóspedes e Custos são os mesmos valores da DRE Forecast.</p>
+                <p className="text-base text-gray-500 mb-4 max-w-md">CMV e Custo por PAX de Alimentos e Bebidas — Receitas editáveis vêm da importação de Receitas; Hóspedes e Custos são os mesmos valores da DRE Forecast.</p>
 
                 <div className="flex flex-wrap items-center gap-4 mb-6">
                     <div className="flex items-center bg-gray-100 p-1 rounded-lg">
@@ -530,7 +530,7 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                                         const next = prev.includes(monthNum) ? prev.filter(m => m !== monthNum) : [...prev, monthNum].sort((a, b) => a - b);
                                         return next.length === 0 ? prev : next;
                                     })}
-                                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${active
+                                    className={`px-3 py-1 text-sm font-bold rounded-md transition-all ${active
                                         ? 'bg-indigo-100 text-indigo-700 border border-indigo-200 shadow-sm'
                                         : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'
                                         }`}
@@ -541,7 +541,7 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                         })}
                         <button
                             onClick={() => setVisibleMonths(visibleMonths.length === 12 ? [selectedMonth || 1] : Array.from({ length: 12 }, (_, i) => i + 1))}
-                            className="px-3 py-1 text-xs font-bold rounded-md transition-all bg-gray-100 text-gray-600 hover:bg-gray-200 ml-2 border border-gray-200"
+                            className="px-3 py-1 text-sm font-bold rounded-md transition-all bg-gray-100 text-gray-600 hover:bg-gray-200 ml-2 border border-gray-200"
                         >
                             {visibleMonths.length === 12 ? 'Deselecionar Todos' : 'Selecionar Todos'}
                         </button>
@@ -549,7 +549,7 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                 </div>
 
                 {!isSingleMonth && (
-                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 font-bold mb-4">
+                    <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 font-bold mb-4">
                         Vários meses selecionados — os valores mostrados são a soma do período. Selecione um único mês para editar as receitas manualmente.
                     </p>
                 )}
@@ -619,8 +619,8 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
 
             <div className="inline-block bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-6 space-y-4">
                 <div>
-                    <h3 className="text-sm font-black text-gray-900 mb-1">Resumo mensal — Custo por PAX</h3>
-                    <p className="text-xs text-gray-500 max-w-xs">Mês a mês, direto da DRE Forecast (hotel/versão selecionados) — sempre os 12 meses, independente do filtro de meses ao lado.</p>
+                    <h3 className="text-base font-black text-gray-900 mb-1">Resumo mensal — Custo por PAX</h3>
+                    <p className="text-sm text-gray-500 max-w-xs">Mês a mês, direto da DRE Forecast (hotel/versão selecionados) — sempre os 12 meses, independente do filtro de meses ao lado.</p>
                 </div>
                 <MonthlyStripTable title="PAX" format="integer" kind="neutral" getMonth={idx => monthlySummary[idx]?.pax || { real: 0, meta: 0 }} />
                 <MonthlyStripTable title="Custo de Alimentos" format="currency" kind="despesa" getMonth={idx => monthlySummary[idx]?.custoAlimentos || { real: 0, meta: 0 }} />
