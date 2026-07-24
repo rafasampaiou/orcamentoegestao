@@ -1216,8 +1216,6 @@ const App: React.FC = () => {
           budgetOccupancyData={budgetOccupancyDataMap[activeBudgetVersionId] || {}}
           activeProjectionType={activeProjectionType}
           setActiveProjectionType={setActiveProjectionType}
-          formattedDate={formattedDate}
-          onMonthChange={handleMonthChange}
         />
       );
       case 'occupancy_real': return (

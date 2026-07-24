@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { ArrowLeft, ArrowRight, Calendar } from 'lucide-react';
 import { Account, CostPackage, Hotel, ImportedRow, ProjectionType, ForecastRow } from '../types';
 import { buildForecastRows, formatValue, formatPointsDiff, parseNum } from './ForecastTable';
 import { normalizeAccountName } from '../services/mockData';
@@ -22,9 +21,18 @@ interface AnaliseABViewProps {
     budgetOccupancyData?: Record<string, number[]>;
     activeProjectionType?: ProjectionType;
     setActiveProjectionType?: React.Dispatch<React.SetStateAction<ProjectionType>>;
-    formattedDate?: string;
-    onMonthChange?: (direction: 'prev' | 'next') => void;
 }
+
+const MONTH_LABELS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+interface AggregatedFields { real: number; budget: number; lastYear: number; previa: number; }
+const emptyAgg = (): AggregatedFields => ({ real: 0, budget: 0, lastYear: 0, previa: 0 });
+const addAgg = (a: AggregatedFields, row: ForecastRow | undefined): AggregatedFields => ({
+    real: a.real + (row?.real || 0),
+    budget: a.budget + (row?.budget || 0),
+    lastYear: a.lastYear + (row?.lastYear || 0),
+    previa: a.previa + (row?.previa || 0),
+});
 
 // Mesmas 5 versões que já existem no resto do app (Reunião de Ritmo/FCA N1/FCA N2/Fechamento/
 // Realizado) — é esse seletor, e não o filtro genérico de Tipo/Categoria/Região do topo, que
@@ -66,14 +74,14 @@ const scenarioBucket = (cenario: string): Scenario => {
 };
 
 // As despesas (Custo de Alimentos/Bebidas) puxam o Realizado da coluna Prévia/Fechamento da DRE
-// Forecast (row.previa), não da coluna Forecast (row.real) — pedido explícito, já que é a Prévia
-// quem reflete o valor sendo trabalhado/fechado. Hóspedes (Adultos/CHD) continuam vindo de
-// row.real, que é o campo que a própria DRE usa pra essas linhas de indicador.
-const dreFieldForScenario = (row: ForecastRow | undefined, scenario: Scenario, realizadoField: 'real' | 'previa' = 'real'): number => {
-    if (!row) return 0;
-    if (scenario === 'META') return row.budget || 0;
-    if (scenario === 'ANO_ANTERIOR') return row.lastYear || 0;
-    return (realizadoField === 'previa' ? row.previa : row.real) || 0;
+// Forecast (campo previa), não da coluna Forecast (campo real) — pedido explícito, já que é a
+// Prévia quem reflete o valor sendo trabalhado/fechado. Hóspedes (Adultos/CHD) continuam vindo
+// do campo real, que é o que a própria DRE usa pra essas linhas de indicador. Quando mais de um
+// mês está selecionado (visão acumulada), `agg` já é a soma desses campos mês a mês.
+const fieldForScenario = (agg: AggregatedFields, scenario: Scenario, realizadoField: 'real' | 'previa' = 'real'): number => {
+    if (scenario === 'META') return agg.budget;
+    if (scenario === 'ANO_ANTERIOR') return agg.lastYear;
+    return realizadoField === 'previa' ? agg.previa : agg.real;
 };
 
 type RowFormat = 'currency' | 'percent' | 'integer' | 'currency2';
@@ -127,7 +135,7 @@ const EditableCell: React.FC<{ value: number; onCommit: (v: number) => void }> =
 const AnaliseABView: React.FC<AnaliseABViewProps> = ({
     selectedMonth, selectedYear, financialData, selectedHotel, accounts, packages, hotels,
     realOccupancyData, activeRealVersionId, activeRealVersionName, activeBudgetVersionId,
-    budgetOccupancyData, activeProjectionType, setActiveProjectionType, formattedDate, onMonthChange,
+    budgetOccupancyData, activeProjectionType, setActiveProjectionType,
 }) => {
     const [revenueRows, setRevenueRows] = useState<any[]>([]);
     const [overrides, setOverrides] = useState<any[]>([]);
@@ -135,6 +143,16 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
     const [pendingEdits, setPendingEdits] = useState<Record<string, number>>({});
     const pendingEditsRef = useRef(pendingEdits);
     pendingEditsRef.current = pendingEdits;
+
+    // Meses considerados na análise — por padrão só o mês corrente, mas dá pra selecionar vários
+    // pra ver o acumulado do período (soma dos meses escolhidos), igual ao filtro de meses da
+    // aba Ocupação.
+    const [visibleMonths, setVisibleMonths] = useState<number[]>(() => selectedMonth ? [selectedMonth] : [1]);
+    useEffect(() => {
+        setVisibleMonths(selectedMonth ? [selectedMonth] : [1]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedHotel, selectedYear]);
+    const isSingleMonth = visibleMonths.length === 1;
 
     useEffect(() => {
         let cancelled = false;
@@ -148,33 +166,44 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
             .catch(err => console.error('Erro ao carregar dados de Análise de A&B', err))
             .finally(() => { if (!cancelled) setIsLoading(false); });
         return () => { cancelled = true; };
-    }, [selectedHotel, selectedYear, selectedMonth]);
+    }, [selectedHotel, selectedYear]);
 
-    // Troca de contexto (hotel/ano/mês/versão) descarta edições ainda não salvas dessa tela.
-    useEffect(() => { setPendingEdits({}); }, [selectedHotel, selectedYear, selectedMonth, activeRealVersionId]);
+    // Troca de contexto (hotel/ano/meses/versão) descarta edições ainda não salvas dessa tela.
+    useEffect(() => { setPendingEdits({}); }, [selectedHotel, selectedYear, visibleMonths, activeRealVersionId]);
 
-    // Linhas "replicadas" da DRE Forecast — mesmo cálculo, sem duplicar lógica.
-    const dreRows = useMemo(() => buildForecastRows(
-        undefined, selectedMonth, selectedYear, financialData, selectedHotel, hotels,
+    // Linhas "replicadas" da DRE Forecast — mesmo cálculo, sem duplicar lógica. Uma chamada por
+    // mês selecionado; os campos usados (real/budget/lastYear/previa) são somados entre os meses
+    // logo abaixo, pra viabilizar a visão acumulada.
+    const monthlyDreRows = useMemo(() => visibleMonths.map(m => buildForecastRows(
+        undefined, m, selectedYear, financialData, selectedHotel, hotels,
         realOccupancyData || {}, activeRealVersionId, activeBudgetVersionId, accounts, packages,
         budgetOccupancyData || {}, activeProjectionType
-    ), [selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData, activeProjectionType]);
+    )), [visibleMonths, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData, activeProjectionType]);
 
-    const findAccountRow = (targetName: string) => dreRows.find(r => r.category === 'Account' && normalizeAccountName(r.label) === normalizeAccountName(targetName));
+    const findAccountRowIn = (rows: ForecastRow[], targetName: string) => rows.find(r => r.category === 'Account' && normalizeAccountName(r.label) === normalizeAccountName(targetName));
 
-    const adultosRow = dreRows.find(r => r.id === 'IND-ADULTOS');
-    const chdRow = dreRows.find(r => r.id === 'IND-CHD');
-    const custoAlimentosRows = CUSTO_ALIMENTOS_ACCOUNTS.map(findAccountRow).filter((r): r is ForecastRow => !!r);
-    const custoBebidasRows = CUSTO_BEBIDAS_ACCOUNTS.map(findAccountRow).filter((r): r is ForecastRow => !!r);
+    // Só pra exibir nome/id das linhas (não varia por mês) — usa o primeiro conjunto disponível.
+    const referenceRows = monthlyDreRows[0] || [];
+    const custoAlimentosRows = CUSTO_ALIMENTOS_ACCOUNTS.map(name => findAccountRowIn(referenceRows, name)).filter((r): r is ForecastRow => !!r);
+    const custoBebidasRows = CUSTO_BEBIDAS_ACCOUNTS.map(name => findAccountRowIn(referenceRows, name)).filter((r): r is ForecastRow => !!r);
+
+    const adultosAgg = useMemo(() => monthlyDreRows.reduce((acc, rows) => addAgg(acc, rows.find(r => r.id === 'IND-ADULTOS')), emptyAgg()), [monthlyDreRows]);
+    const chdAgg = useMemo(() => monthlyDreRows.reduce((acc, rows) => addAgg(acc, rows.find(r => r.id === 'IND-CHD')), emptyAgg()), [monthlyDreRows]);
+    const custoAlimentosAgg = useMemo(() => CUSTO_ALIMENTOS_ACCOUNTS.map(name =>
+        monthlyDreRows.reduce((acc, rows) => addAgg(acc, findAccountRowIn(rows, name)), emptyAgg())
+    ), [monthlyDreRows]);
+    const custoBebidasAgg = useMemo(() => CUSTO_BEBIDAS_ACCOUNTS.map(name =>
+        monthlyDreRows.reduce((acc, rows) => addAgg(acc, findAccountRowIn(rows, name)), emptyAgg())
+    ), [monthlyDreRows]);
 
     // Linhas de receita importadas (Administração > Importação > Receitas), filtradas pro
-    // contexto atual (hotel + mês). O ano é conferido por linha: Realizado/Meta esperam o ano
-    // selecionado; Ano anterior espera o ano selecionado - 1 — os dois sinais da planilha
-    // (coluna Ano + coluna Real/Meta) são usados juntos pra evitar ambiguidade.
+    // contexto atual (hotel + meses selecionados). O ano é conferido por linha: Realizado/Meta
+    // esperam o ano selecionado; Ano anterior espera o ano selecionado - 1 — os dois sinais da
+    // planilha (coluna Ano + coluna Real/Meta) são usados juntos pra evitar ambiguidade.
     const contextRevenueRows = useMemo(() => revenueRows.filter(r =>
         normalizeAccountName(r.hotel || '') === normalizeAccountName(selectedHotel || '') &&
-        Number(r.month) === selectedMonth
-    ), [revenueRows, selectedHotel, selectedMonth]);
+        visibleMonths.includes(Number(r.month))
+    ), [revenueRows, selectedHotel, visibleMonths]);
 
     const sumImportedForAccounts = (targetNames: string[], scenario: Scenario) => {
         const targets = targetNames.map(normalizeAccountName);
@@ -186,17 +215,21 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
             .reduce((sum, r) => sum + (Number(r.value) || 0), 0);
     };
 
+    // Overrides manuais só valem quando um único mês está selecionado — não há um mês só pra
+    // gravar a edição quando a visão é acumulada de vários meses.
     const overrideMap = useMemo(() => {
         const map = new Map<string, number>();
+        if (!isSingleMonth) return map;
+        const targetMonth = visibleMonths[0];
         overrides.forEach(o => {
             if (normalizeAccountName(o.hotel || '') !== normalizeAccountName(selectedHotel || '')) return;
-            if (Number(o.month) !== selectedMonth) return;
+            if (Number(o.month) !== targetMonth) return;
             if (Number(o.year) !== selectedYear) return;
             if ((o.version_id || '') !== (activeRealVersionId || '')) return;
             map.set(`${o.line_key}__${o.scenario}`, Number(o.value) || 0);
         });
         return map;
-    }, [overrides, selectedHotel, selectedMonth, selectedYear, activeRealVersionId]);
+    }, [overrides, selectedHotel, selectedYear, activeRealVersionId, isSingleMonth, visibleMonths]);
 
     const lineValues = useMemo(() => {
         const result: Record<string, Record<Scenario, number>> = {};
@@ -219,6 +252,7 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
     };
 
     const handleCommitCell = (lineKey: string, scenario: Scenario, value: number) => {
+        if (!isSingleMonth) return; // edição manual só existe com um único mês selecionado
         setPendingEdits(prev => ({ ...prev, [`${lineKey}__${scenario}`]: value }));
     };
 
@@ -232,7 +266,7 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                 const lineKey = k.slice(0, sep);
                 const scenario = k.slice(sep + 2);
                 return {
-                    hotel: selectedHotel || '', year: selectedYear || 0, month: selectedMonth || 0,
+                    hotel: selectedHotel || '', year: selectedYear || 0, month: visibleMonths[0] || selectedMonth || 0,
                     versionId: activeRealVersionId || null, lineKey, scenario, value: pendingEditsRef.current[k],
                 };
             });
@@ -266,13 +300,13 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
         const receitaAlimentos = alimentosInclusos + alimentosExtras;
         const receitaBebidas = bebidasInclusas + bebidasExtras;
 
-        const adultos = dreFieldForScenario(adultosRow, scenario);
-        const chd = dreFieldForScenario(chdRow, scenario);
+        const adultos = fieldForScenario(adultosAgg, scenario);
+        const chd = fieldForScenario(chdAgg, scenario);
         const hospedes = adultos + chd;
 
-        const custoAlimentosItems = custoAlimentosRows.map(r => dreFieldForScenario(r, scenario, 'previa'));
+        const custoAlimentosItems = custoAlimentosAgg.map(agg => fieldForScenario(agg, scenario, 'previa'));
         const custoAlimentos = custoAlimentosItems.reduce((a, b) => a + b, 0);
-        const custoBebidasItems = custoBebidasRows.map(r => dreFieldForScenario(r, scenario, 'previa'));
+        const custoBebidasItems = custoBebidasAgg.map(agg => fieldForScenario(agg, scenario, 'previa'));
         const custoBebidas = custoBebidasItems.reduce((a, b) => a + b, 0);
 
         return {
@@ -311,7 +345,7 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
         const textClass = asHeader ? 'text-indigo-900' : (isBold ? 'text-gray-900' : 'text-gray-700');
         const cellClass = `px-2 py-1 text-right tabular-nums whitespace-nowrap ${isBold ? `font-black ${textClass}` : textClass}`;
         const renderCell = (scenario: Scenario, value: number) => {
-            if (editableLineKey && (!editableScenarios || editableScenarios.includes(scenario))) {
+            if (editableLineKey && isSingleMonth && (!editableScenarios || editableScenarios.includes(scenario))) {
                 return <EditableCell value={value} onCommit={v => handleCommitCell(editableLineKey, scenario, v)} />;
             }
             return <>{formatByType(value, format)}</>;
@@ -392,21 +426,43 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                         ))}
                     </div>
 
-                    {onMonthChange && (
-                        <div className="flex items-center gap-3 bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
-                            <button onClick={() => onMonthChange('prev')} className="p-1.5 hover:bg-gray-100 rounded text-gray-500">
-                                <ArrowLeft size={18} />
-                            </button>
-                            <div className="flex items-center gap-2 text-sm text-gray-700 w-36 justify-center font-bold capitalize">
-                                <Calendar size={16} className="text-indigo-500" />
-                                <span>{formattedDate}</span>
-                            </div>
-                            <button onClick={() => onMonthChange('next')} className="p-1.5 hover:bg-gray-100 rounded text-gray-500">
-                                <ArrowRight size={18} />
-                            </button>
-                        </div>
-                    )}
+                    <div className="h-6 w-px bg-gray-300"></div>
+
+                    <div className="flex items-center flex-wrap gap-1">
+                        <span className="text-sm font-bold text-gray-700 mr-2">Filtrar Meses:</span>
+                        {MONTH_LABELS.map((label, idx) => {
+                            const monthNum = idx + 1;
+                            const active = visibleMonths.includes(monthNum);
+                            return (
+                                <button
+                                    key={label}
+                                    onClick={() => setVisibleMonths(prev => {
+                                        const next = prev.includes(monthNum) ? prev.filter(m => m !== monthNum) : [...prev, monthNum].sort((a, b) => a - b);
+                                        return next.length === 0 ? prev : next;
+                                    })}
+                                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${active
+                                        ? 'bg-indigo-100 text-indigo-700 border border-indigo-200 shadow-sm'
+                                        : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'
+                                        }`}
+                                >
+                                    {label}
+                                </button>
+                            );
+                        })}
+                        <button
+                            onClick={() => setVisibleMonths(visibleMonths.length === 12 ? [selectedMonth || 1] : Array.from({ length: 12 }, (_, i) => i + 1))}
+                            className="px-3 py-1 text-xs font-bold rounded-md transition-all bg-gray-100 text-gray-600 hover:bg-gray-200 ml-2 border border-gray-200"
+                        >
+                            {visibleMonths.length === 12 ? 'Deselecionar Todos' : 'Selecionar Todos'}
+                        </button>
+                    </div>
                 </div>
+
+                {!isSingleMonth && (
+                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 font-bold mb-4">
+                        Vários meses selecionados — os valores mostrados são a soma do período. Selecione um único mês para editar as receitas manualmente.
+                    </p>
+                )}
 
                 {isLoading && <div className="py-6 text-center text-gray-400 italic text-sm">Carregando...</div>}
 
