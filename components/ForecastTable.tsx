@@ -450,21 +450,21 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             return true;
         }
 
-        // Gerente de Pacotes can only edit accounts under their assigned Pacotes Master and revenues.
-        // responsiblePackages holds Pacote Master names (see "Pacotes Master" in the user form) —
-        // matched against each account's own masterPackage, not the narrower sub-pacote.
+        // Gerente de Pacotes can only edit accounts under their assigned Pacotes and revenues.
+        // responsiblePackages holds Pacote names (see "Pacotes" no formulário de usuário, mesma
+        // granularidade que aparece na DRE Forecast) — matched against each account's own
+        // package, não o Pacote Master (mais amplo).
         if (currentUser.role === UserRole.PACKAGE_MANAGER) {
             if (row.category === 'Costs' || row.category === 'Package' || row.category === 'Account') {
                 // If it's a package header
                 if (row.isHeader && row.indentLevel === 1) {
-                    const anyAcc = accounts.find(a => (a.package || '').toLowerCase() === row.label.trim().toLowerCase());
-                    return !!anyAcc?.masterPackage && (currentUser.responsiblePackages?.includes(anyAcc.masterPackage) || false);
+                    return currentUser.responsiblePackages?.some(p => p.trim().toLowerCase() === row.label.trim().toLowerCase()) || false;
                 }
                 // If it's an individual account
                 const accId = row.id.split('-')[0];
                 const acc = accounts.find(a => a.id === accId);
-                if (acc && acc.masterPackage) {
-                    return currentUser.responsiblePackages?.includes(acc.masterPackage) || false;
+                if (acc && acc.package) {
+                    return currentUser.responsiblePackages?.includes(acc.package) || false;
                 }
                 // Fallback checking label or indicatorSection
                 return currentUser.responsiblePackages?.some(p =>

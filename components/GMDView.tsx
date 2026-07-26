@@ -105,11 +105,14 @@ const GMDView: React.FC<GMDViewProps> = ({
           return userHotelObjs.length === 0 || !configHotelObj || userHotelObjs.some(h => h.name === configHotelObj.name);
       }
 
-      // Gerente de Pacotes: can resolve if the package is under their responsibility
+      // Gerente de Pacotes: can resolve if any Pacote under this Pacote Master is under their
+      // responsibility — responsiblePackages guarda nomes de Pacote (granularidade da DRE
+      // Forecast), enquanto o config do GMD é atribuído por Pacote Master.
       if (currentUser.role === UserRole.PACKAGE_MANAGER) {
           const pkg = masterPackages.find(p => p.id === config.packageId || p.name === config.packageId);
-          const isResponsibleForPkg = pkg && currentUser.responsiblePackages?.includes(pkg.name);
-          const isResponsibleForRev = currentUser.responsibleRevenues?.some(rev => 
+          const subPackageNames = pkg ? Array.from(new Set(accounts.filter(a => a.masterPackage === pkg.name).map(a => a.package).filter(Boolean))) : [];
+          const isResponsibleForPkg = subPackageNames.some(name => currentUser.responsiblePackages?.includes(name as string));
+          const isResponsibleForRev = currentUser.responsibleRevenues?.some(rev =>
               pkg?.name.toLowerCase().includes(rev.toLowerCase())
           );
           return isResponsibleForPkg || isResponsibleForRev || false;

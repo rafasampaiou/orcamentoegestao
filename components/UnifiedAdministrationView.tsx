@@ -1179,6 +1179,23 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     }));
   }, [accounts]);
 
+  // Pacotes (não Pacote Master) da DRE Forecast — usado na Responsabilidade do Gerente de
+  // Pacotes, que precisa da granularidade mais fina que o Plano de Contas já expõe.
+  const forecastPackages = useMemo(() => {
+    const pkgs = new Map<string, string>(); // name -> code
+    accounts.forEach(acc => {
+      if (acc.package) {
+        if (!pkgs.has(acc.package) || !pkgs.get(acc.package)) {
+          pkgs.set(acc.package, acc.packageCode || acc.package);
+        }
+      }
+    });
+    return Array.from(pkgs.entries()).map(([name, code]) => ({
+      id: code,
+      name: name
+    }));
+  }, [accounts]);
+
 
   const [dreStructure, setDreStructure] = useState<LocalDreSection[]>(() => {
     // Initial DRE generation logic
@@ -6013,11 +6030,11 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 <div className="space-y-4 pt-2 border-t border-gray-100">
                   <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-widest">Responsabilidade do Gerente de Pacotes</h4>
 
-                  {/* Expense Packages (Pacotes Master, do Plano de Contas) */}
+                  {/* Pacotes (mesma granularidade que aparece na DRE Forecast, não o Pacote Master) */}
                   <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Pacotes Master</label>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Pacotes</label>
                     <div className="p-3 border border-gray-200 rounded-xl bg-gray-50 max-h-40 overflow-y-auto space-y-2 custom-scrollbar">
-                      {masterPackages.map(pkg => (
+                      {forecastPackages.map(pkg => (
                         <label key={pkg.name} className="flex items-center gap-2.5 text-xs font-medium text-gray-700 cursor-pointer hover:text-indigo-600">
                           <input
                             type="checkbox"
