@@ -399,7 +399,7 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
         </tr>
     );
 
-    const TableShell: React.FC<{ title?: string; reserveTitleSpace?: boolean; hideLabelColumn?: boolean; children: React.ReactNode }> = ({ title, reserveTitleSpace, hideLabelColumn, children }) => (
+    const TableShell: React.FC<{ title?: string; reserveTitleSpace?: boolean; hideLabelColumn?: boolean; showHeader?: boolean; children: React.ReactNode }> = ({ title, reserveTitleSpace, hideLabelColumn, showHeader = true, children }) => (
         <div>
             {title ? (
                 <div className="text-xs font-black text-gray-500 uppercase tracking-wide mb-1 px-1 text-center">{title}</div>
@@ -416,16 +416,18 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                         <col style={{ width: '120px' }} />
                         <col style={{ width: '105px' }} />
                     </colgroup>
-                    <thead className="bg-gray-50 text-gray-500 uppercase font-bold text-sm sticky top-0">
-                        <tr>
-                            {!hideLabelColumn && <th className="px-3 py-1 text-left">Linha</th>}
-                            <th className="px-2 py-1 text-right">Realizado</th>
-                            <th className="px-2 py-1 text-right">Meta</th>
-                            <th className="px-2 py-1 text-right">Diferença</th>
-                            <th className="px-2 py-1 text-right">Ano anterior</th>
-                            <th className="px-2 py-1 text-right">Diferença</th>
-                        </tr>
-                    </thead>
+                    {showHeader && (
+                        <thead className="bg-gray-50 text-gray-500 uppercase font-bold text-sm sticky top-0">
+                            <tr>
+                                {!hideLabelColumn && <th className="px-3 py-1 text-left">Linha</th>}
+                                <th className="px-2 py-1 text-right">Realizado</th>
+                                <th className="px-2 py-1 text-right">Meta</th>
+                                <th className="px-2 py-1 text-right">Diferença</th>
+                                <th className="px-2 py-1 text-right">Ano anterior</th>
+                                <th className="px-2 py-1 text-right">Diferença</th>
+                            </tr>
+                        </thead>
+                    )}
                     <tbody>{children}</tbody>
                 </table>
             </div>
@@ -580,13 +582,13 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                     </TableShell>
 
                     <div className="flex items-start gap-4 flex-wrap mt-2">
-                        <TableShell reserveTitleSpace>
+                        <TableShell reserveTitleSpace showHeader={false}>
                             <Row label="Custo de Alimentos" asHeader kind="despesa" values={vals(r => r.custoAlimentos)} />
                             {custoAlimentosRows.map((row, i) => (
                                 <Row key={row.id} label={row.label} indent={1} kind="despesa" values={vals(r => r.custoAlimentosItems[i] || 0)} />
                             ))}
                         </TableShell>
-                        <TableShell title="Por PAX" hideLabelColumn>
+                        <TableShell title="Por PAX" hideLabelColumn showHeader={false}>
                             <Row label="" hideLabel asHeader format="currency2" kind="despesa" values={vals(r => r.custoPaxAlimentos)} />
                             {custoAlimentosRows.map((row, i) => (
                                 <Row key={row.id} label="" hideLabel indent={1} format="currency2" kind="despesa" values={itemPax('custoAlimentosItems', i)} />
@@ -595,13 +597,13 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                     </div>
 
                     <div className="flex items-start gap-4 flex-wrap -mt-3">
-                        <TableShell reserveTitleSpace>
+                        <TableShell reserveTitleSpace showHeader={false}>
                             <Row label="Custos de Bebidas" asHeader kind="despesa" values={vals(r => r.custoBebidas)} />
                             {custoBebidasRows.map((row, i) => (
                                 <Row key={row.id} label={row.label} indent={1} kind="despesa" values={vals(r => r.custoBebidasItems[i] || 0)} />
                             ))}
                         </TableShell>
-                        <TableShell reserveTitleSpace hideLabelColumn>
+                        <TableShell reserveTitleSpace hideLabelColumn showHeader={false}>
                             <Row label="" hideLabel asHeader format="currency2" kind="despesa" values={vals(r => r.custoPaxBebidas)} />
                             {custoBebidasRows.map((row, i) => (
                                 <Row key={row.id} label="" hideLabel indent={1} format="currency2" kind="despesa" values={itemPax('custoBebidasItems', i)} />
@@ -610,7 +612,7 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                     </div>
 
                     <div className="mt-7">
-                        <TableShell>
+                        <TableShell showHeader={false}>
                             <SectionHeader label="Alimentos (com o crédito)" />
                             <Row label="Custo por PAX" format="currency2" kind="despesa" values={vals(r => r.custoPaxAlimentos)} />
                             <Row label="CMV %" format="percent" kind="despesa" values={vals(r => r.cmvAlimentos)} />
