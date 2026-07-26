@@ -564,7 +564,7 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
 
                 {isLoading && <div className="py-6 text-center text-gray-400 italic text-sm">Carregando...</div>}
 
-                <div className="space-y-2">
+                <div>
                     <TableShell>
                         <Row label="Receita de Alimentos" asHeader kind="receita" values={vals(r => r.receitaAlimentos)} />
                         <Row label="Inclusos" indent={1} kind="receita" values={vals(r => r.alimentosInclusos)} editableLineKey="alimentos_inclusos" />
@@ -579,7 +579,7 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                         <Row label="CHD" indent={1} format="integer" values={vals(r => r.chd)} />
                     </TableShell>
 
-                    <div className="flex items-start gap-4 flex-wrap">
+                    <div className="flex items-start gap-4 flex-wrap mt-2">
                         <TableShell reserveTitleSpace>
                             <Row label="Custo de Alimentos" asHeader kind="despesa" values={vals(r => r.custoAlimentos)} />
                             {custoAlimentosRows.map((row, i) => (
@@ -594,7 +594,7 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                         </TableShell>
                     </div>
 
-                    <div className="flex items-start gap-4 flex-wrap">
+                    <div className="flex items-start gap-4 flex-wrap -mt-3">
                         <TableShell reserveTitleSpace>
                             <Row label="Custos de Bebidas" asHeader kind="despesa" values={vals(r => r.custoBebidas)} />
                             {custoBebidasRows.map((row, i) => (
@@ -609,19 +609,21 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                         </TableShell>
                     </div>
 
-                    <TableShell>
-                        <SectionHeader label="Alimentos (com o crédito)" />
-                        <Row label="Custo por PAX" format="currency2" kind="despesa" values={vals(r => r.custoPaxAlimentos)} />
-                        <Row label="CMV %" format="percent" kind="despesa" values={vals(r => r.cmvAlimentos)} />
+                    <div className="mt-7">
+                        <TableShell>
+                            <SectionHeader label="Alimentos (com o crédito)" />
+                            <Row label="Custo por PAX" format="currency2" kind="despesa" values={vals(r => r.custoPaxAlimentos)} />
+                            <Row label="CMV %" format="percent" kind="despesa" values={vals(r => r.cmvAlimentos)} />
 
-                        <SectionHeader label="Bebidas" />
-                        <Row label="Custo por PAX" format="currency2" kind="despesa" values={vals(r => r.custoPaxBebidas)} />
-                        <Row label="CMV %" format="percent" kind="despesa" values={vals(r => r.cmvBebidas)} />
+                            <SectionHeader label="Bebidas" />
+                            <Row label="Custo por PAX" format="currency2" kind="despesa" values={vals(r => r.custoPaxBebidas)} />
+                            <Row label="CMV %" format="percent" kind="despesa" values={vals(r => r.cmvBebidas)} />
 
-                        <SectionHeader label="Alimentos e Bebidas (com o crédito)" />
-                        <Row label="Custo por PAX" format="currency2" kind="despesa" values={vals(r => r.custoPaxAB)} />
-                        <Row label="CMV %" format="percent" kind="despesa" values={vals(r => r.cmvAB)} />
-                    </TableShell>
+                            <SectionHeader label="Alimentos e Bebidas (com o crédito)" />
+                            <Row label="Custo por PAX" format="currency2" kind="despesa" values={vals(r => r.custoPaxAB)} />
+                            <Row label="CMV %" format="percent" kind="despesa" values={vals(r => r.cmvAB)} />
+                        </TableShell>
+                    </div>
                 </div>
             </div>
 
