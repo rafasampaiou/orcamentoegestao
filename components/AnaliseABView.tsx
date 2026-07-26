@@ -402,9 +402,9 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
     const TableShell: React.FC<{ title?: string; reserveTitleSpace?: boolean; hideLabelColumn?: boolean; children: React.ReactNode }> = ({ title, reserveTitleSpace, hideLabelColumn, children }) => (
         <div>
             {title ? (
-                <div className="text-sm font-black text-gray-500 uppercase tracking-wide mb-1 px-1">{title}</div>
+                <div className="text-xs font-black text-gray-500 uppercase tracking-wide mb-1 px-1 text-center">{title}</div>
             ) : reserveTitleSpace ? (
-                <div className="text-sm font-black mb-1 px-1 invisible">.</div>
+                <div className="text-xs font-black mb-1 px-1 invisible">.</div>
             ) : null}
             <div className="inline-block max-w-full overflow-x-auto border border-gray-200 rounded-xl align-top">
                 <table className="text-base" style={{ fontFamily: 'Calibri, sans-serif' }}>
@@ -564,7 +564,7 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
 
                 {isLoading && <div className="py-6 text-center text-gray-400 italic text-sm">Carregando...</div>}
 
-                <div className="space-y-4">
+                <div className="space-y-2">
                     <TableShell>
                         <Row label="Receita de Alimentos" asHeader kind="receita" values={vals(r => r.receitaAlimentos)} />
                         <Row label="Inclusos" indent={1} kind="receita" values={vals(r => r.alimentosInclusos)} editableLineKey="alimentos_inclusos" />
