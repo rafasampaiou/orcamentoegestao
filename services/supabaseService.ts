@@ -666,6 +666,59 @@ export const supabaseService = {
     if (error) throw error;
   },
 
+  async deleteFinancialDataByImportId(importId: string): Promise<void> {
+    const { error } = await supabase
+      .from('financial_data')
+      .delete()
+      .eq('import_id', importId);
+    if (error) throw error;
+  },
+
+  async getFinancialDataByImportId(importId: string): Promise<ImportedRow[]> {
+    let allData: any[] = [];
+    let from = 0;
+    const limit = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from('financial_data')
+        .select('*')
+        .eq('import_id', importId)
+        .range(from, from + limit - 1);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        allData = [...allData, ...data];
+      }
+
+      if (!data || data.length < limit) {
+        hasMore = false;
+      } else {
+        from += limit;
+      }
+    }
+
+    return allData.map(r => ({
+      ano:          String(r.year),
+      cenario:      r.scenario,
+      tipo:         r.type || '',
+      hotel:        r.hotel,
+      conta:        r.account_name,
+      cr:           r.cost_center || '',
+      mes:          String(r.month),
+      valor:        String(r.value || '0'),
+      escopo:       r.scope || '',
+      departamento: r.department || '',
+      pacote:       r.package || '',
+      pacoteMaster: r.master_package || '',
+      diretoria:    r.directorate || '',
+      versionId:    r.version_id || '',
+      status:       'valid' as const,
+    }));
+  },
+
   // ═══════════════════════════════════════════════════════════════════════════
   // REVENUE IMPORT (Receitas) — tabela própria, independente de financial_data.
   // Por pedido explícito: essa importação não deve alimentar DRE Forecast nem
@@ -1006,6 +1059,17 @@ export const supabaseService = {
     
     if (error) throw error;
     return data || [];
+  },
+
+  // Usado ao reeditar uma importação já existente (ex.: Despesas) — atualiza os totais do
+  // registro em vez de criar um novo, já que os dados de financial_data são substituídos
+  // mantendo o mesmo import_id.
+  async updateImportHistory(id: string, fields: Record<string, any>): Promise<void> {
+    const { error } = await supabase
+      .from('import_history')
+      .update(fields)
+      .eq('id', id);
+    if (error) throw error;
   },
 
   async deleteImport(id: string): Promise<void> {

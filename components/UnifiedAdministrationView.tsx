@@ -451,6 +451,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const [importHistory, setImportHistory] = useState<any[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [importToDelete, setImportToDelete] = useState<string | null>(null);
+  // Quando setado, "Salvar Despesas Forecast" substitui os dados dessa importação em vez de
+  // criar uma nova — ver handleEditExpensesImport/handleSaveExpensesForecast.
+  const [editingImportId, setEditingImportId] = useState<string | null>(null);
 
   // Logs & Permissions state
   const [activeDreName, setActiveDreName] = useState<'Forecast' | 'Budget'>('Forecast');
@@ -468,6 +471,18 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     } finally {
       setIsLoadingHistory(false);
     }
+  };
+
+  // Mapeamento de linhas "virtuais" da grade de Despesas (drill-down de CR) pra conta+CR reais —
+  // usado tanto ao salvar (handleSaveExpensesForecast) quanto ao recarregar uma importação já
+  // salva pra edição (handleEditExpensesImport), por isso fica no escopo do componente.
+  const expenseSpecialMapping: Record<string, { account: string, cr?: string }> = {
+    "Processamento de dados e TI (TI)": { account: "Processamentos de dados e TI", cr: "ti" },
+    "Processamento de dados e TI (Martech)": { account: "Processamentos de dados e TI", cr: "martech" },
+    "Processamento de dados e TI (Outros)": { account: "Processamentos de dados e TI", cr: "outros" },
+    "Marketing": { account: "Despesas com vendas e marketing", cr: "marketing" },
+    "Martech": { account: "Despesas com vendas e marketing", cr: "martech" },
+    "Outros setores": { account: "Despesas com vendas e marketing", cr: "outros" },
   };
 
   const recordImportHistory = async (rows: ImportedRow[]) => {
@@ -637,6 +652,20 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                           : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(log.valor_total || 0)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-right">
+                        {log.tipo === 'Despesa' && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleEditExpensesImport(log);
+                            }}
+                            className="text-indigo-400 hover:text-indigo-600 p-1 hover:bg-indigo-50 rounded transition-colors relative z-10 mr-1"
+                            title="Editar esta importação"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={(e) => {
@@ -2880,16 +2909,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     const hotelName = hotelObj?.name || '';
 
     const rowsToSave: ImportedRow[] = [];
-
-    // Mapping for virtual/drill-down rows to base account + CR
-    const specialMapping: Record<string, { account: string, cr?: string }> = {
-      "Processamento de dados e TI (TI)": { account: "Processamentos de dados e TI", cr: "ti" },
-      "Processamento de dados e TI (Martech)": { account: "Processamentos de dados e TI", cr: "martech" },
-      "Processamento de dados e TI (Outros)": { account: "Processamentos de dados e TI", cr: "outros" },
-      "Marketing": { account: "Despesas com vendas e marketing", cr: "marketing" },
-      "Martech": { account: "Despesas com vendas e marketing", cr: "martech" },
-      "Outros setores": { account: "Despesas com vendas e marketing", cr: "outros" },
-    };
+    const specialMapping = expenseSpecialMapping;
 
     const baseYear = selectedVersion.year || importTargetYear;
     // "Ano Anterior" saves against last year's data with the Real scenario — the DRE Forecast's
@@ -2928,14 +2948,43 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
     setIsSavingDre(true);
     try {
-      const importId = await recordImportHistory(rowsToSave);
-      await supabaseService.saveFinancialData(rowsToSave, importId);
-      if (onImportData) {
-        onImportData(rowsToSave, 'append');
-      }
-      const wantToValidate = await confirmAction(`Dados de despesas (${scenario === 'BUDGET' ? 'Budget' : 'Forecast'}) salvos com sucesso!\n\nDados salvos, clique OK para validar a importação na DRE Forecast ou Cancelar para permanecer nesta tela.`);
-      if (wantToValidate) {
-        setCurrentView('dashboard');
+      if (scenario === 'REAL' && editingImportId) {
+        // Edição de uma importação existente: reaproveita o mesmo import_id (mantém a FK com
+        // o registro de histórico já existente) em vez de criar uma entrada nova — substitui
+        // os dados antigos daquele import ao invés de duplicar.
+        await supabaseService.deleteFinancialDataByImportId(editingImportId);
+        await supabaseService.saveFinancialData(rowsToSave, editingImportId);
+
+        const monthsUsed = Array.from(new Set(rowsToSave.map(r => parseInt(r.mes, 10)))).sort((a, b) => a - b);
+        const mesesStr = monthsUsed.map(m => {
+          try { return new Date(2024, m - 1).toLocaleString('pt-BR', { month: 'short' }); } catch { return String(m); }
+        }).join(', ');
+        const valorTotal = rowsToSave.reduce((s, r) => s + Math.abs(parseFloat(r.valor) || 0), 0);
+
+        await supabaseService.updateImportHistory(editingImportId, {
+          hotel: hotelName,
+          ano: targetYear,
+          meses: mesesStr || '1-12',
+          version_id: selectedVersionId,
+          valor_total: valorTotal,
+        });
+
+        if (onImportData) {
+          onImportData(rowsToSave, 'replace');
+        }
+        setEditingImportId(null);
+        fetchImportHistory();
+        toast.success('Importação atualizada com sucesso!');
+      } else {
+        const importId = await recordImportHistory(rowsToSave);
+        await supabaseService.saveFinancialData(rowsToSave, importId);
+        if (onImportData) {
+          onImportData(rowsToSave, 'append');
+        }
+        const wantToValidate = await confirmAction(`Dados de despesas (${scenario === 'BUDGET' ? 'Budget' : 'Forecast'}) salvos com sucesso!\n\nDados salvos, clique OK para validar a importação na DRE Forecast ou Cancelar para permanecer nesta tela.`);
+        if (wantToValidate) {
+          setCurrentView('dashboard');
+        }
       }
     } catch (e: any) {
       console.error("Save error:", e);
@@ -2945,6 +2994,52 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     }
   };
 
+  // Recarrega uma importação de Despesas já salva de volta na grade de colagem, pra edição —
+  // clicado a partir do botão "Editar" no Histórico de Importações.
+  const handleEditExpensesImport = async (log: any) => {
+    try {
+      const rows = await supabaseService.getFinancialDataByImportId(log.id);
+      if (rows.length === 0) {
+        toast.error('Não encontrei os dados dessa importação (podem já ter sido apagados).');
+        return;
+      }
+
+      const hotelObj = hotels.find(h => h.name === rows[0].hotel);
+      const cenarioSalvo = rows[0].cenario;
+      const inferredTarget: 'PREVIA' | 'META' | 'ANO_ANTERIOR' =
+        cenarioSalvo === 'META' ? 'META' : (cenarioSalvo === 'Real' ? 'ANO_ANTERIOR' : 'PREVIA');
+
+      // Mapa reverso das linhas virtuais (conta+CR -> rótulo da linha na grade).
+      const reverseMapping = new Map<string, string>();
+      Object.entries(expenseSpecialMapping).forEach(([label, { account, cr }]) => {
+        reverseMapping.set(`${account}|${cr || ''}`, label);
+      });
+
+      const newGrid: Record<string, Record<number, string>> = {};
+      rows.forEach(r => {
+        const rowLabel = reverseMapping.get(`${r.conta}|${r.cr || ''}`) || r.conta;
+        const month = parseInt(r.mes, 10);
+        if (!month) return;
+        if (!newGrid[rowLabel]) newGrid[rowLabel] = {};
+        newGrid[rowLabel][month] = (parseFloat(r.valor) || 0).toLocaleString('pt-BR');
+      });
+
+      setImportScenario('REAL');
+      setImportCategory('expenses');
+      setActiveImportTab('financial');
+      setImportHotelId(hotelObj?.id || '');
+      setTargetRealVersionId(rows[0].versionId || '');
+      setImportRealTarget(inferredTarget);
+      setDreForecastData(newGrid);
+      setEditingImportId(log.id);
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      toast.success('Importação carregada para edição — altere os valores e salve novamente.');
+    } catch (e: any) {
+      console.error('Erro ao carregar importação para edição:', e);
+      toast.error('Erro ao carregar importação: ' + (e?.message || String(e)));
+    }
+  };
 
   const handleClearTaxes = async () => {
     if (await confirmAction('Tem certeza que deseja limpar a tabela de impostos?')) {
@@ -4102,6 +4197,17 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl text-sm text-indigo-800">
                 <p>Importação das Despesas. Escolha o destino, o hotel e a versão e cole os valores mensais.</p>
               </div>
+              {editingImportId && (
+                <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3 text-sm font-bold flex items-center justify-between gap-4">
+                  <span>Editando uma importação existente — ao salvar, os valores substituirão o que foi importado antes (não cria uma nova entrada no histórico).</span>
+                  <button
+                    onClick={() => { setEditingImportId(null); setDreForecastData({}); }}
+                    className="shrink-0 text-amber-700 hover:text-amber-900 underline whitespace-nowrap"
+                  >
+                    Cancelar edição
+                  </button>
+                </div>
+              )}
               <div className="flex flex-wrap items-end gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Hotel</label>
@@ -4148,7 +4254,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                   disabled={isSavingDre || !importHotelId || (!targetRealVersionId && !activeRealVersionId)}
                   className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all flex items-center gap-2 disabled:opacity-50"
                 >
-                  {isSavingDre ? 'Salvando...' : <><Save size={16} /> Salvar Despesas Forecast</>}
+                  {isSavingDre ? 'Salvando...' : <><Save size={16} /> {editingImportId ? 'Salvar Alterações' : 'Salvar Despesas Forecast'}</>}
                 </button>
               </div>
               <SpreadsheetTable
