@@ -494,7 +494,7 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
     };
 
     return (
-        <div className="px-4 py-6 min-h-[calc(100vh-5rem)] flex items-start gap-4 flex-wrap">
+        <div className="px-4 py-6 min-h-[calc(100vh-5rem)] space-y-4">
             <div className="inline-block bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-6">
                 <VersionInfoBanner versionName={activeRealVersionName} />
                 <h2 className="text-xl font-black text-gray-900 mb-1">Análise de A&B</h2>
@@ -617,14 +617,16 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                 </div>
             </div>
 
-            <div className="inline-block bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-6 space-y-4">
-                <div>
+            <div className="inline-block bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-6">
+                <div className="mb-4">
                     <h3 className="text-base font-black text-gray-900 mb-1">Resumo mensal — Custo por PAX</h3>
-                    <p className="text-sm text-gray-500 max-w-xs">Mês a mês, direto da DRE Forecast (hotel/versão selecionados) — sempre os 12 meses, independente do filtro de meses ao lado.</p>
+                    <p className="text-sm text-gray-500 max-w-xl">Mês a mês, direto da DRE Forecast (hotel/versão selecionados) — sempre os 12 meses, independente do filtro de meses acima.</p>
                 </div>
-                <MonthlyStripTable title="PAX" format="integer" kind="neutral" getMonth={idx => monthlySummary[idx]?.pax || { real: 0, meta: 0 }} />
-                <MonthlyStripTable title="Custo de Alimentos" format="currency" kind="despesa" getMonth={idx => monthlySummary[idx]?.custoAlimentos || { real: 0, meta: 0 }} />
-                <MonthlyStripTable title="Custo por PAX" format="currency2" kind="despesa" getMonth={idx => monthlySummary[idx]?.custoPorPax || { real: 0, meta: 0 }} />
+                <div className="flex items-start gap-4 flex-wrap">
+                    <MonthlyStripTable title="Custo de Alimentos" format="currency" kind="despesa" getMonth={idx => monthlySummary[idx]?.custoAlimentos || { real: 0, meta: 0 }} />
+                    <MonthlyStripTable title="PAX" format="integer" kind="neutral" getMonth={idx => monthlySummary[idx]?.pax || { real: 0, meta: 0 }} />
+                    <MonthlyStripTable title="Custo por PAX" format="currency2" kind="despesa" getMonth={idx => monthlySummary[idx]?.custoPorPax || { real: 0, meta: 0 }} />
+                </div>
             </div>
         </div>
     );
