@@ -506,8 +506,7 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
         <div className="px-4 py-6 min-h-[calc(100vh-5rem)] space-y-4">
             <div className="inline-block bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-6">
                 <VersionInfoBanner versionName={activeRealVersionName} />
-                <h2 className="text-xl font-black text-gray-900 mb-1">Análise de A&B</h2>
-                <p className="text-base text-gray-500 mb-4 max-w-md">CMV e Custo por PAX de Alimentos e Bebidas — Receitas editáveis vêm da importação de Receitas; Hóspedes e Custos são os mesmos valores da DRE Forecast.</p>
+                <h2 className="text-xl font-black text-gray-900 mb-4">Análise de A&B</h2>
 
                 <div className="flex flex-wrap items-center gap-4 mb-6">
                     <div className="flex items-center bg-gray-100 p-1 rounded-lg">
@@ -627,10 +626,7 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
             </div>
 
             <div className="inline-block bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-6">
-                <div className="mb-4">
-                    <h3 className="text-base font-black text-gray-900 mb-1">Resumo mensal — Custo por PAX</h3>
-                    <p className="text-sm text-gray-500 max-w-xl">Mês a mês, direto da DRE Forecast (hotel/versão selecionados) — sempre os 12 meses, independente do filtro de meses acima.</p>
-                </div>
+                <h3 className="text-base font-black text-gray-900 mb-4">Resumo mensal — Custo por PAX</h3>
                 <div className="flex items-start gap-4 flex-wrap">
                     <MonthlyStripTable title="Custo de Alimentos" format="currency" kind="despesa" getMonth={idx => monthlySummary[idx]?.custoAlimentos || { real: 0, meta: 0 }} />
                     <MonthlyStripTable title="PAX" format="integer" kind="receita" getMonth={idx => monthlySummary[idx]?.pax || { real: 0, meta: 0 }} />
@@ -653,6 +649,12 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                         }}
                     />
                 </div>
+            </div>
+
+            <div className="inline-block bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-6 text-sm text-gray-600">
+                <p className="font-black text-gray-900 mb-1">Observações:</p>
+                <p>Receitas: Para construção das prévias, insira as receitas manualmente.</p>
+                <p>Número de PAX e despesas: retornam os valores da respectiva prévia.</p>
             </div>
         </div>
     );
