@@ -440,14 +440,23 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
     // semestre com subtotal de cada um e total do ano — componente isolado, não reaproveita
     // Row/TableShell pra não arriscar afetar as tabelas principais da tela. Sem colgroup — a
     // largura fica no tamanho natural do conteúdo (mais estreita que as tabelas da esquerda).
-    const MonthlyStripTable: React.FC<{ title: string; format: RowFormat; kind: RowKind; getMonth: (monthIdx: number) => { real: number; meta: number } }> = ({ title, format, kind, getMonth }) => {
+    const MonthlyStripTable: React.FC<{
+        title: string; format: RowFormat; kind: RowKind; getMonth: (monthIdx: number) => { real: number; meta: number };
+        // Pra métricas que são uma razão (ex.: Custo por PAX), o subtotal do semestre/ano não pode
+        // ser a soma dos valores mensais já divididos — precisa recalcular a razão a partir da
+        // soma dos dois componentes originais (custo somado / pax somado). Quando informado, essa
+        // função substitui a soma padrão pro cálculo dos subtotais.
+        aggregateOverride?: (monthIdxs: number[]) => { real: number; meta: number };
+    }> = ({ title, format, kind, getMonth, aggregateOverride }) => {
         const months = ALL_MONTHS.map((_, idx) => ({ idx, ...getMonth(idx) }));
         const sem1 = months.slice(0, 6);
         const sem2 = months.slice(6, 12);
+        const idxSem1 = sem1.map(d => d.idx);
+        const idxSem2 = sem2.map(d => d.idx);
         const sumOf = (arr: { real: number; meta: number }[]) => arr.reduce((acc, d) => ({ real: acc.real + d.real, meta: acc.meta + d.meta }), { real: 0, meta: 0 });
-        const sem1Sum = sumOf(sem1);
-        const sem2Sum = sumOf(sem2);
-        const yearSum = { real: sem1Sum.real + sem2Sum.real, meta: sem1Sum.meta + sem2Sum.meta };
+        const sem1Sum = aggregateOverride ? aggregateOverride(idxSem1) : sumOf(sem1);
+        const sem2Sum = aggregateOverride ? aggregateOverride(idxSem2) : sumOf(sem2);
+        const yearSum = aggregateOverride ? aggregateOverride([...idxSem1, ...idxSem2]) : { real: sem1Sum.real + sem2Sum.real, meta: sem1Sum.meta + sem2Sum.meta };
 
         const renderRow = (label: string, real: number, meta: number, bold?: boolean) => {
             const diff = real - meta;
@@ -624,8 +633,25 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                 </div>
                 <div className="flex items-start gap-4 flex-wrap">
                     <MonthlyStripTable title="Custo de Alimentos" format="currency" kind="despesa" getMonth={idx => monthlySummary[idx]?.custoAlimentos || { real: 0, meta: 0 }} />
-                    <MonthlyStripTable title="PAX" format="integer" kind="neutral" getMonth={idx => monthlySummary[idx]?.pax || { real: 0, meta: 0 }} />
-                    <MonthlyStripTable title="Custo por PAX" format="currency2" kind="despesa" getMonth={idx => monthlySummary[idx]?.custoPorPax || { real: 0, meta: 0 }} />
+                    <MonthlyStripTable title="PAX" format="integer" kind="receita" getMonth={idx => monthlySummary[idx]?.pax || { real: 0, meta: 0 }} />
+                    <MonthlyStripTable
+                        title="Custo por PAX" format="currency2" kind="despesa"
+                        getMonth={idx => monthlySummary[idx]?.custoPorPax || { real: 0, meta: 0 }}
+                        aggregateOverride={monthIdxs => {
+                            const custo = monthIdxs.reduce((acc, i) => {
+                                const c = monthlySummary[i]?.custoAlimentos || { real: 0, meta: 0 };
+                                return { real: acc.real + c.real, meta: acc.meta + c.meta };
+                            }, { real: 0, meta: 0 });
+                            const pax = monthIdxs.reduce((acc, i) => {
+                                const p = monthlySummary[i]?.pax || { real: 0, meta: 0 };
+                                return { real: acc.real + p.real, meta: acc.meta + p.meta };
+                            }, { real: 0, meta: 0 });
+                            return {
+                                real: pax.real ? custo.real / pax.real : 0,
+                                meta: pax.meta ? custo.meta / pax.meta : 0,
+                            };
+                        }}
+                    />
                 </div>
             </div>
         </div>
