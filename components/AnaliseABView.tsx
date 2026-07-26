@@ -601,7 +601,7 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                                 <Row key={row.id} label={row.label} indent={1} kind="despesa" values={vals(r => r.custoBebidasItems[i] || 0)} />
                             ))}
                         </TableShell>
-                        <TableShell title="Por PAX" hideLabelColumn>
+                        <TableShell reserveTitleSpace hideLabelColumn>
                             <Row label="" hideLabel asHeader format="currency2" kind="despesa" values={vals(r => r.custoPaxBebidas)} />
                             {custoBebidasRows.map((row, i) => (
                                 <Row key={row.id} label="" hideLabel indent={1} format="currency2" kind="despesa" values={itemPax('custoBebidasItems', i)} />
