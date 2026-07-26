@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Network, ChevronRight, ChevronDown, Filter, AlertTriangle, CheckCircle, FileText, ClipboardList, ShieldCheck, ShieldAlert, Calendar, DollarSign, CheckSquare, Search, X, FileEdit, ExternalLink } from 'lucide-react';
-import { GMDConfiguration, Account, CostPackage, Hotel, ImportedRow, User, Justification, CostCenter, UserRole } from '../types';
+import { GMDConfiguration, Account, CostPackage, Hotel, ImportedRow, User, Justification, CostCenter, UserRole, hasRole } from '../types';
 import { VersionInfoBanner } from './VersionInfoBanner';
 
 interface FilterCardProps {
@@ -87,14 +87,17 @@ const GMDView: React.FC<GMDViewProps> = ({
 
   const canUserResolveJustification = (just: Justification) => {
       if (!currentUser) return false;
-      if (currentUser.role === UserRole.ADMIN) return true;
-      if (currentUser.role === UserRole.DIRETORIA) return false;
+      if (hasRole(currentUser, UserRole.ADMIN)) return true;
 
       const config = gmdConfigs.find(c => c.id === just.gmdConfigId);
       if (!config) return false;
 
+      // Um usuário pode acumular vários perfis (ex.: Gerente de Entidade + Gerente de Pacotes)
+      // — cada bloco abaixo concede acesso independentemente; a permissão final é a UNIÃO de
+      // tudo que algum dos perfis do usuário concede, não só o primeiro que bater.
+
       // Gerente de Entidade e Analista de Custos: can resolve/approve if in one of their hotels
-      if (currentUser.role === UserRole.ENTITY_MANAGER || currentUser.role === UserRole.COST_ANALYST) {
+      if (hasRole(currentUser, UserRole.ENTITY_MANAGER) || hasRole(currentUser, UserRole.COST_ANALYST)) {
           const userHotelIds = currentUser.hotelIds && currentUser.hotelIds.length > 0
               ? currentUser.hotelIds
               : (currentUser.hotelId ? [currentUser.hotelId] : []);
@@ -102,30 +105,32 @@ const GMDView: React.FC<GMDViewProps> = ({
               .map(id => hotels.find(h => h.id === id || h.code === id))
               .filter((h): h is Hotel => !!h);
           const configHotelObj = hotels.find(h => h.id === config.hotelId);
-          return userHotelObjs.length === 0 || !configHotelObj || userHotelObjs.some(h => h.name === configHotelObj.name);
+          if (userHotelObjs.length === 0 || !configHotelObj || userHotelObjs.some(h => h.name === configHotelObj.name)) {
+              return true;
+          }
       }
 
       // Gerente de Pacotes: can resolve if any Pacote under this Pacote Master is under their
       // responsibility — responsiblePackages guarda nomes de Pacote (granularidade da DRE
       // Forecast), enquanto o config do GMD é atribuído por Pacote Master.
-      if (currentUser.role === UserRole.PACKAGE_MANAGER) {
+      if (hasRole(currentUser, UserRole.PACKAGE_MANAGER)) {
           const pkg = masterPackages.find(p => p.id === config.packageId || p.name === config.packageId);
           const subPackageNames = pkg ? Array.from(new Set(accounts.filter(a => a.masterPackage === pkg.name).map(a => a.package).filter(Boolean))) : [];
           const isResponsibleForPkg = subPackageNames.some(name => currentUser.responsiblePackages?.includes(name as string));
           const isResponsibleForRev = currentUser.responsibleRevenues?.some(rev =>
               pkg?.name.toLowerCase().includes(rev.toLowerCase())
           );
-          return isResponsibleForPkg || isResponsibleForRev || false;
+          if (isResponsibleForPkg || isResponsibleForRev) return true;
       }
 
       // Gerente de Área / Analista de área: can resolve if CR matches responsibleCostCenters OR directed to them
-      if (currentUser.role === UserRole.AREA_MANAGER || currentUser.role === UserRole.AREA_ANALYST) {
+      if (hasRole(currentUser, UserRole.AREA_MANAGER) || hasRole(currentUser, UserRole.AREA_ANALYST)) {
           if (just.assignedAreaManagerId === currentUser.id) return true;
-          
-          const hasResponsibleCR = config.costCenterIds?.some(ccId => 
+
+          const hasResponsibleCR = config.costCenterIds?.some(ccId =>
               currentUser.responsibleCostCenters?.includes(ccId)
           );
-          return hasResponsibleCR || false;
+          if (hasResponsibleCR) return true;
       }
 
       return false;
@@ -900,7 +905,7 @@ const GMDView: React.FC<GMDViewProps> = ({
                                         >
                                             <option value="">Selecione o gestor de área...</option>
                                             {users
-                                                .filter(u => u.role === UserRole.AREA_MANAGER || u.role === UserRole.AREA_ANALYST)
+                                                .filter(u => hasRole(u, UserRole.AREA_MANAGER) || hasRole(u, UserRole.AREA_ANALYST))
                                                 .map(u => (
                                                     <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
                                                 ))
@@ -992,7 +997,7 @@ const GMDView: React.FC<GMDViewProps> = ({
                                 {canUserResolveJustification(selectedJustification) && (
                                     <div className="flex flex-col gap-2">
                                         {/* Entity Managers, Cost Analysts, and Admins can finalize */}
-                                        {[UserRole.ADMIN, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST].includes(currentUser?.role as any) ? (
+                                        {(hasRole(currentUser, UserRole.ADMIN) || hasRole(currentUser, UserRole.ENTITY_MANAGER) || hasRole(currentUser, UserRole.COST_ANALYST)) ? (
                                             <div className="flex gap-3">
                                                 <button onClick={() => handleCompletePlan(selectedJustification.id)} className="flex-1 bg-green-600 text-white py-2.5 rounded-lg text-sm font-bold hover:bg-green-700 flex justify-center items-center gap-2 shadow-sm transition-colors">
                                                     <CheckCircle size={16} /> Confirmar Conclusão

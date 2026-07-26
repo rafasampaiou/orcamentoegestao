@@ -1,6 +1,6 @@
 import React from 'react';
 import { Layers, Building2 as Building2Icon, ArrowLeft, ArrowRight, Calendar, LogOut } from 'lucide-react';
-import { User, Hotel, ModuleType, UserRole, ViewState, BudgetVersion } from '../types';
+import { User, Hotel, ModuleType, UserRole, ViewState, BudgetVersion, hasRole } from '../types';
 
 interface HeaderProps {
     sidebarCollapsed: boolean;
@@ -54,7 +54,7 @@ const Header: React.FC<HeaderProps> = ({
     // Comparativo de ocupação has its own hotel filter (multi-select, view-only) — the global
     // Tipo/Categoria/Região/Hotel/Versão filters don't apply there anymore.
     const showFilters = currentView === 'dashboard';
-    const isUnrestrictedRole = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.DIRETORIA || currentUser?.role === UserRole.PACKAGE_MANAGER;
+    const isUnrestrictedRole = hasRole(currentUser, UserRole.ADMIN) || hasRole(currentUser, UserRole.DIRETORIA) || hasRole(currentUser, UserRole.PACKAGE_MANAGER);
     const userHotelIds = currentUser?.hotelIds && currentUser.hotelIds.length > 0
         ? currentUser.hotelIds
         : (currentUser?.hotelId ? [currentUser.hotelId] : []);

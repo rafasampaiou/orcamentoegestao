@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Settings2, ChevronUp, Save, Trash2, CheckCircle, ListFilter, LayoutList } from 'lucide-react';
-import { ColumnVisibility, ImportedRow, User, UserRole, Hotel, BudgetVersion, ProjectionType } from '../types';
+import { ColumnVisibility, ImportedRow, User, UserRole, Hotel, BudgetVersion, ProjectionType, hasRole } from '../types';
 
 // A "Versão do Forecast" as selectable in Ocupação — the 5 canonical ProjectionType values
 // (shared with DRE Forecast) plus 2 view-only labels with no DRE Forecast equivalent (Meta/Ano
@@ -456,9 +456,9 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
     currentUser
 }) => {
 
-    const canEditOccupancy = currentUser?.role === UserRole.ADMIN ||
-                            currentUser?.role === UserRole.ENTITY_MANAGER ||
-                            currentUser?.role === UserRole.COST_ANALYST;
+    const canEditOccupancy = hasRole(currentUser, UserRole.ADMIN) ||
+                            hasRole(currentUser, UserRole.ENTITY_MANAGER) ||
+                            hasRole(currentUser, UserRole.COST_ANALYST);
 
     const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>({
         otb: false,

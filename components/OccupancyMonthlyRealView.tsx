@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Save, CheckCircle } from 'lucide-react';
-import { User, UserRole, ProjectionType, ImportedRow, ValidationRecord } from '../types';
+import { User, UserRole, ProjectionType, ImportedRow, ValidationRecord, hasRole } from '../types';
 import { BudgetRow, BudgetOccupancyTable, geralRows, lazerRows, eventRows, OccupancyVersionOption, MEETING_VERSIONS, OWN_SNAPSHOT_VERSIONS } from './OccupancyView';
 import { VersionInfoBanner } from './VersionInfoBanner';
 import OtbProgressTimeline from './OtbProgressTimeline';
@@ -105,9 +105,9 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
     validations,
     onNavigateToForecast
 }) => {
-    const canEditOccupancy = currentUser?.role === UserRole.ADMIN ||
-        currentUser?.role === UserRole.ENTITY_MANAGER ||
-        currentUser?.role === UserRole.COST_ANALYST;
+    const canEditOccupancy = hasRole(currentUser, UserRole.ADMIN) ||
+        hasRole(currentUser, UserRole.ENTITY_MANAGER) ||
+        hasRole(currentUser, UserRole.COST_ANALYST);
 
     const [decimalOverrides, setDecimalOverrides] = useState<Record<string, number>>({});
     const [savedIndicator, setSavedIndicator] = useState(false);

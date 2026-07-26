@@ -29,7 +29,8 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: UserRole;
+  role: UserRole; // Legacy single-role field — kept as roles[0] for callers that only need one.
+  roles?: UserRole[]; // Perfis de acesso — um usuário pode acumular mais de um (ex.: Gerente de Entidade + Gerente de Pacotes).
   avatarUrl?: string;
   hotelId?: string; // Legacy single-hotel link — kept as hotelIds[0] for callers that only need one.
   hotelIds?: string[]; // Hotel Principal/Unidade — a user can now be assigned to more than one.
@@ -43,6 +44,15 @@ export interface User {
   // link and successfully signed in — false while the account is newly created and pending.
   isValidated?: boolean;
 }
+
+// `roles` é a lista completa de perfis; se ainda não foi preenchida (usuário antigo, nunca
+// reeditado desde que multi-perfil existe), cai pro `role` legado — nenhuma migração de dados
+// é necessária pra isso continuar funcionando.
+export const userRoles = (user?: { role?: UserRole; roles?: UserRole[] } | null): UserRole[] =>
+  (user?.roles && user.roles.length > 0) ? user.roles : (user?.role ? [user.role] : []);
+
+export const hasRole = (user: { role?: UserRole; roles?: UserRole[] } | null | undefined, role: UserRole): boolean =>
+  userRoles(user).includes(role);
 
 // Profile represents a user account managed in the `profiles` table in Supabase.
 // It links to auth.users via the `id` field.

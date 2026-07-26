@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { getForecastData, normalizeAccountName } from '../services/mockData';
 import { Plus, Trash2, X, Save, Briefcase, Pencil, Calendar, PieChart, Lock, Settings as SettingsIcon, Users, Search, Upload, Settings, Eye, FileText, Layout, Info, ChevronUp, GripVertical, Database, BedDouble, DollarSign, Target, LayoutList, ArrowUp, ArrowDown, Copy, Loader2 } from 'lucide-react';
-import { User, UserRole, CostCenter, ImportedRow, Hotel, Account, BudgetVersion, LaborParameters, ScheduleItem, ImportedCostCenter, CostPackage, GMDConfiguration, ViewState, DreSection, HotelCategory, HotelRegion, ImportedAccount, KpiCalculation } from '../types';
+import { User, UserRole, CostCenter, ImportedRow, Hotel, Account, BudgetVersion, LaborParameters, ScheduleItem, ImportedCostCenter, CostPackage, GMDConfiguration, ViewState, DreSection, HotelCategory, HotelRegion, ImportedAccount, KpiCalculation, userRoles, hasRole } from '../types';
 import { getDreReferenceOptions } from '../utils/dreReferences';
 import KpiCalculationEditor from './KpiCalculationEditor';
 import TimelineView from './TimelineView';
@@ -1374,6 +1374,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     name: '',
     email: '',
     role: UserRole.PACKAGE_MANAGER,
+    roles: [UserRole.PACKAGE_MANAGER] as UserRole[],
     hotelIds: [] as string[],
     password: '',
     responsiblePackages: [] as string[],
@@ -1434,6 +1435,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       name: '',
       email: '',
       role: UserRole.PACKAGE_MANAGER,
+      roles: [UserRole.PACKAGE_MANAGER],
       hotelIds: [],
       password: '',
       responsiblePackages: [],
@@ -1451,6 +1453,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         name: u.name,
         email: u.email,
         role: u.role,
+        roles: userRoles(u),
         hotelIds: u.hotelIds && u.hotelIds.length > 0 ? u.hotelIds : (u.hotelId ? [u.hotelId] : []),
         password: '',
         responsiblePackages: u.responsiblePackages || [],
@@ -1776,7 +1779,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         id: finalId,
         name: userForm.name,
         email: userForm.email,
-        role: userForm.role,
+        role: userForm.roles[0] || userForm.role,
+        roles: userForm.roles.length > 0 ? userForm.roles : [userForm.role],
         hotelId: userForm.hotelIds[0] || undefined,
         hotelIds: userForm.hotelIds || [],
         tempPassword: userForm.password || undefined,
@@ -5090,10 +5094,14 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{u.email}</td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{userHotelNames.length > 0 ? userHotelNames.join(', ') : '-'}</td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-medium">
-                                <span className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[10px] uppercase font-bold">{u.role}</span>
+                                <div className="flex flex-wrap gap-1">
+                                  {userRoles(u).map(r => (
+                                    <span key={r} className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[10px] uppercase font-bold">{r}</span>
+                                  ))}
+                                </div>
                               </td>
                               <td className="px-6 py-4 text-xs text-gray-500 max-w-[240px]">
-                                {u.role === UserRole.PACKAGE_MANAGER && (
+                                {hasRole(u, UserRole.PACKAGE_MANAGER) && (
                                   <div className="space-y-1">
                                     {u.responsiblePackages && u.responsiblePackages.length > 0 && (
                                       <div>
@@ -5120,7 +5128,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                     )}
                                   </div>
                                 )}
-                                {(u.role === UserRole.AREA_MANAGER || u.role === UserRole.AREA_ANALYST) && (
+                                {(hasRole(u, UserRole.AREA_MANAGER) || hasRole(u, UserRole.AREA_ANALYST)) && (
                                   <div>
                                     {u.responsibleCostCenters && u.responsibleCostCenters.length > 0 ? (
                                       <div>
@@ -5139,13 +5147,13 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                     )}
                                   </div>
                                 )}
-                                {(u.role === UserRole.ENTITY_MANAGER || u.role === UserRole.COST_ANALYST) && (
+                                {(hasRole(u, UserRole.ENTITY_MANAGER) || hasRole(u, UserRole.COST_ANALYST)) && (
                                   <span className="text-emerald-700 font-bold text-[9px] uppercase tracking-wider bg-emerald-50 px-2 py-0.5 rounded">Vínculo com Unidade</span>
                                 )}
-                                {u.role === UserRole.ADMIN && (
+                                {hasRole(u, UserRole.ADMIN) && (
                                   <span className="text-indigo-700 font-bold text-[9px] uppercase tracking-wider bg-indigo-50 px-2 py-0.5 rounded">Acesso Completo</span>
                                 )}
-                                {u.role === UserRole.DIRETORIA && (
+                                {hasRole(u, UserRole.DIRETORIA) && (
                                   <span className="text-slate-600 font-bold text-[9px] uppercase tracking-wider bg-slate-100 px-2 py-0.5 rounded">Acesso Consulta</span>
                                 )}
                               </td>
@@ -5999,10 +6007,24 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 </div>
               )}
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Perfil de Acesso</label>
-                <select value={userForm.role} onChange={e => setUserForm({ ...userForm, role: e.target.value as UserRole })} className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none">
-                  {Object.values(UserRole).map(r => <option key={r} value={r}>{r}</option>)}
-                </select>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Perfil de Acesso <span className="font-normal text-gray-400 normal-case">(pode marcar mais de um)</span></label>
+                <div className="grid grid-cols-2 gap-2 p-3 border border-gray-300 rounded-xl bg-gray-50">
+                  {Object.values(UserRole).map(r => (
+                    <label key={r} className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer hover:text-indigo-600">
+                      <input
+                        type="checkbox"
+                        checked={userForm.roles.includes(r)}
+                        onChange={e => {
+                          const current = userForm.roles;
+                          const nextRoles = e.target.checked ? [...current, r] : current.filter(x => x !== r);
+                          setUserForm({ ...userForm, roles: nextRoles, role: nextRoles[0] || userForm.role });
+                        }}
+                        className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4"
+                      />
+                      {r}
+                    </label>
+                  ))}
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1">Hotel Principal / Unidade</label>
@@ -6026,7 +6048,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               </div>
 
               {/* Condicionais de Responsabilidade com base no Perfil */}
-              {userForm.role === UserRole.PACKAGE_MANAGER && (
+              {userForm.roles.includes(UserRole.PACKAGE_MANAGER) && (
                 <div className="space-y-4 pt-2 border-t border-gray-100">
                   <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-widest">Responsabilidade do Gerente de Pacotes</h4>
 
@@ -6082,7 +6104,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 </div>
               )}
 
-              {(userForm.role === UserRole.AREA_MANAGER || userForm.role === UserRole.AREA_ANALYST) && (
+              {(userForm.roles.includes(UserRole.AREA_MANAGER) || userForm.roles.includes(UserRole.AREA_ANALYST)) && (
                 <div className="space-y-3 pt-2 border-t border-gray-100">
                   <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-widest">Responsabilidade do Gerente/Analista de Área</h4>
                   <div>

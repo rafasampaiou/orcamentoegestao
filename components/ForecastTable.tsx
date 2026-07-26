@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { getForecastData, getDynamicForecastData } from '../services/mockData';
 import { Upload, ListFilter, LayoutList, Settings2, ChevronUp, Activity, TrendingUp, Lock, LockOpen, CheckCircle2, X, FileSpreadsheet, AlertCircle, CheckCircle, ChevronRight, ChevronDown } from 'lucide-react';
-import { ExpenseDriver, ImportedRow, Account, CostPackage, Hotel, ForecastRow, ForecastConfig, ForecastOperator, ColumnVisibility, UserRole, KpiCalculation } from '../types';
+import { ExpenseDriver, ImportedRow, Account, CostPackage, Hotel, ForecastRow, ForecastConfig, ForecastOperator, ColumnVisibility, UserRole, KpiCalculation, hasRole } from '../types';
 import { evaluateFormula } from '../utils/formulaEngine';
 import { supabaseService } from '../services/supabaseService';
 import { VersionInfoBanner } from './VersionInfoBanner';
@@ -257,14 +257,14 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     onDeleteOtbBalancete,
     onResetValidation
 }) => {
-    const canEditForecast = currentUser?.role === UserRole.ADMIN ||
-        currentUser?.role === UserRole.ENTITY_MANAGER ||
-        currentUser?.role === UserRole.COST_ANALYST ||
-        currentUser?.role === UserRole.PACKAGE_MANAGER;
+    const canEditForecast = hasRole(currentUser, UserRole.ADMIN) ||
+        hasRole(currentUser, UserRole.ENTITY_MANAGER) ||
+        hasRole(currentUser, UserRole.COST_ANALYST) ||
+        hasRole(currentUser, UserRole.PACKAGE_MANAGER);
 
-    const canValidate = currentUser?.role === UserRole.ADMIN ||
-        currentUser?.role === UserRole.ENTITY_MANAGER ||
-        currentUser?.role === UserRole.COST_ANALYST;
+    const canValidate = hasRole(currentUser, UserRole.ADMIN) ||
+        hasRole(currentUser, UserRole.ENTITY_MANAGER) ||
+        hasRole(currentUser, UserRole.COST_ANALYST);
 
     // Selecting "Fechamento" as the Forecast version only swaps labels (Prévia → Real) — it
     // does NOT lock editing by itself. Editing only locks once THIS specific closing has
@@ -446,7 +446,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         if (!currentUser) return false;
 
         // ADMIN Geral, Gerente de Entidade, and Analista de Custos have full edit access
-        if ([UserRole.ADMIN, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST].includes(currentUser.role as any)) {
+        if (hasRole(currentUser, UserRole.ADMIN) || hasRole(currentUser, UserRole.ENTITY_MANAGER) || hasRole(currentUser, UserRole.COST_ANALYST)) {
             return true;
         }
 
@@ -454,7 +454,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         // responsiblePackages holds Pacote names (see "Pacotes" no formulário de usuário, mesma
         // granularidade que aparece na DRE Forecast) — matched against each account's own
         // package, não o Pacote Master (mais amplo).
-        if (currentUser.role === UserRole.PACKAGE_MANAGER) {
+        if (hasRole(currentUser, UserRole.PACKAGE_MANAGER)) {
             if (row.category === 'Costs' || row.category === 'Package' || row.category === 'Account') {
                 // If it's a package header
                 if (row.isHeader && row.indentLevel === 1) {
@@ -629,7 +629,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 if (!isIndicator) {
                     canEdit = field === 'real' ? canEditReal : canEditPrevia;
                 } else if (isInputIndicator || isManualRow) {
-                    canEdit = [UserRole.ADMIN, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST].includes(currentUser?.role as any);
+                    canEdit = hasRole(currentUser, UserRole.ADMIN) || hasRole(currentUser, UserRole.ENTITY_MANAGER) || hasRole(currentUser, UserRole.COST_ANALYST);
                 }
 
                 if (canEdit) {
@@ -929,7 +929,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     const confirmSaveResults = async () => {
         setIsSaving(true);
 
-        if ((activeProjectionType === 'Fechamento oficial' || activeProjectionType === 'Realizado') && currentUser?.role !== UserRole.ADMIN) {
+        if ((activeProjectionType === 'Fechamento oficial' || activeProjectionType === 'Realizado') && !hasRole(currentUser, UserRole.ADMIN)) {
             alert('Apenas o ADMIN GERAL pode salvar a versão Fechamento Oficial ou Realizado.');
             return;
         }
@@ -1124,7 +1124,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 <option value="FCA N2">FCA N2</option>
                                 <option value="FCA N1">FCA N1</option>
                                 <option value="Fechamento oficial">Fechamento</option>
-                                {currentUser?.role === UserRole.ADMIN && <option value="Realizado">Realizado</option>}
+                                {hasRole(currentUser, UserRole.ADMIN) && <option value="Realizado">Realizado</option>}
                             </select>
                         </div>
                     </div>
@@ -1594,7 +1594,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         );
                                     } else if (isIndicator) {
                                         const isInputIndicator = ['IND-1', 'IND-2', 'IND-ADULTOS', 'IND-CHD', 'IND-LZ-2', 'IND-LZ-4', 'IND-LZ-5', 'IND-EV-2', 'IND-EV-4', 'IND-EV-5'].includes(row.id);
-                                        const canEditIndicator = [UserRole.ADMIN, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST].includes(currentUser?.role as any);
+                                        const canEditIndicator = hasRole(currentUser, UserRole.ADMIN) || hasRole(currentUser, UserRole.ENTITY_MANAGER) || hasRole(currentUser, UserRole.COST_ANALYST);
 
                                         if (canEditIndicator && (isInputIndicator || isManualRow) && !isLocked) {
                                             realCellContent = (
@@ -2347,7 +2347,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             </button>
                             <button
                                 onClick={async () => {
-                                    if (activeProjectionType === 'Fechamento oficial' && currentUser?.role !== UserRole.ADMIN) {
+                                    if (activeProjectionType === 'Fechamento oficial' && !hasRole(currentUser, UserRole.ADMIN)) {
                                         alert('Apenas o ADMIN GERAL pode criar o evento de Fechamento Oficial.');
                                         return;
                                     }

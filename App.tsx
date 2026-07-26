@@ -22,7 +22,7 @@ import ValidationsView from './components/ValidationsView';
 import { supabase } from './services/supabaseClient';
 import { supabaseService } from './services/supabaseService';
 import { Session } from '@supabase/supabase-js';
-import { ViewState, ImportedRow, User, Hotel, HotelCategory, HotelRegion, CostCenter, CostPackage, Account, GMDConfiguration, ModuleType, UserRole, BudgetVersion, LaborParameters, ScheduleItem, ProjectionType, ValidationRecord, DreSection, KpiCalculation } from './types';
+import { ViewState, ImportedRow, User, Hotel, HotelCategory, HotelRegion, CostCenter, CostPackage, Account, GMDConfiguration, ModuleType, UserRole, BudgetVersion, LaborParameters, ScheduleItem, ProjectionType, ValidationRecord, DreSection, KpiCalculation, hasRole } from './types';
 import { Calendar, ArrowLeft, ArrowRight, Building2 as Building2Icon, Layers } from 'lucide-react';
 import { mockUsers, mockHotels, mockCostCenters, mockPackages, mockAccounts, mockGMDConfigs } from './services/mockData';
 import { Toaster, toast } from 'react-hot-toast';
@@ -369,9 +369,9 @@ const App: React.FC = () => {
       : (currentUser?.hotelId ? [currentUser.hotelId] : []);
     if (hotels.length === 0 || !currentUser || userHotelIds.length === 0) return;
 
-    const isRestricted = currentUser.role !== UserRole.ADMIN &&
-                         currentUser.role !== UserRole.DIRETORIA &&
-                         currentUser.role !== UserRole.PACKAGE_MANAGER;
+    const isRestricted = !hasRole(currentUser, UserRole.ADMIN) &&
+                         !hasRole(currentUser, UserRole.DIRETORIA) &&
+                         !hasRole(currentUser, UserRole.PACKAGE_MANAGER);
 
     if (isRestricted) {
       const userHotels = userHotelIds
@@ -1317,7 +1317,7 @@ const App: React.FC = () => {
       case 'admin_hotels':
       case 'admin_gmd':
       case 'admin':
-        if (currentUser.role !== UserRole.ADMIN) {
+        if (!hasRole(currentUser, UserRole.ADMIN)) {
           return (
             <div className="p-8 text-center text-red-500 font-bold bg-white rounded-2xl border border-red-200 max-w-xl mx-auto shadow-sm mt-12">
               Acesso negado. Apenas perfis Administradores possuem acesso à área administrativa.

@@ -418,6 +418,10 @@ export const supabaseService = {
         }
       }
 
+      // Lista completa de perfis (multi-seleção); se ainda não foi preenchida (usuário nunca
+      // reeditado desde que multi-perfil existe), sintetiza a partir do role legado único.
+      const roles: UserRole[] = (Array.isArray(p.roles) && p.roles.length > 0) ? p.roles : [mappedRole];
+
       // Vários hotéis: a lista completa vive no metadata JSON (mesmo lugar de
       // responsiblePackages/etc.) — hotel_id (coluna simples) continua guardando só o primeiro,
       // para qualquer consumidor legado que ainda espere um hotelId único.
@@ -430,6 +434,7 @@ export const supabaseService = {
         name: p.full_name || '',
         email: p.email || '',
         role: mappedRole,
+        roles,
         hotelId: p.hotel_id || undefined,
         hotelIds,
         tempPassword: p.temp_password || undefined,
@@ -476,6 +481,7 @@ export const supabaseService = {
       full_name: user.name,
       email: user.email,
       role: user.role,
+      roles: (user.roles && user.roles.length > 0) ? user.roles : [user.role],
       // Coluna simples continua guardando só a primeira unidade (compatibilidade); a lista
       // completa fica em meta.hotelIds, acima.
       hotel_id: hotelIds[0] || null,
@@ -509,7 +515,8 @@ export const supabaseService = {
           p_hotel_id: hotelIds[0] || null,
           p_can_admin: true,
           p_can_geral: true,
-          p_can_cadastros: true
+          p_can_cadastros: true,
+          p_roles: (user.roles && user.roles.length > 0) ? user.roles : [user.role]
       });
       
       if (error) throw error;

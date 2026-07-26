@@ -6,7 +6,7 @@ import {
   Calendar, GanttChartSquare, Layers, ShieldCheck, Package,
   UtensilsCrossed
 } from 'lucide-react';
-import { ViewState, ModuleType, User, UserRole } from '../types';
+import { ViewState, ModuleType, User, UserRole, hasRole } from '../types';
 
 interface SidebarProps {
   currentView: ViewState;
@@ -81,7 +81,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   user,
   collapsed,
 }) => {
-  const isAdmin = user.role === UserRole.ADMIN;
+  const isAdmin = hasRole(user, UserRole.ADMIN);
 
   const [exp, setExp] = useState<Record<string, boolean>>({
     real:  currentModule === 'REAL' && !isAdminView(currentView),
