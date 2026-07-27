@@ -5078,7 +5078,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unidade</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Perfil</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Responsabilidades</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pacotes</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">CRs</th>
                           <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Data Cadastro</th>
                           <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Últ. Acesso</th>
                           <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
@@ -5100,61 +5101,47 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                   ))}
                                 </div>
                               </td>
-                              <td className="px-6 py-4 text-xs text-gray-500 max-w-[240px]">
-                                {hasRole(u, UserRole.PACKAGE_MANAGER) && (
+                              <td className="px-6 py-4 text-xs text-gray-500 max-w-[200px]">
+                                {hasRole(u, UserRole.PACKAGE_MANAGER) ? (
                                   <div className="space-y-1">
                                     {u.responsiblePackages && u.responsiblePackages.length > 0 && (
-                                      <div>
-                                        <span className="font-black block text-[8px] text-gray-400 uppercase tracking-widest leading-none mb-0.5">Pacotes</span>
-                                        <div className="flex flex-wrap gap-1">
-                                          {u.responsiblePackages.map(p => (
-                                            <span key={p} className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[9px] font-bold">{p}</span>
-                                          ))}
-                                        </div>
+                                      <div className="flex flex-wrap gap-1">
+                                        {u.responsiblePackages.map(p => (
+                                          <span key={p} className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[9px] font-bold">{p}</span>
+                                        ))}
                                       </div>
                                     )}
                                     {u.responsibleRevenues && u.responsibleRevenues.length > 0 && (
-                                      <div className="pt-1">
-                                        <span className="font-black block text-[8px] text-gray-400 uppercase tracking-widest leading-none mb-0.5">Receitas</span>
-                                        <div className="flex flex-wrap gap-1">
-                                          {u.responsibleRevenues.map(r => (
-                                            <span key={r} className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[9px] font-bold">{r}</span>
-                                          ))}
-                                        </div>
+                                      <div className="flex flex-wrap gap-1">
+                                        {u.responsibleRevenues.map(r => (
+                                          <span key={r} className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[9px] font-bold">{r}</span>
+                                        ))}
                                       </div>
                                     )}
                                     {(!u.responsiblePackages || u.responsiblePackages.length === 0) && (!u.responsibleRevenues || u.responsibleRevenues.length === 0) && (
-                                      <span className="text-gray-400 italic text-[11px]">Nenhum pacote/receita atribuído</span>
+                                      <span className="text-gray-400 italic text-[11px]">Nenhum atribuído</span>
                                     )}
                                   </div>
+                                ) : (
+                                  <span className="text-gray-300">-</span>
                                 )}
-                                {(hasRole(u, UserRole.AREA_MANAGER) || hasRole(u, UserRole.AREA_ANALYST)) && (
-                                  <div>
-                                    {u.responsibleCostCenters && u.responsibleCostCenters.length > 0 ? (
-                                      <div>
-                                        <span className="font-black block text-[8px] text-gray-400 uppercase tracking-widest leading-none mb-0.5">CRs</span>
-                                        <div className="flex flex-wrap gap-1">
-                                          {u.responsibleCostCenters.map(ccId => {
-                                            const cc = costCenters.find(c => c.code === ccId || c.id === ccId);
-                                            return (
-                                              <span key={ccId} className="px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded text-[9px] font-bold" title={cc?.name || ccId}>{cc?.name || ccId}</span>
-                                            );
-                                          })}
-                                        </div>
-                                      </div>
-                                    ) : (
-                                      <span className="text-gray-400 italic text-[11px]">Nenhum CR atribuído</span>
-                                    )}
-                                  </div>
-                                )}
-                                {(hasRole(u, UserRole.ENTITY_MANAGER) || hasRole(u, UserRole.COST_ANALYST)) && (
-                                  <span className="text-emerald-700 font-bold text-[9px] uppercase tracking-wider bg-emerald-50 px-2 py-0.5 rounded">Vínculo com Unidade</span>
-                                )}
-                                {hasRole(u, UserRole.ADMIN) && (
-                                  <span className="text-indigo-700 font-bold text-[9px] uppercase tracking-wider bg-indigo-50 px-2 py-0.5 rounded">Acesso Completo</span>
-                                )}
-                                {hasRole(u, UserRole.DIRETORIA) && (
-                                  <span className="text-slate-600 font-bold text-[9px] uppercase tracking-wider bg-slate-100 px-2 py-0.5 rounded">Acesso Consulta</span>
+                              </td>
+                              <td className="px-6 py-4 text-xs text-gray-500 max-w-[200px]">
+                                {(hasRole(u, UserRole.AREA_MANAGER) || hasRole(u, UserRole.AREA_ANALYST)) ? (
+                                  u.responsibleCostCenters && u.responsibleCostCenters.length > 0 ? (
+                                    <div className="flex flex-wrap gap-1">
+                                      {u.responsibleCostCenters.map(ccId => {
+                                        const cc = costCenters.find(c => c.code === ccId || c.id === ccId);
+                                        return (
+                                          <span key={ccId} className="px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded text-[9px] font-bold" title={cc?.name || ccId}>{cc?.name || ccId}</span>
+                                        );
+                                      })}
+                                    </div>
+                                  ) : (
+                                    <span className="text-gray-400 italic text-[11px]">Nenhum CR atribuído</span>
+                                  )
+                                ) : (
+                                  <span className="text-gray-300">-</span>
                                 )}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-mono text-gray-500">
