@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { getForecastData, normalizeAccountName } from '../services/mockData';
 import { Plus, Trash2, X, Save, Briefcase, Pencil, Calendar, PieChart, Lock, Settings as SettingsIcon, Users, Search, Upload, Settings, Eye, FileText, Layout, Info, ChevronUp, GripVertical, Database, BedDouble, DollarSign, Target, LayoutList, ArrowUp, ArrowDown, Copy, Loader2 } from 'lucide-react';
 import { User, UserRole, CostCenter, ImportedRow, Hotel, Account, BudgetVersion, LaborParameters, ScheduleItem, ImportedCostCenter, CostPackage, GMDConfiguration, ViewState, DreSection, HotelCategory, HotelRegion, ImportedAccount, KpiCalculation, userRoles, hasRole } from '../types';
@@ -342,6 +343,85 @@ interface UnifiedAdministrationViewProps {
   currentView: ViewState;
   setCurrentView: (view: ViewState) => void;
 }
+
+// Botão "Ver" (ícone de olho) na tabela de Usuários — ao clicar, abre um balão com os Pacotes/
+// Receitas e CRs daquele usuário, via portal em document.body (position: fixed), pra não ficar
+// cortado pelo overflow da tabela. Fecha ao clicar fora.
+const UserResponsibilitiesButton: React.FC<{ user: User; costCenters: CostCenter[] }> = ({ user, costCenters }) => {
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const POPOVER_WIDTH = 320;
+
+  useEffect(() => {
+    if (!pos) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (btnRef.current?.contains(e.target as Node)) return;
+      if (popoverRef.current?.contains(e.target as Node)) return;
+      setPos(null);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [pos]);
+
+  const toggle = () => {
+    if (pos) { setPos(null); return; }
+    const rect = btnRef.current!.getBoundingClientRect();
+    const fitsLeftAligned = rect.left + POPOVER_WIDTH + 12 <= window.innerWidth;
+    const left = fitsLeftAligned ? rect.left : Math.max(12, rect.right - POPOVER_WIDTH);
+    setPos({ top: rect.bottom + 4, left });
+  };
+
+  const hasPackages = (user.responsiblePackages && user.responsiblePackages.length > 0) || (user.responsibleRevenues && user.responsibleRevenues.length > 0);
+  const hasCRs = user.responsibleCostCenters && user.responsibleCostCenters.length > 0;
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={toggle}
+        className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+        title="Ver pacotes e CRs"
+      >
+        <Eye size={16} />
+      </button>
+      {pos && createPortal(
+        <div
+          ref={popoverRef}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, width: POPOVER_WIDTH }}
+          className="z-[200] max-h-80 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-2xl p-3 text-left text-xs"
+        >
+          <div className="mb-3 last:mb-0">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Pacotes</span>
+            <div className="flex flex-wrap gap-1 mt-1">
+              {user.responsiblePackages?.map(p => (
+                <span key={p} className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[10px] font-bold">{p}</span>
+              ))}
+              {user.responsibleRevenues?.map(r => (
+                <span key={r} className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[10px] font-bold">{r}</span>
+              ))}
+              {!hasPackages && <span className="text-gray-400 italic">Nenhum atribuído</span>}
+            </div>
+          </div>
+          <div>
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">CRs</span>
+            <div className="flex flex-wrap gap-1 mt-1">
+              {user.responsibleCostCenters?.map(ccId => {
+                const cc = costCenters.find(c => c.code === ccId || c.id === ccId);
+                return (
+                  <span key={ccId} className="px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded text-[10px] font-bold">{cc?.name || ccId}</span>
+                );
+              })}
+              {!hasCRs && <span className="text-gray-400 italic">Nenhum CR atribuído</span>}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+};
 
 const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   onImportData,
@@ -5078,8 +5158,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unidade</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Perfil</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pacotes</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">CRs</th>
+                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Ver</th>
                           <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Data Cadastro</th>
                           <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Últ. Acesso</th>
                           <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
@@ -5101,48 +5180,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                                   ))}
                                 </div>
                               </td>
-                              <td className="px-6 py-4 text-xs text-gray-500 max-w-[200px]">
-                                {hasRole(u, UserRole.PACKAGE_MANAGER) ? (
-                                  <div className="space-y-1">
-                                    {u.responsiblePackages && u.responsiblePackages.length > 0 && (
-                                      <div className="flex flex-wrap gap-1">
-                                        {u.responsiblePackages.map(p => (
-                                          <span key={p} className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[9px] font-bold">{p}</span>
-                                        ))}
-                                      </div>
-                                    )}
-                                    {u.responsibleRevenues && u.responsibleRevenues.length > 0 && (
-                                      <div className="flex flex-wrap gap-1">
-                                        {u.responsibleRevenues.map(r => (
-                                          <span key={r} className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[9px] font-bold">{r}</span>
-                                        ))}
-                                      </div>
-                                    )}
-                                    {(!u.responsiblePackages || u.responsiblePackages.length === 0) && (!u.responsibleRevenues || u.responsibleRevenues.length === 0) && (
-                                      <span className="text-gray-400 italic text-[11px]">Nenhum atribuído</span>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <span className="text-gray-300">-</span>
-                                )}
-                              </td>
-                              <td className="px-6 py-4 text-xs text-gray-500 max-w-[200px]">
-                                {(hasRole(u, UserRole.AREA_MANAGER) || hasRole(u, UserRole.AREA_ANALYST)) ? (
-                                  u.responsibleCostCenters && u.responsibleCostCenters.length > 0 ? (
-                                    <div className="flex flex-wrap gap-1">
-                                      {u.responsibleCostCenters.map(ccId => {
-                                        const cc = costCenters.find(c => c.code === ccId || c.id === ccId);
-                                        return (
-                                          <span key={ccId} className="px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded text-[9px] font-bold" title={cc?.name || ccId}>{cc?.name || ccId}</span>
-                                        );
-                                      })}
-                                    </div>
-                                  ) : (
-                                    <span className="text-gray-400 italic text-[11px]">Nenhum CR atribuído</span>
-                                  )
-                                ) : (
-                                  <span className="text-gray-300">-</span>
-                                )}
+                              <td className="px-6 py-4 whitespace-nowrap text-center">
+                                <UserResponsibilitiesButton user={u} costCenters={costCenters} />
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-mono text-gray-500">
                                 {u.createdAt ? new Date(u.createdAt).toLocaleDateString('pt-BR') : '-'}
