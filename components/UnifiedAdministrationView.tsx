@@ -1276,6 +1276,37 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     }));
   }, [accounts]);
 
+  // Ordem da lista de Usuários: Diretoria/Admin no topo (sem agrupar por hotel), depois por
+  // hotel (ordem alfabética) e dentro de cada hotel por hierarquia — Gerente de Entidade,
+  // Gerente de Pacotes, Gerente de Área, Analistas. Usuário com vários perfis usa o de maior
+  // prioridade (o "primeiro" perfil que ele tem) pra decidir onde entra na lista.
+  const USER_ROLE_RANK: Record<UserRole, number> = {
+    [UserRole.ADMIN]: 0,
+    [UserRole.DIRETORIA]: 0,
+    [UserRole.ENTITY_MANAGER]: 1,
+    [UserRole.PACKAGE_MANAGER]: 2,
+    [UserRole.AREA_MANAGER]: 3,
+    [UserRole.COST_ANALYST]: 4,
+    [UserRole.AREA_ANALYST]: 4,
+  };
+  const getUserPrimaryHotelName = (u: User): string => {
+    const ids = u.hotelIds && u.hotelIds.length > 0 ? u.hotelIds : (u.hotelId ? [u.hotelId] : []);
+    const names = ids.map(id => hotels.find(h => h.id === id)?.name).filter((n): n is string => !!n);
+    return names[0] || '';
+  };
+  const sortedUsers = useMemo(() => {
+    return [...users].sort((a, b) => {
+      const rankA = Math.min(...userRoles(a).map(r => USER_ROLE_RANK[r] ?? 99));
+      const rankB = Math.min(...userRoles(b).map(r => USER_ROLE_RANK[r] ?? 99));
+      if (rankA !== rankB) return rankA - rankB;
+      if (rankA === 0) return a.name.localeCompare(b.name);
+      const hotelA = getUserPrimaryHotelName(a);
+      const hotelB = getUserPrimaryHotelName(b);
+      if (hotelA !== hotelB) return hotelA.localeCompare(hotelB);
+      return a.name.localeCompare(b.name);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [users, hotels]);
 
   const [dreStructure, setDreStructure] = useState<LocalDreSection[]>(() => {
     // Initial DRE generation logic
@@ -5165,7 +5196,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {users.map(u => {
+                        {sortedUsers.map(u => {
                           const userHotelIds = u.hotelIds && u.hotelIds.length > 0 ? u.hotelIds : (u.hotelId ? [u.hotelId] : []);
                           const userHotelNames = userHotelIds.map(id => hotels.find(h => h.id === id)?.name).filter((n): n is string => !!n);
                           return (

@@ -442,6 +442,7 @@ export const supabaseService = {
         responsiblePackages: meta.responsiblePackages || [],
         responsibleRevenues: meta.responsibleRevenues || [],
         responsibleCostCenters: meta.responsibleCostCenters || [],
+        createdAt: p.created_at || undefined,
         isValidated: !!p.is_validated
       };
     }) as User[];
