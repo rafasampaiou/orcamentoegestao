@@ -229,35 +229,53 @@ CREATE OR REPLACE FUNCTION admin_save_user(
   p_hotel_id text,
   p_can_admin boolean,
   p_can_geral boolean,
-  p_can_cadastros boolean
+  p_can_cadastros boolean,
+  p_roles jsonb DEFAULT '[]'::jsonb
 ) RETURNS text
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
   v_user_id uuid;
+  v_id_candidate uuid;
 BEGIN
-  -- Tentar encontrar o usuário no Auth pelo email
-  SELECT id INTO v_user_id FROM auth.users WHERE email = p_email LIMIT 1;
-  
+  -- p_id só é um UUID válido de verdade quando é a edição de um usuário já existente
+  -- (usuário novo chega com um id provisório tipo "u-1234567890", que não é UUID).
+  -- Procurar primeiro pelo ID (confiável) e só depois pelo e-mail evita tentar inserir
+  -- um usuário novo com um ID que já existe, caso o e-mail em profiles tenha ficado
+  -- dessincronizado do que está em auth.users por qualquer motivo.
+  BEGIN
+    v_id_candidate := p_id::uuid;
+  EXCEPTION WHEN invalid_text_representation THEN
+    v_id_candidate := NULL;
+  END;
+
+  IF v_id_candidate IS NOT NULL THEN
+    SELECT id INTO v_user_id FROM auth.users WHERE id = v_id_candidate LIMIT 1;
+  END IF;
+
+  IF v_user_id IS NULL THEN
+    SELECT id INTO v_user_id FROM auth.users WHERE email = p_email LIMIT 1;
+  END IF;
+
   IF v_user_id IS NOT NULL THEN
     -- Usuário já existe. Se passou senha, tenta atualizar.
     IF p_password IS NOT NULL AND p_password != '' THEN
-      UPDATE auth.users 
+      UPDATE auth.users
       SET encrypted_password = crypt(p_password, gen_salt('bf')),
           updated_at = now()
       WHERE id = v_user_id;
     END IF;
+
+    -- Mantém o e-mail de auth.users sincronizado com o que foi salvo no formulário.
+    UPDATE auth.users
+    SET email = p_email, updated_at = now()
+    WHERE id = v_user_id AND email IS DISTINCT FROM p_email;
   ELSE
-    -- Opcional: Se passaram um UUID, tentamos usar, caso contrário geramos um
-    BEGIN
-      v_user_id := p_id::uuid;
-    EXCEPTION WHEN invalid_text_representation THEN
-      v_user_id := gen_random_uuid();
-    END;
+    v_user_id := COALESCE(v_id_candidate, gen_random_uuid());
 
     INSERT INTO auth.users (
-      instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, 
+      instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
       raw_app_meta_data, raw_user_meta_data, created_at, updated_at, confirmation_token, recovery_token, email_change_token_new, email_change
     )
     VALUES (
@@ -268,14 +286,16 @@ BEGIN
 
   -- Sincronizar dados em public.profiles
   INSERT INTO public.profiles (
-    id, email, full_name, role, hotel_id, can_access_admin, can_access_geral, can_access_cadastros, temp_password, created_at, updated_at
+    id, email, full_name, role, roles, hotel_id, can_access_admin, can_access_geral, can_access_cadastros, temp_password, created_at, updated_at
   )
   VALUES (
-    v_user_id::text, p_email, p_name, p_role, p_hotel_id, p_can_admin, p_can_geral, p_can_cadastros, p_password, now(), now()
+    v_user_id::text, p_email, p_name, p_role, p_roles, p_hotel_id, p_can_admin, p_can_geral, p_can_cadastros, p_password, now(), now()
   )
   ON CONFLICT (id) DO UPDATE SET
     full_name = EXCLUDED.full_name,
+    email = EXCLUDED.email,
     role = EXCLUDED.role,
+    roles = EXCLUDED.roles,
     hotel_id = EXCLUDED.hotel_id,
     can_access_admin = EXCLUDED.can_access_admin,
     can_access_geral = EXCLUDED.can_access_geral,
