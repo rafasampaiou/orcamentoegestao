@@ -427,6 +427,9 @@ const GMDView: React.FC<GMDViewProps> = ({
         const totalForecast = allAccountsData.reduce((s, a) => s + (a.forecast || 0), 0);
         const totalPrevia = allAccountsData.reduce((s, a) => s + (a.previa || 0), 0);
         const anyConfigId = configsForPkg[0]?.id;
+        // Gestor cadastrado do Pacote Master nesta unidade (config.packageManagerId, na GMD Config
+        // do hotel atual) — quando há mais de um config pro mesmo master, usa o primeiro.
+        const packageManagerName = users.find(u => u.id === configsForPkg[0]?.packageManagerId)?.name || '-';
 
         const isAdminMaster = pkgName === 'DESPESAS ADMINISTRATIVAS';
         // No master Despesas Administrativas, o "Real" (Prévia) pode ser digitado manualmente
@@ -445,6 +448,7 @@ const GMDView: React.FC<GMDViewProps> = ({
             configId: anyConfigId,
             isMasterHeader: true,
             packageName: pkgName,
+            packageManagerName,
             totalMeta, totalForecast, totalPrevia: masterPrevia,
             deltaVal: masterDeltaVal,
             deltaPct: masterDeltaPct,
@@ -787,12 +791,13 @@ const GMDView: React.FC<GMDViewProps> = ({
                 <table className="w-full text-sm">
                     <thead className="bg-emerald-800 text-white">
                         <tr>
-                            <th className="px-4 py-2.5 text-left font-bold uppercase tracking-wide text-xs w-[30%]">Pacote</th>
-                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-xs w-[16%]">Meta</th>
-                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-xs w-[16%]">Forecast</th>
-                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-xs w-[16%]">Prévia</th>
-                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-xs w-[11%]">Desvio %</th>
-                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-xs w-[11%]">Desvio R$</th>
+                            <th className="px-4 py-2.5 text-left font-bold uppercase tracking-wide text-xs w-[18%]">Gestor</th>
+                            <th className="px-4 py-2.5 text-left font-bold uppercase tracking-wide text-xs w-[24%]">Pacote</th>
+                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-xs w-[14%]">Meta</th>
+                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-xs w-[14%]">Forecast</th>
+                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-xs w-[14%]">Prévia</th>
+                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-xs w-[8%]">Desvio %</th>
+                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-xs w-[8%]">Desvio R$</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -812,6 +817,7 @@ const GMDView: React.FC<GMDViewProps> = ({
 
                             return (
                                 <tr key={pkg.id || `row-${idx}`} className={`transition-colors hover:bg-slate-50 ${bgClass}`}>
+                                    <td className="px-4 py-2 text-slate-500 font-medium">{isMaster ? pkg.packageManagerName : ''}</td>
                                     <td className={`px-4 py-2 ${indentClass} ${textClass}`}>
                                         <div className={isMaster ? 'uppercase tracking-tight' : ''}>{pkg.packageName}</div>
                                     </td>
