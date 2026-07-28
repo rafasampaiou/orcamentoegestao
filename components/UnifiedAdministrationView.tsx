@@ -884,14 +884,13 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   // sempre prevalece sobre a sugestão.
   const GMD_SEGMENT_ROWS = [
     'Despesas administrativas gerais',
-    'Tech HUB (TI)', 'Tech HUB (Marketing)', 'Tech HUB (Martech)', 'Tech HUB (Outros)',
+    'Tech HUB (TI)', 'Tech HUB (Martech)', 'Tech HUB (Outros)',
     'Despesas com vendas e marketing',
     'Marketing', 'Martech', 'Outros',
   ];
   const GMD_SEGMENT_KEYS: Record<string, string> = {
     'Despesas administrativas gerais': 'admin_gerais',
     'Tech HUB (TI)': 'admin_ti',
-    'Tech HUB (Marketing)': 'admin_marketing',
     'Tech HUB (Martech)': 'admin_martech',
     'Tech HUB (Outros)': 'admin_tech_outros',
     'Despesas com vendas e marketing': 'vendas_gerais',
@@ -1505,10 +1504,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     months.forEach(m => {
       const admin = adminTotals[m] || 0;
       const ti = parseFinanceValue(gmdSegmentData['Tech HUB (TI)']?.[m] || '') || 0;
-      const mktAdmin = parseFinanceValue(gmdSegmentData['Tech HUB (Marketing)']?.[m] || '') || 0;
       const mtcAdmin = parseFinanceValue(gmdSegmentData['Tech HUB (Martech)']?.[m] || '') || 0;
       const outrosAdmin = parseFinanceValue(gmdSegmentData['Tech HUB (Outros)']?.[m] || '') || 0;
-      adminGerais[m] = manual('Despesas administrativas gerais', m) ?? fmt(admin - ti - mktAdmin - mtcAdmin - outrosAdmin);
+      adminGerais[m] = manual('Despesas administrativas gerais', m) ?? fmt(admin - ti - mtcAdmin - outrosAdmin);
 
       const vendas = vendasTotals[m] || 0;
       const mkt = parseFinanceValue(gmdSegmentData['Marketing']?.[m] || '') || 0;
