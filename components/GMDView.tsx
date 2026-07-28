@@ -387,6 +387,7 @@ const GMDView: React.FC<GMDViewProps> = ({
                         const scenario = (d.cenario || '').trim().toLowerCase();
                         if (cenarioType === 'Real') return scenario === 'real' || scenario === 'realizado';
                         if (cenarioType === 'Forecast') return scenario === 'forecast' || scenario === 'previsao' || scenario === 'previsão';
+                        if (cenarioType === 'Prévia') return scenario === 'previa' || scenario === 'prévia';
                         return scenario === 'budget' || scenario === 'meta' || scenario === 'orcamento' || scenario === 'orçamento';
                     });
 
@@ -806,41 +807,40 @@ const GMDView: React.FC<GMDViewProps> = ({
         {/* --- TAB 1: MONITOR (FORECAST STYLE) --- */}
         {activeTab === 'monitor' && (
             <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-                <table className="w-full text-xs">
-                    <thead className="bg-gray-100 text-gray-600 font-semibold uppercase tracking-wide">
+                <table className="w-full text-sm">
+                    <thead className="bg-emerald-800 text-white">
                         <tr>
-                            <th className="px-4 py-3 text-left w-[30%]">Pacote / Conta Contábil</th>
-                            {/* NEW COLUMN STRUCTURE: EQUAL WIDTHS (14% each = 70%) */}
-                            <th className="px-2 py-3 text-right text-gray-700 bg-gray-50 w-[14%]">Meta</th>
-                            <th className="px-2 py-3 text-right text-gray-700 bg-blue-50/20 w-[14%]">Forecast</th>
-                            <th className="px-2 py-3 text-right text-gray-700 bg-blue-50/40 w-[14%]">Real</th>
-                            <th className="px-2 py-3 text-right text-gray-700 w-[14%]">DIF (R$)</th>
-                            <th className="px-2 py-3 text-right text-gray-700 w-[14%]">DIF (%)</th>
+                            <th className="px-4 py-2.5 text-left font-bold uppercase tracking-wide text-xs w-[30%]">Pacote</th>
+                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-xs w-[16%]">Meta</th>
+                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-xs w-[16%]">Forecast</th>
+                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-xs w-[16%]">Prévia</th>
+                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-xs w-[11%]">Desvio %</th>
+                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-xs w-[11%]">Desvio R$</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-gray-100">
                         {reportData.map((pkg, idx) => {
-                            const rowColor = pkg.deltaVal > 0 ? 'text-red-600' : 'text-emerald-600';
+                            const isSeg = pkg.isSegmentRow;
+                            const deltaBg = isSeg ? '' : pkg.deltaVal > 0 ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600';
 
                             // Styling based on row type
                             const isMaster = pkg.isMasterHeader;
                             const isSub = pkg.isSubPackage;
-                            const isSeg = pkg.isSegmentRow;
 
-                            const bgClass = isMaster ? 'bg-indigo-50/50' :
-                                           (isSub || isSeg) ? 'bg-gray-50 hover:bg-gray-100 border-l-4 border-l-indigo-300' :
-                                           'bg-gray-50 hover:bg-gray-100';
+                            const bgClass = isMaster ? 'bg-slate-50' :
+                                           (isSub || isSeg) ? 'bg-white border-l-4 border-l-indigo-200' :
+                                           'bg-white';
 
-                            const textClass = isMaster ? 'font-black text-indigo-900' : 'font-bold text-gray-800';
+                            const textClass = isMaster ? 'font-bold text-slate-900' : 'font-semibold text-slate-700';
                             const indentClass = (isSub || isSeg) ? 'pl-8' : 'pl-4';
 
                             return (
-                                <tr key={pkg.id || `row-${idx}`} className={`border-b border-gray-200 transition-colors ${bgClass}`}>
-                                    <td className={`px-4 py-3 ${indentClass} ${textClass}`}>
+                                <tr key={pkg.id || `row-${idx}`} className={`transition-colors hover:bg-slate-50 ${bgClass}`}>
+                                    <td className={`px-4 py-2 ${indentClass} ${textClass}`}>
                                         <div className={isMaster ? 'uppercase tracking-tight' : ''}>{pkg.packageName}</div>
                                     </td>
 
-                                    <td className="px-2 py-3 text-right font-medium text-gray-600 bg-gray-50/50">
+                                    <td className="px-3 py-2 text-right font-medium text-slate-600 tabular-nums">
                                         {isSeg && pkg.segmentKey ? (
                                             <input
                                                 type="number"
@@ -849,12 +849,12 @@ const GMDView: React.FC<GMDViewProps> = ({
                                                     const parsed = parseFloat(e.target.value.replace(',', '.')) || 0;
                                                     if (parsed !== pkg.totalMeta) handleSegmentEdit(pkg.segmentKey, parsed);
                                                 }}
-                                                className="w-24 text-right bg-white border border-gray-300 rounded px-1 py-0.5 text-xs font-medium text-gray-700 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                                                className="w-24 text-right bg-white border border-gray-300 rounded px-1 py-0.5 text-sm font-medium text-gray-700 focus:outline-none focus:ring-1 focus:ring-indigo-400"
                                             />
                                         ) : formatCurrency(pkg.totalMeta)}
                                     </td>
-                                    <td className="px-2 py-3 text-right font-medium text-blue-700 bg-blue-50/20">{isSeg ? '-' : formatCurrency(pkg.totalForecast)}</td>
-                                    <td className="px-2 py-3 text-right font-bold text-gray-900 bg-blue-50/40">
+                                    <td className="px-3 py-2 text-right font-medium text-blue-700 tabular-nums">{isSeg ? '-' : formatCurrency(pkg.totalForecast)}</td>
+                                    <td className="px-3 py-2 text-right font-bold text-slate-900 tabular-nums">
                                         {pkg.previaEditable ? (
                                             <input
                                                 type="number"
@@ -864,13 +864,13 @@ const GMDView: React.FC<GMDViewProps> = ({
                                                     if (parsed !== pkg.totalPrevia) handleSegmentEdit(pkg.previaSegmentKey, parsed);
                                                 }}
                                                 title="Digite o Real apurado nesta etapa da prévia"
-                                                className="w-24 text-right bg-white border border-gray-300 rounded px-1 py-0.5 text-xs font-bold text-gray-900 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                                                className="w-24 text-right bg-white border border-gray-300 rounded px-1 py-0.5 text-sm font-bold text-gray-900 focus:outline-none focus:ring-1 focus:ring-indigo-400"
                                             />
                                         ) : (isSeg ? '-' : formatCurrency(pkg.totalPrevia))}
                                     </td>
 
-                                    <td className={`px-2 py-3 text-right font-bold ${isSeg ? 'text-gray-400' : rowColor}`}>{isSeg ? '-' : formatCurrency(pkg.deltaVal)}</td>
-                                    <td className={`px-2 py-3 text-right font-bold border-r border-gray-200 ${isSeg ? 'text-gray-400' : rowColor}`}>{isSeg ? '-' : formatPercent(pkg.deltaPct)}</td>
+                                    <td className={`px-3 py-2 text-right font-bold tabular-nums ${deltaBg}`}>{isSeg ? '-' : formatPercent(pkg.deltaPct)}</td>
+                                    <td className={`px-3 py-2 text-right font-bold tabular-nums ${deltaBg}`}>{isSeg ? '-' : formatCurrency(pkg.deltaVal)}</td>
                                 </tr>
                             );
                         })}
