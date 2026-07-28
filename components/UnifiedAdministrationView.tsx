@@ -878,7 +878,15 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   // Administrativas; Marketing/Martech dentro de Despesas com Vendas e Marketing) — não altera
   // financial_data, só alimenta a tela de Metas GMD. Fica embaixo da tabela de Despesas (Real),
   // amarrada à mesma versão/destino escolhidos ali. Mesmo formato de dreForecastData.
-  const GMD_SEGMENT_ROWS = ['Tech HUB (TI)', 'Tech HUB (Marketing)', 'Tech HUB (Martech)', 'Marketing', 'Martech'];
+  // Linhas de referência (só leitura, puxadas do total do master digitado na tabela de Despesas
+  // acima) e as linhas "Outros" (calculadas = total do master menos os valores manuais).
+  const GMD_SEGMENT_ROWS = [
+    'Despesas administrativas gerais',
+    'Tech HUB (TI)', 'Tech HUB (Marketing)', 'Tech HUB (Martech)', 'Tech HUB (Outros)',
+    'Despesas com vendas e marketing',
+    'Marketing', 'Martech', 'Outros',
+  ];
+  const GMD_SEGMENT_READONLY_ROWS = ['Despesas administrativas gerais', 'Tech HUB (Outros)', 'Despesas com vendas e marketing', 'Outros'];
   const GMD_SEGMENT_KEYS: Record<string, string> = {
     'Tech HUB (TI)': 'admin_ti',
     'Tech HUB (Marketing)': 'admin_marketing',
@@ -1470,6 +1478,43 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
     return { masters: masterOrder.filter(m => totals[m]), totals };
   }, [dreForecastData, accounts]);
+
+  // Mescla os valores digitados na grade de segmentação GMD com as linhas de referência (total do
+  // master, puxado da tabela de Despesas acima) e as linhas "Outros" calculadas — só pra exibição;
+  // o que é salvo em gmd_expense_segments continua vindo direto de gmdSegmentData.
+  const gmdSegmentDisplayData = useMemo(() => {
+    const months = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    const adminTotals = expenseMasterTotals.totals['DESPESAS ADMINISTRATIVAS'] || {};
+    const vendasTotals = expenseMasterTotals.totals['DESPESAS COM VENDAS E MARKETING'] || {};
+    const fmt = (n: number) => n === 0 ? '' : n.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
+
+    const adminGerais: Record<number, string> = {};
+    const techOutros: Record<number, string> = {};
+    const vendasGerais: Record<number, string> = {};
+    const outros: Record<number, string> = {};
+    months.forEach(m => {
+      const admin = adminTotals[m] || 0;
+      const ti = parseFinanceValue(gmdSegmentData['Tech HUB (TI)']?.[m] || '') || 0;
+      const mktAdmin = parseFinanceValue(gmdSegmentData['Tech HUB (Marketing)']?.[m] || '') || 0;
+      const mtcAdmin = parseFinanceValue(gmdSegmentData['Tech HUB (Martech)']?.[m] || '') || 0;
+      adminGerais[m] = fmt(admin);
+      techOutros[m] = fmt(admin - ti - mktAdmin - mtcAdmin);
+
+      const vendas = vendasTotals[m] || 0;
+      const mkt = parseFinanceValue(gmdSegmentData['Marketing']?.[m] || '') || 0;
+      const mtc = parseFinanceValue(gmdSegmentData['Martech']?.[m] || '') || 0;
+      vendasGerais[m] = fmt(vendas);
+      outros[m] = fmt(vendas - mkt - mtc);
+    });
+
+    return {
+      ...gmdSegmentData,
+      'Despesas administrativas gerais': adminGerais,
+      'Tech HUB (Outros)': techOutros,
+      'Despesas com vendas e marketing': vendasGerais,
+      'Outros': outros,
+    };
+  }, [gmdSegmentData, expenseMasterTotals]);
 
   const handleSaveDreConfig = async () => {
     setIsSavingDre(true);
@@ -4518,7 +4563,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 </div>
                 <SpreadsheetTable
                   rows={GMD_SEGMENT_ROWS}
-                  data={gmdSegmentData}
+                  data={gmdSegmentDisplayData}
+                  readOnlyRows={GMD_SEGMENT_READONLY_ROWS}
                   onCellChange={(row, month, val) => setGmdSegmentData(prev => ({ ...prev, [row]: { ...(prev[row] || {}), [month]: val } }))}
                   onPaste={(row, month, pasted) => {
                     const newData = { ...gmdSegmentData };
