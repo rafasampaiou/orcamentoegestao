@@ -504,32 +504,9 @@ const GMDView: React.FC<GMDViewProps> = ({
                 packageName: 'Outros',
                 totalMeta: outrosOverride !== null ? outrosOverride : (totalMeta - sumSegments),
             });
-        } else {
-            // Masters "normais": agrupa as contas por Pacote da DRE Forecast (sem listar conta a
-            // conta) — genérico pra qualquer master.
-            const byPackage = new Map<string, any[]>();
-            allAccountsData.forEach(a => {
-                const key = a.package || pkgName;
-                if (!byPackage.has(key)) byPackage.set(key, []);
-                byPackage.get(key)!.push(a);
-            });
-            byPackage.forEach((accs, pkgLabel) => {
-                const pMeta = accs.reduce((s, a) => s + (a.meta || 0), 0);
-                const pForecast = accs.reduce((s, a) => s + (a.forecast || 0), 0);
-                const pPrevia = accs.reduce((s, a) => s + (a.previa || 0), 0);
-                flattened.push({
-                    id: `pkg-${pkgName}-${pkgLabel}`,
-                    isSubPackage: true,
-                    indentLevel: 1,
-                    packageName: pkgLabel,
-                    totalMeta: pMeta,
-                    totalForecast: pForecast,
-                    totalPrevia: pPrevia,
-                    deltaVal: pForecast - pPrevia,
-                    deltaPct: pPrevia === 0 ? 0 : ((pForecast - pPrevia) / pPrevia) * 100,
-                });
-            });
         }
+        // Masters "normais" (sem segmentação): só o header do master aparece, já pushado acima —
+        // sem listar Pacote nem conta contábil.
     });
 
     return flattened;
@@ -825,14 +802,13 @@ const GMDView: React.FC<GMDViewProps> = ({
 
                             // Styling based on row type
                             const isMaster = pkg.isMasterHeader;
-                            const isSub = pkg.isSubPackage;
 
                             const bgClass = isMaster ? 'bg-slate-50' :
-                                           (isSub || isSeg) ? 'bg-white border-l-4 border-l-indigo-200' :
+                                           isSeg ? 'bg-white border-l-4 border-l-indigo-200' :
                                            'bg-white';
 
                             const textClass = isMaster ? 'font-bold text-slate-900' : 'font-semibold text-slate-700';
-                            const indentClass = (isSub || isSeg) ? 'pl-8' : 'pl-4';
+                            const indentClass = isSeg ? 'pl-8' : 'pl-4';
 
                             return (
                                 <tr key={pkg.id || `row-${idx}`} className={`transition-colors hover:bg-slate-50 ${bgClass}`}>
