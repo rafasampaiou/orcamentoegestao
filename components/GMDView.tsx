@@ -791,17 +791,17 @@ const GMDView: React.FC<GMDViewProps> = ({
         
         {/* --- TAB 1: MONITOR (FORECAST STYLE) --- */}
         {activeTab === 'monitor' && (
-            <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-                <table className="w-full text-sm">
+            <div className="inline-block max-w-full bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+                <table className="table-fixed text-sm">
                     <thead className="bg-emerald-800 text-white">
                         <tr>
-                            <th className="px-4 py-2.5 text-left font-bold uppercase tracking-wide text-xs w-[18%]">Gestor</th>
-                            <th className="px-4 py-2.5 text-left font-bold uppercase tracking-wide text-xs w-[24%]">Pacote</th>
-                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-xs w-[14%]">Meta</th>
-                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-xs w-[14%]">Forecast</th>
-                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-xs w-[14%]">Prévia</th>
-                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-xs w-[8%]">Desvio %</th>
-                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-xs w-[8%]">Desvio R$</th>
+                            <th className="px-3 py-2.5 text-left font-bold uppercase tracking-wide text-xs w-36">Gestor</th>
+                            <th className="px-3 py-2.5 text-left font-bold uppercase tracking-wide text-xs w-56">Pacote</th>
+                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-xs w-28">Meta</th>
+                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-xs w-28">Forecast</th>
+                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-xs w-28">Prévia</th>
+                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-xs w-24">Desvio %</th>
+                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-xs w-28">Desvio R$</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
