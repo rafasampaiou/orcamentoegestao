@@ -134,6 +134,11 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
     // Timeline dos 8 passos — mesma condição de ForecastTable.tsx (baseada na Versão do Forecast
     // ativa, não no toggle local "period", pra ficar consistente com a DRE Forecast).
     const isMeetingVersion = !!activeProjectionType && MEETING_VERSIONS.includes(activeProjectionType);
+    // Mesma chave/campo que ForecastTable.tsx usa pra saber se o wizard "Iniciar Projeção" já
+    // foi concluído — a timeline só deve aparecer depois disso, não só por estar numa versão
+    // de reunião.
+    const otbContextKey = `${selectedHotel}_${selectedYear}_${(initialSelectedMonth || 1)}_${activeRealVersionId || ''}__${activeProjectionType}__OTB`;
+    const otbDaySaved = realOccupancyData[otbContextKey]?.['__otb_day'];
     const otbProgress = isMeetingVersion ? computeOtbProgress({
         realOccupancyData,
         financialData: financialData || [],
@@ -817,7 +822,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
                     </button>
                 </div>
 
-                {isMeetingVersion && (
+                {isMeetingVersion && !!otbDaySaved && (
                     <div className="mt-3 pt-3 border-t border-gray-100">
                         <OtbProgressTimeline completed={otbProgress} onStepClick={handleOtbStepClick} onStepReset={handleOtbStepReset} resettableSteps={[1, 3, 6]} title="Status da prévia" />
                     </div>

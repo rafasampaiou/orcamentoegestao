@@ -1,7 +1,32 @@
 import React, { useMemo, useState } from 'react';
-import { Network, ChevronRight, ChevronDown, Filter, AlertTriangle, CheckCircle, FileText, ClipboardList, ShieldCheck, ShieldAlert, Calendar, DollarSign, CheckSquare, Search, X, FileEdit, ExternalLink } from 'lucide-react';
-import { GMDConfiguration, Account, CostPackage, Hotel, ImportedRow, User, Justification, CostCenter, UserRole, hasRole } from '../types';
+import { Network, Filter, AlertTriangle, CheckCircle, FileText, ClipboardList, ShieldCheck, ShieldAlert, Calendar, DollarSign, CheckSquare, Search, X, FileEdit, ExternalLink } from 'lucide-react';
+import { GMDConfiguration, Account, CostPackage, Hotel, ImportedRow, User, Justification, CostCenter, UserRole, hasRole, ProjectionType } from '../types';
 import { VersionInfoBanner } from './VersionInfoBanner';
+import { supabaseService } from '../services/supabaseService';
+
+// Segmentação informativa de Despesas Administrativas e Despesas com Vendas e Marketing —
+// alimentada pela importação do Orçamento ou editada direto aqui; nunca altera financial_data.
+const ADMIN_SEGMENT_KEYS: { key: string; label: string }[] = [
+    { key: 'admin_ti', label: 'Tech HUB (TI)' },
+    { key: 'admin_marketing', label: 'Tech HUB (Marketing)' },
+    { key: 'admin_martech', label: 'Tech HUB (Martech)' },
+];
+const VENDAS_SEGMENT_KEYS: { key: string; label: string }[] = [
+    { key: 'vendas_marketing', label: 'Marketing' },
+    { key: 'vendas_martech', label: 'Martech' },
+];
+const SEGMENTED_MASTERS: Record<string, { key: string; label: string }[]> = {
+    'DESPESAS ADMINISTRATIVAS': ADMIN_SEGMENT_KEYS,
+    'DESPESAS COM VENDAS E MARKETING': VENDAS_SEGMENT_KEYS,
+};
+
+const PROJECTION_TYPE_OPTIONS: { value: ProjectionType; label: string }[] = [
+    { value: 'Reunião de Ritmo', label: 'Reunião de Ritmo' },
+    { value: 'FCA N2', label: 'FCA N2' },
+    { value: 'FCA N1', label: 'FCA N1' },
+    { value: 'Fechamento oficial', label: 'Fechamento' },
+    { value: 'Realizado', label: 'Realizado' },
+];
 
 interface FilterCardProps {
     type: string;
@@ -48,6 +73,10 @@ interface GMDViewProps {
     selectedYear: number;
     initialSelectedHotel: string;
     activeRealVersionName?: string;
+    activeRealVersionId?: string;
+    activeBudgetVersionId?: string;
+    activeProjectionType?: ProjectionType;
+    setActiveProjectionType?: React.Dispatch<React.SetStateAction<ProjectionType>>;
     currentUser?: User;
 }
 
@@ -55,20 +84,138 @@ interface GMDViewProps {
 const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'decimal', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val);
 const formatPercent = (val: number) => `${val.toFixed(1)}%`;
 
-const GMDView: React.FC<GMDViewProps> = ({ 
+const GMDView: React.FC<GMDViewProps> = ({
     gmdConfigs, accounts, packages, hotels, financialData, users, costCenters,
-    selectedMonth, selectedYear, initialSelectedHotel, activeRealVersionName, currentUser 
+    selectedMonth, selectedYear, initialSelectedHotel, activeRealVersionName,
+    activeRealVersionId, activeBudgetVersionId, activeProjectionType, setActiveProjectionType, currentUser
 }) => {
   const [activeTab, setActiveTab] = useState<'monitor' | 'justifications'>('monitor');
   const [currentHotel, setCurrentHotel] = useState(initialSelectedHotel);
-  const [expandedPackages, setExpandedPackages] = useState<string[]>([]);
   const [localMonth, setLocalMonth] = useState(selectedMonth);
 
   React.useEffect(() => { setLocalMonth(selectedMonth); }, [selectedMonth]);
-  
-  // Justifications State (Mocked local state for demo)
+
+  // Segmentação de despesas (Tech HUB / Marketing / Martech) — vem do Orçamento importado ou de
+  // edição manual direto aqui; guardada em gmd_expense_segments, amarrada à versão de Orçamento.
+  const [gmdSegments, setGmdSegments] = useState<any[]>([]);
+  const [pendingSegmentEdits, setPendingSegmentEdits] = useState<Record<string, number>>({});
+  const pendingSegmentEditsRef = React.useRef<Record<string, number>>({});
+  React.useEffect(() => { pendingSegmentEditsRef.current = pendingSegmentEdits; }, [pendingSegmentEdits]);
+
+  React.useEffect(() => {
+    supabaseService.getGmdExpenseSegments().then(setGmdSegments).catch(() => {});
+  }, []);
+
+  React.useEffect(() => {
+    const keys = Object.keys(pendingSegmentEdits);
+    if (keys.length === 0) return;
+    const timeout = setTimeout(async () => {
+        const hotelObj = hotels.find(h => h.name === currentHotel);
+        const rows = keys.map(k => ({
+            hotel: hotelObj?.name || currentHotel, year: selectedYear, month: localMonth,
+            versionId: activeBudgetVersionId || null, segmentKey: k, value: pendingSegmentEditsRef.current[k],
+        }));
+        try {
+            await supabaseService.upsertGmdExpenseSegments(rows);
+            setGmdSegments(prev => {
+                const map = new Map(prev.map((s: any) => [`${s.hotel}|${s.year}|${s.month}|${s.version_id}|${s.segment_key}`, s]));
+                rows.forEach(r => {
+                    const vid = r.versionId || '';
+                    map.set(`${r.hotel}|${r.year}|${r.month}|${vid}|${r.segmentKey}`, {
+                        hotel: r.hotel, year: r.year, month: r.month, version_id: vid,
+                        segment_key: r.segmentKey, value: r.value,
+                    });
+                });
+                return Array.from(map.values());
+            });
+            setPendingSegmentEdits(prev => {
+                const next = { ...prev };
+                keys.forEach(k => { if (next[k] === pendingSegmentEditsRef.current[k]) delete next[k]; });
+                return next;
+            });
+        } catch (e) {
+            console.error('Erro ao salvar segmentação GMD', e);
+        }
+    }, 800);
+    return () => clearTimeout(timeout);
+  }, [pendingSegmentEdits, currentHotel, selectedYear, localMonth, activeBudgetVersionId, hotels]);
+
+  const getSegmentValue = (segmentKey: string): number => {
+    if (segmentKey in pendingSegmentEdits) return pendingSegmentEdits[segmentKey];
+    const hotelObj = hotels.find(h => h.name === currentHotel);
+    const vid = activeBudgetVersionId || '';
+    const found = gmdSegments.find((s: any) =>
+        (s.hotel === currentHotel || s.hotel === hotelObj?.name) &&
+        s.year === selectedYear && s.month === localMonth &&
+        (s.version_id || '') === vid && s.segment_key === segmentKey
+    );
+    return found ? (parseFloat(found.value) || 0) : 0;
+  };
+
+  const handleSegmentEdit = (segmentKey: string, value: number) => {
+    setPendingSegmentEdits(prev => ({ ...prev, [segmentKey]: value }));
+  };
+
+  // Justifications State — persistidas em gmd_justifications (services/supabaseService.ts),
+  // amarradas a hotel/ano/mês/versão, pra não se perder conforme a mesma versão avança de estágio.
   const [justifications, setJustifications] = useState<Justification[]>([]);
-  
+
+  React.useEffect(() => {
+    supabaseService.getGmdJustifications().then(rows => {
+        setJustifications(rows.filter((r: any) => r.hotel === currentHotel).map((r: any): Justification => ({
+            id: r.id,
+            gmdConfigId: r.gmd_config_id,
+            accountId: r.account_id,
+            accountName: r.account_name,
+            month: r.month,
+            year: r.year,
+            meta: parseFloat(r.meta) || 0,
+            forecast: parseFloat(r.forecast) || 0,
+            previa: parseFloat(r.previa) || 0,
+            deltaR: parseFloat(r.delta_r) || 0,
+            deltaPct: parseFloat(r.delta_pct) || 0,
+            explanation: r.explanation || '',
+            status: r.status || 'Pendentes',
+            rejectionReason: r.rejection_reason,
+            actionPlan: r.action_plan,
+            actionPlanStartDate: r.action_plan_start_date,
+            actionPlanEndDate: r.action_plan_end_date,
+            actionPlanPresentationDate: r.action_plan_presentation_date,
+            recoveredValue: r.recovered_value != null ? parseFloat(r.recovered_value) : undefined,
+            completionObservation: r.completion_observation,
+            assignedAreaManagerId: r.assigned_area_manager_id,
+        })));
+    }).catch(() => {});
+  }, []);
+
+  const persistJustification = (j: Justification) => {
+    supabaseService.upsertGmdJustification({
+        id: j.id,
+        hotel: currentHotel,
+        year: j.year,
+        month: j.month,
+        versionId: activeRealVersionId || null,
+        gmdConfigId: j.gmdConfigId,
+        accountId: j.accountId,
+        accountName: j.accountName,
+        meta: j.meta,
+        forecast: j.forecast,
+        previa: j.previa,
+        deltaR: j.deltaR,
+        deltaPct: j.deltaPct,
+        explanation: j.explanation,
+        status: j.status,
+        rejectionReason: j.rejectionReason,
+        actionPlan: j.actionPlan,
+        actionPlanStartDate: j.actionPlanStartDate,
+        actionPlanEndDate: j.actionPlanEndDate,
+        actionPlanPresentationDate: j.actionPlanPresentationDate,
+        recoveredValue: j.recoveredValue,
+        completionObservation: j.completionObservation,
+        assignedAreaManagerId: j.assignedAreaManagerId,
+    }).catch(e => console.error('Erro ao salvar plano de ação GMD', e));
+  };
+
   // Interaction State - Selected Item for Modal
   const [selectedJustification, setSelectedJustification] = useState<Justification | null>(null);
 
@@ -163,16 +310,15 @@ const GMDView: React.FC<GMDViewProps> = ({
     const activeHotelObj = hotels.find(h => h.name === currentHotel);
     const activeHotelCode = activeHotelObj?.code || '';
 
-    // 2. Build Hierarchy with Grouping
-    const groupedData = new Map<string, any>(); // key = packageId (or packageId+subArea)
+    const flattened: any[] = [];
 
     masterPackages.forEach(pkg => {
         const pkgName = pkg.name || 'Pacote Desconhecido';
         const pkgId = pkg.id;
-        
+
         // Try to find configurations for this package
         const configsForPkg = hotelConfigs.filter(c => c.packageId === pkgId || c.packageId === pkgName);
-        
+
         // If no config, create a dummy one to ensure it renders
         if (configsForPkg.length === 0) {
             configsForPkg.push({
@@ -188,20 +334,20 @@ const GMDView: React.FC<GMDViewProps> = ({
             });
         }
 
+        // Junta as contas de todos os configs desse master numa lista só (a maioria dos masters
+        // tem um único config; havendo mais de um, os totais do master continuam corretos).
+        let allAccountsData: any[] = [];
         configsForPkg.forEach(config => {
-            const pkgManager = users.find(u => u.id === config.packageManagerId);
-            const accManager = users.find(u => u.id === config.accountManagerId);
+            const configCCNames = costCenters
+                .filter(cc => config.costCenterIds?.includes(cc.id))
+                .map(cc => cc.name.trim().toLowerCase());
 
             const linkedAccountsData = config.linkedAccountIds.map(accId => {
                 const acc = accounts.find(a => a.id === accId);
                 if (!acc) return null;
 
-                const configCCNames = costCenters
-                    .filter(cc => config.costCenterIds?.includes(cc.id))
-                    .map(cc => cc.name.trim().toLowerCase());
-
                 const filterValue = (cenarioType: 'Real' | 'Budget' | 'Forecast' | 'Prévia', year: number) => {
-                    const matches = financialData.filter(d => 
+                    const matches = financialData.filter(d =>
                         parseInt(d.ano) === year &&
                         parseInt(d.mes) === localMonth &&
                         d.conta.trim().toLowerCase() === acc.name.trim().toLowerCase() &&
@@ -234,6 +380,7 @@ const GMDView: React.FC<GMDViewProps> = ({
                     id: acc.id,
                     name: acc.name,
                     code: acc.code,
+                    package: acc.package || pkgName,
                     meta: budget,
                     forecast: forecast,
                     previa: previa,
@@ -243,114 +390,108 @@ const GMDView: React.FC<GMDViewProps> = ({
                 };
             }).filter(Boolean) as any[];
 
-            if (linkedAccountsData.length === 0) return;
-
-            const totalMeta = linkedAccountsData.reduce((s, a) => s + (a.meta || 0), 0);
-            const totalForecast = linkedAccountsData.reduce((s, a) => s + (a.forecast || 0), 0);
-            const totalPrevia = linkedAccountsData.reduce((s, a) => s + (a.previa || 0), 0);
-
-            let groupKey = pkgName;
-            let displayName = pkgName;
-            let isTIGroup = false;
-
-            if (config.subArea) {
-                if (pkgName === 'DESPESAS ADMINISTRATIVAS') {
-                    groupKey = 'Processamento de dados e TI';
-                    displayName = `Processamento de dados e TI (${config.subArea})`;
-                    isTIGroup = true;
-                } else if (pkgName === 'DESPESAS COM VENDAS E MARKETING') {
-                    displayName = `${config.subArea}`;
-                } else {
-                    displayName = `${pkgName} (${config.subArea})`;
-                }
-            }
-
-            const row = {
-                configId: config.id,
-                packageName: displayName,
-                originalPackageName: pkgName,
-                subArea: config.subArea,
-                packageManagerName: pkgManager?.name || 'Não Definido',
-                accountManagerName: accManager?.name || 'Não Definido',
-                accounts: linkedAccountsData,
-                totalMeta,
-                totalForecast,
-                totalPrevia,
-                deltaVal: totalForecast - totalPrevia,
-                deltaPct: totalPrevia === 0 ? 0 : ((totalForecast - totalPrevia) / totalPrevia) * 100
-            };
-
-            if (!groupedData.has(groupKey)) {
-                groupedData.set(groupKey, {
-                    isMaster: true,
-                    name: groupKey,
-                    totalMeta: 0,
-                    totalForecast: 0,
-                    totalPrevia: 0,
-                    children: []
-                });
-            }
-            
-            const group = groupedData.get(groupKey);
-            group.totalMeta += totalMeta;
-            group.totalForecast += totalForecast;
-            group.totalPrevia += totalPrevia;
-            group.children.push(row);
+            allAccountsData = allAccountsData.concat(linkedAccountsData);
         });
-    });
 
-    // Flatten for rendering
-    const flattened: any[] = [];
-    groupedData.forEach(group => {
-        // Calculate group deltas
-        group.deltaVal = group.totalForecast - group.totalPrevia;
-        group.deltaPct = group.totalPrevia === 0 ? 0 : (group.deltaVal / group.totalPrevia) * 100;
+        if (allAccountsData.length === 0) return;
 
-        const needsHierarchy = group.name === 'DESPESAS ADMINISTRATIVAS' || 
-                               group.name === 'DESPESAS COM VENDAS E MARKETING' ||
-                               group.name === 'Processamento de dados e TI';
-        
-        if (needsHierarchy) {
-            flattened.push({
-                ...group,
-                id: `master-${group.name}`,
-                isMasterHeader: true,
-                packageName: group.name,
-            });
-            group.children.forEach((child: any) => {
+        const totalMeta = allAccountsData.reduce((s, a) => s + (a.meta || 0), 0);
+        const totalForecast = allAccountsData.reduce((s, a) => s + (a.forecast || 0), 0);
+        const totalPrevia = allAccountsData.reduce((s, a) => s + (a.previa || 0), 0);
+        const masterDeltaVal = totalForecast - totalPrevia;
+        const masterDeltaPct = totalPrevia === 0 ? 0 : (masterDeltaVal / totalPrevia) * 100;
+        const anyConfigId = configsForPkg[0]?.id;
+
+        // Master Header row — sempre aparece, com o total do master. Guarda `accounts` (conta a
+        // conta) só pra alimentar a geração de Justification — a UI não lista conta contábil.
+        flattened.push({
+            id: `master-${pkgName}`,
+            configId: anyConfigId,
+            isMasterHeader: true,
+            packageName: pkgName,
+            totalMeta, totalForecast, totalPrevia,
+            deltaVal: masterDeltaVal,
+            deltaPct: masterDeltaPct,
+            accounts: allAccountsData,
+        });
+
+        const segmentDefs = SEGMENTED_MASTERS[pkgName];
+        if (segmentDefs) {
+            // Masters com segmentação informativa (Despesas Administrativas / Vendas e Marketing):
+            // filhos são as linhas de segmentação (Tech HUB TI/Marketing/Martech, ou Marketing/Martech),
+            // mais "Outros" calculado — nunca a lista de pacotes ou de contas.
+            let sumSegments = 0;
+            segmentDefs.forEach(seg => {
+                const val = getSegmentValue(seg.key);
+                sumSegments += val;
                 flattened.push({
-                    ...child,
-                    isSubPackage: true,
-                    indentLevel: 1
+                    id: `seg-${pkgName}-${seg.key}`,
+                    isSegmentRow: true,
+                    indentLevel: 1,
+                    segmentKey: seg.key,
+                    packageName: seg.label,
+                    totalMeta: val,
                 });
+            });
+            flattened.push({
+                id: `seg-${pkgName}-outros`,
+                isSegmentRow: true,
+                indentLevel: 1,
+                segmentKey: null,
+                packageName: 'Outros',
+                totalMeta: totalMeta - sumSegments,
             });
         } else {
-            // Standard behavior: show children as top-level if no breakdown needed
-            group.children.forEach((child: any) => {
+            // Masters "normais": agrupa as contas por Pacote da DRE Forecast (sem listar conta a
+            // conta) — genérico pra qualquer master.
+            const byPackage = new Map<string, any[]>();
+            allAccountsData.forEach(a => {
+                const key = a.package || pkgName;
+                if (!byPackage.has(key)) byPackage.set(key, []);
+                byPackage.get(key)!.push(a);
+            });
+            byPackage.forEach((accs, pkgLabel) => {
+                const pMeta = accs.reduce((s, a) => s + (a.meta || 0), 0);
+                const pForecast = accs.reduce((s, a) => s + (a.forecast || 0), 0);
+                const pPrevia = accs.reduce((s, a) => s + (a.previa || 0), 0);
                 flattened.push({
-                    ...child,
-                    indentLevel: 0
+                    id: `pkg-${pkgName}-${pkgLabel}`,
+                    isSubPackage: true,
+                    indentLevel: 1,
+                    packageName: pkgLabel,
+                    totalMeta: pMeta,
+                    totalForecast: pForecast,
+                    totalPrevia: pPrevia,
+                    deltaVal: pForecast - pPrevia,
+                    deltaPct: pPrevia === 0 ? 0 : ((pForecast - pPrevia) / pPrevia) * 100,
                 });
             });
         }
     });
 
     return flattened;
-  }, [gmdConfigs, currentHotel, masterPackages, accounts, users, financialData, localMonth, selectedYear, hotels, costCenters]);
+  }, [gmdConfigs, currentHotel, masterPackages, accounts, users, financialData, localMonth, selectedYear, hotels, costCenters, gmdSegments, pendingSegmentEdits]);
+
+  // Id determinístico por hotel+versão+ano+mês+conta — assim, ao progredir de estágio dentro da
+  // MESMA versão (mesmo activeRealVersionId), a linha é a MESMA no banco: status/plano continuam.
+  const slugify = (s: string) => (s || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const buildJustificationId = (accId: string) =>
+      `${slugify(currentHotel)}__${slugify(activeRealVersionId || '')}__${selectedYear}__${localMonth}__${slugify(accId)}`;
 
   // --- EFFECT: POPULATE JUSTIFICATIONS ---
   React.useEffect(() => {
     setJustifications(prev => {
         const newDeviations: Justification[] = [];
-        
+
         reportData.forEach(pkg => {
             pkg.accounts?.forEach((acc: any) => {
                 // Threshold for creating justification (Example: > 100 R$ deviation)
-                if (acc.deltaVal > 100) { 
-                    const existing = prev.find(j => j.accountId === acc.id && j.month === localMonth && j.year === selectedYear);
+                if (acc.deltaVal > 100) {
+                    const id = buildJustificationId(acc.id);
+                    const existing = prev.find(j => j.id === id);
                     if (!existing) {
-                        newDeviations.push({
-                            id: `just-${selectedYear}-${localMonth}-${acc.id}`,
+                        const newJust: Justification = {
+                            id,
                             gmdConfigId: pkg.configId,
                             accountId: acc.id,
                             accountName: acc.name,
@@ -363,7 +504,9 @@ const GMDView: React.FC<GMDViewProps> = ({
                             deltaPct: acc.deltaPct,
                             explanation: '',
                             status: 'Pendentes'
-                        });
+                        };
+                        newDeviations.push(newJust);
+                        persistJustification(newJust);
                     }
                 }
             });
@@ -372,14 +515,10 @@ const GMDView: React.FC<GMDViewProps> = ({
         if (newDeviations.length === 0) return prev;
         return [...prev, ...newDeviations];
     });
-  }, [reportData, localMonth, selectedYear]);
+  }, [reportData, localMonth, selectedYear, currentHotel, activeRealVersionId]);
 
 
   // --- HANDLERS ---
-  const togglePackage = (id: string) => {
-      setExpandedPackages(prev => prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]);
-  };
-
   const openJustificationModal = (just: Justification) => {
       setSelectedJustification(just);
       setJustificationText(just.explanation || '');
@@ -404,10 +543,17 @@ const GMDView: React.FC<GMDViewProps> = ({
       setAssignedAreaManagerId('');
   };
 
+  const updateAndPersist = (id: string, updater: (j: Justification) => Justification) => {
+      setJustifications(prev => prev.map(j => {
+          if (j.id !== id) return j;
+          const updated = updater(j);
+          persistJustification(updated);
+          return updated;
+      }));
+  };
+
   const handleJustificationSubmit = (id: string) => {
-      setJustifications(prev => prev.map(j => 
-          j.id === id ? { ...j, explanation: justificationText, status: 'Em andamento' } : j
-      ));
+      updateAndPersist(id, j => ({ ...j, explanation: justificationText, status: 'Em andamento' }));
       closeJustificationModal();
   };
 
@@ -416,40 +562,34 @@ const GMDView: React.FC<GMDViewProps> = ({
            alert("Por favor, preencha as datas de início, fim e apresentação.");
            return;
        }
-       setJustifications(prev => prev.map(j => 
-          j.id === id ? { 
-              ...j, 
-              actionPlan: actionPlanText, 
+       updateAndPersist(id, j => ({
+              ...j,
+              actionPlan: actionPlanText,
               actionPlanStartDate: planStartDate,
               actionPlanEndDate: planEndDate,
               actionPlanPresentationDate: planPresentationDate,
               assignedAreaManagerId: assignedAreaManagerId,
               status: newStatus
-          } : j
-      ));
+       }));
       closeJustificationModal();
   };
 
   const handleCompletePlan = (id: string) => {
-      setJustifications(prev => prev.map(j => 
-        j.id === id ? {
+      updateAndPersist(id, j => ({
             ...j,
             status: 'Concluído',
             recoveredValue: parseFloat(recoveredValue.replace(',', '.') || '0'),
             completionObservation: completionObs
-        } : j
-      ));
+      }));
       closeJustificationModal();
   };
 
   const handleUpdateExecution = (id: string) => {
-      setJustifications(prev => prev.map(j => 
-        j.id === id ? {
+      updateAndPersist(id, j => ({
             ...j,
             recoveredValue: parseFloat(recoveredValue.replace(',', '.') || '0'),
             completionObservation: completionObs
-        } : j
-      ));
+      }));
       alert("Progresso salvo com sucesso!");
       closeJustificationModal();
   };
@@ -529,6 +669,24 @@ const GMDView: React.FC<GMDViewProps> = ({
           </div>
 
           <div className="flex items-center gap-4">
+              {/* Version Filter */}
+              {setActiveProjectionType && (
+                  <div className="flex items-center bg-gray-100 p-1 rounded-lg">
+                      {PROJECTION_TYPE_OPTIONS.map(opt => (
+                          <button
+                              key={opt.value}
+                              onClick={() => setActiveProjectionType(opt.value)}
+                              className={`px-3 py-1 text-xs font-bold rounded-md transition-all whitespace-nowrap ${activeProjectionType === opt.value
+                                  ? 'bg-white text-indigo-600 shadow-sm border border-gray-200'
+                                  : 'text-gray-500 hover:text-gray-700'
+                              }`}
+                          >
+                              {opt.label}
+                          </button>
+                      ))}
+                  </div>
+              )}
+
               {/* Month Filter */}
               <div className="flex items-center bg-white px-3 py-1.5 rounded-lg border border-gray-300 shadow-sm">
                 <Calendar className="text-gray-400 mr-2" size={16} />
@@ -600,72 +758,42 @@ const GMDView: React.FC<GMDViewProps> = ({
                     </thead>
                     <tbody>
                         {reportData.map((pkg, idx) => {
-                            const isExpanded = expandedPackages.includes(pkg.configId || pkg.id);
                             const rowColor = pkg.deltaVal > 0 ? 'text-red-600' : 'text-emerald-600';
-                            
+
                             // Styling based on row type
                             const isMaster = pkg.isMasterHeader;
                             const isSub = pkg.isSubPackage;
-                            
-                            const bgClass = isMaster ? 'bg-indigo-50/50 hover:bg-indigo-100/50' : 
-                                           isSub ? 'bg-gray-50 hover:bg-gray-100 border-l-4 border-l-indigo-300' : 
+                            const isSeg = pkg.isSegmentRow;
+
+                            const bgClass = isMaster ? 'bg-indigo-50/50' :
+                                           (isSub || isSeg) ? 'bg-gray-50 hover:bg-gray-100 border-l-4 border-l-indigo-300' :
                                            'bg-gray-50 hover:bg-gray-100';
-                            
+
                             const textClass = isMaster ? 'font-black text-indigo-900' : 'font-bold text-gray-800';
-                            const indentClass = isSub ? 'pl-8' : isMaster ? 'pl-4' : 'pl-4';
+                            const indentClass = (isSub || isSeg) ? 'pl-8' : 'pl-4';
 
                             return (
-                                <React.Fragment key={pkg.configId || pkg.id || `row-${idx}`}>
-                                    {/* Header Row (Master or Package) */}
-                                    <tr 
-                                        className={`border-b border-gray-200 transition-colors cursor-pointer ${bgClass}`} 
-                                        onClick={() => togglePackage(pkg.configId || pkg.id)}
-                                    >
-                                        <td className={`px-4 py-3 flex items-center gap-2 ${indentClass} ${textClass}`}>
-                                            {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                                            <div>
-                                                <div className="uppercase tracking-tight">{pkg.packageName}</div>
-                                                {!isMaster && (
-                                                    <div className="text-[10px] text-gray-500 font-normal mt-0.5">
-                                                        Gestor: {pkg.packageManagerName} | Área: {pkg.accountManagerName}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </td>
-                                        
-                                        <td className="px-2 py-3 text-right font-medium text-gray-600 bg-gray-50/50">{formatCurrency(pkg.totalMeta)}</td>
-                                        <td className="px-2 py-3 text-right font-medium text-blue-700 bg-blue-50/20">{formatCurrency(pkg.totalForecast)}</td>
-                                        <td className="px-2 py-3 text-right font-bold text-gray-900 bg-blue-50/40">{formatCurrency(pkg.totalPrevia)}</td>
-                                        
-                                        <td className={`px-2 py-3 text-right font-bold ${rowColor}`}>{formatCurrency(pkg.deltaVal)}</td>
-                                        <td className={`px-2 py-3 text-right font-bold border-r border-gray-200 ${rowColor}`}>{formatPercent(pkg.deltaPct)}</td>
-                                    </tr>
+                                <tr key={pkg.id || `row-${idx}`} className={`border-b border-gray-200 transition-colors ${bgClass}`}>
+                                    <td className={`px-4 py-3 ${indentClass} ${textClass}`}>
+                                        <div className={isMaster ? 'uppercase tracking-tight' : ''}>{pkg.packageName}</div>
+                                    </td>
 
-                                    {/* Linked Accounts Rows (Only for sub-packages or non-hierarchical packages) */}
-                                    {isExpanded && pkg.accounts && pkg.accounts.map((acc: any) => {
-                                        const accColor = acc.deltaVal > 0 ? 'text-red-600' : 'text-emerald-600';
-                                        return (
-                                            <tr key={acc.id} className="border-b border-gray-100 bg-white hover:bg-gray-50">
-                                                <td className={`px-4 py-2 ${isSub ? 'pl-16' : 'pl-12'} flex flex-col justify-center`}>
-                                                    <span className="text-gray-700 font-medium">{acc.name}</span>
-                                                    <span className="text-[9px] text-gray-400 font-mono">{acc.code}</span>
-                                                </td>
-                                                
-                                                <td className="px-2 py-2 text-right text-gray-500">{formatCurrency(acc.meta)}</td>
-                                                <td className="px-2 py-2 text-right text-blue-600 bg-blue-50/10">{formatCurrency(acc.forecast)}</td>
-                                                <td className="px-2 py-2 text-right font-medium bg-blue-50/20">{formatCurrency(acc.previa)}</td>
-                                                
-                                                <td className={`px-2 py-2 text-right font-medium ${accColor}`}>{formatCurrency(acc.deltaVal)}</td>
-                                                <td className={`px-2 py-2 text-right text-[10px] border-r border-gray-200 ${accColor}`}>{formatPercent(acc.deltaPct)}</td>
-                                            </tr>
-                                        );
-                                    })}
-                                    
-                                    {/* Empty State for Package */}
-                                    {isExpanded && pkg.accounts && pkg.accounts.length === 0 && !isMaster && (
-                                        <tr><td colSpan={6} className="px-4 py-3 text-center text-gray-400 italic text-xs">Nenhuma conta vinculada a este pacote neste hotel.</td></tr>
-                                    )}
-                                </React.Fragment>
+                                    <td className="px-2 py-3 text-right font-medium text-gray-600 bg-gray-50/50">
+                                        {isSeg && pkg.segmentKey ? (
+                                            <input
+                                                type="number"
+                                                defaultValue={pkg.totalMeta || ''}
+                                                onBlur={(e) => handleSegmentEdit(pkg.segmentKey, parseFloat(e.target.value.replace(',', '.')) || 0)}
+                                                className="w-24 text-right bg-white border border-gray-300 rounded px-1 py-0.5 text-xs font-medium text-gray-700 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                                            />
+                                        ) : formatCurrency(pkg.totalMeta)}
+                                    </td>
+                                    <td className="px-2 py-3 text-right font-medium text-blue-700 bg-blue-50/20">{isSeg ? '-' : formatCurrency(pkg.totalForecast)}</td>
+                                    <td className="px-2 py-3 text-right font-bold text-gray-900 bg-blue-50/40">{isSeg ? '-' : formatCurrency(pkg.totalPrevia)}</td>
+
+                                    <td className={`px-2 py-3 text-right font-bold ${isSeg ? 'text-gray-400' : rowColor}`}>{isSeg ? '-' : formatCurrency(pkg.deltaVal)}</td>
+                                    <td className={`px-2 py-3 text-right font-bold border-r border-gray-200 ${isSeg ? 'text-gray-400' : rowColor}`}>{isSeg ? '-' : formatPercent(pkg.deltaPct)}</td>
+                                </tr>
                             );
                         })}
                     </tbody>

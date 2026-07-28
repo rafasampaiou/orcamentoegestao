@@ -874,6 +874,19 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   // Table-based import data (rowLabel -> monthIndex 1-12 -> string value)
   const [dreForecastData, setDreForecastData] = useState<Record<string, Record<number, string>>>({});
   const [dreBudgetData, setDreBudgetData] = useState<Record<string, Record<number, string>>>({});
+  // Segmentação informativa pra Metas GMD (Tech HUB TI/Marketing/Martech dentro de Despesas
+  // Administrativas; Marketing/Martech dentro de Despesas com Vendas e Marketing) — não altera
+  // financial_data, só alimenta a tela de Metas GMD. Mesmo formato de dreBudgetData.
+  const GMD_SEGMENT_ROWS = ['Tech HUB (TI)', 'Tech HUB (Marketing)', 'Tech HUB (Martech)', 'Marketing', 'Martech'];
+  const GMD_SEGMENT_KEYS: Record<string, string> = {
+    'Tech HUB (TI)': 'admin_ti',
+    'Tech HUB (Marketing)': 'admin_marketing',
+    'Tech HUB (Martech)': 'admin_martech',
+    'Marketing': 'vendas_marketing',
+    'Martech': 'vendas_martech',
+  };
+  const [gmdSegmentData, setGmdSegmentData] = useState<Record<string, Record<number, string>>>({});
+  const [isSavingGmdSegments, setIsSavingGmdSegments] = useState(false);
   const [taxesImportData, setTaxesImportData] = useState<Record<string, Record<number, string>>>({});
   const [taxesBudgetData, setTaxesBudgetData] = useState<Record<string, Record<number, string>>>({});
   const [occupancyImportData, setOccupancyImportData] = useState<Record<string, Record<number, string>>>({});
@@ -3173,6 +3186,41 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     }
   };
 
+  // Salva a segmentação informativa (Tech HUB TI/Marketing/Martech, Marketing/Martech de Vendas)
+  // pra Metas GMD — tabela própria (gmd_expense_segments), nunca toca financial_data.
+  const handleSaveGmdSegments = async () => {
+    if (!budgetImportHotelId) return alert('Selecione um hotel');
+    const versionId = targetBudgetVersionId || activeBudgetVersionId;
+    const version = budgetVersions.find(v => v.id === versionId);
+    if (!version) return alert('Selecione uma versão de orçamento');
+    const hotelName = hotels.find(h => h.id === budgetImportHotelId)?.name || '';
+
+    const rows: { hotel: string; year: number; month: number; versionId: string | null; segmentKey: string; value: number }[] = [];
+    Object.entries(gmdSegmentData).forEach(([rowLabel, months]) => {
+      const segmentKey = GMD_SEGMENT_KEYS[rowLabel];
+      if (!segmentKey) return;
+      Object.entries(months).forEach(([month, value]) => {
+        if (value === undefined || value === '') return;
+        const numVal = parseFinanceValue(value);
+        if (isNaN(numVal)) return;
+        rows.push({ hotel: hotelName, year: version.year, month: parseInt(month, 10), versionId, segmentKey, value: numVal });
+      });
+    });
+
+    if (rows.length === 0) return alert('Preencha ao menos um valor na tabela de segmentação.');
+
+    setIsSavingGmdSegments(true);
+    try {
+      await supabaseService.upsertGmdExpenseSegments(rows);
+      toast.success('Segmentação para Metas GMD salva com sucesso!');
+    } catch (e: any) {
+      console.error('Erro ao salvar segmentação GMD:', e);
+      alert('Erro ao salvar segmentação: ' + (e?.message || 'Erro desconhecido'));
+    } finally {
+      setIsSavingGmdSegments(false);
+    }
+  };
+
   const handleClearTaxes = async () => {
     if (await confirmAction('Tem certeza que deseja limpar a tabela de impostos?')) {
       setTaxesImportData({});
@@ -4811,6 +4859,42 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               setDreBudgetData(newData);
             }}
           />
+
+          <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-4">
+            <div>
+              <p className="text-sm font-bold text-gray-900">Segmentação para Metas GMD</p>
+              <p className="text-xs text-gray-500 mt-1">
+                Informativo — não altera os valores importados na tabela acima. Alimenta só a Meta segmentada em Metas GMD (Despesas Administrativas e Despesas com Vendas e Marketing).
+              </p>
+            </div>
+            <SpreadsheetTable
+              rows={GMD_SEGMENT_ROWS}
+              data={gmdSegmentData}
+              onCellChange={(row, month, val) => setGmdSegmentData(prev => ({ ...prev, [row]: { ...(prev[row] || {}), [month]: val } }))}
+              onPaste={(row, month, pasted) => {
+                const newData = { ...gmdSegmentData };
+                const startIdx = GMD_SEGMENT_ROWS.indexOf(row);
+                pasted.forEach((pRow, rOffset) => {
+                  const targetRow = GMD_SEGMENT_ROWS[startIdx + rOffset];
+                  if (targetRow) {
+                    if (!newData[targetRow]) newData[targetRow] = {};
+                    pRow.forEach((val, cOffset) => {
+                      const targetCol = month + cOffset;
+                      if (targetCol <= 12) newData[targetRow][targetCol] = val;
+                    });
+                  }
+                });
+                setGmdSegmentData(newData);
+              }}
+            />
+            <button
+              onClick={handleSaveGmdSegments}
+              disabled={isSavingGmdSegments || !budgetImportHotelId || !(targetBudgetVersionId || activeBudgetVersionId)}
+              className="bg-orange-600 text-white px-6 py-2 rounded-lg font-bold text-sm hover:bg-orange-700 shadow-lg shadow-orange-100 transition-all flex items-center gap-2 disabled:opacity-50"
+            >
+              {isSavingGmdSegments ? 'Salvando...' : <><Save size={16} /> Salvar Segmentação GMD</>}
+            </button>
+          </div>
         </div>
       )}
 

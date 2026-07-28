@@ -1206,7 +1206,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                     </div>
                 </div>
 
-                {isMeetingVersion && (
+                {isMeetingVersion && !!otbDaySaved && (
                     <div className="px-5 py-2 border-b border-gray-200 bg-gray-50/50 shrink-0">
                         <OtbProgressTimeline completed={otbProgress} onStepClick={handleOtbStepClick} onStepReset={handleOtbStepReset} title="Status da prévia" />
                     </div>

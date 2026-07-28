@@ -3,7 +3,7 @@ import { ForecastRow, ImportedRow, ProjectionType, ValidationRecord } from '../t
 export const OTB_STEP_LABELS = [
     'Escolher o dia final On the books',
     'Inserir a ocupação On the books',
-    'Inserir despesas do balancete',
+    'Inserir despesas do balancete por CR',
     'Inserir a ocupação e receita do Forecast',
     'Calcular Forecast',
     'Incluir despesas da prévia',

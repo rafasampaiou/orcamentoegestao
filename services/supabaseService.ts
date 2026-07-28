@@ -800,6 +800,83 @@ export const supabaseService = {
     if (error) throw error;
   },
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GMD EXPENSE SEGMENTS (Metas GMD) — segmentação informativa de Despesas
+  // Administrativas (Tech HUB TI/Marketing/Martech) e Despesas com Vendas e
+  // Marketing (Marketing/Martech), só pra Meta. Não altera financial_data.
+  // ═══════════════════════════════════════════════════════════════════════════
+  async getGmdExpenseSegments(): Promise<any[]> {
+    return fetchAllRows('gmd_expense_segments');
+  },
+
+  async upsertGmdExpenseSegments(rows: {
+    hotel: string; year: number; month: number; versionId: string | null;
+    segmentKey: string; value: number;
+  }[]): Promise<void> {
+    if (rows.length === 0) return;
+    const records = rows.map(r => ({
+      hotel: r.hotel,
+      year: r.year,
+      month: r.month,
+      version_id: r.versionId || '',
+      segment_key: r.segmentKey,
+      value: r.value,
+      updated_at: new Date().toISOString(),
+    }));
+    const { error } = await supabase
+      .from('gmd_expense_segments')
+      .upsert(records, { onConflict: 'hotel,year,month,version_id,segment_key' });
+    if (error) throw error;
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GMD JUSTIFICATIONS (Metas GMD) — planos de ação persistentes, amarrados a
+  // hotel/ano/mês/versão (antes ficavam só em memória e eram recriados do zero).
+  // ═══════════════════════════════════════════════════════════════════════════
+  async getGmdJustifications(): Promise<any[]> {
+    return fetchAllRows('gmd_justifications');
+  },
+
+  async upsertGmdJustification(j: {
+    id: string; hotel: string; year: number; month: number; versionId: string | null;
+    gmdConfigId?: string; accountId: string; accountName?: string;
+    meta?: number; forecast?: number; previa?: number; deltaR?: number; deltaPct?: number;
+    explanation?: string; status?: string; rejectionReason?: string;
+    actionPlan?: string; actionPlanStartDate?: string; actionPlanEndDate?: string; actionPlanPresentationDate?: string;
+    recoveredValue?: number; completionObservation?: string; assignedAreaManagerId?: string;
+  }): Promise<void> {
+    const record = {
+      id: j.id,
+      hotel: j.hotel,
+      year: j.year,
+      month: j.month,
+      version_id: j.versionId || '',
+      gmd_config_id: j.gmdConfigId || null,
+      account_id: j.accountId,
+      account_name: j.accountName || null,
+      meta: j.meta || 0,
+      forecast: j.forecast || 0,
+      previa: j.previa || 0,
+      delta_r: j.deltaR || 0,
+      delta_pct: j.deltaPct || 0,
+      explanation: j.explanation || null,
+      status: j.status || 'Pendentes',
+      rejection_reason: j.rejectionReason || null,
+      action_plan: j.actionPlan || null,
+      action_plan_start_date: j.actionPlanStartDate || null,
+      action_plan_end_date: j.actionPlanEndDate || null,
+      action_plan_presentation_date: j.actionPlanPresentationDate || null,
+      recovered_value: j.recoveredValue ?? null,
+      completion_observation: j.completionObservation || null,
+      assigned_area_manager_id: j.assignedAreaManagerId || null,
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = await supabase
+      .from('gmd_justifications')
+      .upsert(record, { onConflict: 'id' });
+    if (error) throw error;
+  },
+
   // Usado pelo "Resetar etapa" do balancete OTB — remove só os lançamentos daquele contexto
   // específico (hotel/ano/mês/versão/cenário), sem tocar no resto dos dados da versão.
   async deleteFinancialDataByContext(hotel: string, year: number, month: number, versionId: string, scenario: string): Promise<void> {
