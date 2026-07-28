@@ -1285,14 +1285,14 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     }));
   }, [accounts]);
 
-  // Pacotes (não Pacote Master) da DRE Forecast — usado na Responsabilidade do Gerente de
-  // Pacotes, que precisa da granularidade mais fina que o Plano de Contas já expõe.
+  // Pacotes Master — os mesmos que aparecem em Metas GMD — usado na Responsabilidade do Gerente
+  // de Pacotes; o gestor marcado aqui é quem aparece na coluna Gestor do GMD.
   const forecastPackages = useMemo(() => {
     const pkgs = new Map<string, string>(); // name -> code
     accounts.forEach(acc => {
-      if (acc.package) {
-        if (!pkgs.has(acc.package) || !pkgs.get(acc.package)) {
-          pkgs.set(acc.package, acc.packageCode || acc.package);
+      if (acc.masterPackage) {
+        if (!pkgs.has(acc.masterPackage) || !pkgs.get(acc.masterPackage)) {
+          pkgs.set(acc.masterPackage, acc.masterPackageCode || acc.masterPackage);
         }
       }
     });
@@ -6247,9 +6247,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 <div className="space-y-4 pt-2 border-t border-gray-100">
                   <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-widest">Responsabilidade do Gerente de Pacotes</h4>
 
-                  {/* Pacotes (mesma granularidade que aparece na DRE Forecast, não o Pacote Master) */}
+                  {/* Pacotes Master — os mesmos que aparecem em Metas GMD */}
                   <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Pacotes</label>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Pacotes Master</label>
                     <div className="p-3 border border-gray-200 rounded-xl bg-gray-50 max-h-40 overflow-y-auto space-y-2 custom-scrollbar">
                       {forecastPackages.map(pkg => (
                         <label key={pkg.name} className="flex items-center gap-2.5 text-xs font-medium text-gray-700 cursor-pointer hover:text-indigo-600">

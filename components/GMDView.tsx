@@ -284,13 +284,11 @@ const GMDView: React.FC<GMDViewProps> = ({
           }
       }
 
-      // Gerente de Pacotes: can resolve if any Pacote under this Pacote Master is under their
-      // responsibility — responsiblePackages guarda nomes de Pacote (granularidade da DRE
-      // Forecast), enquanto o config do GMD é atribuído por Pacote Master.
+      // Gerente de Pacotes: can resolve if this Pacote Master is under their responsibility —
+      // responsiblePackages guarda nomes de Pacote Master (mesma lista que aparece em Metas GMD).
       if (hasRole(currentUser, UserRole.PACKAGE_MANAGER)) {
           const pkg = masterPackages.find(p => p.id === config.packageId || p.name === config.packageId);
-          const subPackageNames = pkg ? Array.from(new Set(accounts.filter(a => a.masterPackage === pkg.name).map(a => a.package).filter(Boolean))) : [];
-          const isResponsibleForPkg = subPackageNames.some(name => currentUser.responsiblePackages?.includes(name as string));
+          const isResponsibleForPkg = !!pkg && currentUser.responsiblePackages?.includes(pkg.name);
           const isResponsibleForRev = currentUser.responsibleRevenues?.some(rev =>
               pkg?.name.toLowerCase().includes(rev.toLowerCase())
           );
@@ -427,9 +425,15 @@ const GMDView: React.FC<GMDViewProps> = ({
         const totalForecast = allAccountsData.reduce((s, a) => s + (a.forecast || 0), 0);
         const totalPrevia = allAccountsData.reduce((s, a) => s + (a.previa || 0), 0);
         const anyConfigId = configsForPkg[0]?.id;
-        // Gestor cadastrado do Pacote Master nesta unidade (config.packageManagerId, na GMD Config
-        // do hotel atual) — quando há mais de um config pro mesmo master, usa o primeiro.
-        const packageManagerName = users.find(u => u.id === configsForPkg[0]?.packageManagerId)?.name || '-';
+        // Gestor cadastrado do Pacote Master nesta unidade — usuário com perfil Gerente de
+        // Pacotes que tem esse Pacote Master em "Responsabilidade do Gerente de Pacotes" (Cadastro
+        // de Usuários) e está vinculado ao hotel atual.
+        const responsibleManager = users.find(u => {
+            if (!hasRole(u, UserRole.PACKAGE_MANAGER) || !u.responsiblePackages?.includes(pkgName)) return false;
+            const userHotelIds = u.hotelIds && u.hotelIds.length > 0 ? u.hotelIds : (u.hotelId ? [u.hotelId] : []);
+            return userHotelIds.includes(activeHotelObj?.id || '');
+        });
+        const packageManagerName = responsibleManager?.name || '-';
 
         const isAdminMaster = pkgName === 'DESPESAS ADMINISTRATIVAS';
         // No master Despesas Administrativas, o "Real" (Prévia) pode ser digitado manualmente
