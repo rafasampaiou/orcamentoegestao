@@ -5,16 +5,28 @@ import { VersionInfoBanner } from './VersionInfoBanner';
 import { supabaseService } from '../services/supabaseService';
 
 // Segmentação informativa de Despesas Administrativas e Despesas com Vendas e Marketing —
-// alimentada pela importação do Orçamento ou editada direto aqui; nunca altera financial_data.
+// alimentada pela importação de Despesas (Destino: Meta) ou editada direto aqui; nunca altera
+// financial_data.
 const ADMIN_SEGMENT_KEYS: { key: string; label: string }[] = [
     { key: 'admin_ti', label: 'Tech HUB (TI)' },
     { key: 'admin_marketing', label: 'Tech HUB (Marketing)' },
     { key: 'admin_martech', label: 'Tech HUB (Martech)' },
+    { key: 'admin_tech_outros', label: 'Tech HUB (Outros)' },
 ];
+// "Despesas administrativas gerais" é o que sobra do master depois de tirar os 4 itens acima —
+// calculado por padrão, mas também pode ser digitado manualmente (mesmo padrão dos demais).
+const ADMIN_GERAIS_KEY = 'admin_gerais';
+const ADMIN_GERAIS_LABEL = 'Despesas administrativas gerais';
+// Override manual do "Real" (coluna Prévia) do master Despesas Administrativas, digitado direto
+// em Metas GMD conforme a prévia é montada em cada estágio (Reunião de Ritmo, FCA N2, FCA N1,
+// Fechamento) — a Meta desse master continua vindo só da importação.
+const ADMIN_REAL_OVERRIDE_KEY = 'admin_real_override';
+
 const VENDAS_SEGMENT_KEYS: { key: string; label: string }[] = [
     { key: 'vendas_marketing', label: 'Marketing' },
     { key: 'vendas_martech', label: 'Martech' },
 ];
+const VENDAS_OUTROS_KEY = 'vendas_outros';
 const SEGMENTED_MASTERS: Record<string, { key: string; label: string }[]> = {
     'DESPESAS ADMINISTRATIVAS': ADMIN_SEGMENT_KEYS,
     'DESPESAS COM VENDAS E MARKETING': VENDAS_SEGMENT_KEYS,
@@ -106,15 +118,27 @@ const GMDView: React.FC<GMDViewProps> = ({
     supabaseService.getGmdExpenseSegments().then(setGmdSegments).catch(() => {});
   }, []);
 
+  // Chave de pendência/gravação: normalmente é só a versão real (mesmo valor em qualquer estágio),
+  // exceto o override manual do Real do master Despesas Administrativas, que varia por ESTÁGIO
+  // (Reunião de Ritmo, FCA N2, FCA N1, Fechamento) — aí a versão gravada inclui o estágio também.
+  const segmentVersionId = (segmentKey: string): string =>
+      segmentKey === ADMIN_REAL_OVERRIDE_KEY
+          ? `${activeRealVersionId || ''}__${activeProjectionType || ''}`
+          : (activeRealVersionId || '');
+  const pendingKey = (segmentKey: string) => `${segmentVersionId(segmentKey)}::${segmentKey}`;
+
   React.useEffect(() => {
     const keys = Object.keys(pendingSegmentEdits);
     if (keys.length === 0) return;
     const timeout = setTimeout(async () => {
         const hotelObj = hotels.find(h => h.name === currentHotel);
-        const rows = keys.map(k => ({
-            hotel: hotelObj?.name || currentHotel, year: selectedYear, month: localMonth,
-            versionId: activeRealVersionId || null, segmentKey: k, value: pendingSegmentEditsRef.current[k],
-        }));
+        const rows = keys.map(k => {
+            const sep = k.indexOf('::');
+            return {
+                hotel: hotelObj?.name || currentHotel, year: selectedYear, month: localMonth,
+                versionId: k.slice(0, sep) || null, segmentKey: k.slice(sep + 2), value: pendingSegmentEditsRef.current[k],
+            };
+        });
         try {
             await supabaseService.upsertGmdExpenseSegments(rows);
             setGmdSegments(prev => {
@@ -138,22 +162,25 @@ const GMDView: React.FC<GMDViewProps> = ({
         }
     }, 800);
     return () => clearTimeout(timeout);
-  }, [pendingSegmentEdits, currentHotel, selectedYear, localMonth, activeRealVersionId, hotels]);
+  }, [pendingSegmentEdits, currentHotel, selectedYear, localMonth, hotels]);
 
-  const getSegmentValue = (segmentKey: string): number => {
-    if (segmentKey in pendingSegmentEdits) return pendingSegmentEdits[segmentKey];
+  // Retorna null quando o valor nunca foi definido (nem manualmente, nem importado) — distinto de
+  // "definido como zero" — pra quem chama saber quando deve cair no cálculo padrão (fallback).
+  const getSegmentValue = (segmentKey: string): number | null => {
+    const pKey = pendingKey(segmentKey);
+    if (pKey in pendingSegmentEdits) return pendingSegmentEdits[pKey];
     const hotelObj = hotels.find(h => h.name === currentHotel);
-    const vid = activeRealVersionId || '';
+    const vid = segmentVersionId(segmentKey);
     const found = gmdSegments.find((s: any) =>
         (s.hotel === currentHotel || s.hotel === hotelObj?.name) &&
         s.year === selectedYear && s.month === localMonth &&
         (s.version_id || '') === vid && s.segment_key === segmentKey
     );
-    return found ? (parseFloat(found.value) || 0) : 0;
+    return found ? (parseFloat(found.value) || 0) : null;
   };
 
   const handleSegmentEdit = (segmentKey: string, value: number) => {
-    setPendingSegmentEdits(prev => ({ ...prev, [segmentKey]: value }));
+    setPendingSegmentEdits(prev => ({ ...prev, [pendingKey(segmentKey)]: value }));
   };
 
   // Justifications State — persistidas em gmd_justifications (services/supabaseService.ts),
@@ -398,9 +425,17 @@ const GMDView: React.FC<GMDViewProps> = ({
         const totalMeta = allAccountsData.reduce((s, a) => s + (a.meta || 0), 0);
         const totalForecast = allAccountsData.reduce((s, a) => s + (a.forecast || 0), 0);
         const totalPrevia = allAccountsData.reduce((s, a) => s + (a.previa || 0), 0);
-        const masterDeltaVal = totalForecast - totalPrevia;
-        const masterDeltaPct = totalPrevia === 0 ? 0 : (masterDeltaVal / totalPrevia) * 100;
         const anyConfigId = configsForPkg[0]?.id;
+
+        const isAdminMaster = pkgName === 'DESPESAS ADMINISTRATIVAS';
+        // No master Despesas Administrativas, o "Real" (Prévia) pode ser digitado manualmente
+        // enquanto a prévia é montada estágio a estágio — no estágio Realizado volta a ser o
+        // valor apurado normalmente.
+        const previaOverride = isAdminMaster && activeProjectionType !== 'Realizado'
+            ? getSegmentValue(ADMIN_REAL_OVERRIDE_KEY) : null;
+        const masterPrevia = previaOverride !== null ? previaOverride : totalPrevia;
+        const masterDeltaVal = totalForecast - masterPrevia;
+        const masterDeltaPct = masterPrevia === 0 ? 0 : (masterDeltaVal / masterPrevia) * 100;
 
         // Master Header row — sempre aparece, com o total do master. Guarda `accounts` (conta a
         // conta) só pra alimentar a geração de Justification — a UI não lista conta contábil.
@@ -409,20 +444,46 @@ const GMDView: React.FC<GMDViewProps> = ({
             configId: anyConfigId,
             isMasterHeader: true,
             packageName: pkgName,
-            totalMeta, totalForecast, totalPrevia,
+            totalMeta, totalForecast, totalPrevia: masterPrevia,
             deltaVal: masterDeltaVal,
             deltaPct: masterDeltaPct,
             accounts: allAccountsData,
+            previaEditable: isAdminMaster && activeProjectionType !== 'Realizado',
+            previaSegmentKey: ADMIN_REAL_OVERRIDE_KEY,
         });
 
         const segmentDefs = SEGMENTED_MASTERS[pkgName];
-        if (segmentDefs) {
-            // Masters com segmentação informativa (Despesas Administrativas / Vendas e Marketing):
-            // filhos são as linhas de segmentação (Tech HUB TI/Marketing/Martech, ou Marketing/Martech),
-            // mais "Outros" calculado — nunca a lista de pacotes ou de contas.
+        if (segmentDefs && isAdminMaster) {
+            // Despesas Administrativas: "gerais" é o que sobra do master depois dos 4 itens abaixo
+            // (Tech HUB TI/Marketing/Martech/Outros, todos digitados manualmente) — nunca lista de
+            // pacotes ou de contas.
+            let sumManual = 0;
+            segmentDefs.forEach(seg => { sumManual += getSegmentValue(seg.key) || 0; });
+            const geraisOverride = getSegmentValue(ADMIN_GERAIS_KEY);
+            flattened.push({
+                id: `seg-${pkgName}-gerais`,
+                isSegmentRow: true,
+                indentLevel: 1,
+                segmentKey: ADMIN_GERAIS_KEY,
+                packageName: ADMIN_GERAIS_LABEL,
+                totalMeta: geraisOverride !== null ? geraisOverride : (totalMeta - sumManual),
+            });
+            segmentDefs.forEach(seg => {
+                flattened.push({
+                    id: `seg-${pkgName}-${seg.key}`,
+                    isSegmentRow: true,
+                    indentLevel: 1,
+                    segmentKey: seg.key,
+                    packageName: seg.label,
+                    totalMeta: getSegmentValue(seg.key) || 0,
+                });
+            });
+        } else if (segmentDefs) {
+            // Despesas com Vendas e Marketing: filhos são Marketing/Martech (manuais) mais
+            // "Outros" — calculado por padrão, mas também pode ser digitado manualmente.
             let sumSegments = 0;
             segmentDefs.forEach(seg => {
-                const val = getSegmentValue(seg.key);
+                const val = getSegmentValue(seg.key) || 0;
                 sumSegments += val;
                 flattened.push({
                     id: `seg-${pkgName}-${seg.key}`,
@@ -433,13 +494,14 @@ const GMDView: React.FC<GMDViewProps> = ({
                     totalMeta: val,
                 });
             });
+            const outrosOverride = getSegmentValue(VENDAS_OUTROS_KEY);
             flattened.push({
                 id: `seg-${pkgName}-outros`,
                 isSegmentRow: true,
                 indentLevel: 1,
-                segmentKey: null,
+                segmentKey: VENDAS_OUTROS_KEY,
                 packageName: 'Outros',
-                totalMeta: totalMeta - sumSegments,
+                totalMeta: outrosOverride !== null ? outrosOverride : (totalMeta - sumSegments),
             });
         } else {
             // Masters "normais": agrupa as contas por Pacote da DRE Forecast (sem listar conta a
@@ -470,7 +532,7 @@ const GMDView: React.FC<GMDViewProps> = ({
     });
 
     return flattened;
-  }, [gmdConfigs, currentHotel, masterPackages, accounts, users, financialData, localMonth, selectedYear, hotels, costCenters, gmdSegments, pendingSegmentEdits]);
+  }, [gmdConfigs, currentHotel, masterPackages, accounts, users, financialData, localMonth, selectedYear, hotels, costCenters, gmdSegments, pendingSegmentEdits, activeRealVersionId, activeProjectionType]);
 
   // Id determinístico por hotel+versão+ano+mês+conta — assim, ao progredir de estágio dentro da
   // MESMA versão (mesmo activeRealVersionId), a linha é a MESMA no banco: status/plano continuam.
@@ -783,13 +845,29 @@ const GMDView: React.FC<GMDViewProps> = ({
                                             <input
                                                 type="number"
                                                 defaultValue={pkg.totalMeta || ''}
-                                                onBlur={(e) => handleSegmentEdit(pkg.segmentKey, parseFloat(e.target.value.replace(',', '.')) || 0)}
+                                                onBlur={(e) => {
+                                                    const parsed = parseFloat(e.target.value.replace(',', '.')) || 0;
+                                                    if (parsed !== pkg.totalMeta) handleSegmentEdit(pkg.segmentKey, parsed);
+                                                }}
                                                 className="w-24 text-right bg-white border border-gray-300 rounded px-1 py-0.5 text-xs font-medium text-gray-700 focus:outline-none focus:ring-1 focus:ring-indigo-400"
                                             />
                                         ) : formatCurrency(pkg.totalMeta)}
                                     </td>
                                     <td className="px-2 py-3 text-right font-medium text-blue-700 bg-blue-50/20">{isSeg ? '-' : formatCurrency(pkg.totalForecast)}</td>
-                                    <td className="px-2 py-3 text-right font-bold text-gray-900 bg-blue-50/40">{isSeg ? '-' : formatCurrency(pkg.totalPrevia)}</td>
+                                    <td className="px-2 py-3 text-right font-bold text-gray-900 bg-blue-50/40">
+                                        {pkg.previaEditable ? (
+                                            <input
+                                                type="number"
+                                                defaultValue={pkg.totalPrevia || ''}
+                                                onBlur={(e) => {
+                                                    const parsed = parseFloat(e.target.value.replace(',', '.')) || 0;
+                                                    if (parsed !== pkg.totalPrevia) handleSegmentEdit(pkg.previaSegmentKey, parsed);
+                                                }}
+                                                title="Digite o Real apurado nesta etapa da prévia"
+                                                className="w-24 text-right bg-white border border-gray-300 rounded px-1 py-0.5 text-xs font-bold text-gray-900 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                                            />
+                                        ) : (isSeg ? '-' : formatCurrency(pkg.totalPrevia))}
+                                    </td>
 
                                     <td className={`px-2 py-3 text-right font-bold ${isSeg ? 'text-gray-400' : rowColor}`}>{isSeg ? '-' : formatCurrency(pkg.deltaVal)}</td>
                                     <td className={`px-2 py-3 text-right font-bold border-r border-gray-200 ${isSeg ? 'text-gray-400' : rowColor}`}>{isSeg ? '-' : formatPercent(pkg.deltaPct)}</td>
