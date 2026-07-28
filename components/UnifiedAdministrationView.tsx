@@ -5990,40 +5990,58 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
           )}
           {activeGeralTab === 'import' && (
             <div className="space-y-6">
-              {/* Import Tabs */}
-              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 flex items-center justify-end">
-                <div className="flex items-center gap-3">
+              {/* Real x Orçamento */}
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center bg-white p-1 rounded-lg border border-gray-200 shadow-sm">
                   <button
-                    onClick={() => { setActiveImportTab('financial'); fetchImportHistory(); }}
-                    className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${activeImportTab === 'financial' || ['occupancy', 'revenue', 'taxes', 'expenses'].includes(activeImportTab) ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                    onClick={() => setImportScenario('REAL')}
+                    className={`px-4 py-1.5 text-xs font-black uppercase rounded-md transition-all ${importScenario === 'REAL' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                   >
-                    Despesas
+                    Real
                   </button>
                   <button
-                    onClick={() => { setActiveImportTab('revenueStandalone'); fetchImportHistory(); }}
-                    className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${activeImportTab === 'revenueStandalone' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                    onClick={() => setImportScenario('BUDGET')}
+                    className={`px-4 py-1.5 text-xs font-black uppercase rounded-md transition-all ${importScenario === 'BUDGET' ? 'bg-orange-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                   >
-                    Receitas
-                  </button>
-                  <button
-                    onClick={() => { setActiveImportTab('costCenters'); fetchImportHistory(); }}
-                    className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${activeImportTab === 'costCenters' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
-                  >
-                    Setores
-                  </button>
-                  <button
-                    onClick={() => { setActiveImportTab('accounts'); fetchImportHistory(); }}
-                    className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${activeImportTab === 'accounts' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
-                  >
-                    Contas
-                  </button>
-                  <button
-                    onClick={() => { setActiveImportTab('history'); fetchImportHistory(); }}
-                    className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${activeImportTab === 'history' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
-                  >
-                    Histórico
+                    Orçamento
                   </button>
                 </div>
+
+                {/* Import Tabs (só fazem sentido no cenário Real) */}
+                {importScenario === 'REAL' && (
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => { setActiveImportTab('financial'); fetchImportHistory(); }}
+                      className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${activeImportTab === 'financial' || ['occupancy', 'revenue', 'taxes', 'expenses'].includes(activeImportTab) ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                    >
+                      Despesas
+                    </button>
+                    <button
+                      onClick={() => { setActiveImportTab('revenueStandalone'); fetchImportHistory(); }}
+                      className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${activeImportTab === 'revenueStandalone' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                    >
+                      Receitas
+                    </button>
+                    <button
+                      onClick={() => { setActiveImportTab('costCenters'); fetchImportHistory(); }}
+                      className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${activeImportTab === 'costCenters' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                    >
+                      Setores
+                    </button>
+                    <button
+                      onClick={() => { setActiveImportTab('accounts'); fetchImportHistory(); }}
+                      className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${activeImportTab === 'accounts' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                    >
+                      Contas
+                    </button>
+                    <button
+                      onClick={() => { setActiveImportTab('history'); fetchImportHistory(); }}
+                      className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${activeImportTab === 'history' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                    >
+                      Histórico
+                    </button>
+                  </div>
+                )}
               </div>
 
               {importScenario === 'REAL' && activeImportTab !== 'costCenters' && activeImportTab !== 'accounts' && activeImportTab !== 'history' && (
