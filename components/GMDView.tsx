@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Network, Filter, AlertTriangle, CheckCircle, FileText, ClipboardList, ShieldCheck, ShieldAlert, Calendar, DollarSign, CheckSquare, Search, X, FileEdit, ExternalLink } from 'lucide-react';
+import { Network, Filter, AlertTriangle, CheckCircle, FileText, ClipboardList, ShieldCheck, ShieldAlert, Calendar, DollarSign, CheckSquare, Search, X, FileEdit, ExternalLink, ChevronDown, ChevronRight } from 'lucide-react';
 import { GMDConfiguration, Account, CostPackage, Hotel, ImportedRow, User, Justification, CostCenter, UserRole, hasRole, ProjectionType } from '../types';
 import { VersionInfoBanner } from './VersionInfoBanner';
 import { supabaseService } from '../services/supabaseService';
@@ -105,6 +105,13 @@ const GMDView: React.FC<GMDViewProps> = ({
   const [localMonth, setLocalMonth] = useState(selectedMonth);
 
   React.useEffect(() => { setLocalMonth(selectedMonth); }, [selectedMonth]);
+
+  // Masters com linhas de segmentação (Despesas Administrativas / Vendas e Marketing) — nomes
+  // aqui dentro escondem as linhas de Tech HUB/Marketing/Martech/Outros daquele master.
+  const [collapsedSegments, setCollapsedSegments] = useState<string[]>([]);
+  const toggleSegments = (pkgName: string) => {
+      setCollapsedSegments(prev => prev.includes(pkgName) ? prev.filter(p => p !== pkgName) : [...prev, pkgName]);
+  };
 
   // Segmentação de despesas (Tech HUB / Marketing / Martech) — vem da tabela de Despesas
   // importada (Destino: Meta) ou de edição manual direto aqui; guardada em gmd_expense_segments,
@@ -445,6 +452,8 @@ const GMDView: React.FC<GMDViewProps> = ({
         const masterDeltaVal = totalForecast - masterPrevia;
         const masterDeltaPct = masterPrevia === 0 ? 0 : (masterDeltaVal / masterPrevia) * 100;
 
+        const segmentDefs = SEGMENTED_MASTERS[pkgName];
+
         // Master Header row — sempre aparece, com o total do master. Guarda `accounts` (conta a
         // conta) só pra alimentar a geração de Justification — a UI não lista conta contábil.
         flattened.push({
@@ -459,9 +468,10 @@ const GMDView: React.FC<GMDViewProps> = ({
             accounts: allAccountsData,
             previaEditable: isAdminMaster && activeProjectionType !== 'Realizado',
             previaSegmentKey: ADMIN_REAL_OVERRIDE_KEY,
+            hasSegments: !!segmentDefs,
+            segmentGroupKey: pkgName,
         });
 
-        const segmentDefs = SEGMENTED_MASTERS[pkgName];
         if (segmentDefs && isAdminMaster) {
             // Despesas Administrativas: "gerais" é o que sobra do master depois dos 4 itens abaixo
             // (Tech HUB TI/Marketing/Martech/Outros, todos digitados manualmente) — nunca lista de
@@ -476,6 +486,7 @@ const GMDView: React.FC<GMDViewProps> = ({
                 segmentKey: ADMIN_GERAIS_KEY,
                 packageName: ADMIN_GERAIS_LABEL,
                 totalMeta: geraisOverride !== null ? geraisOverride : (totalMeta - sumManual),
+                parentMaster: pkgName,
             });
             segmentDefs.forEach(seg => {
                 flattened.push({
@@ -485,6 +496,7 @@ const GMDView: React.FC<GMDViewProps> = ({
                     segmentKey: seg.key,
                     packageName: seg.label,
                     totalMeta: getSegmentValue(seg.key) || 0,
+                    parentMaster: pkgName,
                 });
             });
         } else if (segmentDefs) {
@@ -501,6 +513,7 @@ const GMDView: React.FC<GMDViewProps> = ({
                     segmentKey: seg.key,
                     packageName: seg.label,
                     totalMeta: val,
+                    parentMaster: pkgName,
                 });
             });
             const outrosOverride = getSegmentValue(VENDAS_OUTROS_KEY);
@@ -511,6 +524,7 @@ const GMDView: React.FC<GMDViewProps> = ({
                 segmentKey: VENDAS_OUTROS_KEY,
                 packageName: 'Outros',
                 totalMeta: outrosOverride !== null ? outrosOverride : (totalMeta - sumSegments),
+                parentMaster: pkgName,
             });
         }
         // Masters "normais" (sem segmentação): só o header do master aparece, já pushado acima —
@@ -792,25 +806,28 @@ const GMDView: React.FC<GMDViewProps> = ({
         {/* --- TAB 1: MONITOR (FORECAST STYLE) --- */}
         {activeTab === 'monitor' && (
             <div className="inline-block max-w-full bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-                <table className="table-fixed text-sm">
+                <table className="table-fixed text-base">
                     <thead className="bg-emerald-800 text-white">
                         <tr>
-                            <th className="px-3 py-2.5 text-left font-bold uppercase tracking-wide text-xs w-36">Gestor</th>
-                            <th className="px-3 py-2.5 text-left font-bold uppercase tracking-wide text-xs w-56">Pacote</th>
-                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-xs w-28">Meta</th>
-                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-xs w-28">Forecast</th>
-                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-xs w-28">Prévia</th>
-                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-xs w-24">Desvio %</th>
-                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-xs w-28">Desvio R$</th>
+                            <th className="px-3 py-2.5 text-left font-bold uppercase tracking-wide text-sm w-72">Gestor</th>
+                            <th className="px-3 py-2.5 text-left font-bold uppercase tracking-wide text-sm w-64">Pacote</th>
+                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-sm w-28">Meta</th>
+                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-sm w-28">Forecast</th>
+                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-sm w-28">Prévia</th>
+                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-sm w-24">Desvio %</th>
+                            <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-sm w-28">Desvio R$</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                        {reportData.map((pkg, idx) => {
+                        {reportData
+                            .filter(pkg => !pkg.parentMaster || !collapsedSegments.includes(pkg.parentMaster))
+                            .map((pkg, idx) => {
                             const isSeg = pkg.isSegmentRow;
                             const deltaBg = isSeg ? '' : pkg.deltaVal > 0 ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600';
 
                             // Styling based on row type
                             const isMaster = pkg.isMasterHeader;
+                            const isCollapsed = pkg.hasSegments && collapsedSegments.includes(pkg.segmentGroupKey);
 
                             const bgClass = isMaster ? 'bg-slate-50' :
                                            isSeg ? 'bg-white border-l-4 border-l-indigo-200' :
@@ -823,7 +840,18 @@ const GMDView: React.FC<GMDViewProps> = ({
                                 <tr key={pkg.id || `row-${idx}`} className={`transition-colors hover:bg-slate-50 ${bgClass}`}>
                                     <td className="px-4 py-2 text-slate-500 font-medium">{isMaster ? pkg.packageManagerName : ''}</td>
                                     <td className={`px-4 py-2 ${indentClass} ${textClass}`}>
-                                        <div className={isMaster ? 'uppercase tracking-tight' : ''}>{pkg.packageName}</div>
+                                        <div className={`flex items-center gap-1.5 ${isMaster ? 'uppercase tracking-tight' : ''}`}>
+                                            {pkg.hasSegments && (
+                                                <button
+                                                    onClick={() => toggleSegments(pkg.segmentGroupKey)}
+                                                    className="text-slate-400 hover:text-slate-600 shrink-0"
+                                                    title={isCollapsed ? 'Mostrar segmentação' : 'Ocultar segmentação'}
+                                                >
+                                                    {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                                                </button>
+                                            )}
+                                            <span>{pkg.packageName}</span>
+                                        </div>
                                     </td>
 
                                     <td className="px-3 py-2 text-right font-medium text-slate-600 tabular-nums">
