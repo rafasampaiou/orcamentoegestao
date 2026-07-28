@@ -74,7 +74,6 @@ interface GMDViewProps {
     initialSelectedHotel: string;
     activeRealVersionName?: string;
     activeRealVersionId?: string;
-    activeBudgetVersionId?: string;
     activeProjectionType?: ProjectionType;
     setActiveProjectionType?: React.Dispatch<React.SetStateAction<ProjectionType>>;
     currentUser?: User;
@@ -87,7 +86,7 @@ const formatPercent = (val: number) => `${val.toFixed(1)}%`;
 const GMDView: React.FC<GMDViewProps> = ({
     gmdConfigs, accounts, packages, hotels, financialData, users, costCenters,
     selectedMonth, selectedYear, initialSelectedHotel, activeRealVersionName,
-    activeRealVersionId, activeBudgetVersionId, activeProjectionType, setActiveProjectionType, currentUser
+    activeRealVersionId, activeProjectionType, setActiveProjectionType, currentUser
 }) => {
   const [activeTab, setActiveTab] = useState<'monitor' | 'justifications'>('monitor');
   const [currentHotel, setCurrentHotel] = useState(initialSelectedHotel);
@@ -95,8 +94,9 @@ const GMDView: React.FC<GMDViewProps> = ({
 
   React.useEffect(() => { setLocalMonth(selectedMonth); }, [selectedMonth]);
 
-  // Segmentação de despesas (Tech HUB / Marketing / Martech) — vem do Orçamento importado ou de
-  // edição manual direto aqui; guardada em gmd_expense_segments, amarrada à versão de Orçamento.
+  // Segmentação de despesas (Tech HUB / Marketing / Martech) — vem da tabela de Despesas
+  // importada (Destino: Meta) ou de edição manual direto aqui; guardada em gmd_expense_segments,
+  // amarrada à mesma versão real usada pra importar a Meta.
   const [gmdSegments, setGmdSegments] = useState<any[]>([]);
   const [pendingSegmentEdits, setPendingSegmentEdits] = useState<Record<string, number>>({});
   const pendingSegmentEditsRef = React.useRef<Record<string, number>>({});
@@ -113,7 +113,7 @@ const GMDView: React.FC<GMDViewProps> = ({
         const hotelObj = hotels.find(h => h.name === currentHotel);
         const rows = keys.map(k => ({
             hotel: hotelObj?.name || currentHotel, year: selectedYear, month: localMonth,
-            versionId: activeBudgetVersionId || null, segmentKey: k, value: pendingSegmentEditsRef.current[k],
+            versionId: activeRealVersionId || null, segmentKey: k, value: pendingSegmentEditsRef.current[k],
         }));
         try {
             await supabaseService.upsertGmdExpenseSegments(rows);
@@ -138,12 +138,12 @@ const GMDView: React.FC<GMDViewProps> = ({
         }
     }, 800);
     return () => clearTimeout(timeout);
-  }, [pendingSegmentEdits, currentHotel, selectedYear, localMonth, activeBudgetVersionId, hotels]);
+  }, [pendingSegmentEdits, currentHotel, selectedYear, localMonth, activeRealVersionId, hotels]);
 
   const getSegmentValue = (segmentKey: string): number => {
     if (segmentKey in pendingSegmentEdits) return pendingSegmentEdits[segmentKey];
     const hotelObj = hotels.find(h => h.name === currentHotel);
-    const vid = activeBudgetVersionId || '';
+    const vid = activeRealVersionId || '';
     const found = gmdSegments.find((s: any) =>
         (s.hotel === currentHotel || s.hotel === hotelObj?.name) &&
         s.year === selectedYear && s.month === localMonth &&

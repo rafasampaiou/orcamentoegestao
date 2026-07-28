@@ -876,7 +876,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const [dreBudgetData, setDreBudgetData] = useState<Record<string, Record<number, string>>>({});
   // Segmentação informativa pra Metas GMD (Tech HUB TI/Marketing/Martech dentro de Despesas
   // Administrativas; Marketing/Martech dentro de Despesas com Vendas e Marketing) — não altera
-  // financial_data, só alimenta a tela de Metas GMD. Mesmo formato de dreBudgetData.
+  // financial_data, só alimenta a tela de Metas GMD. Fica embaixo da tabela de Despesas (Real),
+  // amarrada à mesma versão/destino escolhidos ali. Mesmo formato de dreForecastData.
   const GMD_SEGMENT_ROWS = ['Tech HUB (TI)', 'Tech HUB (Marketing)', 'Tech HUB (Martech)', 'Marketing', 'Martech'];
   const GMD_SEGMENT_KEYS: Record<string, string> = {
     'Tech HUB (TI)': 'admin_ti',
@@ -3189,11 +3190,11 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   // Salva a segmentação informativa (Tech HUB TI/Marketing/Martech, Marketing/Martech de Vendas)
   // pra Metas GMD — tabela própria (gmd_expense_segments), nunca toca financial_data.
   const handleSaveGmdSegments = async () => {
-    if (!budgetImportHotelId) return alert('Selecione um hotel');
-    const versionId = targetBudgetVersionId || activeBudgetVersionId;
-    const version = budgetVersions.find(v => v.id === versionId);
-    if (!version) return alert('Selecione uma versão de orçamento');
-    const hotelName = hotels.find(h => h.id === budgetImportHotelId)?.name || '';
+    if (!importHotelId) return alert('Selecione um hotel');
+    const versionId = targetRealVersionId || activeRealVersionId;
+    const version = realVersions.find(v => v.id === versionId);
+    if (!version) return alert('Selecione uma versão de destino');
+    const hotelName = hotels.find(h => h.id === importHotelId)?.name || '';
 
     const rows: { hotel: string; year: number; month: number; versionId: string | null; segmentKey: string; value: number }[] = [];
     Object.entries(gmdSegmentData).forEach(([rowLabel, months]) => {
@@ -4507,6 +4508,42 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                   </div>
                 </div>
               )}
+
+              <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-4">
+                <div>
+                  <p className="text-sm font-bold text-gray-900">Segmentação para Metas GMD</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Informativo — não altera os valores importados na tabela acima. Alimenta só a Meta segmentada em Metas GMD (Despesas Administrativas e Despesas com Vendas e Marketing).
+                  </p>
+                </div>
+                <SpreadsheetTable
+                  rows={GMD_SEGMENT_ROWS}
+                  data={gmdSegmentData}
+                  onCellChange={(row, month, val) => setGmdSegmentData(prev => ({ ...prev, [row]: { ...(prev[row] || {}), [month]: val } }))}
+                  onPaste={(row, month, pasted) => {
+                    const newData = { ...gmdSegmentData };
+                    const startIdx = GMD_SEGMENT_ROWS.indexOf(row);
+                    pasted.forEach((pRow, rOffset) => {
+                      const targetRow = GMD_SEGMENT_ROWS[startIdx + rOffset];
+                      if (targetRow) {
+                        if (!newData[targetRow]) newData[targetRow] = {};
+                        pRow.forEach((val, cOffset) => {
+                          const targetCol = month + cOffset;
+                          if (targetCol <= 12) newData[targetRow][targetCol] = val;
+                        });
+                      }
+                    });
+                    setGmdSegmentData(newData);
+                  }}
+                />
+                <button
+                  onClick={handleSaveGmdSegments}
+                  disabled={isSavingGmdSegments || !importHotelId || !(targetRealVersionId || activeRealVersionId)}
+                  className="bg-orange-600 text-white px-6 py-2 rounded-lg font-bold text-sm hover:bg-orange-700 shadow-lg shadow-orange-100 transition-all flex items-center gap-2 disabled:opacity-50"
+                >
+                  {isSavingGmdSegments ? 'Salvando...' : <><Save size={16} /> Salvar Segmentação GMD</>}
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -4859,42 +4896,6 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               setDreBudgetData(newData);
             }}
           />
-
-          <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-4">
-            <div>
-              <p className="text-sm font-bold text-gray-900">Segmentação para Metas GMD</p>
-              <p className="text-xs text-gray-500 mt-1">
-                Informativo — não altera os valores importados na tabela acima. Alimenta só a Meta segmentada em Metas GMD (Despesas Administrativas e Despesas com Vendas e Marketing).
-              </p>
-            </div>
-            <SpreadsheetTable
-              rows={GMD_SEGMENT_ROWS}
-              data={gmdSegmentData}
-              onCellChange={(row, month, val) => setGmdSegmentData(prev => ({ ...prev, [row]: { ...(prev[row] || {}), [month]: val } }))}
-              onPaste={(row, month, pasted) => {
-                const newData = { ...gmdSegmentData };
-                const startIdx = GMD_SEGMENT_ROWS.indexOf(row);
-                pasted.forEach((pRow, rOffset) => {
-                  const targetRow = GMD_SEGMENT_ROWS[startIdx + rOffset];
-                  if (targetRow) {
-                    if (!newData[targetRow]) newData[targetRow] = {};
-                    pRow.forEach((val, cOffset) => {
-                      const targetCol = month + cOffset;
-                      if (targetCol <= 12) newData[targetRow][targetCol] = val;
-                    });
-                  }
-                });
-                setGmdSegmentData(newData);
-              }}
-            />
-            <button
-              onClick={handleSaveGmdSegments}
-              disabled={isSavingGmdSegments || !budgetImportHotelId || !(targetBudgetVersionId || activeBudgetVersionId)}
-              className="bg-orange-600 text-white px-6 py-2 rounded-lg font-bold text-sm hover:bg-orange-700 shadow-lg shadow-orange-100 transition-all flex items-center gap-2 disabled:opacity-50"
-            >
-              {isSavingGmdSegments ? 'Salvando...' : <><Save size={16} /> Salvar Segmentação GMD</>}
-            </button>
-          </div>
         </div>
       )}
 
@@ -5990,58 +5991,40 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
           )}
           {activeGeralTab === 'import' && (
             <div className="space-y-6">
-              {/* Real x Orçamento */}
-              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 flex items-center justify-between gap-4 flex-wrap">
-                <div className="flex items-center bg-white p-1 rounded-lg border border-gray-200 shadow-sm">
+              {/* Import Tabs */}
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 flex items-center justify-end">
+                <div className="flex items-center gap-3">
                   <button
-                    onClick={() => setImportScenario('REAL')}
-                    className={`px-4 py-1.5 text-xs font-black uppercase rounded-md transition-all ${importScenario === 'REAL' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    onClick={() => { setActiveImportTab('financial'); fetchImportHistory(); }}
+                    className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${activeImportTab === 'financial' || ['occupancy', 'revenue', 'taxes', 'expenses'].includes(activeImportTab) ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
                   >
-                    Real
+                    Despesas
                   </button>
                   <button
-                    onClick={() => setImportScenario('BUDGET')}
-                    className={`px-4 py-1.5 text-xs font-black uppercase rounded-md transition-all ${importScenario === 'BUDGET' ? 'bg-orange-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    onClick={() => { setActiveImportTab('revenueStandalone'); fetchImportHistory(); }}
+                    className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${activeImportTab === 'revenueStandalone' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
                   >
-                    Orçamento
+                    Receitas
+                  </button>
+                  <button
+                    onClick={() => { setActiveImportTab('costCenters'); fetchImportHistory(); }}
+                    className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${activeImportTab === 'costCenters' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                  >
+                    Setores
+                  </button>
+                  <button
+                    onClick={() => { setActiveImportTab('accounts'); fetchImportHistory(); }}
+                    className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${activeImportTab === 'accounts' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                  >
+                    Contas
+                  </button>
+                  <button
+                    onClick={() => { setActiveImportTab('history'); fetchImportHistory(); }}
+                    className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${activeImportTab === 'history' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                  >
+                    Histórico
                   </button>
                 </div>
-
-                {/* Import Tabs (só fazem sentido no cenário Real) */}
-                {importScenario === 'REAL' && (
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => { setActiveImportTab('financial'); fetchImportHistory(); }}
-                      className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${activeImportTab === 'financial' || ['occupancy', 'revenue', 'taxes', 'expenses'].includes(activeImportTab) ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
-                    >
-                      Despesas
-                    </button>
-                    <button
-                      onClick={() => { setActiveImportTab('revenueStandalone'); fetchImportHistory(); }}
-                      className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${activeImportTab === 'revenueStandalone' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
-                    >
-                      Receitas
-                    </button>
-                    <button
-                      onClick={() => { setActiveImportTab('costCenters'); fetchImportHistory(); }}
-                      className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${activeImportTab === 'costCenters' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
-                    >
-                      Setores
-                    </button>
-                    <button
-                      onClick={() => { setActiveImportTab('accounts'); fetchImportHistory(); }}
-                      className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${activeImportTab === 'accounts' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
-                    >
-                      Contas
-                    </button>
-                    <button
-                      onClick={() => { setActiveImportTab('history'); fetchImportHistory(); }}
-                      className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${activeImportTab === 'history' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
-                    >
-                      Histórico
-                    </button>
-                  </div>
-                )}
               </div>
 
               {importScenario === 'REAL' && activeImportTab !== 'costCenters' && activeImportTab !== 'accounts' && activeImportTab !== 'history' && (

@@ -1276,7 +1276,6 @@ const App: React.FC = () => {
           initialSelectedHotel={selectedHotel}
           activeRealVersionName={activeRealVersionName}
           activeRealVersionId={activeRealVersionId}
-          activeBudgetVersionId={activeBudgetVersionId}
           activeProjectionType={activeProjectionType}
           setActiveProjectionType={setActiveProjectionType}
           currentUser={currentUser}
