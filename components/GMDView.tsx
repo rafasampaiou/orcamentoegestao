@@ -763,8 +763,8 @@ const GMDView: React.FC<GMDViewProps> = ({
                 <table className="table-fixed text-base">
                     <thead className="bg-emerald-800 text-white">
                         <tr>
-                            <th className="px-3 py-2.5 text-left font-bold uppercase tracking-wide text-sm w-72">Gestor</th>
-                            <th className="px-3 py-2.5 text-left font-bold uppercase tracking-wide text-sm w-64">Pacote</th>
+                            <th className="px-3 py-2.5 text-left font-bold uppercase tracking-wide text-sm w-56">Gestor</th>
+                            <th className="px-3 py-2.5 text-left font-bold uppercase tracking-wide text-sm w-96">Pacote</th>
                             <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-sm w-28">Meta</th>
                             <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-sm w-28">Forecast</th>
                             <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-sm w-28">Prévia</th>
@@ -792,8 +792,8 @@ const GMDView: React.FC<GMDViewProps> = ({
 
                             return (
                                 <tr key={pkg.id || `row-${idx}`} className={`transition-colors hover:bg-slate-50 ${bgClass}`}>
-                                    <td className="px-4 py-2 text-slate-500 font-medium">{isMaster ? pkg.packageManagerName : ''}</td>
-                                    <td className={`px-4 py-2 ${indentClass} ${textClass}`}>
+                                    <td className="px-4 py-2 text-slate-500 font-medium truncate">{isMaster ? pkg.packageManagerName : ''}</td>
+                                    <td className={`px-4 py-2 whitespace-nowrap ${indentClass} ${textClass}`}>
                                         <div className={`flex items-center gap-1.5 ${isMaster ? 'uppercase tracking-tight' : ''}`}>
                                             {pkg.hasSegments && (
                                                 <button
