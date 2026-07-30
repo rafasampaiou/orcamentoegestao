@@ -8,15 +8,9 @@ import { supabaseService } from '../services/supabaseService';
 // alimentada pela importação de Despesas (Destino: Meta) ou editada direto aqui; nunca altera
 // financial_data.
 const ADMIN_SEGMENT_KEYS: { key: string; label: string }[] = [
-    { key: 'admin_ti', label: 'Tech HUB (TI)' },
     { key: 'admin_marketing', label: 'Tech HUB (Marketing)' },
     { key: 'admin_martech', label: 'Tech HUB (Martech)' },
-    { key: 'admin_tech_outros', label: 'Tech HUB (Outros)' },
 ];
-// "Despesas administrativas gerais" é o que sobra do master depois de tirar os 4 itens acima —
-// calculado por padrão, mas também pode ser digitado manualmente (mesmo padrão dos demais).
-const ADMIN_GERAIS_KEY = 'admin_gerais';
-const ADMIN_GERAIS_LABEL = 'Despesas administrativas gerais';
 // Override manual do "Real" (coluna Prévia) do master Despesas Administrativas, digitado direto
 // em Metas GMD conforme a prévia é montada em cada estágio (Reunião de Ritmo, FCA N2, FCA N1,
 // Fechamento) — a Meta desse master continua vindo só da importação.
@@ -26,7 +20,6 @@ const VENDAS_SEGMENT_KEYS: { key: string; label: string }[] = [
     { key: 'vendas_marketing', label: 'Marketing' },
     { key: 'vendas_martech', label: 'Martech' },
 ];
-const VENDAS_OUTROS_KEY = 'vendas_outros';
 const SEGMENTED_MASTERS: Record<string, { key: string; label: string }[]> = {
     'DESPESAS ADMINISTRATIVAS': ADMIN_SEGMENT_KEYS,
     'DESPESAS COM VENDAS E MARKETING': VENDAS_SEGMENT_KEYS,
@@ -472,22 +465,10 @@ const GMDView: React.FC<GMDViewProps> = ({
             segmentGroupKey: pkgName,
         });
 
-        if (segmentDefs && isAdminMaster) {
-            // Despesas Administrativas: "gerais" é o que sobra do master depois dos 4 itens abaixo
-            // (Tech HUB TI/Marketing/Martech/Outros, todos digitados manualmente) — nunca lista de
+        if (segmentDefs) {
+            // Despesas Administrativas / Despesas com Vendas e Marketing: filhos são só as 2
+            // linhas manuais (Tech HUB Marketing/Martech, ou Marketing/Martech) — nunca lista de
             // pacotes ou de contas.
-            let sumManual = 0;
-            segmentDefs.forEach(seg => { sumManual += getSegmentValue(seg.key) || 0; });
-            const geraisOverride = getSegmentValue(ADMIN_GERAIS_KEY);
-            flattened.push({
-                id: `seg-${pkgName}-gerais`,
-                isSegmentRow: true,
-                indentLevel: 1,
-                segmentKey: ADMIN_GERAIS_KEY,
-                packageName: ADMIN_GERAIS_LABEL,
-                totalMeta: geraisOverride !== null ? geraisOverride : (totalMeta - sumManual),
-                parentMaster: pkgName,
-            });
             segmentDefs.forEach(seg => {
                 flattened.push({
                     id: `seg-${pkgName}-${seg.key}`,
@@ -498,33 +479,6 @@ const GMDView: React.FC<GMDViewProps> = ({
                     totalMeta: getSegmentValue(seg.key) || 0,
                     parentMaster: pkgName,
                 });
-            });
-        } else if (segmentDefs) {
-            // Despesas com Vendas e Marketing: filhos são Marketing/Martech (manuais) mais
-            // "Outros" — calculado por padrão, mas também pode ser digitado manualmente.
-            let sumSegments = 0;
-            segmentDefs.forEach(seg => {
-                const val = getSegmentValue(seg.key) || 0;
-                sumSegments += val;
-                flattened.push({
-                    id: `seg-${pkgName}-${seg.key}`,
-                    isSegmentRow: true,
-                    indentLevel: 1,
-                    segmentKey: seg.key,
-                    packageName: seg.label,
-                    totalMeta: val,
-                    parentMaster: pkgName,
-                });
-            });
-            const outrosOverride = getSegmentValue(VENDAS_OUTROS_KEY);
-            flattened.push({
-                id: `seg-${pkgName}-outros`,
-                isSegmentRow: true,
-                indentLevel: 1,
-                segmentKey: VENDAS_OUTROS_KEY,
-                packageName: 'Outros',
-                totalMeta: outrosOverride !== null ? outrosOverride : (totalMeta - sumSegments),
-                parentMaster: pkgName,
             });
         }
         // Masters "normais" (sem segmentação): só o header do master aparece, já pushado acima —
