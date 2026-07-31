@@ -763,6 +763,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
     // Timeline dos 8 passos de montagem da projeção — só faz sentido pras 3 versões de reunião.
     const [showBalanceteModal, setShowBalanceteModal] = useState(false);
+    // Resumo já salvo de uma importação anterior do balancete — quando presente, o modal abre
+    // direto na tela de resumo (Revisar) em vez de pedir upload de arquivo de novo.
+    const [balanceteReviewData, setBalanceteReviewData] = useState<any | null>(null);
     // Sinaliza (por alguns segundos) a linha de conta contábil por onde começar a preencher a
     // Prévia — usado pelo passo 6 do timeline pra apontar onde o usuário deve ir.
     const [highlightRowId, setHighlightRowId] = useState<string | null>(null);
@@ -798,7 +801,19 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         } else if (index === 1) {
             onNavigateToOccupancy?.(true);
         } else if (index === 2) {
-            setShowBalanceteModal(true);
+            // Etapa já concluída: busca o resumo salvo dessa importação pra abrir o modal direto
+            // na tela de "Revisar" — sem isso, precisaria reimportar o arquivo do zero só pra ver
+            // o resumo de novo.
+            if (otbProgress[2]) {
+                setBalanceteReviewData(null);
+                supabaseService.getBalanceteResumo(selectedHotel || '', selectedYear || 0, selectedMonth || 0, activeRealVersionId || '')
+                    .then(resumo => setBalanceteReviewData(resumo))
+                    .catch(() => setBalanceteReviewData(null))
+                    .finally(() => setShowBalanceteModal(true));
+            } else {
+                setBalanceteReviewData(null);
+                setShowBalanceteModal(true);
+            }
         } else if (index === 3) {
             onNavigateToOccupancy?.(false);
         } else if (index === 4) {
@@ -2484,6 +2499,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                         setRealOccupancyData={setRealOccupancyData}
                         onImportData={(rows, mode) => onImportData?.(rows, mode)}
                         onClose={() => setShowBalanceteModal(false)}
+                        initialParsed={balanceteReviewData}
                     />
                 )
             )}

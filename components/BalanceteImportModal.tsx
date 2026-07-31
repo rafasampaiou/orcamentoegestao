@@ -17,6 +17,9 @@ interface BalanceteImportModalProps {
     otbContextKey: string;
     setRealOccupancyData: React.Dispatch<React.SetStateAction<Record<string, Record<string, number>>>>;
     onClose: () => void;
+    // Resumo já persistido (import_history.resumo_balancete) de uma importação anterior — abre
+    // direto na tela de resumo (modo "Revisar"), sem pedir upload de arquivo de novo.
+    initialParsed?: ParsedBalancete | null;
 }
 
 // Códigos fixos do balancete que alimentam linhas específicas da DRE Forecast (coluna OTB),
@@ -154,11 +157,11 @@ const ForaDoEscopoCard: React.FC<{ name: string; total: number; items: DespesaRo
     );
 };
 
-const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, hotel, year, month, versionId, onImportData, otbContextKey, setRealOccupancyData, onClose }) => {
-    const [parsed, setParsed] = useState<ParsedBalancete | null>(null);
+const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, hotel, year, month, versionId, onImportData, otbContextKey, setRealOccupancyData, onClose, initialParsed }) => {
+    const [parsed, setParsed] = useState<ParsedBalancete | null>(initialParsed || null);
     const [fileName, setFileName] = useState('');
     const [isSaving, setIsSaving] = useState(false);
-    const [imported, setImported] = useState(false);
+    const [imported, setImported] = useState(!!initialParsed);
 
     const handleFile = async (file: File) => {
         setFileName(file.name);
@@ -336,6 +339,9 @@ const BalanceteImportModal: React.FC<BalanceteImportModalProps> = ({ accounts, h
                 version_id: versionId || null,
                 user_id: null,
                 valor_total: valorTotal,
+                // Guarda o resumo inteiro (totais, setores/contas fora do escopo) — sem isso não
+                // dava pra "Revisar" essa etapa depois sem reimportar o arquivo do zero.
+                resumo_balancete: parsed,
             }]);
             const importId = historyEntry.id;
 

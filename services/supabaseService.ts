@@ -1146,6 +1146,26 @@ export const supabaseService = {
     return data || [];
   },
 
+  // Resumo salvo pela importação do balancete por CR (BalanceteImportModal) — dá pra "Revisar"
+  // a etapa depois sem precisar reimportar o arquivo. Pega o mais recente pra esse contexto,
+  // já que reimportações antigas continuam no histórico.
+  async getBalanceteResumo(hotel: string, year: number, month: number, versionId: string): Promise<any | null> {
+    const monthName = new Date(2024, (month || 1) - 1).toLocaleString('pt-BR', { month: 'short' });
+    let query = supabase
+      .from('import_history')
+      .select('resumo_balancete')
+      .eq('hotel', hotel)
+      .eq('ano', year)
+      .eq('meses', monthName)
+      .not('resumo_balancete', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    query = versionId ? query.eq('version_id', versionId) : query.is('version_id', null);
+    const { data, error } = await query;
+    if (error) throw error;
+    return data && data.length > 0 ? data[0].resumo_balancete : null;
+  },
+
   // Usado ao reeditar uma importação já existente (ex.: Despesas) — atualiza os totais do
   // registro em vez de criar um novo, já que os dados de financial_data são substituídos
   // mantendo o mesmo import_id.
