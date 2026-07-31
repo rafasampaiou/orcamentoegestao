@@ -803,10 +803,12 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     const isMeetingVersionCompleted = isMeetingVersion && currentValidation?.status === 'Validado';
     const isLocked = ((isMonthClosed && isAlreadyValidated) || isMeetingVersionCompleted) && !forceUnlockValidated;
 
-    // "Calcular Forecast" só fica disponível a partir da etapa de mesmo nome — antes de escolher
-    // o dia final, inserir a ocupação/despesas On the books e a ocupação/receita do Forecast
-    // (etapas 1 a 4), ainda não há o que calcular.
-    const canClickCalcularForecast = !isMeetingVersion || !!(otbProgress[0] && otbProgress[1] && otbProgress[2] && otbProgress[3]);
+    // "Calcular Forecast" só fica disponível (com aparência ativa) exatamente na etapa de mesmo
+    // nome — etapas 1 a 4 (escolher o dia final, ocupação/despesas On the books, ocupação/receita
+    // do Forecast) já concluídas, e a própria etapa "Calcular Forecast" ainda não. Em qualquer
+    // outra etapa (antes de chegar nela, ou depois de já ter passado) o botão fica com aparência
+    // inativa; clicar mesmo assim só mostra um aviso, não desabilita o clique de verdade.
+    const isOnCalcularForecastStep = !isMeetingVersion || !!(otbProgress[0] && otbProgress[1] && otbProgress[2] && otbProgress[3] && !otbProgress[4]);
 
     // Assim que pelo menos uma despesa da Prévia foi preenchida (e a etapa ainda não foi
     // confirmada), o badge da etapa 6 pulsa convidando o usuário a marcar como concluída — em vez
@@ -1249,7 +1251,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         title="Clique para reabrir esta versão para edição"
                                     >
                                         <Lock size={20} />
-                                        Versão concluída, clique aqui para editar
+                                        Versão concluída (clique para editá-la)
                                     </button>
                                 )
                             ) : !otbDaySaved ? (
@@ -1290,12 +1292,17 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
                         {canEditForecast && (
                             <button
-                                onClick={handleCalcularForecast}
-                                disabled={!canClickCalcularForecast}
-                                title={canClickCalcularForecast ? undefined : 'Disponível a partir da etapa "Calcular Forecast" no Status da prévia (conclua as etapas 1 a 4 antes)'}
-                                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg transition-colors text-base font-bold ${canClickCalcularForecast
+                                onClick={() => {
+                                    if (!isOnCalcularForecastStep) {
+                                        toast.error('Só é possível calcular o Forecast quando estiver na respectiva etapa de construção da prévia.');
+                                        return;
+                                    }
+                                    handleCalcularForecast();
+                                }}
+                                title={isOnCalcularForecastStep ? undefined : 'Disponível só na etapa "Calcular Forecast" do Status da prévia'}
+                                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg transition-colors text-base font-bold ${isOnCalcularForecastStep
                                     ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-md'
-                                    : 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'}`}
+                                    : 'bg-gray-200 text-gray-400 shadow-none'}`}
                             >
                                 <Activity size={20} />
                                 Calcular Forecast
