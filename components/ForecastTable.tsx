@@ -1330,7 +1330,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                     </div>
                 </div>
 
-                {isMeetingVersion && !!otbDaySaved && (
+                {isMeetingVersion && !!otbDaySaved && (!isMeetingVersionCompleted || forceUnlockValidated) && (
                     <div className="px-5 py-2 border-b border-gray-200 bg-gray-50/50 shrink-0">
                         <OtbProgressTimeline completed={otbProgress} onStepClick={handleOtbStepClick} onStepReset={handleOtbStepReset} pulsingSteps={otbPulsingSteps} onStepConfirm={handleOtbStepConfirm} title="Status da prévia" />
                     </div>
