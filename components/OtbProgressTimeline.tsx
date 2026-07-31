@@ -10,6 +10,11 @@ interface OtbProgressTimelineProps {
     // prop, todas as 8 oferecem a escolha. Usado pela tela de Ocupação, que só sabe resetar as 3
     // etapas que vivem nela (as outras continuam navegando direto pra DRE Forecast).
     resettableSteps?: number[];
+    // Etapas ainda não concluídas, mas com pelo menos um dado já preenchido — mostra um check
+    // pulsando no lugar do número, convidando o usuário a marcar como concluída quando terminar
+    // (em vez de já marcar sozinho, já que "pelo menos um item preenchido" não quer dizer "terminei").
+    pulsingSteps?: number[];
+    onStepConfirm?: (index: number) => void;
     title?: string;
 }
 
@@ -24,7 +29,7 @@ const CASCADE_ON_RESET: Record<number, number> = {
 // UnifiedAdministrationView.tsx, só que horizontal/compacto pra caber no topo da tela. Todo passo
 // é clicável a qualquer momento (não é sequencial) — se ainda não foi feito, o clique navega direto;
 // se já foi feito, pergunta se o usuário quer revisar (mesma navegação) ou resetar (desfazer).
-const OtbProgressTimeline: React.FC<OtbProgressTimelineProps> = ({ completed, onStepClick, onStepReset, resettableSteps, title }) => {
+const OtbProgressTimeline: React.FC<OtbProgressTimelineProps> = ({ completed, onStepClick, onStepReset, resettableSteps, pulsingSteps, onStepConfirm, title }) => {
     const [confirmIndex, setConfirmIndex] = useState<number | null>(null);
     const [pendingReset, setPendingReset] = useState<number | null>(null);
     const doneCount = completed.filter(Boolean).length;
@@ -53,25 +58,28 @@ const OtbProgressTimeline: React.FC<OtbProgressTimelineProps> = ({ completed, on
             <div className="flex items-start gap-1 overflow-x-auto py-2 flex-1">
                 {OTB_STEP_LABELS.map((label, idx) => {
                     const done = !!completed[idx];
+                    const isPulsing = !done && !!pulsingSteps?.includes(idx);
                     const isLast = idx === OTB_STEP_LABELS.length - 1;
                     return (
                         <React.Fragment key={idx}>
                             <button
                                 type="button"
-                                onClick={() => handleBadgeClick(idx)}
+                                onClick={() => isPulsing ? onStepConfirm?.(idx) : handleBadgeClick(idx)}
                                 className="flex flex-col items-center gap-1 w-20 shrink-0 group"
-                                title={`${label} (clique para editar/refazer)`}
+                                title={isPulsing ? `${label} (clique para marcar como concluída)` : `${label} (clique para editar/refazer)`}
                             >
                                 <div
                                     className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-colors group-hover:border-indigo-400 ${
                                         done
                                             ? 'bg-emerald-500 border-emerald-500 text-white'
-                                            : 'bg-white border-gray-300 text-gray-500'
+                                            : isPulsing
+                                                ? 'bg-emerald-100 border-emerald-400 text-emerald-600 animate-pulse'
+                                                : 'bg-white border-gray-300 text-gray-500'
                                     }`}
                                 >
-                                    {done ? <Check size={16} /> : idx + 1}
+                                    {done || isPulsing ? <Check size={16} /> : idx + 1}
                                 </div>
-                                <span className={`text-[10px] text-center leading-tight ${done ? 'text-emerald-700 font-bold' : 'text-gray-500'}`}>
+                                <span className={`text-[10px] text-center leading-tight ${done ? 'text-emerald-700 font-bold' : isPulsing ? 'text-emerald-600 font-bold' : 'text-gray-500'}`}>
                                     {label}
                                 </span>
                             </button>

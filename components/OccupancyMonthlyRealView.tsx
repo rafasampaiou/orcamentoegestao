@@ -26,8 +26,7 @@ interface OccupancyMonthlyRealViewProps {
     // Mês ativo na DRE Forecast no momento de "Iniciar Projeção" — semeia o filtro de meses já
     // mostrando só esse mês, em vez dos 12.
     initialSelectedMonth?: number;
-    // Só pra timeline dos 8 passos (computeOtbProgress) — o passo "despesas da Prévia" fica
-    // sempre pendente aqui, já que essa tela não tem acesso às linhas da DRE Forecast.
+    // Só pra timeline dos 8 passos (computeOtbProgress).
     financialData?: ImportedRow[];
     validations?: ValidationRecord[];
     // Passos da timeline que só existem na DRE Forecast (balancete, despesas da Prévia, Calcular

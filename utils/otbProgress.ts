@@ -1,4 +1,4 @@
-import { ForecastRow, ImportedRow, ProjectionType, ValidationRecord } from '../types';
+import { ImportedRow, ProjectionType, ValidationRecord } from '../types';
 
 export const OTB_STEP_LABELS = [
     'Escolher o dia final On the books',
@@ -15,8 +15,6 @@ interface ComputeOtbProgressParams {
     realOccupancyData: Record<string, Record<string, number>>;
     financialData: ImportedRow[];
     validations: ValidationRecord[];
-    // Só disponível na tela da DRE Forecast — na Ocupação, o passo 5 fica sempre pendente.
-    forecastRows?: ForecastRow[];
     hotel: string;
     year: number;
     month: number;
@@ -31,10 +29,12 @@ const GERAL_BASE_IDS = ['geral_sold', 'geral_dm_fap', 'lazer_sold', 'lazer_dm_fa
 const hasOccupancyData = (bucket: Record<string, number>) =>
     GERAL_BASE_IDS.some(id => (bucket[id] || bucket[`${id}_forecast`] || bucket[`${id}_previa`] || 0) !== 0);
 
-// 7 dos 8 passos são detectados automaticamente a partir do que já foi preenchido; só o passo 7
-// (Validar informações) é uma marcação manual do usuário — ver components/OtbProgressTimeline.tsx.
+// 6 dos 8 passos são detectados automaticamente a partir do que já foi preenchido; os passos 6
+// (Incluir despesas da prévia) e 7 (Validar informações) são marcação manual do usuário — ver
+// components/OtbProgressTimeline.tsx (o passo 6 mostra um check pulsando, convidando a confirmar,
+// assim que pelo menos uma despesa é preenchida — ver ForecastTable.tsx).
 export function computeOtbProgress(params: ComputeOtbProgressParams): boolean[] {
-    const { realOccupancyData, financialData, validations, forecastRows, hotel, year, month, versionId, projectionType } = params;
+    const { realOccupancyData, financialData, validations, hotel, year, month, versionId, projectionType } = params;
 
     const otbKey = `${hotel}_${year}_${month}_${versionId}__${projectionType}__OTB`;
     const normalKey = `${hotel}_${year}_${month}_${versionId}__${projectionType}`;
@@ -53,9 +53,9 @@ export function computeOtbProgress(params: ComputeOtbProgressParams): boolean[] 
     );
     const step4 = hasOccupancyData(normalData);
     // Ordem trocada a pedido: passo 5 é "Calcular Forecast" (flag manual), passo 6 é
-    // "Incluir despesas da prévia" (detectado pelas linhas de Custos com Prévia preenchida).
+    // "Incluir despesas da prévia" (também manual — confirmada pelo usuário, não só detectada).
     const step5 = !!otbData['__forecast_calculated'];
-    const step6 = !!forecastRows?.some(r => r.category === 'Costs' && (r.previa || 0) !== 0);
+    const step6 = !!otbData['__previa_despesas_confirmada'];
     const step7 = !!otbData['__validado_manual'];
     const step8 = validations.some(v =>
         v.projectionType === projectionType && v.month === month && v.year === year && v.hotelId === hotel

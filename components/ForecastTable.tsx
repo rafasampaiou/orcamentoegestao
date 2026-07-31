@@ -425,7 +425,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     // lista — eles alimentam getOtbOccValue (Imposto/Time Share/ISS na coluna OTB), então uma
     // mudança neles precisa disparar o recomputo; excluí-los fazia o valor importado pelo
     // balancete só aparecer depois de recarregar a página.
-    const NON_CALC_OCCUPANCY_FLAGS = ['__otb_day', '__forecast_calculated', '__validado_manual'];
+    const NON_CALC_OCCUPANCY_FLAGS = ['__otb_day', '__forecast_calculated', '__validado_manual', '__previa_despesas_confirmada'];
     const occupancySignature = useMemo(() => {
         return JSON.stringify(realOccupancyData, (key, value) => (NON_CALC_OCCUPANCY_FLAGS.includes(key) ? undefined : value));
     }, [realOccupancyData]);
@@ -782,13 +782,18 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         realOccupancyData,
         financialData: financialData || [],
         validations: validations || [],
-        forecastRows: data,
         hotel: selectedHotel || '',
         year: selectedYear || 0,
         month: selectedMonth || 0,
         versionId: activeRealVersionId || '',
         projectionType: activeProjectionType!,
     }) : [];
+
+    // Assim que pelo menos uma despesa da Prévia foi preenchida (e a etapa ainda não foi
+    // confirmada), o badge da etapa 6 pulsa convidando o usuário a marcar como concluída — em vez
+    // de marcar sozinho, já que "um item preenchido" não quer dizer "terminei de preencher".
+    const previaHasEntries = data.some(r => r.category === 'Costs' && (r.previa || 0) !== 0);
+    const otbPulsingSteps = previaHasEntries && !otbProgress[5] ? [5] : [];
 
     // Nenhum passo é bloqueado por ordem — o usuário pode clicar em qualquer etapa a qualquer
     // momento pra editar/refazer, mesmo fora de sequência.
@@ -853,6 +858,18 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             handleSaveResultsDirectly();
         }
         // Passo 6 (índice 5, despesas da Prévia) não navega — já está nesta mesma tela.
+    };
+
+    // Confirma explicitamente que a etapa 6 (índice 5, despesas da Prévia) terminou — clicado no
+    // check pulsando do badge — e já avança pra etapa 7 (Validar informações).
+    const handleOtbStepConfirm = (index: number) => {
+        if (index === 5 && setRealOccupancyData) {
+            setRealOccupancyData(prev => ({
+                ...prev,
+                [otbContextKey]: { ...(prev[otbContextKey] || {}), '__previa_despesas_confirmada': 1 }
+            }));
+            handleOtbStepClick(6);
+        }
     };
 
     // "Resetar etapa" — desfaz o que a etapa marca como concluída, pra dar pra refazer do zero.
@@ -932,6 +949,13 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 }
                 return row;
             }), packages, accounts));
+            if (setRealOccupancyData) {
+                setRealOccupancyData(prev => {
+                    const current = { ...(prev[otbContextKey] || {}) };
+                    delete current['__previa_despesas_confirmada'];
+                    return { ...prev, [otbContextKey]: current };
+                });
+            }
         } else if (index === 6) {
             if (!setRealOccupancyData) return;
             setRealOccupancyData(prev => {
@@ -1230,7 +1254,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
                 {isMeetingVersion && !!otbDaySaved && (
                     <div className="px-5 py-2 border-b border-gray-200 bg-gray-50/50 shrink-0">
-                        <OtbProgressTimeline completed={otbProgress} onStepClick={handleOtbStepClick} onStepReset={handleOtbStepReset} title="Status da prévia" />
+                        <OtbProgressTimeline completed={otbProgress} onStepClick={handleOtbStepClick} onStepReset={handleOtbStepReset} pulsingSteps={otbPulsingSteps} onStepConfirm={handleOtbStepConfirm} title="Status da prévia" />
                     </div>
                 )}
 
