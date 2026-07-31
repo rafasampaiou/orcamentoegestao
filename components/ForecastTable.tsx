@@ -413,16 +413,21 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     const [showValidationModal, setShowValidationModal] = useState(false);
     const [justifications, setJustifications] = useState<Record<string, string>>({});
 
-    // Flags de controle da timeline OTB (__otb_day, __forecast_calculated, __validado_manual,
-    // __balancete_imposto, __balancete_time_share) moram dentro de realOccupancyData pra ficarem
-    // visíveis também na tela de Ocupação, mas nenhuma delas entra no cálculo de getForecastData —
-    // por isso não podem disparar um recomputo de derivedData. Sem essa exclusão, marcar
-    // "Calcular Forecast" concluído (que grava __forecast_calculated no exato momento em que os
-    // valores recém-calculados de Custos acabaram de ser aplicados em `data`) fazia esse mesmo
-    // clique disparar um recomputo que sobrescrevia `data` de volta com os valores originais —
-    // como se o cálculo nunca tivesse acontecido.
+    // Flags de controle puras da timeline OTB (__otb_day, __forecast_calculated,
+    // __validado_manual) moram dentro de realOccupancyData pra ficarem visíveis também na tela
+    // de Ocupação, mas nenhuma delas entra no cálculo de getForecastData — por isso não podem
+    // disparar um recomputo de derivedData. Sem essa exclusão, marcar "Calcular Forecast"
+    // concluído (que grava __forecast_calculated no exato momento em que os valores recém-
+    // calculados de Custos acabaram de ser aplicados em `data`) fazia esse mesmo clique disparar
+    // um recomputo que sobrescrevia `data` de volta com os valores originais — como se o cálculo
+    // nunca tivesse acontecido.
+    // IMPORTANTE: __balancete_imposto/__balancete_time_share/__balancete_iss NÃO entram nessa
+    // lista — eles alimentam getOtbOccValue (Imposto/Time Share/ISS na coluna OTB), então uma
+    // mudança neles precisa disparar o recomputo; excluí-los fazia o valor importado pelo
+    // balancete só aparecer depois de recarregar a página.
+    const NON_CALC_OCCUPANCY_FLAGS = ['__otb_day', '__forecast_calculated', '__validado_manual'];
     const occupancySignature = useMemo(() => {
-        return JSON.stringify(realOccupancyData, (key, value) => (key.startsWith('__') ? undefined : value));
+        return JSON.stringify(realOccupancyData, (key, value) => (NON_CALC_OCCUPANCY_FLAGS.includes(key) ? undefined : value));
     }, [realOccupancyData]);
 
     const derivedData = useMemo(() => {
@@ -861,6 +866,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                     const current = { ...(prev[otbContextKey] || {}) };
                     delete current['__balancete_imposto'];
                     delete current['__balancete_time_share'];
+                    delete current['__balancete_iss'];
                     return { ...prev, [otbContextKey]: current };
                 });
             }
