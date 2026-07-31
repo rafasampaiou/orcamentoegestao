@@ -1092,10 +1092,14 @@ export const supabaseService = {
     }));
   },
 
+  // record.id é determinístico (hotel+ano+mês+versão, ver ForecastTable.tsx) — upsert em vez de
+  // insert pra "Salvar Projeção" repetidas vezes no mesmo período (ex.: salvando ainda "Em
+  // construção", depois salvando de novo já "Validado") atualizar a mesma linha, não acumular
+  // uma linha nova por clique.
   async saveValidation(record: ValidationRecord): Promise<void> {
     const { error } = await supabase
       .from('validations')
-      .insert({
+      .upsert({
         id: record.id,
         hotel_id: record.hotelId,
         user_id: record.userId,
@@ -1105,7 +1109,7 @@ export const supabaseService = {
         projection_type: record.projectionType,
         validated_at: record.validatedAt,
         status: record.status
-      });
+      }, { onConflict: 'id' });
     if (error) throw error;
   },
 

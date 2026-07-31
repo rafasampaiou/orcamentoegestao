@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ValidationRecord, Hotel, User } from '../types';
-import { Calendar, Filter, Building2, CheckCircle2, ArrowRight } from 'lucide-react';
+import { Calendar, Filter, Building2, CheckCircle2, ArrowRight, Clock } from 'lucide-react';
 
 interface ValidationsViewProps {
   validations: ValidationRecord[];
@@ -151,10 +151,17 @@ const ValidationsView: React.FC<ValidationsViewProps> = ({ validations, hotels, 
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-bold border border-emerald-100">
-                                                <CheckCircle2 size={16} />
-                                                Validado
-                                            </span>
+                                            {validation.status === 'Em construção' ? (
+                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-700 rounded-lg text-sm font-bold border border-amber-100">
+                                                    <Clock size={16} />
+                                                    Em construção
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-bold border border-emerald-100">
+                                                    <CheckCircle2 size={16} />
+                                                    Validado
+                                                </span>
+                                            )}
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             {onNavigateToValidation && (

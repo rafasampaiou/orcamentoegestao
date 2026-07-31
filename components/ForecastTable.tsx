@@ -275,13 +275,14 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         v.month === selectedMonth &&
         v.year === selectedYear
     );
-    // A validated closing can be reopened for editing via the "Resultados validados" button —
-    // this local flag lifts the lock for the current period until it's validated again.
+    // A validated closing (ou, pras versões de reunião, uma projeção já concluída — ver
+    // isMeetingVersionCompleted mais abaixo) pode ser reaberta pra edição via o botão "Versão
+    // concluída"/"Resultados validados" — esse flag local levanta o bloqueio pro período atual
+    // até ser validada de novo.
     const [forceUnlockValidated, setForceUnlockValidated] = useState(false);
     useEffect(() => {
         setForceUnlockValidated(false);
     }, [selectedHotel, selectedMonth, selectedYear, activeProjectionType]);
-    const isLocked = isMonthClosed && isAlreadyValidated && !forceUnlockValidated;
 
     const [data, setData] = useState<ForecastRow[]>(() => buildForecastRows(
         dreConfigs, selectedMonth, selectedYear, financialData, selectedHotel, hotels,
@@ -789,6 +790,24 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         projectionType: activeProjectionType!,
     }) : [];
 
+    // Registro de validação (Salvar Projeção) do período/versão atual — pode estar "Em
+    // construção" (salvo sem terminar todas as etapas) ou "Validado" (salvo depois de Validar
+    // informações, etapa 7). Pras versões de reunião, uma vez "Validado" a tela trava pra edição
+    // (mesmo padrão já usado pro Fechamento oficial) até clicar em "clique aqui para editar".
+    const currentValidation = (validations || []).find(v =>
+        v.projectionType === activeProjectionType &&
+        v.hotelId === selectedHotel &&
+        v.month === selectedMonth &&
+        v.year === selectedYear
+    );
+    const isMeetingVersionCompleted = isMeetingVersion && currentValidation?.status === 'Validado';
+    const isLocked = ((isMonthClosed && isAlreadyValidated) || isMeetingVersionCompleted) && !forceUnlockValidated;
+
+    // "Calcular Forecast" só fica disponível a partir da etapa de mesmo nome — antes de escolher
+    // o dia final, inserir a ocupação/despesas On the books e a ocupação/receita do Forecast
+    // (etapas 1 a 4), ainda não há o que calcular.
+    const canClickCalcularForecast = !isMeetingVersion || !!(otbProgress[0] && otbProgress[1] && otbProgress[2] && otbProgress[3]);
+
     // Assim que pelo menos uma despesa da Prévia foi preenchida (e a etapa ainda não foi
     // confirmada), o badge da etapa 6 pulsa convidando o usuário a marcar como concluída — em vez
     // de marcar sozinho, já que "um item preenchido" não quer dizer "terminei de preencher".
@@ -1000,8 +1019,18 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 await supabaseService.saveForecastProjections(hName, selectedMonth || 1, selectedYear || 2026, activeRealVersionId || 'default', rowsToSave, activeProjectionType);
             }
 
+            // Id determinístico (hotel+ano+mês+versão) — assim, salvar de novo o mesmo período
+            // (ex.: primeiro "Em construção", depois "Validado") atualiza o mesmo registro em vez
+            // de acumular uma linha nova por clique em "Salvar Projeção".
+            const valSlug = (s: string) => (s || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+            const validationId = `val_${valSlug(hName)}_${selectedYear || 2026}_${selectedMonth || 1}_${valSlug(activeProjectionType || '')}`;
+            // Pras versões de reunião, só marca "Validado" se a etapa 7 (Validar informações) já
+            // tiver sido confirmada — senão fica "Em construção" (aparece assim em Validações, e
+            // o usuário pode continuar de onde parou depois).
+            const isFullyComplete = !isMeetingVersion || !!otbProgress[6];
+
             const newValidation: import('../types').ValidationRecord = {
-                id: `val_${Date.now()}`,
+                id: validationId,
                 hotelId: selectedHotel || '',
                 userId: currentUser?.id || '',
                 userName: currentUser?.name || 'Desconhecido',
@@ -1009,13 +1038,13 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 year: selectedYear || 2026,
                 projectionType: activeProjectionType || 'Reunião de Ritmo',
                 validatedAt: new Date().toISOString(),
-                status: 'Validado'
+                status: isFullyComplete ? 'Validado' : 'Em construção'
             };
 
             await supabaseService.saveValidation(newValidation);
 
             if (setValidations) {
-                setValidations(prev => [...prev, newValidation]);
+                setValidations(prev => [...prev.filter(v => v.id !== validationId), newValidation]);
             }
             setForceUnlockValidated(false);
 
@@ -1208,28 +1237,72 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             {showDetails ? 'Ocultar Contas' : 'Mostrar Contas'}
                         </button>
 
-                        {canEditForecast && onNavigateToOccupancy && (
-                            <button
-                                onClick={handleIniciarProjecao}
-                                className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-base font-bold transition-colors border bg-white text-gray-600 border-gray-300 hover:bg-gray-50 shadow-sm"
-                                title="Ir para a aba Ocupação já filtrada nesta Versão do Forecast"
-                            >
-                                <TrendingUp size={20} />
-                                Iniciar Projeção
-                            </button>
+                        {isMeetingVersion ? (
+                            // Versões de reunião: um único botão que muda de nome/função conforme a
+                            // etapa — Iniciar Projeção (ainda não começou) → Salvar Projeção (já
+                            // começou) → Versão concluída (Validado, clique pra reabrir a edição).
+                            isMeetingVersionCompleted && !forceUnlockValidated ? (
+                                canValidate && (
+                                    <button
+                                        onClick={() => setForceUnlockValidated(true)}
+                                        className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors shadow-sm text-base font-bold"
+                                        title="Clique para reabrir esta versão para edição"
+                                    >
+                                        <Lock size={20} />
+                                        Versão concluída, clique aqui para editar
+                                    </button>
+                                )
+                            ) : !otbDaySaved ? (
+                                canEditForecast && onNavigateToOccupancy && (
+                                    <button
+                                        onClick={handleIniciarProjecao}
+                                        className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-base font-bold transition-colors border bg-white text-gray-600 border-gray-300 hover:bg-gray-50 shadow-sm"
+                                        title="Ir para a aba Ocupação já filtrada nesta Versão do Forecast"
+                                    >
+                                        <TrendingUp size={20} />
+                                        Iniciar Projeção
+                                    </button>
+                                )
+                            ) : (
+                                canValidate && (
+                                    <button
+                                        onClick={handleSaveResultsDirectly}
+                                        className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-md text-base font-bold"
+                                        title="Salva o progresso mesmo sem terminar todas as etapas — pode continuar depois"
+                                    >
+                                        <CheckCircle2 size={20} />
+                                        Salvar Projeção
+                                    </button>
+                                )
+                            )
+                        ) : (
+                            canEditForecast && onNavigateToOccupancy && (
+                                <button
+                                    onClick={handleIniciarProjecao}
+                                    className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-base font-bold transition-colors border bg-white text-gray-600 border-gray-300 hover:bg-gray-50 shadow-sm"
+                                    title="Ir para a aba Ocupação já filtrada nesta Versão do Forecast"
+                                >
+                                    <TrendingUp size={20} />
+                                    Iniciar Projeção
+                                </button>
+                            )
                         )}
 
                         {canEditForecast && (
                             <button
                                 onClick={handleCalcularForecast}
-                                className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-md text-base font-bold"
+                                disabled={!canClickCalcularForecast}
+                                title={canClickCalcularForecast ? undefined : 'Disponível a partir da etapa "Calcular Forecast" no Status da prévia (conclua as etapas 1 a 4 antes)'}
+                                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg transition-colors text-base font-bold ${canClickCalcularForecast
+                                    ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-md'
+                                    : 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'}`}
                             >
                                 <Activity size={20} />
                                 Calcular Forecast
                             </button>
                         )}
 
-                        {canValidate && (
+                        {!isMeetingVersion && canValidate && (
                             isMonthClosed && isAlreadyValidated && !forceUnlockValidated ? (
                                 <button
                                     onClick={() => setForceUnlockValidated(true)}

@@ -477,7 +477,7 @@ export interface ValidationRecord {
     year: number;
     projectionType: ProjectionType;
     validatedAt: string;
-    status: 'Validado';
+    status: 'Validado' | 'Em construção';
 }
 
 export interface Justification {
