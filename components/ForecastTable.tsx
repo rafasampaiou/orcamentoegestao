@@ -4,7 +4,6 @@ import { Upload, ListFilter, LayoutList, Settings2, ChevronUp, Activity, Trendin
 import { ExpenseDriver, ImportedRow, Account, CostPackage, Hotel, ForecastRow, ForecastConfig, ForecastOperator, ColumnVisibility, UserRole, KpiCalculation, hasRole } from '../types';
 import { evaluateFormula } from '../utils/formulaEngine';
 import { supabaseService } from '../services/supabaseService';
-import { VersionInfoBanner } from './VersionInfoBanner';
 import { MEETING_VERSIONS } from './OccupancyView';
 import OtbProgressTimeline from './OtbProgressTimeline';
 import BalanceteImportModal from './BalanceteImportModal';
@@ -1171,7 +1170,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
     return (
         <div className="flex flex-col w-full">
-            <VersionInfoBanner versionName={activeRealVersionName} />
             {/* No h-full here: the table renders at its natural full height (no internal
                 scrollbar) and the page itself scrolls (via the ancestor <main overflow-auto>
                 in App.tsx) to reach the Transformação/Reatividade cards below, instead of the

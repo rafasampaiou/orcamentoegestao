@@ -3,7 +3,6 @@ import { Account, CostPackage, Hotel, ImportedRow, ProjectionType, ForecastRow }
 import { buildForecastRows, formatValue, formatPointsDiff, parseNum } from './ForecastTable';
 import { normalizeAccountName } from '../services/mockData';
 import { supabaseService } from '../services/supabaseService';
-import { VersionInfoBanner } from './VersionInfoBanner';
 import toast from 'react-hot-toast';
 
 interface AnaliseABViewProps {
@@ -507,7 +506,6 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
     return (
         <div className="px-4 py-6 min-h-[calc(100vh-5rem)] space-y-4">
             <div className="inline-block bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-6">
-                <VersionInfoBanner versionName={activeRealVersionName} />
                 <h2 className="text-xl font-black text-gray-900 mb-4">Análise de A&B</h2>
 
                 <div className="flex flex-wrap items-center gap-4 mb-6">

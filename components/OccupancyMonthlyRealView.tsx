@@ -2,7 +2,6 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Save, CheckCircle } from 'lucide-react';
 import { User, UserRole, ProjectionType, ImportedRow, ValidationRecord, hasRole } from '../types';
 import { BudgetRow, BudgetOccupancyTable, geralRows, lazerRows, eventRows, OccupancyVersionOption, MEETING_VERSIONS, OWN_SNAPSHOT_VERSIONS } from './OccupancyView';
-import { VersionInfoBanner } from './VersionInfoBanner';
 import OtbProgressTimeline from './OtbProgressTimeline';
 import { computeOtbProgress } from '../utils/otbProgress';
 
@@ -727,7 +726,6 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
             em vez de chutar um valor fixo de pixels. */}
         <div className="px-8 pt-6 shrink-0" style={{ overflowY: 'hidden', scrollbarGutter: 'stable both-edges' }}>
         <div className="max-w-[1600px] mx-auto px-8 pt-8 pb-6 bg-white shadow-sm border border-gray-200 rounded-2xl">
-            <VersionInfoBanner versionName={activeRealVersionName} />
             <div className="mb-6 flex items-start justify-between">
                 <div>
                     <div className="flex items-center gap-3">

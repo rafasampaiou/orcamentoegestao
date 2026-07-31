@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Network, Filter, AlertTriangle, CheckCircle, FileText, ClipboardList, ShieldCheck, ShieldAlert, Calendar, DollarSign, CheckSquare, Search, X, FileEdit, ExternalLink, ChevronDown, ChevronRight } from 'lucide-react';
 import { GMDConfiguration, Account, CostPackage, Hotel, ImportedRow, User, Justification, CostCenter, UserRole, hasRole, ProjectionType } from '../types';
-import { VersionInfoBanner } from './VersionInfoBanner';
 import { supabaseService } from '../services/supabaseService';
 
 // Segmentação informativa de Despesas Administrativas e Despesas com Vendas e Marketing —
@@ -671,8 +670,6 @@ const GMDView: React.FC<GMDViewProps> = ({
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 h-full overflow-hidden flex flex-col font-sans relative">
-       
-       <VersionInfoBanner versionName={activeRealVersionName} />
 
        {/* HEADER */}
        <div className="p-5 border-b border-gray-200 bg-gray-50 flex justify-between items-center shrink-0">

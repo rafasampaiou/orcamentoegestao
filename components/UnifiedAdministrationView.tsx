@@ -7,7 +7,6 @@ import { getDreReferenceOptions } from '../utils/dreReferences';
 import KpiCalculationEditor from './KpiCalculationEditor';
 import TimelineView from './TimelineView';
 import ReplicateBudgetModal, { ReplicationOptions } from './ReplicateBudgetModal';
-import { VersionInfoBanner } from './VersionInfoBanner';
 import RevenueStandaloneImportModal from './RevenueStandaloneImportModal';
 import { supabaseService } from '../services/supabaseService';
 import { supabaseTemp } from '../services/supabaseClient';
@@ -6105,11 +6104,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   };
   const vt = viewTitles[currentView] || viewTitles.admin;
 
-  const activeRealVersionName = realVersions.find(v => v.id === activeRealVersionId)?.name;
-
   return (
     <div className="p-6 max-w-[98%] mx-auto">
-      <VersionInfoBanner versionName={activeRealVersionName} />
       {/* Breadcrumb + Page Title */}
       <div className="mb-6">
         <p className="text-[11px] font-bold text-indigo-400 uppercase tracking-widest mb-1">{vt.breadcrumb}</p>
