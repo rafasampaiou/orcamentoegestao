@@ -918,10 +918,11 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 });
             }
         } else if (index === 5) {
-            // Despesas da Prévia — volta as linhas de Custos/Contas que tinham Prévia preenchida
-            // pra zero, como se ainda não tivesse sido preenchida.
+            // Despesas da Prévia — volta as linhas de Custos/Contas/Pacotes (inclusive as que
+            // tiveram a Prévia digitada direto no pacote) que tinham Prévia preenchida pra zero,
+            // como se ainda não tivesse sido preenchida.
             setData(prevData => recalculateTotals(prevData.map(row => {
-                if ((row.category === 'Costs' || row.category === 'Account') && (row.previa || 0) !== 0) {
+                if ((row.category === 'Costs' || row.category === 'Account' || row.category === 'Package') && (row.previa || 0) !== 0) {
                     return {
                         ...row,
                         previa: 0,
@@ -1666,6 +1667,23 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             realCellContent = <span className="font-medium">{formatValue(row.real, formatType)}</span>;
                                             previaCellContent = <span className="font-medium">{formatValue(row.previa, formatType)}</span>;
                                         }
+                                    }
+
+                                    // Pacotes de Custos: além da soma automática das contas vinculadas, também dá
+                                    // pra digitar a Prévia direto no pacote — pra quem monta a prévia só por pacote,
+                                    // sem detalhar conta a conta. O valor digitado prevalece sobre a soma (ver
+                                    // isManualPreviaOverride em recalculateTotals) até a etapa ser resetada.
+                                    if (row.category === 'Package' && canEditForecast && !isLocked && isRowEditable) {
+                                        previaCellContent = (
+                                            <FormattedInput
+                                                inputRef={(el: any) => { inputRefs.current[`input-previa-${row.id}`] = el; }}
+                                                className={inputClass}
+                                                value={row.previa}
+                                                formatType={formatType}
+                                                onChange={(val: number) => handleManualValueChange(row.id, 'previa', val)}
+                                                onKeyDown={(e: any) => handleKeyDown(e, row.id, 'previa')}
+                                            />
+                                        );
                                     }
 
                                     const previaLYVal = (row.previa || 0) - (row.lastYear || 0);
@@ -2959,9 +2977,14 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
             pkgRow.real = children.reduce((sum, c) => sum + c.real, 0);
             pkgRow.budget = children.reduce((sum, c) => sum + c.budget, 0);
             pkgRow.lastYear = children.reduce((sum, c) => sum + c.lastYear, 0);
-            pkgRow.previa = children.reduce((sum, c) => sum + (c.previa || 0), 0);
+            // Prévia digitada direto no pacote (isManualPreviaOverride) prevalece sobre a soma das
+            // contas — sem essa trava, o valor digitado seria sobrescrito de volta na mesma hora,
+            // já que essa soma roda de novo a cada recalculateTotals (inclusive o que dispara o
+            // próprio digitar o valor).
+            if (!pkgRow.isManualPreviaOverride) {
+                pkgRow.previa = children.reduce((sum, c) => sum + (c.previa || 0), 0);
+            }
             pkgRow.isManualOverride = false;
-            pkgRow.isManualPreviaOverride = false;
         }
     });
 
