@@ -10,6 +10,26 @@ import BalanceteImportModal from './BalanceteImportModal';
 import { computeOtbProgress } from '../utils/otbProgress';
 import toast from 'react-hot-toast';
 
+// Nomes amigáveis das colunas comentáveis (usado só no rótulo do modal de comentário).
+const COLUMN_LABELS: Record<string, string> = {
+    label: 'Descrição',
+    otb: 'OTB',
+    previa: 'Prévia',
+    real: 'Forecast',
+    budget: 'Meta',
+    deltaPreviaBudget: 'Δ Prévia-Meta (R$)',
+    deltaPreviaBudgetPct: 'Δ Prévia-Meta (%)',
+    deltaPreviaForecast: 'Δ Prévia-Forecast (R$)',
+    deltaPreviaForecastPct: 'Δ Prévia-Forecast (%)',
+    lastYear: 'Ano Anterior',
+    deltaLY: 'Δ LY (R$)',
+    deltaLYPct: 'Δ LY (%)',
+    driverOtb: 'KPI (OTB)',
+    driverPrevia: 'KPI (Prévia)',
+    driverForecast: 'KPI (Forecast)',
+    driverBudget: 'KPI (Meta)',
+};
+
 interface ForecastTableProps {
     selectedMonth?: number;
     selectedYear?: number;
@@ -331,19 +351,22 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
-    // Comentários por linha (clique com botão direito) — salvos por hotel/ano/mês/Versão do
-    // Forecast (activeProjectionType, o mesmo valor do seletor "Versão do Forecast" no topo).
+    // Comentários por célula (linha+coluna, clique com botão direito) — salvos por
+    // hotel/ano/mês/Versão do Forecast (activeProjectionType, o mesmo valor do seletor "Versão
+    // do Forecast" no topo). Chave local: `${rowId}::${columnId}`.
     const [rowComments, setRowComments] = useState<Record<string, { id: string; comment: string; userName?: string }>>({});
-    const [rowContextMenu, setRowContextMenu] = useState<{ rowId: string; x: number; y: number } | null>(null);
-    const [commentEditorRowId, setCommentEditorRowId] = useState<string | null>(null);
+    const [cellContextMenu, setCellContextMenu] = useState<{ rowId: string; columnId: string; x: number; y: number } | null>(null);
+    const [commentEditorCell, setCommentEditorCell] = useState<{ rowId: string; columnId: string } | null>(null);
     const [commentDraft, setCommentDraft] = useState('');
+
+    const cellKey = (rowId: string, columnId: string) => `${rowId}::${columnId}`;
 
     useEffect(() => {
         supabaseService.getDreRowComments().then(rows => {
             const map: Record<string, { id: string; comment: string; userName?: string }> = {};
             rows.forEach((r: any) => {
                 if (r.hotel === selectedHotel && r.year === selectedYear && r.month === selectedMonth && r.version_id === (activeProjectionType || '')) {
-                    map[r.row_id] = { id: r.id, comment: r.comment, userName: r.user_name };
+                    map[cellKey(r.row_id, r.column_id || '')] = { id: r.id, comment: r.comment, userName: r.user_name };
                 }
             });
             setRowComments(map);
@@ -351,60 +374,62 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     }, [selectedHotel, selectedYear, selectedMonth, activeProjectionType]);
 
     useEffect(() => {
-        if (!rowContextMenu) return;
-        const close = () => setRowContextMenu(null);
+        if (!cellContextMenu) return;
+        const close = () => setCellContextMenu(null);
         window.addEventListener('click', close);
         window.addEventListener('scroll', close, true);
         return () => {
             window.removeEventListener('click', close);
             window.removeEventListener('scroll', close, true);
         };
-    }, [rowContextMenu]);
+    }, [cellContextMenu]);
 
     const commentSlug = (s: string) => (s || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
-    const buildCommentId = (rowId: string) =>
-        `com_${commentSlug(selectedHotel || '')}_${selectedYear || 0}_${selectedMonth || 0}_${commentSlug(activeProjectionType || '')}_${commentSlug(rowId)}`;
+    const buildCommentId = (rowId: string, columnId: string) =>
+        `com_${commentSlug(selectedHotel || '')}_${selectedYear || 0}_${selectedMonth || 0}_${commentSlug(activeProjectionType || '')}_${commentSlug(rowId)}_${commentSlug(columnId)}`;
 
-    const handleRowContextMenu = (e: React.MouseEvent, rowId: string) => {
+    const handleCellContextMenu = (e: React.MouseEvent, rowId: string, columnId: string) => {
         e.preventDefault();
-        setRowContextMenu({ rowId, x: e.clientX, y: e.clientY });
+        setCellContextMenu({ rowId, columnId, x: e.clientX, y: e.clientY });
     };
 
-    const openCommentEditor = (rowId: string) => {
-        setCommentDraft(rowComments[rowId]?.comment || '');
-        setCommentEditorRowId(rowId);
-        setRowContextMenu(null);
+    const openCommentEditor = (rowId: string, columnId: string) => {
+        setCommentDraft(rowComments[cellKey(rowId, columnId)]?.comment || '');
+        setCommentEditorCell({ rowId, columnId });
+        setCellContextMenu(null);
     };
 
     const saveComment = async () => {
-        const rowId = commentEditorRowId;
-        if (!rowId) return;
+        const cell = commentEditorCell;
+        if (!cell) return;
+        const key = cellKey(cell.rowId, cell.columnId);
         const text = commentDraft.trim();
-        if (!text) { setCommentEditorRowId(null); return; }
-        const id = rowComments[rowId]?.id || buildCommentId(rowId);
+        if (!text) { setCommentEditorCell(null); return; }
+        const id = rowComments[key]?.id || buildCommentId(cell.rowId, cell.columnId);
         try {
             await supabaseService.upsertDreRowComment({
                 id, hotel: selectedHotel || '', year: selectedYear || 0, month: selectedMonth || 0,
-                versionId: activeProjectionType || '', rowId, comment: text,
+                versionId: activeProjectionType || '', rowId: cell.rowId, columnId: cell.columnId, comment: text,
                 userId: currentUser?.id, userName: currentUser?.name,
             });
-            setRowComments(prev => ({ ...prev, [rowId]: { id, comment: text, userName: currentUser?.name } }));
+            setRowComments(prev => ({ ...prev, [key]: { id, comment: text, userName: currentUser?.name } }));
             toast.success('Comentário salvo.');
         } catch (e: any) {
             toast.error('Erro ao salvar comentário: ' + (e?.message || String(e)));
         }
-        setCommentEditorRowId(null);
+        setCommentEditorCell(null);
     };
 
-    const deleteComment = async (rowId: string) => {
-        const existing = rowComments[rowId];
-        setRowContextMenu(null);
+    const deleteComment = async (rowId: string, columnId: string) => {
+        const key = cellKey(rowId, columnId);
+        const existing = rowComments[key];
+        setCellContextMenu(null);
         if (!existing) return;
         try {
             await supabaseService.deleteDreRowComment(existing.id);
             setRowComments(prev => {
                 const next = { ...prev };
-                delete next[rowId];
+                delete next[key];
                 return next;
             });
             toast.success('Comentário removido.');
@@ -413,20 +438,38 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         }
     };
 
-    const renderCommentBadge = (rowId: string) => {
-        const c = rowComments[rowId];
+    // Bolinha pequena no canto superior esquerdo da célula — só aparece quando há comentário.
+    const renderCommentBadge = (rowId: string, columnId: string) => {
+        const c = rowComments[cellKey(rowId, columnId)];
         if (!c) return null;
         return (
             <span
-                onClick={(e) => { e.stopPropagation(); openCommentEditor(rowId); }}
-                onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); openCommentEditor(rowId); }}
+                onClick={(e) => { e.stopPropagation(); openCommentEditor(rowId, columnId); }}
+                onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); openCommentEditor(rowId, columnId); }}
                 title={c.comment}
-                className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-blue-500 text-white text-[10px] font-bold cursor-pointer shrink-0 hover:bg-blue-600"
+                className="absolute top-0 left-0 inline-flex items-center justify-center w-3 h-3 rounded-full bg-orange-100 text-orange-700 text-[8px] font-normal leading-none cursor-pointer z-10"
             >
                 i
             </span>
         );
     };
+
+    // Envolve um <td> com o clique direito (comentário) e a bolinha "i" no canto — usado em toda
+    // célula da DRE Forecast (label e todas as colunas de valor/KPI).
+    const CommentableCell: React.FC<{
+        rowId: string; columnId: string; className?: string; style?: React.CSSProperties;
+        title?: string; children?: React.ReactNode;
+    }> = ({ rowId, columnId, className, style, title, children }) => (
+        <td
+            style={style}
+            title={title}
+            className={`relative ${className || ''}`}
+            onContextMenu={(e) => handleCellContextMenu(e, rowId, columnId)}
+        >
+            {children}
+            {renderCommentBadge(rowId, columnId)}
+        </td>
+    );
 
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
         description: 300,
@@ -1896,68 +1939,68 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     return (
                                         <>
                                             {columnVisibility.otb && isMeetingVersion && (
-                                                <td style={textStyle} className="px-2 py-px text-right border-r border-gray-100 tabular-nums bg-amber-50/30 truncate">
+                                                <CommentableCell rowId={row.id} columnId="otb" style={textStyle} className="px-2 py-px text-right border-r border-gray-100 tabular-nums bg-amber-50/30 truncate">
                                                     {row.otb !== undefined ? formatValue(row.otb, formatType) : '-'}
-                                                </td>
+                                                </CommentableCell>
                                             )}
                                             {columnVisibility.previa && (
-                                                <td style={textStyle} className={`px-2 py-px text-right border-r border-gray-100 tabular-nums truncate ${row.id === highlightRowId ? 'bg-amber-200 ring-2 ring-inset ring-amber-500 animate-pulse' : previaBg}`}>
+                                                <CommentableCell rowId={row.id} columnId="previa" style={textStyle} className={`px-2 py-px text-right border-r border-gray-100 tabular-nums truncate ${row.id === highlightRowId ? 'bg-amber-200 ring-2 ring-inset ring-amber-500 animate-pulse' : previaBg}`}>
                                                     {previaCellContent}
-                                                </td>
+                                                </CommentableCell>
                                             )}
 
                                             {columnVisibility.real && (
-                                                <td style={textStyle} className={`px-2 py-px text-right border-l border-gray-200 tabular-nums ${effectiveText} ${effectiveBg} truncate`}>
+                                                <CommentableCell rowId={row.id} columnId="real" style={textStyle} className={`px-2 py-px text-right border-l border-gray-200 tabular-nums ${effectiveText} ${effectiveBg} truncate`}>
                                                     {realCellContent}
-                                                </td>
+                                                </CommentableCell>
                                             )}
 
                                             {columnVisibility.budget && (
-                                                <td style={textStyle} className={`px-2 py-px text-right border-r border-gray-100 tabular-nums ${isBlueHighlight ? 'text-sky-900' : 'text-slate-500'} truncate`}>
+                                                <CommentableCell rowId={row.id} columnId="budget" style={textStyle} className={`px-2 py-px text-right border-r border-gray-100 tabular-nums ${isBlueHighlight ? 'text-sky-900' : 'text-slate-500'} truncate`}>
                                                     {formatValue(row.budget, formatType)}
-                                                </td>
+                                                </CommentableCell>
                                             )}
 
                                             {columnVisibility.deltaPreviaBudget && (
-                                                <td className={`px-2 py-px text-right border-r border-gray-100 tabular-nums font-medium ${getDeltaColorClass(row, row.deltaPreviaBudgetVal)} truncate`}>
+                                                <CommentableCell rowId={row.id} columnId="deltaPreviaBudget" className={`px-2 py-px text-right border-r border-gray-100 tabular-nums font-medium ${getDeltaColorClass(row, row.deltaPreviaBudgetVal)} truncate`}>
                                                     {formatValue(row.deltaPreviaBudgetVal || 0, (isIndicator || row.category === 'Labor') && formatType !== 'percent' ? formatType : 'currency')}
-                                                </td>
+                                                </CommentableCell>
                                             )}
 
                                             {columnVisibility.deltaPreviaBudgetPct && (
-                                                <td className={`px-2 py-px text-right tabular-nums ${getDeltaColorClass(row, row.deltaPreviaBudgetPct)} truncate`}>
+                                                <CommentableCell rowId={row.id} columnId="deltaPreviaBudgetPct" className={`px-2 py-px text-right tabular-nums ${getDeltaColorClass(row, row.deltaPreviaBudgetPct)} truncate`}>
                                                     {isPercentFormatRow ? formatPointsDiff(row.deltaPreviaBudgetVal) : formatPercentDiff(row.deltaPreviaBudgetPct)}
-                                                </td>
+                                                </CommentableCell>
                                             )}
 
                                             {columnVisibility.deltaPreviaForecast && (
-                                                <td className={`px-2 py-px text-right border-r border-gray-100 tabular-nums font-medium ${getDeltaColorClass(row, row.deltaPreviaForecastVal)} truncate`}>
+                                                <CommentableCell rowId={row.id} columnId="deltaPreviaForecast" className={`px-2 py-px text-right border-r border-gray-100 tabular-nums font-medium ${getDeltaColorClass(row, row.deltaPreviaForecastVal)} truncate`}>
                                                     {formatValue(row.deltaPreviaForecastVal || 0, (isIndicator || row.category === 'Labor') && formatType !== 'percent' ? formatType : 'currency')}
-                                                </td>
+                                                </CommentableCell>
                                             )}
 
                                             {columnVisibility.deltaPreviaForecastPct && (
-                                                <td className={`px-2 py-px text-right border-r border-gray-200 tabular-nums ${getDeltaColorClass(row, row.deltaPreviaForecastPct)} truncate`}>
+                                                <CommentableCell rowId={row.id} columnId="deltaPreviaForecastPct" className={`px-2 py-px text-right border-r border-gray-200 tabular-nums ${getDeltaColorClass(row, row.deltaPreviaForecastPct)} truncate`}>
                                                     {isPercentFormatRow ? formatPointsDiff(row.deltaPreviaForecastVal) : formatPercentDiff(row.deltaPreviaForecastPct)}
-                                                </td>
+                                                </CommentableCell>
                                             )}
 
                                             {columnVisibility.lastYear && (
-                                                <td style={textStyle} className={`px-2 py-px text-right tabular-nums border-r border-gray-100 truncate ${isBlueHighlight ? 'bg-sky-100 text-sky-900' : 'bg-orange-50/20 text-slate-500'}`}>
+                                                <CommentableCell rowId={row.id} columnId="lastYear" style={textStyle} className={`px-2 py-px text-right tabular-nums border-r border-gray-100 truncate ${isBlueHighlight ? 'bg-sky-100 text-sky-900' : 'bg-orange-50/20 text-slate-500'}`}>
                                                     {formatValue(row.lastYear, formatType)}
-                                                </td>
+                                                </CommentableCell>
                                             )}
 
                                             {columnVisibility.deltaLY && (
-                                                <td className={`px-2 py-px text-right border-r border-gray-100 tabular-nums font-medium ${previaLYValColor} truncate`}>
+                                                <CommentableCell rowId={row.id} columnId="deltaLY" className={`px-2 py-px text-right border-r border-gray-100 tabular-nums font-medium ${previaLYValColor} truncate`}>
                                                     {formatValue(previaLYVal, (isIndicator || row.category === 'Labor') && formatType !== 'percent' ? formatType : 'currency')}
-                                                </td>
+                                                </CommentableCell>
                                             )}
 
                                             {columnVisibility.deltaLYPct && (
-                                                <td className={`px-2 py-px text-right tabular-nums ${previaLYColor} ${isBlueHighlight ? 'bg-sky-100' : 'bg-orange-50/10'} truncate`}>
+                                                <CommentableCell rowId={row.id} columnId="deltaLYPct" className={`px-2 py-px text-right tabular-nums ${previaLYColor} ${isBlueHighlight ? 'bg-sky-100' : 'bg-orange-50/10'} truncate`}>
                                                     {isPercentFormatRow ? formatPointsDiff(previaLYVal) : formatPercentDiff(previaLYPct)}
-                                                </td>
+                                                </CommentableCell>
                                             )}
 
                                             {(columnVisibility.driverOtb || columnVisibility.driverPrevia || columnVisibility.driverForecast || columnVisibility.driverBudget) && (
@@ -1965,16 +2008,18 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             )}
 
                                             {columnVisibility.driverOtb && isMeetingVersion && (
-                                                <td
+                                                <CommentableCell
+                                                    rowId={row.id} columnId="driverOtb"
                                                     title={!hideKpi ? kpiFormulaTooltip : undefined}
                                                     style={kpiBorderStyle}
                                                     className={`px-1 text-center tabular-nums text-xs truncate ${kpiBorderClass} ${hideKpi || !hasKpi ? 'bg-white text-transparent' : 'text-amber-700 bg-amber-50/40 cursor-help'}`}>
                                                     {!hideKpi && hasKpi ? formatValue(kpiValue('otb'), kpiFormatType) : ''}
-                                                </td>
+                                                </CommentableCell>
                                             )}
 
                                             {columnVisibility.driverPrevia && (
-                                                <td
+                                                <CommentableCell
+                                                    rowId={row.id} columnId="driverPrevia"
                                                     title={!hideKpi ? kpiFormulaTooltip : undefined}
                                                     style={kpiBorderStyle}
                                                     className={`px-1 text-center tabular-nums text-xs truncate ${kpiBorderClass} ${hideKpi || !hasKpi ? 'bg-white text-transparent' : 'text-slate-500 bg-slate-50 cursor-help'}`}>
@@ -1990,11 +2035,12 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                                             />
                                                         ) : formatValue(kpiValue('previa'), kpiFormatType))
                                                         : ''}
-                                                </td>
+                                                </CommentableCell>
                                             )}
 
                                             {columnVisibility.driverForecast && (
-                                                <td
+                                                <CommentableCell
+                                                    rowId={row.id} columnId="driverForecast"
                                                     title={!hideKpi ? kpiFormulaTooltip : undefined}
                                                     style={kpiBorderStyle}
                                                     className={`px-1 text-center tabular-nums text-xs truncate ${kpiBorderClass} ${hideKpi || !hasKpi ? 'bg-white text-transparent' : 'text-slate-500 bg-slate-50 cursor-help'}`}>
@@ -2010,16 +2056,17 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                                             />
                                                         ) : formatValue(kpiValue('real'), kpiFormatType))
                                                         : ''}
-                                                </td>
+                                                </CommentableCell>
                                             )}
 
                                             {columnVisibility.driverBudget && (
-                                                <td
+                                                <CommentableCell
+                                                    rowId={row.id} columnId="driverBudget"
                                                     title={!hideKpi ? kpiFormulaTooltip : undefined}
                                                     style={kpiBorderStyle}
                                                     className={`px-2 py-px text-center tabular-nums text-xs truncate ${kpiBorderClass} ${hideKpi || !hasKpi ? 'bg-white text-transparent' : 'text-slate-500 bg-slate-50 cursor-help'}`}>
                                                     {!hideKpi && hasKpi ? formatValue(kpiValue('budget'), kpiFormatType) : ''}
-                                                </td>
+                                                </CommentableCell>
                                             )}
                                         </>
                                     );
@@ -2027,13 +2074,12 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
                                 if (isIndicator) {
                                     return (
-                                        <tr key={row.id} className="border-b border-gray-100 hover:bg-sky-50/30 transition-colors h-6" onContextMenu={(e) => handleRowContextMenu(e, row.id)}>
-                                            <td className="px-2 py-px border-r border-gray-100 align-middle sticky left-0 z-20 bg-white">
-                                                <div className="flex items-center gap-1 pl-4">
-                                                    <span className="truncate text-xs font-bold text-slate-700">{row.label}</span>
-                                                    {renderCommentBadge(row.id)}
+                                        <tr key={row.id} className="border-b border-gray-100 hover:bg-sky-50/30 transition-colors h-6">
+                                            <CommentableCell rowId={row.id} columnId="label" className="px-2 py-px border-r border-gray-100 align-middle sticky left-0 z-20 bg-white">
+                                                <div className="truncate text-xs font-bold text-slate-700 pl-4">
+                                                    {row.label}
                                                 </div>
-                                            </td>
+                                            </CommentableCell>
                                             {renderFinancialCells(false, "bg-sky-50/30")}
                                         </tr>
                                     )
@@ -2047,12 +2093,11 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     const textClass = isBlueHighlight ? "text-sky-900" : "text-slate-800";
 
                                     return (
-                                        <tr key={row.id} id={`dre-row-${row.id}`} className={rowClass} onContextMenu={(e) => handleRowContextMenu(e, row.id)}>
-                                            <td className={`px-2 py-1.5 text-sm font-bold ${textClass} uppercase tracking-wide flex items-center gap-1 truncate sticky left-0 z-20 ${stickyClass}`}>
+                                        <tr key={row.id} id={`dre-row-${row.id}`} className={rowClass}>
+                                            <CommentableCell rowId={row.id} columnId="label" className={`px-2 py-1.5 text-sm font-bold ${textClass} uppercase tracking-wide flex items-center truncate sticky left-0 z-20 ${stickyClass}`}>
                                                 {!isBlueHighlight && <div className="w-1 h-4 bg-indigo-500 mr-2 rounded-full"></div>}
-                                                <span className="truncate">{row.label}</span>
-                                                {renderCommentBadge(row.id)}
-                                            </td>
+                                                {row.label}
+                                            </CommentableCell>
                                             {renderFinancialCells(true)}
                                         </tr>
                                     );
@@ -2060,8 +2105,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
                                 if (isGroupHeader || isSpecialRevenue) {
                                     return (
-                                        <tr key={row.id} className="bg-gray-50 text-gray-800 font-bold border-b border-gray-200 hover:bg-gray-100 transition-colors" onContextMenu={(e) => handleRowContextMenu(e, row.id)}>
-                                            <td className="px-2 py-1 text-sm uppercase align-middle border-r border-gray-200 sticky left-0 z-20 bg-gray-50">
+                                        <tr key={row.id} className="bg-gray-50 text-gray-800 font-bold border-b border-gray-200 hover:bg-gray-100 transition-colors">
+                                            <CommentableCell rowId={row.id} columnId="label" className="px-2 py-1 text-sm uppercase align-middle border-r border-gray-200 sticky left-0 z-20 bg-gray-50">
                                                 <div style={{ paddingLeft: `${(row.indentLevel || 0) * 16}px` }} className="truncate flex items-center gap-2">
                                                     {row.category === 'Package' && (
                                                         <button
@@ -2071,10 +2116,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                                             {expandedPackages.has(row.id) ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                                                         </button>
                                                     )}
-                                                    <span className="truncate">{row.label}</span>
-                                                    {renderCommentBadge(row.id)}
+                                                    {row.label}
                                                 </div>
-                                            </td>
+                                            </CommentableCell>
                                             {renderFinancialCells(true, "bg-gray-50 border-r border-gray-200")}
                                         </tr>
                                     );
@@ -2082,11 +2126,10 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
                                 if (isSubGroupHeader) {
                                     return (
-                                        <tr key={row.id} className="bg-gray-50 text-gray-600 font-semibold border-b border-gray-200 hover:bg-gray-100 transition-colors" onContextMenu={(e) => handleRowContextMenu(e, row.id)}>
-                                            <td className="px-2 py-1 text-sm uppercase pl-8 truncate sticky left-0 z-20 bg-gray-50 border-r border-gray-200">
-                                                <span className="truncate">{row.label}</span>
-                                                {renderCommentBadge(row.id)}
-                                            </td>
+                                        <tr key={row.id} className="bg-gray-50 text-gray-600 font-semibold border-b border-gray-200 hover:bg-gray-100 transition-colors">
+                                            <CommentableCell rowId={row.id} columnId="label" className="px-2 py-1 text-sm uppercase pl-8 truncate sticky left-0 z-20 bg-gray-50 border-r border-gray-200">
+                                                {row.label}
+                                            </CommentableCell>
                                             {renderFinancialCells(true, "bg-gray-50 border-r border-gray-200")}
                                         </tr>
                                     );
@@ -2109,31 +2152,26 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         id={`dre-row-${row.id}`}
                                         style={{ backgroundColor: row.bgColor || undefined }}
                                         className={`transition-colors text-slate-700 hover:bg-indigo-50/30 ${isTotal ? 'bg-indigo-50 font-bold border-y-2 border-gray-300 text-indigo-900' : 'border-b border-gray-100'} ${row.id === 'REV-IMP' ? 'bg-sky-100 border-y-2 border-sky-300 font-bold text-sky-950 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.5)]' : ''}`}
-                                        onContextMenu={(e) => handleRowContextMenu(e, row.id)}
                                     >
-                                        <td
+                                        <CommentableCell
+                                            rowId={row.id} columnId="label"
                                             style={rowTextStyle}
                                             className={`px-2 py-px border-r border-gray-100 align-middle sticky left-0 z-20 ${row.id === 'REV-IMP' ? 'bg-sky-100' : 'bg-white'} group-hover:bg-indigo-50/30 ${isTotal ? 'bg-indigo-50' : ''}`}
                                         >
                                             <div
                                                 style={{ paddingLeft: `${(row.indentLevel || 0) * 16 + 12}px` }}
-                                                className={`flex items-center gap-1 text-xs ${isTotal ? 'uppercase tracking-wide' : ''}`}
+                                                className={`truncate text-xs ${isTotal ? 'uppercase tracking-wide' : ''}`}
+                                                title={
+                                                    row.id === 'REV-EXTRA-OR'
+                                                        ? 'OR = Outras Receitas. Linha utilizada para inserir a diferença de receita extra da USALI com a ferramenta de receitas extras que pode ter algumas correções gerenciais.'
+                                                        : row.id === 'REV-APT-OR'
+                                                        ? 'OR = Outras Receitas. Linha utilizada para inserir a diferença de receita de hospedagem entre o Consolidado e a planilha Meta x Realizado da equipe de Inteligência de Mercado, já que podem ter alguns ajustes gerenciais que não refletem no Consolidado.'
+                                                        : undefined
+                                                }
                                             >
-                                                <span
-                                                    className="truncate"
-                                                    title={
-                                                        row.id === 'REV-EXTRA-OR'
-                                                            ? 'OR = Outras Receitas. Linha utilizada para inserir a diferença de receita extra da USALI com a ferramenta de receitas extras que pode ter algumas correções gerenciais.'
-                                                            : row.id === 'REV-APT-OR'
-                                                            ? 'OR = Outras Receitas. Linha utilizada para inserir a diferença de receita de hospedagem entre o Consolidado e a planilha Meta x Realizado da equipe de Inteligência de Mercado, já que podem ter alguns ajustes gerenciais que não refletem no Consolidado.'
-                                                            : undefined
-                                                    }
-                                                >
-                                                    {displayLabel}
-                                                </span>
-                                                {renderCommentBadge(row.id)}
+                                                {displayLabel}
                                             </div>
-                                        </td>
+                                        </CommentableCell>
                                         {renderFinancialCells(false)}
                                     </tr>
                                 );
@@ -2788,22 +2826,22 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             )}
 
             {/* Custom Modals */}
-            {rowContextMenu && (
+            {cellContextMenu && (
                 <div
                     className="fixed z-[110] bg-white rounded-lg shadow-2xl border border-gray-200 py-1 text-sm min-w-[180px]"
-                    style={{ top: rowContextMenu.y, left: rowContextMenu.x }}
+                    style={{ top: cellContextMenu.y, left: cellContextMenu.x }}
                     onClick={(e) => e.stopPropagation()}
                 >
-                    {rowComments[rowContextMenu.rowId] ? (
+                    {rowComments[cellKey(cellContextMenu.rowId, cellContextMenu.columnId)] ? (
                         <>
                             <button
-                                onClick={() => openCommentEditor(rowContextMenu.rowId)}
+                                onClick={() => openCommentEditor(cellContextMenu.rowId, cellContextMenu.columnId)}
                                 className="w-full text-left px-4 py-2 hover:bg-gray-50 text-gray-700 font-medium"
                             >
                                 Editar comentário
                             </button>
                             <button
-                                onClick={() => deleteComment(rowContextMenu.rowId)}
+                                onClick={() => deleteComment(cellContextMenu.rowId, cellContextMenu.columnId)}
                                 className="w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 font-medium"
                             >
                                 Excluir comentário
@@ -2811,7 +2849,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                         </>
                     ) : (
                         <button
-                            onClick={() => openCommentEditor(rowContextMenu.rowId)}
+                            onClick={() => openCommentEditor(cellContextMenu.rowId, cellContextMenu.columnId)}
                             className="w-full text-left px-4 py-2 hover:bg-gray-50 text-gray-700 font-medium"
                         >
                             Adicionar comentário
@@ -2820,15 +2858,15 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 </div>
             )}
 
-            {commentEditorRowId && (
+            {commentEditorCell && (
                 <div
                     className="fixed inset-0 bg-black/50 flex items-center justify-center z-[120] p-4"
-                    onClick={() => setCommentEditorRowId(null)}
+                    onClick={() => setCommentEditorCell(null)}
                 >
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
-                        <h3 className="font-bold text-gray-800 mb-1">Comentário da linha</h3>
+                        <h3 className="font-bold text-gray-800 mb-1">Comentário da célula</h3>
                         <p className="text-xs text-gray-400 mb-3">
-                            {data.find(r => r.id === commentEditorRowId)?.label} — salvo pra {selectedHotel}, {monthName}/{selectedYear}, {activeProjectionType}
+                            {data.find(r => r.id === commentEditorCell.rowId)?.label} — coluna {COLUMN_LABELS[commentEditorCell.columnId] || commentEditorCell.columnId} — salvo pra {selectedHotel}, {monthName}/{selectedYear}, {activeProjectionType}
                         </p>
                         <textarea
                             autoFocus
@@ -2840,7 +2878,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                         />
                         <div className="flex justify-end gap-2 mt-4">
                             <button
-                                onClick={() => setCommentEditorRowId(null)}
+                                onClick={() => setCommentEditorCell(null)}
                                 className="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-lg"
                             >
                                 Cancelar

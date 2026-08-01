@@ -1126,8 +1126,8 @@ export const supabaseService = {
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // DRE ROW COMMENTS — comentário por linha da DRE Forecast (clique com botão direito),
-  // amarrado a hotel/ano/mês/versão do Forecast.
+  // DRE ROW COMMENTS — comentário por célula da DRE Forecast (linha+coluna, clique
+  // com botão direito), amarrado a hotel/ano/mês/versão do Forecast.
   // ═══════════════════════════════════════════════════════════════════════════
   async getDreRowComments(): Promise<any[]> {
     return fetchAllRows('dre_row_comments');
@@ -1135,7 +1135,7 @@ export const supabaseService = {
 
   async upsertDreRowComment(row: {
     id: string; hotel: string; year: number; month: number; versionId: string | null;
-    rowId: string; comment: string; userId?: string; userName?: string;
+    rowId: string; columnId: string; comment: string; userId?: string; userName?: string;
   }): Promise<void> {
     const { error } = await supabase
       .from('dre_row_comments')
@@ -1146,6 +1146,7 @@ export const supabaseService = {
         month: row.month,
         version_id: row.versionId || '',
         row_id: row.rowId,
+        column_id: row.columnId,
         comment: row.comment,
         user_id: row.userId || null,
         user_name: row.userName || null,
