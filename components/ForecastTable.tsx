@@ -331,6 +331,103 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
+    // Comentários por linha (clique com botão direito) — salvos por hotel/ano/mês/Versão do
+    // Forecast (activeProjectionType, o mesmo valor do seletor "Versão do Forecast" no topo).
+    const [rowComments, setRowComments] = useState<Record<string, { id: string; comment: string; userName?: string }>>({});
+    const [rowContextMenu, setRowContextMenu] = useState<{ rowId: string; x: number; y: number } | null>(null);
+    const [commentEditorRowId, setCommentEditorRowId] = useState<string | null>(null);
+    const [commentDraft, setCommentDraft] = useState('');
+
+    useEffect(() => {
+        supabaseService.getDreRowComments().then(rows => {
+            const map: Record<string, { id: string; comment: string; userName?: string }> = {};
+            rows.forEach((r: any) => {
+                if (r.hotel === selectedHotel && r.year === selectedYear && r.month === selectedMonth && r.version_id === (activeProjectionType || '')) {
+                    map[r.row_id] = { id: r.id, comment: r.comment, userName: r.user_name };
+                }
+            });
+            setRowComments(map);
+        }).catch(() => {});
+    }, [selectedHotel, selectedYear, selectedMonth, activeProjectionType]);
+
+    useEffect(() => {
+        if (!rowContextMenu) return;
+        const close = () => setRowContextMenu(null);
+        window.addEventListener('click', close);
+        window.addEventListener('scroll', close, true);
+        return () => {
+            window.removeEventListener('click', close);
+            window.removeEventListener('scroll', close, true);
+        };
+    }, [rowContextMenu]);
+
+    const commentSlug = (s: string) => (s || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const buildCommentId = (rowId: string) =>
+        `com_${commentSlug(selectedHotel || '')}_${selectedYear || 0}_${selectedMonth || 0}_${commentSlug(activeProjectionType || '')}_${commentSlug(rowId)}`;
+
+    const handleRowContextMenu = (e: React.MouseEvent, rowId: string) => {
+        e.preventDefault();
+        setRowContextMenu({ rowId, x: e.clientX, y: e.clientY });
+    };
+
+    const openCommentEditor = (rowId: string) => {
+        setCommentDraft(rowComments[rowId]?.comment || '');
+        setCommentEditorRowId(rowId);
+        setRowContextMenu(null);
+    };
+
+    const saveComment = async () => {
+        const rowId = commentEditorRowId;
+        if (!rowId) return;
+        const text = commentDraft.trim();
+        if (!text) { setCommentEditorRowId(null); return; }
+        const id = rowComments[rowId]?.id || buildCommentId(rowId);
+        try {
+            await supabaseService.upsertDreRowComment({
+                id, hotel: selectedHotel || '', year: selectedYear || 0, month: selectedMonth || 0,
+                versionId: activeProjectionType || '', rowId, comment: text,
+                userId: currentUser?.id, userName: currentUser?.name,
+            });
+            setRowComments(prev => ({ ...prev, [rowId]: { id, comment: text, userName: currentUser?.name } }));
+            toast.success('Comentário salvo.');
+        } catch (e: any) {
+            toast.error('Erro ao salvar comentário: ' + (e?.message || String(e)));
+        }
+        setCommentEditorRowId(null);
+    };
+
+    const deleteComment = async (rowId: string) => {
+        const existing = rowComments[rowId];
+        setRowContextMenu(null);
+        if (!existing) return;
+        try {
+            await supabaseService.deleteDreRowComment(existing.id);
+            setRowComments(prev => {
+                const next = { ...prev };
+                delete next[rowId];
+                return next;
+            });
+            toast.success('Comentário removido.');
+        } catch (e: any) {
+            toast.error('Erro ao remover comentário: ' + (e?.message || String(e)));
+        }
+    };
+
+    const renderCommentBadge = (rowId: string) => {
+        const c = rowComments[rowId];
+        if (!c) return null;
+        return (
+            <span
+                onClick={(e) => { e.stopPropagation(); openCommentEditor(rowId); }}
+                onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); openCommentEditor(rowId); }}
+                title={c.comment}
+                className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-blue-500 text-white text-[10px] font-bold cursor-pointer shrink-0 hover:bg-blue-600"
+            >
+                i
+            </span>
+        );
+    };
+
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
         description: 300,
         otb: 120,
@@ -1930,10 +2027,11 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
                                 if (isIndicator) {
                                     return (
-                                        <tr key={row.id} className="border-b border-gray-100 hover:bg-sky-50/30 transition-colors h-6">
+                                        <tr key={row.id} className="border-b border-gray-100 hover:bg-sky-50/30 transition-colors h-6" onContextMenu={(e) => handleRowContextMenu(e, row.id)}>
                                             <td className="px-2 py-px border-r border-gray-100 align-middle sticky left-0 z-20 bg-white">
-                                                <div className="truncate text-xs font-bold text-slate-700 pl-4">
-                                                    {row.label}
+                                                <div className="flex items-center gap-1 pl-4">
+                                                    <span className="truncate text-xs font-bold text-slate-700">{row.label}</span>
+                                                    {renderCommentBadge(row.id)}
                                                 </div>
                                             </td>
                                             {renderFinancialCells(false, "bg-sky-50/30")}
@@ -1949,10 +2047,11 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     const textClass = isBlueHighlight ? "text-sky-900" : "text-slate-800";
 
                                     return (
-                                        <tr key={row.id} id={`dre-row-${row.id}`} className={rowClass}>
-                                            <td className={`px-2 py-1.5 text-sm font-bold ${textClass} uppercase tracking-wide flex items-center truncate sticky left-0 z-20 ${stickyClass}`}>
+                                        <tr key={row.id} id={`dre-row-${row.id}`} className={rowClass} onContextMenu={(e) => handleRowContextMenu(e, row.id)}>
+                                            <td className={`px-2 py-1.5 text-sm font-bold ${textClass} uppercase tracking-wide flex items-center gap-1 truncate sticky left-0 z-20 ${stickyClass}`}>
                                                 {!isBlueHighlight && <div className="w-1 h-4 bg-indigo-500 mr-2 rounded-full"></div>}
-                                                {row.label}
+                                                <span className="truncate">{row.label}</span>
+                                                {renderCommentBadge(row.id)}
                                             </td>
                                             {renderFinancialCells(true)}
                                         </tr>
@@ -1961,7 +2060,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
                                 if (isGroupHeader || isSpecialRevenue) {
                                     return (
-                                        <tr key={row.id} className="bg-gray-50 text-gray-800 font-bold border-b border-gray-200 hover:bg-gray-100 transition-colors">
+                                        <tr key={row.id} className="bg-gray-50 text-gray-800 font-bold border-b border-gray-200 hover:bg-gray-100 transition-colors" onContextMenu={(e) => handleRowContextMenu(e, row.id)}>
                                             <td className="px-2 py-1 text-sm uppercase align-middle border-r border-gray-200 sticky left-0 z-20 bg-gray-50">
                                                 <div style={{ paddingLeft: `${(row.indentLevel || 0) * 16}px` }} className="truncate flex items-center gap-2">
                                                     {row.category === 'Package' && (
@@ -1972,7 +2071,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                                             {expandedPackages.has(row.id) ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                                                         </button>
                                                     )}
-                                                    {row.label}
+                                                    <span className="truncate">{row.label}</span>
+                                                    {renderCommentBadge(row.id)}
                                                 </div>
                                             </td>
                                             {renderFinancialCells(true, "bg-gray-50 border-r border-gray-200")}
@@ -1982,9 +2082,10 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
                                 if (isSubGroupHeader) {
                                     return (
-                                        <tr key={row.id} className="bg-gray-50 text-gray-600 font-semibold border-b border-gray-200 hover:bg-gray-100 transition-colors">
+                                        <tr key={row.id} className="bg-gray-50 text-gray-600 font-semibold border-b border-gray-200 hover:bg-gray-100 transition-colors" onContextMenu={(e) => handleRowContextMenu(e, row.id)}>
                                             <td className="px-2 py-1 text-sm uppercase pl-8 truncate sticky left-0 z-20 bg-gray-50 border-r border-gray-200">
-                                                {row.label}
+                                                <span className="truncate">{row.label}</span>
+                                                {renderCommentBadge(row.id)}
                                             </td>
                                             {renderFinancialCells(true, "bg-gray-50 border-r border-gray-200")}
                                         </tr>
@@ -2008,6 +2109,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         id={`dre-row-${row.id}`}
                                         style={{ backgroundColor: row.bgColor || undefined }}
                                         className={`transition-colors text-slate-700 hover:bg-indigo-50/30 ${isTotal ? 'bg-indigo-50 font-bold border-y-2 border-gray-300 text-indigo-900' : 'border-b border-gray-100'} ${row.id === 'REV-IMP' ? 'bg-sky-100 border-y-2 border-sky-300 font-bold text-sky-950 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.5)]' : ''}`}
+                                        onContextMenu={(e) => handleRowContextMenu(e, row.id)}
                                     >
                                         <td
                                             style={rowTextStyle}
@@ -2015,16 +2117,21 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         >
                                             <div
                                                 style={{ paddingLeft: `${(row.indentLevel || 0) * 16 + 12}px` }}
-                                                className={`truncate text-xs ${isTotal ? 'uppercase tracking-wide' : ''}`}
-                                                title={
-                                                    row.id === 'REV-EXTRA-OR'
-                                                        ? 'OR = Outras Receitas. Linha utilizada para inserir a diferença de receita extra da USALI com a ferramenta de receitas extras que pode ter algumas correções gerenciais.'
-                                                        : row.id === 'REV-APT-OR'
-                                                        ? 'OR = Outras Receitas. Linha utilizada para inserir a diferença de receita de hospedagem entre o Consolidado e a planilha Meta x Realizado da equipe de Inteligência de Mercado, já que podem ter alguns ajustes gerenciais que não refletem no Consolidado.'
-                                                        : undefined
-                                                }
+                                                className={`flex items-center gap-1 text-xs ${isTotal ? 'uppercase tracking-wide' : ''}`}
                                             >
-                                                {displayLabel}
+                                                <span
+                                                    className="truncate"
+                                                    title={
+                                                        row.id === 'REV-EXTRA-OR'
+                                                            ? 'OR = Outras Receitas. Linha utilizada para inserir a diferença de receita extra da USALI com a ferramenta de receitas extras que pode ter algumas correções gerenciais.'
+                                                            : row.id === 'REV-APT-OR'
+                                                            ? 'OR = Outras Receitas. Linha utilizada para inserir a diferença de receita de hospedagem entre o Consolidado e a planilha Meta x Realizado da equipe de Inteligência de Mercado, já que podem ter alguns ajustes gerenciais que não refletem no Consolidado.'
+                                                            : undefined
+                                                    }
+                                                >
+                                                    {displayLabel}
+                                                </span>
+                                                {renderCommentBadge(row.id)}
                                             </div>
                                         </td>
                                         {renderFinancialCells(false)}
@@ -2681,6 +2788,74 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             )}
 
             {/* Custom Modals */}
+            {rowContextMenu && (
+                <div
+                    className="fixed z-[110] bg-white rounded-lg shadow-2xl border border-gray-200 py-1 text-sm min-w-[180px]"
+                    style={{ top: rowContextMenu.y, left: rowContextMenu.x }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {rowComments[rowContextMenu.rowId] ? (
+                        <>
+                            <button
+                                onClick={() => openCommentEditor(rowContextMenu.rowId)}
+                                className="w-full text-left px-4 py-2 hover:bg-gray-50 text-gray-700 font-medium"
+                            >
+                                Editar comentário
+                            </button>
+                            <button
+                                onClick={() => deleteComment(rowContextMenu.rowId)}
+                                className="w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 font-medium"
+                            >
+                                Excluir comentário
+                            </button>
+                        </>
+                    ) : (
+                        <button
+                            onClick={() => openCommentEditor(rowContextMenu.rowId)}
+                            className="w-full text-left px-4 py-2 hover:bg-gray-50 text-gray-700 font-medium"
+                        >
+                            Adicionar comentário
+                        </button>
+                    )}
+                </div>
+            )}
+
+            {commentEditorRowId && (
+                <div
+                    className="fixed inset-0 bg-black/50 flex items-center justify-center z-[120] p-4"
+                    onClick={() => setCommentEditorRowId(null)}
+                >
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
+                        <h3 className="font-bold text-gray-800 mb-1">Comentário da linha</h3>
+                        <p className="text-xs text-gray-400 mb-3">
+                            {data.find(r => r.id === commentEditorRowId)?.label} — salvo pra {selectedHotel}, {monthName}/{selectedYear}, {activeProjectionType}
+                        </p>
+                        <textarea
+                            autoFocus
+                            value={commentDraft}
+                            onChange={(e) => setCommentDraft(e.target.value)}
+                            rows={4}
+                            className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
+                            placeholder="Escreva o comentário..."
+                        />
+                        <div className="flex justify-end gap-2 mt-4">
+                            <button
+                                onClick={() => setCommentEditorRowId(null)}
+                                className="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-lg"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={saveComment}
+                                className="px-4 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg"
+                            >
+                                Salvar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {showAlertModal && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col scale-in-center">

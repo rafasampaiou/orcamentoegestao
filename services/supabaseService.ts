@@ -1126,6 +1126,43 @@ export const supabaseService = {
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // DRE ROW COMMENTS — comentário por linha da DRE Forecast (clique com botão direito),
+  // amarrado a hotel/ano/mês/versão do Forecast.
+  // ═══════════════════════════════════════════════════════════════════════════
+  async getDreRowComments(): Promise<any[]> {
+    return fetchAllRows('dre_row_comments');
+  },
+
+  async upsertDreRowComment(row: {
+    id: string; hotel: string; year: number; month: number; versionId: string | null;
+    rowId: string; comment: string; userId?: string; userName?: string;
+  }): Promise<void> {
+    const { error } = await supabase
+      .from('dre_row_comments')
+      .upsert({
+        id: row.id,
+        hotel: row.hotel,
+        year: row.year,
+        month: row.month,
+        version_id: row.versionId || '',
+        row_id: row.rowId,
+        comment: row.comment,
+        user_id: row.userId || null,
+        user_name: row.userName || null,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'id' });
+    if (error) throw error;
+  },
+
+  async deleteDreRowComment(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('dre_row_comments')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // IMPORT HISTORY
   // ═══════════════════════════════════════════════════════════════════════════
   async getImportHistory(): Promise<any[]> {
