@@ -1799,66 +1799,66 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     return (
                                         <>
                                             {columnVisibility.otb && isMeetingVersion && (
-                                                <td style={textStyle} className="px-2 py-1 text-right border-r border-gray-100 tabular-nums bg-amber-50/30 truncate">
+                                                <td style={textStyle} className="px-2 py-0.5 text-right border-r border-gray-100 tabular-nums bg-amber-50/30 truncate">
                                                     {row.otb !== undefined ? formatValue(row.otb, formatType) : '-'}
                                                 </td>
                                             )}
                                             {columnVisibility.previa && (
-                                                <td style={textStyle} className={`px-2 py-1 text-right border-r border-gray-100 tabular-nums truncate ${row.id === highlightRowId ? 'bg-amber-200 ring-2 ring-inset ring-amber-500 animate-pulse' : previaBg}`}>
+                                                <td style={textStyle} className={`px-2 py-0.5 text-right border-r border-gray-100 tabular-nums truncate ${row.id === highlightRowId ? 'bg-amber-200 ring-2 ring-inset ring-amber-500 animate-pulse' : previaBg}`}>
                                                     {previaCellContent}
                                                 </td>
                                             )}
 
                                             {columnVisibility.real && (
-                                                <td style={textStyle} className={`px-2 py-1 text-right border-l border-gray-200 tabular-nums ${effectiveText} ${effectiveBg} truncate`}>
+                                                <td style={textStyle} className={`px-2 py-0.5 text-right border-l border-gray-200 tabular-nums ${effectiveText} ${effectiveBg} truncate`}>
                                                     {realCellContent}
                                                 </td>
                                             )}
 
                                             {columnVisibility.budget && (
-                                                <td style={textStyle} className={`px-2 py-1 text-right border-r border-gray-100 tabular-nums ${isBlueHighlight ? 'text-sky-900' : 'text-slate-500'} truncate`}>
+                                                <td style={textStyle} className={`px-2 py-0.5 text-right border-r border-gray-100 tabular-nums ${isBlueHighlight ? 'text-sky-900' : 'text-slate-500'} truncate`}>
                                                     {formatValue(row.budget, formatType)}
                                                 </td>
                                             )}
 
                                             {columnVisibility.deltaPreviaBudget && (
-                                                <td className={`px-2 py-1 text-right border-r border-gray-100 tabular-nums font-medium ${getDeltaColorClass(row, row.deltaPreviaBudgetVal)} truncate`}>
+                                                <td className={`px-2 py-0.5 text-right border-r border-gray-100 tabular-nums font-medium ${getDeltaColorClass(row, row.deltaPreviaBudgetVal)} truncate`}>
                                                     {formatValue(row.deltaPreviaBudgetVal || 0, (isIndicator || row.category === 'Labor') && formatType !== 'percent' ? formatType : 'currency')}
                                                 </td>
                                             )}
 
                                             {columnVisibility.deltaPreviaBudgetPct && (
-                                                <td className={`px-2 py-1 text-right tabular-nums ${getDeltaColorClass(row, row.deltaPreviaBudgetPct)} truncate`}>
+                                                <td className={`px-2 py-0.5 text-right tabular-nums ${getDeltaColorClass(row, row.deltaPreviaBudgetPct)} truncate`}>
                                                     {isPercentFormatRow ? formatPointsDiff(row.deltaPreviaBudgetVal) : formatPercentDiff(row.deltaPreviaBudgetPct)}
                                                 </td>
                                             )}
 
                                             {columnVisibility.deltaPreviaForecast && (
-                                                <td className={`px-2 py-1 text-right border-r border-gray-100 tabular-nums font-medium ${getDeltaColorClass(row, row.deltaPreviaForecastVal)} truncate`}>
+                                                <td className={`px-2 py-0.5 text-right border-r border-gray-100 tabular-nums font-medium ${getDeltaColorClass(row, row.deltaPreviaForecastVal)} truncate`}>
                                                     {formatValue(row.deltaPreviaForecastVal || 0, (isIndicator || row.category === 'Labor') && formatType !== 'percent' ? formatType : 'currency')}
                                                 </td>
                                             )}
 
                                             {columnVisibility.deltaPreviaForecastPct && (
-                                                <td className={`px-2 py-1 text-right border-r border-gray-200 tabular-nums ${getDeltaColorClass(row, row.deltaPreviaForecastPct)} truncate`}>
+                                                <td className={`px-2 py-0.5 text-right border-r border-gray-200 tabular-nums ${getDeltaColorClass(row, row.deltaPreviaForecastPct)} truncate`}>
                                                     {isPercentFormatRow ? formatPointsDiff(row.deltaPreviaForecastVal) : formatPercentDiff(row.deltaPreviaForecastPct)}
                                                 </td>
                                             )}
 
                                             {columnVisibility.lastYear && (
-                                                <td style={textStyle} className={`px-2 py-1 text-right tabular-nums border-r border-gray-100 truncate ${isBlueHighlight ? 'bg-sky-100 text-sky-900' : 'bg-orange-50/20 text-slate-500'}`}>
+                                                <td style={textStyle} className={`px-2 py-0.5 text-right tabular-nums border-r border-gray-100 truncate ${isBlueHighlight ? 'bg-sky-100 text-sky-900' : 'bg-orange-50/20 text-slate-500'}`}>
                                                     {formatValue(row.lastYear, formatType)}
                                                 </td>
                                             )}
 
                                             {columnVisibility.deltaLY && (
-                                                <td className={`px-2 py-1 text-right border-r border-gray-100 tabular-nums font-medium ${previaLYValColor} truncate`}>
+                                                <td className={`px-2 py-0.5 text-right border-r border-gray-100 tabular-nums font-medium ${previaLYValColor} truncate`}>
                                                     {formatValue(previaLYVal, (isIndicator || row.category === 'Labor') && formatType !== 'percent' ? formatType : 'currency')}
                                                 </td>
                                             )}
 
                                             {columnVisibility.deltaLYPct && (
-                                                <td className={`px-2 py-1 text-right tabular-nums ${previaLYColor} ${isBlueHighlight ? 'bg-sky-100' : 'bg-orange-50/10'} truncate`}>
+                                                <td className={`px-2 py-0.5 text-right tabular-nums ${previaLYColor} ${isBlueHighlight ? 'bg-sky-100' : 'bg-orange-50/10'} truncate`}>
                                                     {isPercentFormatRow ? formatPointsDiff(previaLYVal) : formatPercentDiff(previaLYPct)}
                                                 </td>
                                             )}
@@ -1920,7 +1920,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                                 <td
                                                     title={!hideKpi ? kpiFormulaTooltip : undefined}
                                                     style={kpiBorderStyle}
-                                                    className={`px-2 py-1 text-center tabular-nums text-xs truncate ${kpiBorderClass} ${hideKpi || !hasKpi ? 'bg-white text-transparent' : 'text-slate-500 bg-slate-50 cursor-help'}`}>
+                                                    className={`px-2 py-0.5 text-center tabular-nums text-xs truncate ${kpiBorderClass} ${hideKpi || !hasKpi ? 'bg-white text-transparent' : 'text-slate-500 bg-slate-50 cursor-help'}`}>
                                                     {!hideKpi && hasKpi ? formatValue(kpiValue('budget'), kpiFormatType) : ''}
                                                 </td>
                                             )}
@@ -1930,8 +1930,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
                                 if (isIndicator) {
                                     return (
-                                        <tr key={row.id} className="border-b border-gray-100 hover:bg-sky-50/30 transition-colors h-8">
-                                            <td className="px-2 py-1 border-r border-gray-100 align-middle sticky left-0 z-20 bg-white">
+                                        <tr key={row.id} className="border-b border-gray-100 hover:bg-sky-50/30 transition-colors h-7">
+                                            <td className="px-2 py-0.5 border-r border-gray-100 align-middle sticky left-0 z-20 bg-white">
                                                 <div className="truncate text-xs font-bold text-slate-700 pl-4">
                                                     {row.label}
                                                 </div>
@@ -1950,7 +1950,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
                                     return (
                                         <tr key={row.id} id={`dre-row-${row.id}`} className={rowClass}>
-                                            <td className={`px-2 py-3 text-sm font-bold ${textClass} uppercase tracking-wide flex items-center truncate sticky left-0 z-20 ${stickyClass}`}>
+                                            <td className={`px-2 py-2 text-sm font-bold ${textClass} uppercase tracking-wide flex items-center truncate sticky left-0 z-20 ${stickyClass}`}>
                                                 {!isBlueHighlight && <div className="w-1 h-4 bg-indigo-500 mr-2 rounded-full"></div>}
                                                 {row.label}
                                             </td>
@@ -1962,7 +1962,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 if (isGroupHeader || isSpecialRevenue) {
                                     return (
                                         <tr key={row.id} className="bg-gray-50 text-gray-800 font-bold border-b border-gray-200 hover:bg-gray-100 transition-colors">
-                                            <td className="px-2 py-2 text-sm uppercase align-middle border-r border-gray-200 sticky left-0 z-20 bg-gray-50">
+                                            <td className="px-2 py-1.5 text-sm uppercase align-middle border-r border-gray-200 sticky left-0 z-20 bg-gray-50">
                                                 <div style={{ paddingLeft: `${(row.indentLevel || 0) * 16}px` }} className="truncate flex items-center gap-2">
                                                     {row.category === 'Package' && (
                                                         <button
@@ -1983,7 +1983,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 if (isSubGroupHeader) {
                                     return (
                                         <tr key={row.id} className="bg-gray-50 text-gray-600 font-semibold border-b border-gray-200 hover:bg-gray-100 transition-colors">
-                                            <td className="px-2 py-2 text-sm uppercase pl-8 truncate sticky left-0 z-20 bg-gray-50 border-r border-gray-200">
+                                            <td className="px-2 py-1.5 text-sm uppercase pl-8 truncate sticky left-0 z-20 bg-gray-50 border-r border-gray-200">
                                                 {row.label}
                                             </td>
                                             {renderFinancialCells(true, "bg-gray-50 border-r border-gray-200")}
@@ -2011,7 +2011,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     >
                                         <td
                                             style={rowTextStyle}
-                                            className={`px-2 py-1 border-r border-gray-100 align-middle sticky left-0 z-20 ${row.id === 'REV-IMP' ? 'bg-sky-100' : 'bg-white'} group-hover:bg-indigo-50/30 ${isTotal ? 'bg-indigo-50' : ''}`}
+                                            className={`px-2 py-0.5 border-r border-gray-100 align-middle sticky left-0 z-20 ${row.id === 'REV-IMP' ? 'bg-sky-100' : 'bg-white'} group-hover:bg-indigo-50/30 ${isTotal ? 'bg-indigo-50' : ''}`}
                                         >
                                             <div
                                                 style={{ paddingLeft: `${(row.indentLevel || 0) * 16 + 12}px` }}
