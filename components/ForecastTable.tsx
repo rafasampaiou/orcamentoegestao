@@ -468,20 +468,29 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
     // Envolve um <td> com o clique direito (comentário) e a bolinha "i" no canto — usado em toda
     // célula da DRE Forecast (label e todas as colunas de valor/KPI).
-    const CommentableCell: React.FC<{
-        rowId: string; columnId: string; className?: string; style?: React.CSSProperties;
-        title?: string; children?: React.ReactNode;
-    }> = ({ rowId, columnId, className, style, title, children }) => (
-        <td
-            style={style}
-            title={title}
-            className={`relative ${className || ''}`}
-            onContextMenu={(e) => handleCellContextMenu(e, rowId, columnId)}
-        >
-            {children}
-            {renderCommentBadge(rowId, columnId)}
-        </td>
-    );
+    // Memoizado (só recria quando rowComments muda) — definir isso como uma const comum recriava
+    // a função a cada digitação em QUALQUER campo da tabela (setData -> re-render), e como React
+    // identifica componentes pela referência da função, uma nova referência a cada tecla fazia
+    // desmontar e remontar o <td>/<FormattedInput> de dentro, perdendo o foco e o que já tinha
+    // sido digitado — parecia "fechar a edição" depois de só um caractere.
+    const CommentableCell = useMemo(() => {
+        const Comp: React.FC<{
+            rowId: string; columnId: string; className?: string; style?: React.CSSProperties;
+            title?: string; children?: React.ReactNode;
+        }> = ({ rowId, columnId, className, style, title, children }) => (
+            <td
+                style={style}
+                title={title}
+                className={`relative ${className || ''}`}
+                onContextMenu={(e) => handleCellContextMenu(e, rowId, columnId)}
+            >
+                {children}
+                {renderCommentBadge(rowId, columnId)}
+            </td>
+        );
+        return Comp;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [rowComments]);
 
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
         description: 300,
@@ -692,9 +701,24 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         });
     };
 
+    // Se uma conta contábil de um pacote foi editada na Prévia (por digitação direta ou via KPI),
+    // o pacote sai do modo "valor manual" (digitado direto nele, ex.: via KPI ÷ PAX) e volta a
+    // somar as contas — mesmo que antes tivesse ficado "travado" num valor digitado direto nele.
+    const clearParentPackagePreviaOverride = (rows: ForecastRow[], accountRowId: string): ForecastRow[] => {
+        const acc = accounts.find(a => a.id === accountRowId) || accounts.find(a => a.id === accountRowId.split('-')[0]);
+        if (!acc) return rows;
+        return rows.map(row =>
+            row.category === 'Package' && row.indentLevel === 1 && row.isHeader &&
+            ((acc.package || '').toLowerCase() === (row.label || '').toLowerCase() || acc.packageId === row.id)
+                ? { ...row, isManualPreviaOverride: false }
+                : row
+        );
+    };
+
     const handleManualValueChange = (rowId: string, field: 'real' | 'previa', value: number) => {
         setData(prevData => {
-            const newData = prevData.map(row => {
+            const editedRow = prevData.find(r => r.id === rowId);
+            let newData = prevData.map(row => {
                 if (row.id !== rowId) return row;
 
                 const isOccupancy = row.id.startsWith('IND-');
@@ -713,6 +737,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 }
                 return { ...row, [field]: value };
             });
+            if (field === 'previa' && editedRow && editedRow.category !== 'Package') {
+                newData = clearParentPackagePreviaOverride(newData, rowId);
+            }
             return recalculateTotals(newData, packages, accounts);
         });
     };
@@ -721,7 +748,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     // Prévia/Forecast value from the formula's denominator, so adjusting the rate adjusts the result.
     const handleKpiValueChange = (rowId: string, field: 'previa' | 'real', typedKpiValue: number) => {
         setData(prevData => {
-            const newData = prevData.map(row => {
+            const editedRow = prevData.find(r => r.id === rowId);
+            let newData = prevData.map(row => {
                 if (row.id !== rowId) return row;
 
                 // Pacotes de Custos não guardam o KPI em rowConfig (isso é por conta contábil) —
@@ -747,6 +775,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 if (field === 'real') return { ...row, real: newValue, isManualOverride: true };
                 return { ...row, previa: newValue, isManualPreviaOverride: true };
             });
+            if (field === 'previa' && editedRow && editedRow.category !== 'Package') {
+                newData = clearParentPackagePreviaOverride(newData, rowId);
+            }
             return recalculateTotals(newData, packages, accounts);
         });
     };
@@ -823,7 +854,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
         setData(prevData => {
             // CLONE PROFUNDO DA LISTA PARA NÃO MUTAR O ESTADO
-            const newData = prevData.map(r => ({
+            let newData: ForecastRow[] = prevData.map(r => ({
                 ...r,
                 forecastConfig: { ...r.forecastConfig },
                 previaConfig: r.previaConfig ? { ...r.previaConfig } : undefined
@@ -833,6 +864,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             if (startIndex === -1) return prevData;
 
             let lineIndex = 0;
+            const editedPreviaRowIds: string[] = [];
 
             for (let i = startIndex; i < newData.length && lineIndex < lines.length; i++) {
                 const row = newData[i];
@@ -902,9 +934,16 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             }
                         }
                     }
+                    if (field === 'previa' && !isNaN(val)) editedPreviaRowIds.push(row.id);
                     lineIndex++;
                 }
             }
+
+            // Colar Prévia numa conta contábil também tira o pacote dela do modo "valor manual" —
+            // mesmo comportamento de digitar direto na célula (ver clearParentPackagePreviaOverride).
+            editedPreviaRowIds.forEach(id => {
+                newData = clearParentPackagePreviaOverride(newData, id);
+            });
 
             return recalculateTotals(newData, packages, accounts);
         });
