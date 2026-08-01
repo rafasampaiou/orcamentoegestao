@@ -442,12 +442,19 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     const renderCommentBadge = (rowId: string, columnId: string) => {
         const c = rowComments[cellKey(rowId, columnId)];
         if (!c) return null;
+        // Clicar (ou clicar com botão direito) na bolinha abre o mesmo menu de Editar/Excluir do
+        // clique direito na célula — não vai direto pro editor, pra dar a opção de excluir também.
+        const openMenu = (e: React.MouseEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setCellContextMenu({ rowId, columnId, x: e.clientX, y: e.clientY });
+        };
         return (
             <span
-                onClick={(e) => { e.stopPropagation(); openCommentEditor(rowId, columnId); }}
-                onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); openCommentEditor(rowId, columnId); }}
+                onClick={openMenu}
+                onContextMenu={openMenu}
                 title={c.comment}
-                className="absolute top-0 left-0 inline-flex items-center justify-center w-3 h-3 rounded-full bg-orange-100 text-orange-700 text-[8px] font-normal leading-none cursor-pointer z-10"
+                className="absolute top-0 left-0 inline-flex items-center justify-center w-3 h-3 rounded-sm bg-orange-100 text-orange-700 text-[8px] font-normal leading-none cursor-pointer z-10"
             >
                 i
             </span>
