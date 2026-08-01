@@ -724,7 +724,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             const newData = prevData.map(row => {
                 if (row.id !== rowId) return row;
 
-                const calc = row.rowConfig?.kpiCalculation;
+                // Pacotes de Custos não guardam o KPI em rowConfig (isso é por conta contábil) —
+                // o KPI do pacote vem de packageKpiConfigs (Configuração de KPI por Pacote).
+                const calc = row.category === 'Package' ? packageKpiConfigs[row.label.trim()] : row.rowConfig?.kpiCalculation;
                 const selfDenominatorLabel = calc ? parseSelfRatioDenominator(calc.formula, row.label) : null;
                 const precomputedDenominator = row.rowConfig?.precomputedKpi?.denominator?.[field];
 
@@ -1878,7 +1880,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 // Forecast" already knows how to project, so it's cleanly invertible.
                                 const kpiSelfDenominator = accountKpiCalc
                                     ? parseSelfRatioDenominator(accountKpiCalc.formula, row.label)
-                                    : (impostoKpiCalc ? parseSelfRatioDenominator(impostoKpiCalc.formula, row.label) : null);
+                                    : packageKpiCalc
+                                        ? parseSelfRatioDenominator(packageKpiCalc.formula, row.label)
+                                        : (impostoKpiCalc ? parseSelfRatioDenominator(impostoKpiCalc.formula, row.label) : null);
                                 const isEditableKpi = !!kpiSelfDenominator && canEditForecast && !isLocked && isRowEditableForUser(row);
                                 // Receitas Extras (Lazer/Eventos) KPI Prévia is also invertible (Receita ÷ PAX,
                                 // with PAX carried in precomputedKpi.denominator) — but only the Prévia column,
