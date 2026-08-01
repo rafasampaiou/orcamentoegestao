@@ -30,6 +30,11 @@ const COLUMN_LABELS: Record<string, string> = {
     driverBudget: 'KPI (Meta)',
 };
 
+// Pacotes onde, além de digitar o KPI (Prévia) do pacote como um todo, dá pra distribuir esse
+// valor entre as contas contábeis na mesma proporção que cada uma representa da Meta do pacote
+// — via clique direito na célula Prévia do pacote, "Distribuir nas contas contábeis".
+const KPI_DISTRIBUTABLE_PACKAGES = ['custo de alimentos', 'custo de bebidas'];
+
 interface ForecastTableProps {
     selectedMonth?: number;
     selectedYear?: number;
@@ -742,6 +747,67 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             });
             return recalculateTotals(newData, packages, accounts);
         });
+    };
+
+    // "Distribuir nas contas contábeis" (clique direito na Prévia do pacote, só Custo de
+    // Alimentos/Bebidas) — pega o valor total já digitado no pacote (normalmente via KPI ÷ PAX) e
+    // reparte entre as contas contábeis do pacote na mesma proporção que cada uma representa da
+    // Meta (Budget) do pacote. Depois, o pacote volta a ser a soma das contas (deixa de estar
+    // "preso" no valor manual), já que a soma das contas recém-distribuídas dá o mesmo total.
+    const handleDistributePreviaToAccounts = (packageRowId: string) => {
+        setData(prevData => {
+            const pkgRow = prevData.find(r => r.id === packageRowId);
+            if (!pkgRow) return prevData;
+            const pkgId = pkgRow.id;
+            const pkgName = pkgRow.label;
+
+            // Mesma lógica de "quem é filho deste pacote" usada em recalculateTotals.
+            const children = prevData.filter(r => {
+                if (r.indentLevel !== 2) return false;
+                if (r.category !== 'Costs' && r.category !== 'Account') return false;
+                if (r.id.startsWith('p-drill-')) {
+                    return r.id.includes(pkgId) || r.id.includes(`-${pkgName}-`);
+                }
+                let acc = accounts.find(a => a.id === r.id);
+                if (!acc) {
+                    const originalAccId = r.id.split('-')[0];
+                    acc = accounts.find(a => a.id === originalAccId);
+                }
+                if (!acc) return false;
+                return (acc.package || '').toLowerCase() === (pkgName || '').toLowerCase() || acc.packageId === pkgId;
+            });
+
+            if (children.length === 0) {
+                toast.error('Nenhuma conta contábil encontrada nesse pacote.');
+                return prevData;
+            }
+
+            const totalBudget = children.reduce((s, c) => s + (c.budget || 0), 0);
+            if (totalBudget === 0) {
+                toast.error('Não há valores de Meta nas contas desse pacote pra calcular a proporção.');
+                return prevData;
+            }
+
+            const targetPrevia = pkgRow.previa || 0;
+            const childIds = new Set(children.map(c => c.id));
+
+            const distributed = prevData.map(row => {
+                if (row.id === packageRowId) return { ...row, isManualPreviaOverride: false };
+                if (!childIds.has(row.id)) return row;
+                const share = (row.budget || 0) / totalBudget;
+                const newPrevia = targetPrevia * share;
+                return {
+                    ...row,
+                    previa: newPrevia,
+                    isManualPreviaOverride: true,
+                    previaConfig: { ...(row.previaConfig || { method: 'Fixed' as const }), method: 'Fixed' as const, manualValue: newPrevia }
+                };
+            });
+
+            toast.success(`Prévia distribuída para ${children.length} conta(s) de "${pkgName}", na mesma proporção da Meta.`);
+            return recalculateTotals(distributed, packages, accounts);
+        });
+        setCellContextMenu(null);
     };
 
     const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>, startRowId: string, field: 'real' | 'previa') => {
@@ -2833,37 +2899,51 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             )}
 
             {/* Custom Modals */}
-            {cellContextMenu && (
-                <div
-                    className="fixed z-[110] bg-white rounded-lg shadow-2xl border border-gray-200 py-1 text-sm min-w-[180px]"
-                    style={{ top: cellContextMenu.y, left: cellContextMenu.x }}
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    {rowComments[cellKey(cellContextMenu.rowId, cellContextMenu.columnId)] ? (
-                        <>
+            {cellContextMenu && (() => {
+                const menuRow = data.find(r => r.id === cellContextMenu.rowId);
+                const canDistributePrevia = cellContextMenu.columnId === 'previa' &&
+                    menuRow?.category === 'Package' &&
+                    KPI_DISTRIBUTABLE_PACKAGES.includes((menuRow.label || '').trim().toLowerCase());
+                return (
+                    <div
+                        className="fixed z-[110] bg-white rounded-lg shadow-2xl border border-gray-200 py-1 text-sm min-w-[220px]"
+                        style={{ top: cellContextMenu.y, left: cellContextMenu.x }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {rowComments[cellKey(cellContextMenu.rowId, cellContextMenu.columnId)] ? (
+                            <>
+                                <button
+                                    onClick={() => openCommentEditor(cellContextMenu.rowId, cellContextMenu.columnId)}
+                                    className="w-full text-left px-4 py-2 hover:bg-gray-50 text-gray-700 font-medium"
+                                >
+                                    Editar comentário
+                                </button>
+                                <button
+                                    onClick={() => deleteComment(cellContextMenu.rowId, cellContextMenu.columnId)}
+                                    className="w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 font-medium"
+                                >
+                                    Excluir comentário
+                                </button>
+                            </>
+                        ) : (
                             <button
                                 onClick={() => openCommentEditor(cellContextMenu.rowId, cellContextMenu.columnId)}
                                 className="w-full text-left px-4 py-2 hover:bg-gray-50 text-gray-700 font-medium"
                             >
-                                Editar comentário
+                                Adicionar comentário
                             </button>
+                        )}
+                        {canDistributePrevia && (
                             <button
-                                onClick={() => deleteComment(cellContextMenu.rowId, cellContextMenu.columnId)}
-                                className="w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 font-medium"
+                                onClick={() => handleDistributePreviaToAccounts(cellContextMenu.rowId)}
+                                className="w-full text-left px-4 py-2 hover:bg-indigo-50 text-indigo-700 font-medium border-t border-gray-100"
                             >
-                                Excluir comentário
+                                Distribuir nas contas contábeis
                             </button>
-                        </>
-                    ) : (
-                        <button
-                            onClick={() => openCommentEditor(cellContextMenu.rowId, cellContextMenu.columnId)}
-                            className="w-full text-left px-4 py-2 hover:bg-gray-50 text-gray-700 font-medium"
-                        >
-                            Adicionar comentário
-                        </button>
-                    )}
-                </div>
-            )}
+                        )}
+                    </div>
+                );
+            })()}
 
             {commentEditorCell && (
                 <div
