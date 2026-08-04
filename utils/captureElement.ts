@@ -1,4 +1,7 @@
-import html2canvas from 'html2canvas';
+// html2canvas-pro (não o html2canvas original) — o original não sabe interpretar a função de
+// cor oklch(), que é o padrão do Tailwind v4 usado neste projeto; esse fork suporta oklch/lab/
+// color-mix e é um substituto direto (mesma API).
+import html2canvas from 'html2canvas-pro';
 import { CaptureSpec, SlideCaptureTarget } from './slidesCaptureTargets';
 
 // Captura um elemento da tela exatamente como está renderizado no momento do clique (mesmas
