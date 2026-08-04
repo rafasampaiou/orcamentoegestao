@@ -9,9 +9,11 @@
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 export const SLIDES_TEMPLATE_ID = import.meta.env.VITE_GOOGLE_SLIDES_TEMPLATE_ID || '';
 
-// drive.file: só arquivos criados/abertos pelo app (a cópia gerada) — não pede acesso a todo
-// o Drive do usuário. presentations: editar a cópia (texto, imagens, slides).
-const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/presentations';
+// drive.readonly: só pra conseguir LER o template já existente na primeira cópia — drive.file
+// sozinho não alcança arquivos que o app não criou, mesmo que o usuário já tenha acesso a eles
+// no Drive normalmente (dava 404 ao tentar copiar o template). drive.file: gerencia os arquivos
+// que o próprio app cria (a cópia gerada, as imagens dos prints). presentations: editar a cópia.
+const SCOPES = 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/presentations';
 
 let cachedToken: { accessToken: string; expiresAt: number } | null = null;
 let gisScriptLoaded: Promise<void> | null = null;
