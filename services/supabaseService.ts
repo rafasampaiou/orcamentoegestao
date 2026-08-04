@@ -1164,6 +1164,38 @@ export const supabaseService = {
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // SLIDE PRESENTATIONS (Gerar Apresentação, Google Slides)
+  // ═══════════════════════════════════════════════════════════════════════════
+  async getSlidePresentation(hotel: string, year: number, month: number, projectionType: string): Promise<any | null> {
+    const { data, error } = await supabase
+      .from('slide_presentations')
+      .select('*')
+      .eq('hotel', hotel).eq('year', year).eq('month', month).eq('projection_type', projectionType)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (error) throw error;
+    return data && data.length > 0 ? data[0] : null;
+  },
+
+  async upsertSlidePresentation(record: {
+    id: string; hotel: string; year: number; month: number; projectionType: string;
+    presentationId: string; presentationUrl?: string; driveFolderId?: string;
+    createdByUserId?: string; createdByUserName?: string;
+  }): Promise<void> {
+    const { error } = await supabase
+      .from('slide_presentations')
+      .upsert({
+        id: record.id,
+        hotel: record.hotel, year: record.year, month: record.month, projection_type: record.projectionType,
+        presentation_id: record.presentationId, presentation_url: record.presentationUrl || null,
+        drive_folder_id: record.driveFolderId || null,
+        created_by_user_id: record.createdByUserId || null, created_by_user_name: record.createdByUserName || null,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'id' });
+    if (error) throw error;
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // IMPORT HISTORY
   // ═══════════════════════════════════════════════════════════════════════════
   async getImportHistory(): Promise<any[]> {

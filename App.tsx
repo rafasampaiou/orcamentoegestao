@@ -23,6 +23,12 @@ import { supabase } from './services/supabaseClient';
 import { supabaseService } from './services/supabaseService';
 import { Session } from '@supabase/supabase-js';
 import { ViewState, ImportedRow, User, Hotel, HotelCategory, HotelRegion, CostCenter, CostPackage, Account, GMDConfiguration, ModuleType, UserRole, BudgetVersion, LaborParameters, ScheduleItem, ProjectionType, ValidationRecord, DreSection, KpiCalculation, hasRole } from './types';
+import { SLIDES_CAPTURE_TARGETS } from './utils/slidesCaptureTargets';
+import { captureSlideTarget, getPngBlobSize } from './utils/captureElement';
+import {
+    ensureGoogleAccessToken, ensureDriveFolder, copyTemplatePresentation, uploadImageAndGetPublicUrl,
+    getPresentationStructure, addContentSlideFromMold, deleteSlide, fillCoverPlaceholders,
+} from './services/googleSlidesService';
 import { Calendar, ArrowLeft, ArrowRight, Building2 as Building2Icon, Layers } from 'lucide-react';
 import { mockUsers, mockHotels, mockCostCenters, mockPackages, mockAccounts, mockGMDConfigs } from './services/mockData';
 import { Toaster, toast } from 'react-hot-toast';
@@ -101,6 +107,10 @@ function buildOtbProjectionsSnapshot(
 const App: React.FC = () => {
   const [currentModule, setCurrentModule] = useState<ModuleType>('REAL');
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
+  // "Gerar Apresentação" (Google Slides, botão na DRE Forecast) — ver handleGenerateSlides.
+  const [isGeneratingSlides, setIsGeneratingSlides] = useState(false);
+  const [pendingSlideRegen, setPendingSlideRegen] = useState<{ existingId: string; presentationId: string } | null>(null);
+  const slideRegenChoiceRef = useRef<((choice: 'update' | 'new' | null) => void) | null>(null);
   const [selectedHotel, setSelectedHotel] = useState('Atibaia');
   const [selectedHotelType, setSelectedHotelType] = useState<string>('Todos');
   const [selectedHotelCategory, setSelectedHotelCategory] = useState<string>('Todas');
@@ -736,6 +746,121 @@ const App: React.FC = () => {
     }
   };
 
+  // Espera um elemento aparecer no DOM (usado depois de trocar de tela pra capturar outra seção)
+  // — poll simples em vez de um delay fixo, já que telas mais pesadas (Análise de A&B) podem
+  // demorar mais pra terminar de calcular/renderizar do que outras.
+  const waitForElement = (elementId: string, timeoutMs = 6000): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const start = Date.now();
+      const check = () => {
+        if (document.getElementById(elementId)) { resolve(); return; }
+        if (Date.now() - start > timeoutMs) { reject(new Error(`Elemento "${elementId}" não apareceu a tempo.`)); return; }
+        setTimeout(check, 150);
+      };
+      check();
+    });
+  };
+
+  // "Gerar Apresentação" (Google Slides) — botão na DRE Forecast, liberado só quando o Status da
+  // prévia estiver 8/8 concluído (ver ForecastTable.tsx). Percorre SLIDES_CAPTURE_TARGETS,
+  // trocando de tela quando necessário pra capturar cada seção exatamente como está na hora.
+  const handleGenerateSlides = async () => {
+    if (isGeneratingSlides) return;
+    setIsGeneratingSlides(true);
+    const originalView = currentView;
+    try {
+      const token = await ensureGoogleAccessToken();
+      const hotelName = selectedHotel;
+      const year = selectedDate.getFullYear();
+      const month = selectedDate.getMonth() + 1;
+      const projectionType = activeProjectionType;
+      const monthName = selectedDate.toLocaleString('pt-BR', { month: 'long' });
+
+      const slug = (s: string) => (s || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const comboId = `slidedeck_${slug(hotelName)}_${year}_${month}_${slug(projectionType)}`;
+
+      const existing = await supabaseService.getSlidePresentation(hotelName, year, month, projectionType);
+      let mode: 'update' | 'new' = 'new';
+      let recordId = `${comboId}_${Date.now()}`;
+      if (existing) {
+        const choice = await new Promise<'update' | 'new' | null>(resolve => {
+          slideRegenChoiceRef.current = resolve;
+          setPendingSlideRegen({ existingId: existing.id, presentationId: existing.presentation_id });
+        });
+        setPendingSlideRegen(null);
+        if (!choice) return; // cancelado pelo usuário
+        mode = choice;
+        if (mode === 'update') recordId = existing.id;
+      }
+
+      const rootFolderId = await ensureDriveFolder(token, 'Apresentações Forecast');
+      const hotelFolderId = await ensureDriveFolder(token, hotelName, rootFolderId);
+      const yearFolderId = await ensureDriveFolder(token, String(year), hotelFolderId);
+
+      const deckName = `Forecast - ${hotelName} - ${monthName} ${year} - ${projectionType}`;
+      const { id: presentationId, url } = await copyTemplatePresentation(token, deckName, yearFolderId);
+
+      const structure = await getPresentationStructure(token, presentationId);
+      if (structure.slideIds.length < 4) {
+        throw new Error('O template precisa ter pelo menos 4 slides (capa, subcapa, molde de conteúdo, fechamento).');
+      }
+      const moldSlideId = structure.slideIds[2];
+
+      // Nomes dos placeholders assumidos no template — ajuste aqui se forem diferentes.
+      await fillCoverPlaceholders(token, presentationId, {
+        '{{VERSAO}}': projectionType,
+        '{{HOTEL_DATA}}': `${hotelName} — ${new Date().toLocaleDateString('pt-BR')}`,
+      });
+
+      for (let i = 0; i < SLIDES_CAPTURE_TARGETS.length; i++) {
+        const target = SLIDES_CAPTURE_TARGETS[i];
+        if (currentView !== target.view) {
+          setCurrentView(target.view);
+          const firstCapture = target.captures[0];
+          const firstElementId = firstCapture.kind === 'element' ? firstCapture.elementId : firstCapture.containerId;
+          await waitForElement(firstElementId);
+          await new Promise(r => setTimeout(r, 300)); // layout/gráficos terminarem de assentar
+        }
+        const blob = await captureSlideTarget(target);
+        const imageSize = await getPngBlobSize(blob);
+        const imageUrl = await uploadImageAndGetPublicUrl(token, blob, `${target.id}.png`, yearFolderId);
+        await addContentSlideFromMold(token, presentationId, moldSlideId, 2 + i, target.title, imageUrl, imageSize, structure.pageSize);
+      }
+
+      await deleteSlide(token, presentationId, moldSlideId);
+
+      if (mode === 'update' && existing) {
+        try {
+          await fetch(`https://www.googleapis.com/drive/v3/files/${existing.presentation_id}`, {
+            method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
+          });
+        } catch {
+          // Preferível deixar o arquivo antigo órfão do que travar a geração da nova apresentação por isso.
+        }
+      }
+
+      await supabaseService.upsertSlidePresentation({
+        id: recordId, hotel: hotelName, year, month, projectionType,
+        presentationId, presentationUrl: url, driveFolderId: yearFolderId,
+        createdByUserId: currentUser?.id, createdByUserName: currentUser?.name,
+      });
+
+      setCurrentView(originalView);
+      toast.success((t) => (
+        <span>
+          Apresentação gerada!{' '}
+          <button onClick={() => { window.open(url, '_blank'); toast.dismiss(t.id); }} className="underline font-bold">Abrir</button>
+        </span>
+      ));
+    } catch (err: any) {
+      console.error('Erro ao gerar apresentação:', err);
+      toast.error('Erro ao gerar apresentação: ' + (err?.message || String(err)));
+      setCurrentView(originalView);
+    } finally {
+      setIsGeneratingSlides(false);
+    }
+  };
+
   const handleMonthChange = (direction: 'prev' | 'next') => {
     const newDate = new Date(selectedDate);
     if (direction === 'prev') {
@@ -1196,6 +1321,8 @@ const App: React.FC = () => {
               onImportData={handleImportData}
               onDeleteOtbBalancete={handleDeleteOtbBalancete}
               onResetValidation={handleResetValidation}
+              onGenerateSlides={handleGenerateSlides}
+              isGeneratingSlides={isGeneratingSlides}
             />
           </div>
         </div>
@@ -1415,6 +1542,44 @@ const App: React.FC = () => {
   return (
     <div className="flex bg-gray-50 min-h-screen font-['Inter',sans-serif]">
       <Toaster position="top-right" />
+
+      {pendingSlideRegen && (
+        <div className="fixed inset-0 bg-black/40 z-[200] flex items-center justify-center" onClick={() => { slideRegenChoiceRef.current?.(null); setPendingSlideRegen(null); }}>
+          <div className="bg-white rounded-xl shadow-2xl p-5 w-96" onClick={e => e.stopPropagation()}>
+            <p className="font-bold text-gray-800 mb-1">Já existe uma apresentação gerada</p>
+            <p className="text-sm text-gray-500 mb-4">Pra esse hotel, mês e versão já existe uma apresentação. O que você quer fazer?</p>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => { slideRegenChoiceRef.current?.('update'); setPendingSlideRegen(null); }}
+                className="w-full px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 transition-colors"
+              >
+                Atualizar existente
+              </button>
+              <button
+                onClick={() => { slideRegenChoiceRef.current?.('new'); setPendingSlideRegen(null); }}
+                className="w-full px-4 py-2 rounded-lg bg-gray-50 text-gray-700 border border-gray-200 text-sm font-bold hover:bg-gray-100 transition-colors"
+              >
+                Criar nova versão
+              </button>
+              <button
+                onClick={() => { slideRegenChoiceRef.current?.(null); setPendingSlideRegen(null); }}
+                className="w-full px-4 py-1 text-xs text-gray-400 hover:text-gray-600"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isGeneratingSlides && (
+        <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center">
+          <div className="bg-white rounded-xl shadow-2xl p-6 flex items-center gap-3">
+            <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+            <span className="font-bold text-gray-700">Gerando apresentação...</span>
+          </div>
+        </div>
+      )}
       <Sidebar
         currentView={currentView}
         currentModule={currentModule}

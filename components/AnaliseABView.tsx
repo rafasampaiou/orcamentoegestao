@@ -505,7 +505,7 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
 
     return (
         <div className="px-4 py-6 min-h-[calc(100vh-5rem)] space-y-4">
-            <div className="inline-block bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-6">
+            <div id="slides-capture-analise-ab" className="inline-block bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-6">
                 <h2 className="text-xl font-black text-gray-900 mb-4">Análise de A&B</h2>
 
                 <div className="flex flex-wrap items-center gap-4 mb-6">
@@ -627,7 +627,7 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                 </div>
             </div>
 
-            <div className="inline-block bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-6">
+            <div id="slides-capture-resumo-mensal" className="inline-block bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-6">
                 <h3 className="text-base font-black text-gray-900 mb-4">Resumo mensal — Custo por PAX</h3>
                 <div className="flex items-start gap-4 flex-wrap">
                     <MonthlyStripTable title="Custo de Alimentos" format="currency" kind="despesa" getMonth={idx => monthlySummary[idx]?.custoAlimentos || { real: 0, meta: 0 }} />

@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { getForecastData, getDynamicForecastData } from '../services/mockData';
-import { Upload, ListFilter, LayoutList, Settings2, ChevronUp, Activity, TrendingUp, Lock, LockOpen, CheckCircle2, X, FileSpreadsheet, AlertCircle, CheckCircle, ChevronRight, ChevronDown } from 'lucide-react';
+import { Upload, ListFilter, LayoutList, Settings2, ChevronUp, Activity, TrendingUp, Lock, LockOpen, CheckCircle2, X, FileSpreadsheet, AlertCircle, CheckCircle, ChevronRight, ChevronDown, Presentation } from 'lucide-react';
 import { ExpenseDriver, ImportedRow, Account, CostPackage, Hotel, ForecastRow, ForecastConfig, ForecastOperator, ColumnVisibility, UserRole, KpiCalculation, hasRole } from '../types';
 import { evaluateFormula } from '../utils/formulaEngine';
 import { supabaseService } from '../services/supabaseService';
@@ -68,6 +68,10 @@ interface ForecastTableProps {
     onImportData?: (rows: ImportedRow[], mode: 'append' | 'replace') => void;
     onDeleteOtbBalancete?: (hotel: string, year: number, month: number, versionId: string) => void;
     onResetValidation?: (hotelId: string, year: number, month: number, projectionType: import('../types').ProjectionType) => void;
+    // "Gerar Apresentação" (Google Slides) — a orquestração (trocar de tela, capturar, chamar a
+    // API do Google) mora em App.tsx, que é quem controla a navegação entre telas.
+    onGenerateSlides?: () => void;
+    isGeneratingSlides?: boolean;
 }
 
 // --- UTILITÁRIOS MOVIDOS PARA FORA PARA EVITAR RE-RENDERIZAÇÕES DESNECESSÁRIAS ---
@@ -279,7 +283,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     onNavigateToOccupancy,
     onImportData,
     onDeleteOtbBalancete,
-    onResetValidation
+    onResetValidation,
+    onGenerateSlides,
+    isGeneratingSlides,
 }) => {
     const canEditForecast = hasRole(currentUser, UserRole.ADMIN) ||
         hasRole(currentUser, UserRole.ENTITY_MANAGER) ||
@@ -1581,6 +1587,20 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 </button>
                             )
                         )}
+
+                        {isMeetingVersion && canValidate && (
+                            <button
+                                onClick={() => onGenerateSlides?.()}
+                                disabled={!otbProgress.every(Boolean) || !!isGeneratingSlides}
+                                title={!otbProgress.every(Boolean) ? 'Disponível quando o Status da prévia estiver 8/8 concluído' : undefined}
+                                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg transition-colors text-base font-bold ${otbProgress.every(Boolean) && !isGeneratingSlides
+                                    ? 'bg-amber-500 text-white hover:bg-amber-600 shadow-md'
+                                    : 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'}`}
+                            >
+                                <Presentation size={20} />
+                                {isGeneratingSlides ? 'Gerando...' : 'Gerar Apresentação'}
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -2332,7 +2352,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 ];
 
                 return (
-                    <div className="flex flex-col gap-4 mt-4 shrink-0">
+                    <div id="slides-capture-dre-cards" className="flex flex-col gap-4 mt-4 shrink-0">
                         {groups.map(group => (
                             <div key={group.label}>
                                 <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">{group.label}</p>
