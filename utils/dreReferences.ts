@@ -14,6 +14,21 @@ const REVENUE_RESULT_LABELS = [
   'RECEITA LÍQUIDA',
   'GOP COM DEDUÇÃO DE IMPOSTOS (R$)',
   'GOP SEM DEDUÇÃO DE IMPOSTOS (R$)',
+  'Receita de Apartamentos',
+  // "Lazer" e "Eventos" existem em dobro na DRE (dentro de Receita de Apartamentos e de
+  // Receitas Extras, com o mesmo nome de linha) — aqui entram já qualificados, mesmo padrão
+  // usado no import por template (ver IMPORT_LABEL_MAP em ForecastTable.tsx). O motor de KPI
+  // (resolveKpiTerm) sabe resolver esse formato pro id certo, mesmo a linha na DRE continuando
+  // a se chamar só "Lazer"/"Eventos".
+  'Receita de Apartamentos (Lazer)',
+  'Receita de Apartamentos (Eventos)',
+  'OR de hospedagem',
+  'Receitas Extras',
+  'Receitas Extras (Lazer)',
+  'Receitas Extras (Eventos)',
+  'OR Extras',
+  'Cancelamento de Time Share',
+  'Receita de ISS',
 ];
 
 export function getDreReferenceOptions(accounts: Account[]): DreReferenceOption[] {

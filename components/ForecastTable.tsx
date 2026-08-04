@@ -3140,6 +3140,16 @@ function getDriverValue(driver: string | undefined, allRows: ForecastRow[], base
     return 0;
 }
 
+// "Lazer" e "Eventos" existem em dobro na DRE (dentro de Receita de Apartamentos e de Receitas
+// Extras, com o mesmo nome de linha) — o seletor de fórmula oferece essas 4 combinações já
+// qualificadas (mesmo padrão do IMPORT_LABEL_MAP acima), e aqui é onde isso resolve pro id certo.
+const QUALIFIED_KPI_TERM_ROW_IDS: Record<string, string> = {
+    'receita de apartamentos (lazer)': 'REV-APT-LAZER',
+    'receita de apartamentos (eventos)': 'REV-APT-EVENTOS',
+    'receitas extras (lazer)': 'REV-EXTRA-LAZER',
+    'receitas extras (eventos)': 'REV-EXTRA-EVENTOS',
+};
+
 // A package's KPI only makes sense when every Variável account inside it shares the
 // same Plano de Contas driver — otherwise there is no single unit to divide the total by.
 // Resolves the value of any freely-picked KPI calculation term (an account, package, indicator
@@ -3147,7 +3157,10 @@ function getDriverValue(driver: string | undefined, allRows: ForecastRow[], base
 function resolveKpiTerm(termLabel: string | undefined, allRows: ForecastRow[], field: 'previa' | 'real' | 'budget' | 'otb'): number {
     if (!termLabel) return 0;
     const target = termLabel.trim().toLowerCase();
-    const row = allRows.find(r => r.label.trim().toLowerCase() === target);
+    const qualifiedId = QUALIFIED_KPI_TERM_ROW_IDS[target];
+    const row = qualifiedId
+        ? allRows.find(r => r.id === qualifiedId)
+        : allRows.find(r => r.label.trim().toLowerCase() === target);
     if (!row) return 0;
     // OTB reads the row's own OTB snapshot directly — no Meta substitution, since the whole point
     // is to reflect what was actually entered as of the cutoff day (or nothing, if not yet filled).
