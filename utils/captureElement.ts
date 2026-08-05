@@ -119,11 +119,13 @@ function blobToImage(blob: Blob): Promise<HTMLImageElement> {
 }
 
 // Empilha várias imagens verticalmente numa só (ex.: recorte de tabela + card separado abaixo) —
-// alinhadas à esquerda, com a largura do mais largo dos dois.
-export async function stackPngBlobsVertically(blobs: Blob[]): Promise<Blob> {
+// alinhadas à esquerda, com a largura do mais largo dos dois. Um espaço em branco entre cada
+// imagem (gapPx, em pixels da imagem final) evita que blocos sem relação visual (ex.: fim de uma
+// tabela colado no rótulo de outra seção) pareçam uma coisa só/duplicada.
+export async function stackPngBlobsVertically(blobs: Blob[], gapPx: number = 0): Promise<Blob> {
     const images = await Promise.all(blobs.map(blobToImage));
     const width = Math.max(...images.map(i => i.width));
-    const height = images.reduce((sum, i) => sum + i.height, 0);
+    const height = images.reduce((sum, i) => sum + i.height, 0) + gapPx * (images.length - 1);
 
     const canvas = document.createElement('canvas');
     canvas.width = width;
@@ -134,9 +136,9 @@ export async function stackPngBlobsVertically(blobs: Blob[]): Promise<Blob> {
     ctx.fillRect(0, 0, width, height);
 
     let y = 0;
-    images.forEach(img => {
+    images.forEach((img, i) => {
         ctx.drawImage(img, 0, y);
-        y += img.height;
+        y += img.height + (i < images.length - 1 ? gapPx : 0);
     });
 
     return canvasToPngBlob(canvas);
@@ -151,5 +153,5 @@ async function resolveCaptureSpec(spec: CaptureSpec): Promise<Blob> {
 // usado pelo "Gerar Apresentação" (App.tsx) pra cada item de SLIDES_CAPTURE_TARGETS.
 export async function captureSlideTarget(target: SlideCaptureTarget): Promise<Blob> {
     const blobs = await Promise.all(target.captures.map(resolveCaptureSpec));
-    return blobs.length === 1 ? blobs[0] : stackPngBlobsVertically(blobs);
+    return blobs.length === 1 ? blobs[0] : stackPngBlobsVertically(blobs, 40);
 }
