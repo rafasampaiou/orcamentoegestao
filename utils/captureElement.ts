@@ -52,6 +52,14 @@ export async function captureElementByIdAsPngBlob(elementId: string): Promise<Bl
 // Captura um elemento inteiro e recorta só o trecho vertical entre dois elementos-marcadores
 // dentro dele (ex.: "da linha X até a linha Y" numa tabela grande) — usado pra dividir a DRE
 // Forecast (uma única tabela) em "partes" sem precisar mudar como ela é renderizada.
+//
+// A escala usada pra converter a posição dos marcadores (em pixels de tela) pra pixels da
+// imagem capturada é calculada pela ALTURA (canvas.height ÷ scrollHeight do container), não pela
+// largura — a tabela da DRE costuma ter rolagem horizontal (mais colunas do que cabe na tela), e
+// nesse caso largura visível (clientWidth) ≠ largura renderizada pelo html2canvas (scrollWidth),
+// o que fazia o recorte vertical calcular a proporção errada e "vazar" bem além do marcador de
+// baixo. Além disso, tudo é medido enquanto o container ainda está com max-height/overflow
+// removidos (mesmo estado em que o html2canvas realmente capturou), não depois de restaurados.
 export async function captureElementRegionByIdAsPngBlob(
     containerId: string,
     topMarkerId: string,
@@ -63,12 +71,24 @@ export async function captureElementRegionByIdAsPngBlob(
     if (!container) throw new Error(`Elemento "${containerId}" não encontrado pra captura.`);
     if (!topEl || !bottomEl) throw new Error(`Marcador de recorte não encontrado ("${topMarkerId}" / "${bottomMarkerId}").`);
 
-    const canvas = await captureElementToCanvas(container);
-    const scale = canvas.width / container.getBoundingClientRect().width;
+    const prevMaxHeight = container.style.maxHeight;
+    const prevOverflow = container.style.overflow;
+    container.style.maxHeight = 'none';
+    container.style.overflow = 'visible';
 
-    const containerTop = container.getBoundingClientRect().top;
-    const cropTop = Math.max(0, (topEl.getBoundingClientRect().top - containerTop) * scale);
-    const cropBottom = Math.min(canvas.height, (bottomEl.getBoundingClientRect().bottom - containerTop) * scale);
+    let cropTop: number, cropBottom: number, canvas: HTMLCanvasElement;
+    try {
+        const scrollHeightAtCapture = container.scrollHeight;
+        canvas = await html2canvas(container, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+        const verticalScale = canvas.height / scrollHeightAtCapture;
+
+        const containerTop = container.getBoundingClientRect().top;
+        cropTop = Math.max(0, (topEl.getBoundingClientRect().top - containerTop) * verticalScale);
+        cropBottom = Math.min(canvas.height, (bottomEl.getBoundingClientRect().bottom - containerTop) * verticalScale);
+    } finally {
+        container.style.maxHeight = prevMaxHeight;
+        container.style.overflow = prevOverflow;
+    }
     const cropHeight = Math.max(1, cropBottom - cropTop);
 
     const cropped = document.createElement('canvas');
