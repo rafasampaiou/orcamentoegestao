@@ -508,7 +508,7 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
             <div id="slides-capture-analise-ab" className="inline-block bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-6">
                 <h2 className="text-xl font-black text-gray-900 mb-4">Análise de A&B</h2>
 
-                <div className="flex flex-wrap items-center gap-4 mb-6">
+                <div data-slide-capture-hide="true" className="flex flex-wrap items-center gap-4 mb-6">
                     <div className="flex items-center bg-gray-100 p-1 rounded-lg">
                         {PROJECTION_TYPE_OPTIONS.map(opt => (
                             <button
