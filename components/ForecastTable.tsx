@@ -1657,7 +1657,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                     )}
 
                     <table className="text-base text-left border-collapse table-fixed w-max">
-                        <thead className="bg-white sticky top-0 z-30 shadow-sm font-bold text-sky-900 uppercase tracking-tight text-sm">
+                        <thead id="dre-table-header" className="bg-white sticky top-0 z-30 shadow-sm font-bold text-sky-900 uppercase tracking-tight text-sm">
                             <tr>
                                 <th
                                     style={{ width: columnWidths.description }}

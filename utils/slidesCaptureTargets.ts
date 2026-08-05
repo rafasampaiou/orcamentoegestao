@@ -46,6 +46,9 @@ export const SLIDES_CAPTURE_TARGETS: SlideCaptureTarget[] = [
         title: 'DRE',
         view: 'dashboard',
         captures: [
+            // Cabeçalho da tabela (colunas OTBS/PRÉVIA/FORECAST/META/Δ etc.) empilhado em cima do
+            // recorte — sem ele, quem visse só essa parte não saberia a qual coluna cada valor pertence.
+            { kind: 'region', containerId: 'dre-scroll-container', topMarkerId: 'dre-scroll-container', bottomMarkerId: 'dre-table-header' },
             { kind: 'region', containerId: 'dre-scroll-container', topMarkerId: 'dre-row-CST-HEAD', bottomMarkerId: 'dre-row-RES-OP-COM-IMP-PCT' },
             { kind: 'element', elementId: 'slides-capture-dre-cards' },
         ],
