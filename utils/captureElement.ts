@@ -51,6 +51,10 @@ export async function captureElementToCanvas(element: HTMLElement): Promise<HTML
             scale: 2, // retina — texto pequeno da DRE Forecast fica legível no slide
             backgroundColor: '#ffffff',
             useCORS: true,
+            // Usa o próprio motor de renderização do navegador (via SVG) em vez do html2canvas
+            // reconstruir o CSS manualmente — mais fiel pra layouts com flexbox/cores do Tailwind
+            // (evita perder cor, sombra, cantos arredondados etc. na imagem capturada).
+            foreignObjectRendering: true,
             onclone: prepareCloneForCapture,
         });
     } finally {
@@ -109,7 +113,7 @@ export async function captureElementRegionByIdAsPngBlob(
     let cropTop: number, cropBottom: number, canvas: HTMLCanvasElement;
     try {
         const scrollHeightAtCapture = container.scrollHeight;
-        canvas = await html2canvas(container, { scale: 2, backgroundColor: '#ffffff', useCORS: true, onclone: prepareCloneForCapture });
+        canvas = await html2canvas(container, { scale: 2, backgroundColor: '#ffffff', useCORS: true, foreignObjectRendering: true, onclone: prepareCloneForCapture });
         const verticalScale = canvas.height / scrollHeightAtCapture;
 
         const containerTop = container.getBoundingClientRect().top;

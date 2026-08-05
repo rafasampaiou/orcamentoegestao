@@ -762,6 +762,21 @@ const App: React.FC = () => {
     });
   };
 
+  // Espera qualquer indicador de "carregando" (marcado com data-slide-loading-indicator, ex.:
+  // Análise de A&B) desaparecer do DOM antes de capturar — sem isso, uma tela que ainda está
+  // buscando dados no Supabase podia ser capturada no meio do carregamento, com números zerados.
+  const waitForNoLoadingIndicator = (timeoutMs = 8000): Promise<void> => {
+    return new Promise(resolve => {
+      const start = Date.now();
+      const check = () => {
+        if (!document.querySelector('[data-slide-loading-indicator]')) { resolve(); return; }
+        if (Date.now() - start > timeoutMs) { resolve(); return; } // melhor capturar tarde que travar pra sempre
+        setTimeout(check, 150);
+      };
+      check();
+    });
+  };
+
   // "Gerar Apresentação" (Google Slides) — botão na DRE Forecast, liberado só quando o Status da
   // prévia estiver 8/8 concluído (ver ForecastTable.tsx). Percorre SLIDES_CAPTURE_TARGETS,
   // trocando de tela quando necessário pra capturar cada seção exatamente como está na hora.
@@ -845,6 +860,7 @@ const App: React.FC = () => {
         const firstCapture = target.captures[0];
         const firstElementId = firstCapture.kind === 'element' ? firstCapture.elementId : firstCapture.containerId;
         await waitForElement(firstElementId);
+        await waitForNoLoadingIndicator();
         await new Promise(r => setTimeout(r, 300)); // layout/gráficos terminarem de assentar
         const blob = await captureSlideTarget(target);
         const imageSize = await getPngBlobSize(blob);

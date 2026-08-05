@@ -562,7 +562,7 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                     </p>
                 )}
 
-                {isLoading && <div className="py-6 text-center text-gray-400 italic text-sm">Carregando...</div>}
+                {isLoading && <div data-slide-loading-indicator="true" className="py-6 text-center text-gray-400 italic text-sm">Carregando...</div>}
 
                 <div>
                     <TableShell>
