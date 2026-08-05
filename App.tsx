@@ -110,8 +110,6 @@ const App: React.FC = () => {
   // "Gerar Apresentação" (Google Slides, botão na DRE Forecast) — ver handleGenerateSlides.
   const [isGeneratingSlides, setIsGeneratingSlides] = useState(false);
   const [slideGenProgress, setSlideGenProgress] = useState<{ label: string; percent: number } | null>(null);
-  const [pendingSlideRegen, setPendingSlideRegen] = useState<{ existingId: string; presentationId: string } | null>(null);
-  const slideRegenChoiceRef = useRef<((choice: 'update' | 'new' | null) => void) | null>(null);
   const [selectedHotel, setSelectedHotel] = useState('Atibaia');
   const [selectedHotelType, setSelectedHotelType] = useState<string>('Todos');
   const [selectedHotelCategory, setSelectedHotelCategory] = useState<string>('Todas');
@@ -806,24 +804,12 @@ const App: React.FC = () => {
       const slug = (s: string) => (s || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
       const comboId = `slidedeck_${slug(hotelName)}_${year}_${month}_${slug(projectionType)}`;
 
-      setProgress('Verificando apresentações existentes...');
-      const existing = await supabaseService.getSlidePresentation(hotelName, year, month, projectionType);
-      // mode 'new' = escolha "Atualizar versão" no modal (cria uma apresentação nova/V2, mantém a
-      // anterior intacta). mode 'update' = escolha "Criar nova versão" (apaga a anterior e coloca
-      // esta no lugar, reaproveitando o mesmo registro). Nomes internos ficaram invertidos da
-      // intuição por causa da ordem em que foram implementados — o que importa é o rótulo do botão.
-      let mode: 'update' | 'new' = 'new';
-      let recordId = `${comboId}_${Date.now()}`;
-      if (existing) {
-        const choice = await new Promise<'update' | 'new' | null>(resolve => {
-          slideRegenChoiceRef.current = resolve;
-          setPendingSlideRegen({ existingId: existing.id, presentationId: existing.presentation_id });
-        });
-        setPendingSlideRegen(null);
-        if (!choice) return; // cancelado pelo usuário
-        mode = choice;
-        if (mode === 'update') recordId = existing.id;
-      }
+      // Cada clique cria uma apresentação NOVA (V1, V2, V3...) — nunca substitui/apaga uma
+      // anterior. A contagem é só pra numerar/rotular a nova, não decide nada.
+      setProgress('Verificando versões existentes...');
+      const previousVersions = await supabaseService.getSlidePresentations(hotelName, year, month, projectionType);
+      const versionNumber = previousVersions.length + 1;
+      const recordId = `${comboId}_v${versionNumber}_${Date.now()}`;
 
       setProgress('Preparando pastas no Google Drive...');
       const rootFolderId = await ensureDriveFolder(token, 'Apresentações Forecast');
@@ -831,7 +817,7 @@ const App: React.FC = () => {
       const yearFolderId = await ensureDriveFolder(token, String(year), hotelFolderId);
 
       setProgress('Copiando o modelo da apresentação...');
-      const deckName = `Forecast - ${hotelName} - ${monthName} ${year} - ${projectionType}`;
+      const deckName = `Forecast - ${hotelName} - ${monthName} ${year} - ${projectionType} (V${versionNumber})`;
       const { id: presentationId, url } = await copyTemplatePresentation(token, deckName, yearFolderId);
 
       const structure = await getPresentationStructure(token, presentationId);
@@ -871,16 +857,6 @@ const App: React.FC = () => {
       setProgress('Finalizando apresentação...');
       await deleteSlide(token, presentationId, moldSlideId);
 
-      if (mode === 'update' && existing) {
-        try {
-          await fetch(`https://www.googleapis.com/drive/v3/files/${existing.presentation_id}`, {
-            method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
-          });
-        } catch {
-          // Preferível deixar o arquivo antigo órfão do que travar a geração da nova apresentação por isso.
-        }
-      }
-
       await supabaseService.upsertSlidePresentation({
         id: recordId, hotel: hotelName, year, month, projectionType,
         presentationId, presentationUrl: url, driveFolderId: yearFolderId,
@@ -891,7 +867,7 @@ const App: React.FC = () => {
       setCurrentView(originalView);
       toast.success((t) => (
         <span>
-          Apresentação gerada!{' '}
+          Apresentação V{versionNumber} gerada!{' '}
           <button onClick={() => { window.open(url, '_blank'); toast.dismiss(t.id); }} className="underline font-bold">Abrir</button>
         </span>
       ));
@@ -1587,38 +1563,7 @@ const App: React.FC = () => {
     <div className="flex bg-gray-50 min-h-screen font-['Inter',sans-serif]">
       <Toaster position="top-right" />
 
-      {pendingSlideRegen && (
-        <div className="fixed inset-0 bg-black/40 z-[200] flex items-center justify-center" onClick={() => { slideRegenChoiceRef.current?.(null); setPendingSlideRegen(null); }}>
-          <div className="bg-white rounded-xl shadow-2xl p-5 w-96" onClick={e => e.stopPropagation()}>
-            <p className="font-bold text-gray-800 mb-1">Já existe uma apresentação gerada</p>
-            <p className="text-sm text-gray-500 mb-4">Pra esse hotel, mês e versão já existe uma apresentação. O que você quer fazer?</p>
-            <div className="flex flex-col gap-2">
-              <button
-                onClick={() => { slideRegenChoiceRef.current?.('new'); setPendingSlideRegen(null); }}
-                className="w-full px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 transition-colors text-left"
-              >
-                Atualizar versão
-                <span className="block text-[11px] font-normal text-indigo-100 mt-0.5">Cria uma nova apresentação (V2) e mantém a anterior</span>
-              </button>
-              <button
-                onClick={() => { slideRegenChoiceRef.current?.('update'); setPendingSlideRegen(null); }}
-                className="w-full px-4 py-2 rounded-lg bg-gray-50 text-gray-700 border border-gray-200 text-sm font-bold hover:bg-gray-100 transition-colors text-left"
-              >
-                Criar nova versão
-                <span className="block text-[11px] font-normal text-gray-400 mt-0.5">Apaga a apresentação anterior e cria outra no lugar</span>
-              </button>
-              <button
-                onClick={() => { slideRegenChoiceRef.current?.(null); setPendingSlideRegen(null); }}
-                className="w-full px-4 py-1 text-xs text-gray-400 hover:text-gray-600"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isGeneratingSlides && !pendingSlideRegen && (
+      {isGeneratingSlides && (
         <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center">
           <div className="bg-white rounded-xl shadow-2xl p-6 w-96">
             <div className="flex items-center gap-3 mb-3">

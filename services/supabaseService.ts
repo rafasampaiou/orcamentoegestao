@@ -1166,15 +1166,17 @@ export const supabaseService = {
   // ═══════════════════════════════════════════════════════════════════════════
   // SLIDE PRESENTATIONS (Gerar Apresentação, Google Slides)
   // ═══════════════════════════════════════════════════════════════════════════
-  async getSlidePresentation(hotel: string, year: number, month: number, projectionType: string): Promise<any | null> {
+  // Todas as apresentações já geradas pra esse hotel/mês/versão de projeção (mais antiga primeiro)
+  // — cada clique em "Gerar Apresentação" cria uma NOVA (V1, V2, V3...), nunca substitui/apaga as
+  // anteriores. Usado só pra numerar a próxima (length + 1); nenhuma é escolhida/sobrescrita.
+  async getSlidePresentations(hotel: string, year: number, month: number, projectionType: string): Promise<any[]> {
     const { data, error } = await supabase
       .from('slide_presentations')
       .select('*')
       .eq('hotel', hotel).eq('year', year).eq('month', month).eq('projection_type', projectionType)
-      .order('created_at', { ascending: false })
-      .limit(1);
+      .order('created_at', { ascending: true });
     if (error) throw error;
-    return data && data.length > 0 ? data[0] : null;
+    return data || [];
   },
 
   async upsertSlidePresentation(record: {

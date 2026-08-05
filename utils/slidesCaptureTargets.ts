@@ -31,14 +31,18 @@ export interface SlideCaptureTarget {
     captures: CaptureSpec[];
 }
 
-// Ids usados em components/ForecastTable.tsx e components/AnaliseABView.tsx.
+// Lista definitiva (confirmada 2026-08-05): ocupação/receita, despesas+GOP+transformação, Análise
+// de A&B, Resumo de A&B, GMD — nessa ordem. Ids usados em components/ForecastTable.tsx e
+// components/AnaliseABView.tsx.
 export const SLIDES_CAPTURE_TARGETS: SlideCaptureTarget[] = [
     {
         id: 'dre-parte-1',
         title: 'DRE',
         view: 'dashboard',
         captures: [
-            { kind: 'region', containerId: 'dre-scroll-container', topMarkerId: 'dre-scroll-container', bottomMarkerId: 'dre-row-REV-NET' },
+            // Do topo da tabela até "Receita de ISS" (inclusive) — Impostos e Receita Líquida
+            // ficam pro início do slide de despesas/GOP, não são perdidos.
+            { kind: 'region', containerId: 'dre-scroll-container', topMarkerId: 'dre-scroll-container', bottomMarkerId: 'dre-row-REV-ISS' },
         ],
     },
     {
@@ -49,15 +53,11 @@ export const SLIDES_CAPTURE_TARGETS: SlideCaptureTarget[] = [
             // Cabeçalho da tabela (colunas OTBS/PRÉVIA/FORECAST/META/Δ etc.) empilhado em cima do
             // recorte — sem ele, quem visse só essa parte não saberia a qual coluna cada valor pertence.
             { kind: 'region', containerId: 'dre-scroll-container', topMarkerId: 'dre-scroll-container', bottomMarkerId: 'dre-table-header' },
-            { kind: 'region', containerId: 'dre-scroll-container', topMarkerId: 'dre-row-CST-HEAD', bottomMarkerId: 'dre-row-RES-OP-COM-IMP-PCT' },
+            // De "Impostos" (linha seguinte à Receita de ISS do slide anterior) até "GOP com dedução
+            // de impostos (%)", seguido dos cards de Transformação/Reatividade.
+            { kind: 'region', containerId: 'dre-scroll-container', topMarkerId: 'dre-row-REV-IMP', bottomMarkerId: 'dre-row-RES-OP-COM-IMP-PCT' },
             { kind: 'element', elementId: 'slides-capture-dre-cards' },
         ],
-    },
-    {
-        id: 'gmd',
-        title: 'GMD',
-        view: 'gmd',
-        captures: [{ kind: 'element', elementId: 'slides-capture-gmd' }],
     },
     {
         id: 'analise-ab',
@@ -70,5 +70,11 @@ export const SLIDES_CAPTURE_TARGETS: SlideCaptureTarget[] = [
         title: 'Resumo Mensal',
         view: 'ab_analysis',
         captures: [{ kind: 'element', elementId: 'slides-capture-resumo-mensal' }],
+    },
+    {
+        id: 'gmd',
+        title: 'GMD',
+        view: 'gmd',
+        captures: [{ kind: 'element', elementId: 'slides-capture-gmd' }],
     },
 ];
