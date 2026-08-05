@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Account, CostPackage, Hotel, ImportedRow, ProjectionType } from '../types';
+import { Account, CostPackage, Hotel, ImportedRow, ProjectionType, ValidationRecord } from '../types';
 import { buildForecastRows, formatValue, formatPercentDiff, formatPointsDiff } from './ForecastTable';
 
 interface ComparativesViewProps {
@@ -15,9 +15,14 @@ interface ComparativesViewProps {
     budgetOccupancyData?: Record<string, number[]>;
     activeProjectionType?: ProjectionType;
     setActiveProjectionType?: React.Dispatch<React.SetStateAction<ProjectionType>>;
+    validations?: ValidationRecord[];
 }
 
 const MONTH_LABELS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+const ALL_MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+// Ordem de "mais avançado" — usada pra achar, dado um mês já validado em mais de uma versão
+// (raro, mas possível), qual delas prevalece. Mesma ordem de PROJECTION_TYPE_OPTIONS, invertida.
+const PROJECTION_RANK: ProjectionType[] = ['Realizado', 'Fechamento oficial', 'FCA N1', 'FCA N2', 'Reunião de Ritmo'];
 
 // Mesmas 5 versões do resto do app — ver AnaliseABView.tsx.
 const PROJECTION_TYPE_OPTIONS: { value: ProjectionType; label: string }[] = [
@@ -106,8 +111,20 @@ const formatDeltaPct = (diff: number, base: number, format: RowFormat): string =
 const ComparativesView: React.FC<ComparativesViewProps> = ({
     selectedMonth, selectedYear, financialData, accounts, packages, hotels,
     realOccupancyData, activeRealVersionId, activeBudgetVersionId, budgetOccupancyData,
-    activeProjectionType, setActiveProjectionType,
+    activeProjectionType, setActiveProjectionType, validations,
 }) => {
+    // "Projetar": ano inteiro por hotel — meses já validados usam Real/Prévia, os demais repetem
+    // a Meta (escalada pelo WHAT IF % daquele hotel). Simulação client-side, não persiste.
+    const [projectionMode, setProjectionMode] = useState(false);
+    const [whatIfByHotel, setWhatIfByHotel] = useState<Record<string, number>>({});
+
+    // Só conta como "mês já trabalhado" se existir uma validação com status "Validado" pra esse
+    // hotel+ano+mês — "Em construção" ainda entra na repetição de Meta.
+    const findValidatedVersion = (hotelId: string, month: number): ProjectionType | null => {
+        const matches = (validations || []).filter(v => v.hotelId === hotelId && v.year === selectedYear && v.month === month && v.status === 'Validado');
+        if (matches.length === 0) return null;
+        return PROJECTION_RANK.find(rank => matches.some(v => v.projectionType === rank)) || null;
+    };
     // Meses considerados — por padrão só o mês corrente, mas dá pra acumular vários (soma do
     // período), mesmo padrão/UI do filtro "Filtrar Meses" da Análise de A&B.
     const [visibleMonths, setVisibleMonths] = useState<number[]>(() => selectedMonth ? [selectedMonth] : [1]);
@@ -157,9 +174,51 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
             return { previa: acc.previa + (r?.previa || 0), budget: acc.budget + (r?.budget || 0), lastYear: acc.lastYear + (r?.lastYear || 0) };
         }, zeroTotals());
 
+    // Estágio 1 (caro): pra cada hotel × cada um dos 12 meses do ano, descobre se o mês já foi
+    // validado (e em qual versão) e busca Receita/Imposto/Despesa desse mês nessa versão — não
+    // depende do WHAT IF, só recalcula se os dados/hotéis/validações mudarem.
+    const perHotelMonthlyAnnual = useMemo(() => {
+        if (!projectionMode) return [];
+        const selected = hotels.filter(h => effectiveSelectedNames.includes(h.name));
+        return selected.map(hotel => ({
+            hotel,
+            months: ALL_MONTHS.map(m => {
+                const validated = findValidatedVersion(hotel.id, m);
+                const rows = buildForecastRows(
+                    undefined, m, selectedYear, financialData, hotel.name, hotels,
+                    realOccupancyData || {}, activeRealVersionId, activeBudgetVersionId, accounts, packages,
+                    budgetOccupancyData || {}, validated || activeProjectionType
+                );
+                return {
+                    worked: !!validated,
+                    revenue: rows.find(r => r.id === 'REV-TOTAL'),
+                    tax: rows.find(r => r.id === 'REV-IMP'),
+                    expense: rows.find(r => r.id === 'CST-HEAD'),
+                };
+            }),
+        }));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [projectionMode, hotels, effectiveSelectedNames, selectedYear, financialData, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData, activeProjectionType, validations]);
+
+    // Estágio 2 (barato): aplica o WHAT IF % de cada hotel nos meses ainda não trabalhados —
+    // arrastar o slider só recalcula isso, não repete as 12 chamadas de buildForecastRows.
+    const perHotelProjectedTotals = useMemo(() => perHotelMonthlyAnnual.map(({ hotel, months }) => {
+        const pct = (whatIfByHotel[hotel.id] ?? 100) / 100;
+        const combine = (field: 'revenue' | 'tax' | 'expense'): PeriodTotals => months.reduce((acc, mo) => {
+            const r = mo[field];
+            const previaContribution = mo.worked ? (r?.previa || 0) : (r?.budget || 0) * pct;
+            return {
+                previa: acc.previa + previaContribution,
+                budget: acc.budget + (r?.budget || 0),
+                lastYear: acc.lastYear + (r?.lastYear || 0),
+            };
+        }, zeroTotals());
+        return { hotel, isAdm: hotel.type === 'Administradora', revenue: combine('revenue'), tax: combine('tax'), expense: combine('expense') };
+    }), [perHotelMonthlyAnnual, whatIfByHotel]);
+
     const gopBlocks: GopBlock[] = useMemo(() => {
         type RawBlock = { hotel: Hotel; isAdm: boolean; revenue: PeriodTotals; tax: PeriodTotals; expense: PeriodTotals };
-        const raw: RawBlock[] = perHotelMonthlyRows.map(({ hotel, monthsRows }) => ({
+        const raw: RawBlock[] = projectionMode ? perHotelProjectedTotals : perHotelMonthlyRows.map(({ hotel, monthsRows }) => ({
             hotel,
             isAdm: hotel.type === 'Administradora',
             revenue: sumField(monthsRows, 'REV-TOTAL'),
@@ -230,12 +289,28 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
             blocks.push({ key: 'grupo-com-jp', name: 'Grupo com JP', isAdm: false, ppm, rows });
         }
         return blocks;
-    }, [perHotelMonthlyRows, hideSemImposto]);
+    }, [perHotelMonthlyRows, perHotelProjectedTotals, projectionMode, hideSemImposto]);
 
     return (
         <div className="px-4 py-6 min-h-[calc(100vh-5rem)] space-y-4">
             <div className="inline-block max-w-full bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-6">
-                <h2 className="text-xl font-black text-gray-900 mb-4">Tabela de GOP</h2>
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-black text-gray-900">Tabela de GOP</h2>
+                    <button
+                        onClick={() => setProjectionMode(v => !v)}
+                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${projectionMode
+                            ? 'bg-indigo-600 text-white shadow-sm'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'}`}
+                    >
+                        {projectionMode ? 'Projeção ativa — clique pra sair' : 'Projetar'}
+                    </button>
+                </div>
+
+                {projectionMode && (
+                    <p className="text-sm text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 font-bold mb-4">
+                        Modo Projeção: meses já validados usam Real/Prévia; os demais repetem a Meta, escalada pelo WHAT IF % de cada hotel — sempre o ano inteiro (Jan–Dez).
+                    </p>
+                )}
 
                 <div className="flex flex-wrap items-start gap-6 mb-3">
                     {setActiveProjectionType && (
@@ -257,8 +332,8 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
                         </div>
                     )}
 
-                    <div>
-                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Mês</p>
+                    <div className={projectionMode ? 'opacity-40 pointer-events-none' : ''}>
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Mês {projectionMode && '(ano inteiro no modo Projeção)'}</p>
                         <div className="flex items-center flex-wrap gap-1">
                             {MONTH_LABELS.map((label, idx) => {
                                 const monthNum = idx + 1;
@@ -266,6 +341,7 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
                                 return (
                                     <button
                                         key={label}
+                                        disabled={projectionMode}
                                         onClick={() => setVisibleMonths(prev => {
                                             const next = prev.includes(monthNum) ? prev.filter(m => m !== monthNum) : [...prev, monthNum].sort((a, b) => a - b);
                                             return next.length === 0 ? prev : next;
@@ -279,6 +355,7 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
                                 );
                             })}
                             <button
+                                disabled={projectionMode}
                                 onClick={() => setVisibleMonths(visibleMonths.length === 12 ? [selectedMonth || 1] : Array.from({ length: 12 }, (_, i) => i + 1))}
                                 className="px-3 py-1 text-sm font-bold rounded-md transition-all bg-gray-100 text-gray-600 hover:bg-gray-200 ml-2 border border-gray-200"
                             >
@@ -313,13 +390,13 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
                     <span className="text-sm font-bold text-gray-600">Ocultar GOP R$ / GOP % sem imposto</span>
                 </label>
 
-                {!isSingleMonth && (
+                {!isSingleMonth && !projectionMode && (
                     <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 font-bold mb-4">
                         Vários meses selecionados — os valores mostrados são a soma do período.
                     </p>
                 )}
 
-                <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                <div className="inline-block max-w-full overflow-x-auto border border-gray-200 rounded-xl">
                     <table className="text-xs table-fixed">
                         <colgroup>
                             <col style={{ width: '88px' }} />
@@ -332,12 +409,13 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
                             <col style={{ width: '85px' }} />
                             <col style={{ width: '65px' }} />
                             <col style={{ width: '75px' }} />
+                            {projectionMode && <col style={{ width: '90px' }} />}
                         </colgroup>
                         <thead className="bg-emerald-800 text-white">
                             <tr>
                                 <th className="px-2 py-2 text-center font-bold uppercase tracking-wide">Filial</th>
                                 <th className="px-2 py-2 text-left font-bold uppercase tracking-wide">Indicador</th>
-                                <th className="px-2 py-2 text-right font-bold uppercase tracking-wide">REAL {selectedYear}</th>
+                                <th className="px-2 py-2 text-right font-bold uppercase tracking-wide">{projectionMode ? 'PROJETADO' : 'REAL'} {selectedYear}</th>
                                 <th className="px-2 py-2 text-right font-bold uppercase tracking-wide">META {selectedYear}</th>
                                 <th className="px-2 py-2 text-right font-bold uppercase tracking-wide">R{yy}-M{yy}</th>
                                 <th className="px-2 py-2 text-right font-bold uppercase tracking-wide">%</th>
@@ -345,17 +423,18 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
                                 <th className="px-2 py-2 text-right font-bold uppercase tracking-wide">R{yy}-R{yyLY}</th>
                                 <th className="px-2 py-2 text-right font-bold uppercase tracking-wide">%</th>
                                 <th className="px-2 py-2 text-center font-bold uppercase tracking-wide">GOP PPM</th>
+                                {projectionMode && <th className="px-2 py-2 text-center font-bold uppercase tracking-wide">WHAT IF %</th>}
                             </tr>
                         </thead>
                         <tbody>
                             {gopBlocks.length === 0 && (
-                                <tr><td colSpan={10} className="text-center text-gray-400 italic py-8">Selecione ao menos um hotel.</td></tr>
+                                <tr><td colSpan={projectionMode ? 11 : 10} className="text-center text-gray-400 italic py-8">Selecione ao menos um hotel.</td></tr>
                             )}
                             {gopBlocks.map((block, blockIdx) => block.rows.map((row, i) => {
                                 const diffMeta = row.values.previa - row.values.budget;
                                 const diffLY = row.values.previa - row.values.lastYear;
                                 return (
-                                    <tr key={`${block.key}-${i}`} className={`${blockIdx % 2 === 1 ? 'bg-gray-50/60' : 'bg-white'} border-b border-gray-100`}>
+                                    <tr key={`${block.key}-${i}`} className={`${row.label.startsWith('GOP') ? 'bg-gray-100/70' : (blockIdx % 2 === 1 ? 'bg-gray-50/60' : 'bg-white')} border-b border-gray-100`}>
                                         {i === 0 && (
                                             <td rowSpan={block.rows.length} className="px-2 py-1.5 text-center align-middle font-black text-gray-900 border-r border-gray-200 truncate">
                                                 {block.name}
@@ -372,6 +451,23 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
                                         {i === 0 && (
                                             <td rowSpan={block.rows.length} className={`px-2 py-1.5 text-center align-middle font-black border-l border-gray-200 ${block.isAdm ? despesaPpmClass(block.ppm) : gopPpmClass(block.ppm)}`}>
                                                 {block.ppm === null ? '-' : formatValue(block.ppm, 'percent')}
+                                            </td>
+                                        )}
+                                        {projectionMode && i === 0 && (
+                                            <td rowSpan={block.rows.length} className="px-2 py-1.5 text-center align-middle border-l border-gray-200">
+                                                {(block.key === 'grupo' || block.key === 'grupo-com-jp') ? (
+                                                    <span className="text-gray-400">-</span>
+                                                ) : (
+                                                    <div className="flex flex-col items-center gap-1">
+                                                        <input
+                                                            type="range" min={0} max={100}
+                                                            value={whatIfByHotel[block.key] ?? 100}
+                                                            onChange={e => setWhatIfByHotel(prev => ({ ...prev, [block.key]: Number(e.target.value) }))}
+                                                            className="w-16 accent-indigo-600"
+                                                        />
+                                                        <span className="text-[11px] font-black text-indigo-700">{whatIfByHotel[block.key] ?? 100}%</span>
+                                                    </div>
+                                                )}
                                             </td>
                                         )}
                                     </tr>

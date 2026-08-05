@@ -1422,6 +1422,7 @@ const App: React.FC = () => {
           budgetOccupancyData={budgetOccupancyDataMap[activeBudgetVersionId] || {}}
           activeProjectionType={activeProjectionType}
           setActiveProjectionType={setActiveProjectionType}
+          validations={validations}
         />
       );
       case 'gmd': return (
