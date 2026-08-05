@@ -793,6 +793,10 @@ const App: React.FC = () => {
 
       setProgress('Verificando apresentações existentes...');
       const existing = await supabaseService.getSlidePresentation(hotelName, year, month, projectionType);
+      // mode 'new' = escolha "Atualizar versão" no modal (cria uma apresentação nova/V2, mantém a
+      // anterior intacta). mode 'update' = escolha "Criar nova versão" (apaga a anterior e coloca
+      // esta no lugar, reaproveitando o mesmo registro). Nomes internos ficaram invertidos da
+      // intuição por causa da ordem em que foram implementados — o que importa é o rótulo do botão.
       let mode: 'update' | 'new' = 'new';
       let recordId = `${comboId}_${Date.now()}`;
       if (existing) {
@@ -1574,16 +1578,18 @@ const App: React.FC = () => {
             <p className="text-sm text-gray-500 mb-4">Pra esse hotel, mês e versão já existe uma apresentação. O que você quer fazer?</p>
             <div className="flex flex-col gap-2">
               <button
-                onClick={() => { slideRegenChoiceRef.current?.('update'); setPendingSlideRegen(null); }}
-                className="w-full px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 transition-colors"
+                onClick={() => { slideRegenChoiceRef.current?.('new'); setPendingSlideRegen(null); }}
+                className="w-full px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 transition-colors text-left"
               >
-                Atualizar existente
+                Atualizar versão
+                <span className="block text-[11px] font-normal text-indigo-100 mt-0.5">Cria uma nova apresentação (V2) e mantém a anterior</span>
               </button>
               <button
-                onClick={() => { slideRegenChoiceRef.current?.('new'); setPendingSlideRegen(null); }}
-                className="w-full px-4 py-2 rounded-lg bg-gray-50 text-gray-700 border border-gray-200 text-sm font-bold hover:bg-gray-100 transition-colors"
+                onClick={() => { slideRegenChoiceRef.current?.('update'); setPendingSlideRegen(null); }}
+                className="w-full px-4 py-2 rounded-lg bg-gray-50 text-gray-700 border border-gray-200 text-sm font-bold hover:bg-gray-100 transition-colors text-left"
               >
                 Criar nova versão
+                <span className="block text-[11px] font-normal text-gray-400 mt-0.5">Apaga a apresentação anterior e cria outra no lugar</span>
               </button>
               <button
                 onClick={() => { slideRegenChoiceRef.current?.(null); setPendingSlideRegen(null); }}

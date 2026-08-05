@@ -4,6 +4,21 @@
 import html2canvas from 'html2canvas-pro';
 import { CaptureSpec, SlideCaptureTarget } from './slidesCaptureTargets';
 
+// html2canvas tem suporte limitado a elementos de formulário (<input>/<textarea>) — em vez de
+// pintar o elemento a partir do CSS computado normalmente, ele desenha um substituto próprio, que
+// às vezes ignora "border: 1px solid transparent" (usado nas células editáveis da DRE Forecast pra
+// reservar o espaço da borda de foco sem mostrar nada) e desenha uma borda visível por padrão —
+// aparecia como uma caixinha em volta de valores da Prévia que na tela não têm caixa nenhuma. Como
+// isso só afeta o CLONE usado pra gerar a imagem (não a tela real), forçar "sem borda" nele é seguro.
+function stripInputBordersOnClone(clonedDoc: Document) {
+    clonedDoc.querySelectorAll('input, textarea, select').forEach((el) => {
+        const style = (el as HTMLElement).style;
+        style.border = 'none';
+        style.outline = 'none';
+        style.boxShadow = 'none';
+    });
+}
+
 // Captura um elemento da tela exatamente como está renderizado no momento do clique (mesmas
 // colunas mostradas/ocultas, mesmo filtro etc.) — usado pelo "Gerar Apresentação" (App.tsx) pra
 // colar o "print" de cada seção nos slides do Google Slides.
@@ -30,6 +45,7 @@ export async function captureElementToCanvas(element: HTMLElement): Promise<HTML
             scale: 2, // retina — texto pequeno da DRE Forecast fica legível no slide
             backgroundColor: '#ffffff',
             useCORS: true,
+            onclone: stripInputBordersOnClone,
         });
     } finally {
         element.style.maxHeight = prevMaxHeight;
@@ -87,7 +103,7 @@ export async function captureElementRegionByIdAsPngBlob(
     let cropTop: number, cropBottom: number, canvas: HTMLCanvasElement;
     try {
         const scrollHeightAtCapture = container.scrollHeight;
-        canvas = await html2canvas(container, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+        canvas = await html2canvas(container, { scale: 2, backgroundColor: '#ffffff', useCORS: true, onclone: stripInputBordersOnClone });
         const verticalScale = canvas.height / scrollHeightAtCapture;
 
         const containerTop = container.getBoundingClientRect().top;
