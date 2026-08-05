@@ -1408,7 +1408,22 @@ const App: React.FC = () => {
           onNavigateToForecast={() => setCurrentView('dashboard')}
         />
       );
-      case 'comparatives': return <ComparativesView activeRealVersionName={activeRealVersionName} />;
+      case 'comparatives': return (
+        <ComparativesView
+          selectedMonth={selectedDate.getMonth() + 1}
+          selectedYear={selectedDate.getFullYear()}
+          financialData={importedFinancialData}
+          accounts={accounts}
+          packages={packages}
+          hotels={hotels}
+          realOccupancyData={realOccupancyData}
+          activeRealVersionId={activeRealVersionId}
+          activeBudgetVersionId={activeBudgetVersionId}
+          budgetOccupancyData={budgetOccupancyDataMap[activeBudgetVersionId] || {}}
+          activeProjectionType={activeProjectionType}
+          setActiveProjectionType={setActiveProjectionType}
+        />
+      );
       case 'gmd': return (
         <GMDView
           gmdConfigs={gmdConfigs}
