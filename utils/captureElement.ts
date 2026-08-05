@@ -51,10 +51,10 @@ export async function captureElementToCanvas(element: HTMLElement): Promise<HTML
             scale: 2, // retina — texto pequeno da DRE Forecast fica legível no slide
             backgroundColor: '#ffffff',
             useCORS: true,
-            // Usa o próprio motor de renderização do navegador (via SVG) em vez do html2canvas
-            // reconstruir o CSS manualmente — mais fiel pra layouts com flexbox/cores do Tailwind
-            // (evita perder cor, sombra, cantos arredondados etc. na imagem capturada).
-            foreignObjectRendering: true,
+            // foreignObjectRendering (renderização via SVG) chegou a ser testada aqui, mas em telas
+            // mais complexas (Análise de A&B) renderizava só parte do conteúdo (resto ficava em
+            // branco) — voltado pro modo padrão (canvas 2D, mais lento porém mais confiável nesses
+            // layouts).
             onclone: prepareCloneForCapture,
         });
     } finally {
@@ -107,13 +107,21 @@ export async function captureElementRegionByIdAsPngBlob(
 
     const prevMaxHeight = container.style.maxHeight;
     const prevOverflow = container.style.overflow;
+    const prevWidth = container.style.width;
+    const prevScrollLeft = container.scrollLeft;
     container.style.maxHeight = 'none';
     container.style.overflow = 'visible';
+    // A tabela da DRE tem mais colunas do que cabe na tela (rolagem horizontal) — sem fixar a
+    // largura no scrollWidth (largura total do conteúdo, não só a visível) e sem zerar o scroll,
+    // a captura saía mostrando só o trecho de colunas que estava rolado no momento do clique
+    // (faltando a coluna "Descrição" à esquerda, por exemplo), em vez da tabela inteira.
+    container.style.width = `${container.scrollWidth}px`;
+    container.scrollLeft = 0;
 
     let cropTop: number, cropBottom: number, canvas: HTMLCanvasElement;
     try {
         const scrollHeightAtCapture = container.scrollHeight;
-        canvas = await html2canvas(container, { scale: 2, backgroundColor: '#ffffff', useCORS: true, foreignObjectRendering: true, onclone: prepareCloneForCapture });
+        canvas = await html2canvas(container, { scale: 2, backgroundColor: '#ffffff', useCORS: true, onclone: prepareCloneForCapture });
         const verticalScale = canvas.height / scrollHeightAtCapture;
 
         const containerTop = container.getBoundingClientRect().top;
@@ -122,6 +130,8 @@ export async function captureElementRegionByIdAsPngBlob(
     } finally {
         container.style.maxHeight = prevMaxHeight;
         container.style.overflow = prevOverflow;
+        container.style.width = prevWidth;
+        container.scrollLeft = prevScrollLeft;
     }
     const cropHeight = Math.max(1, cropBottom - cropTop);
 
