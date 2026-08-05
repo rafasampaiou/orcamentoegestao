@@ -28,6 +28,13 @@ const PROJECTION_TYPE_OPTIONS: { value: ProjectionType; label: string }[] = [
     { value: 'Realizado', label: 'Realizado' },
 ];
 
+// "João Pessoa" entra 2x na ordem final (ver montagem de gopBlocks): uma vez como hotel próprio,
+// e o hotel some/entra na comparação do "Grupo" x "Grupo com JP" — pedido explícito do usuário
+// pra poder comparar o resultado do grupo com e sem esse hotel.
+const DIACRITICS_REGEX = new RegExp("[\u0300-\u036f]", "g");
+const normalizeName = (s: string) => s.trim().toLowerCase().normalize('NFD').replace(DIACRITICS_REGEX, '');
+const isJoaoPessoa = (name: string) => normalizeName(name) === 'joao pessoa';
+
 interface PeriodTotals { previa: number; budget: number; lastYear: number; }
 const zeroTotals = (): PeriodTotals => ({ previa: 0, budget: 0, lastYear: 0 });
 const addTotals = (a: PeriodTotals, b: PeriodTotals): PeriodTotals => ({ previa: a.previa + b.previa, budget: a.budget + b.budget, lastYear: a.lastYear + b.lastYear });
@@ -75,7 +82,7 @@ const despesaPpmClass = (ppm: number | null): string => {
 // Cor da célula de diferença: pra receita/GOP, "maior" é bom (verde); pra despesa/imposto, é o
 // oposto — mesmo padrão de AnaliseABView.tsx (diffCellClass).
 const diffCellClass = (diff: number, kind: RowKind): string => {
-    const base = 'px-2 py-1.5 text-right tabular-nums whitespace-nowrap';
+    const base = 'px-1.5 py-1 text-right tabular-nums whitespace-nowrap';
     if (!diff) return `${base} text-gray-400`;
     const isGood = kind === 'receita' ? diff > 0 : diff < 0;
     return `${base} ${isGood ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`;
@@ -121,6 +128,9 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
         const base = prev ?? hotels.map(h => h.name);
         return base.includes(name) ? base.filter(n => n !== name) : [...base, name];
     });
+
+    // Linhas "sem imposto" só aparecem se o usuário pedir — a tabela já tem bastante coisa.
+    const [hideSemImposto, setHideSemImposto] = useState(false);
 
     const yy = String(selectedYear || new Date().getFullYear()).slice(-2);
     const yyLY = String((selectedYear || new Date().getFullYear()) - 1).slice(-2);
@@ -172,14 +182,15 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
                 { label: 'Despesa', format: 'currency', kind: 'despesa', values: expense },
                 { label: 'GOP R$', format: 'currency', kind: 'receita', values: gopR },
                 { label: 'GOP %', format: 'percent', kind: 'receita', values: gopPct },
-                { label: 'GOP R$ sem imposto', format: 'currency', kind: 'receita', values: gopRSemImp },
-                { label: 'GOP % sem imposto', format: 'percent', kind: 'receita', values: gopPctSemImp },
+                ...(hideSemImposto ? [] : [
+                    { label: 'GOP R$ sem imposto', format: 'currency' as const, kind: 'receita' as const, values: gopRSemImp },
+                    { label: 'GOP % sem imposto', format: 'percent' as const, kind: 'receita' as const, values: gopPctSemImp },
+                ]),
             ];
             const ppm = gopR.budget ? (gopR.previa / gopR.budget) * 100 : null;
             return { rows, ppm };
         };
-
-        const blocks: GopBlock[] = raw.map(b => {
+        const blockFor = (b: RawBlock): GopBlock => {
             if (b.isAdm) {
                 const pctReceita = pctOf(b.expense, groupRevenue);
                 const rows: IndicatorRow[] = [
@@ -191,27 +202,42 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
             }
             const { rows, ppm } = buildNormalRows(b.revenue, b.tax, b.expense);
             return { key: b.hotel.id, name: b.hotel.name, isAdm: false, ppm, rows };
-        });
+        };
 
-        // Linha "Grupo" — soma de todos os hotéis selecionados (inclui a despesa da
-        // Administradora), recalculando o GOP a partir dos totais somados (nunca somando GOP%
-        // diretamente entre hotéis).
-        if (raw.length > 0) {
+        // Ordem final pedida pelo usuário: todos os hotéis normais (na ordem em que já vêm em
+        // `hotels`) + Administradora, depois "Grupo" (soma sem João Pessoa), depois João Pessoa
+        // como hotel próprio (se selecionado), e por fim "Grupo com JP" (soma incluindo ele) — pra
+        // comparar o resultado do grupo com e sem esse hotel.
+        const jpRaw = raw.find(b => isJoaoPessoa(b.hotel.name));
+        const nonJpRaw = raw.filter(b => !isJoaoPessoa(b.hotel.name));
+
+        const blocks: GopBlock[] = nonJpRaw.map(blockFor);
+
+        if (nonJpRaw.length > 0) {
+            const grpRevenue = nonJpRaw.reduce((acc, b) => addTotals(acc, b.revenue), zeroTotals());
+            const grpTax = nonJpRaw.reduce((acc, b) => addTotals(acc, b.tax), zeroTotals());
+            const grpExpense = nonJpRaw.reduce((acc, b) => addTotals(acc, b.expense), zeroTotals());
+            const { rows, ppm } = buildNormalRows(grpRevenue, grpTax, grpExpense);
+            blocks.push({ key: 'grupo', name: 'Grupo', isAdm: false, ppm, rows });
+        }
+
+        if (jpRaw) {
+            blocks.push(blockFor(jpRaw));
             const grpRevenue = raw.reduce((acc, b) => addTotals(acc, b.revenue), zeroTotals());
             const grpTax = raw.reduce((acc, b) => addTotals(acc, b.tax), zeroTotals());
             const grpExpense = raw.reduce((acc, b) => addTotals(acc, b.expense), zeroTotals());
             const { rows, ppm } = buildNormalRows(grpRevenue, grpTax, grpExpense);
-            blocks.push({ key: 'grupo', name: 'Grupo', isAdm: false, ppm, rows });
+            blocks.push({ key: 'grupo-com-jp', name: 'Grupo com JP', isAdm: false, ppm, rows });
         }
         return blocks;
-    }, [perHotelMonthlyRows]);
+    }, [perHotelMonthlyRows, hideSemImposto]);
 
     return (
         <div className="px-4 py-6 min-h-[calc(100vh-5rem)] space-y-4">
             <div className="inline-block max-w-full bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-6">
                 <h2 className="text-xl font-black text-gray-900 mb-4">Tabela de GOP</h2>
 
-                <div className="flex flex-wrap items-start gap-6 mb-4">
+                <div className="flex flex-wrap items-start gap-6 mb-3">
                     {setActiveProjectionType && (
                         <div>
                             <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Versão</p>
@@ -278,15 +304,14 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
                                     </button>
                                 );
                             })}
-                            <button
-                                onClick={() => setSelectedHotelNames(effectiveSelectedNames.length === hotels.length ? [] : hotels.map(h => h.name))}
-                                className="px-3 py-1 text-sm font-bold rounded-md transition-all bg-gray-100 text-gray-600 hover:bg-gray-200 ml-2 border border-gray-200"
-                            >
-                                {effectiveSelectedNames.length === hotels.length ? 'Deselecionar Todos' : 'Selecionar Todos'}
-                            </button>
                         </div>
                     </div>
                 </div>
+
+                <label className="flex items-center gap-2 mb-4 cursor-pointer select-none">
+                    <input type="checkbox" checked={hideSemImposto} onChange={e => setHideSemImposto(e.target.checked)} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+                    <span className="text-sm font-bold text-gray-600">Ocultar GOP R$ / GOP % sem imposto</span>
+                </label>
 
                 {!isSingleMonth && (
                     <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 font-bold mb-4">
@@ -295,19 +320,31 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
                 )}
 
                 <div className="overflow-x-auto border border-gray-200 rounded-xl">
-                    <table className="min-w-full text-sm">
+                    <table className="text-xs table-fixed">
+                        <colgroup>
+                            <col style={{ width: '88px' }} />
+                            <col style={{ width: '130px' }} />
+                            <col style={{ width: '90px' }} />
+                            <col style={{ width: '90px' }} />
+                            <col style={{ width: '85px' }} />
+                            <col style={{ width: '65px' }} />
+                            <col style={{ width: '90px' }} />
+                            <col style={{ width: '85px' }} />
+                            <col style={{ width: '65px' }} />
+                            <col style={{ width: '75px' }} />
+                        </colgroup>
                         <thead className="bg-emerald-800 text-white">
                             <tr>
-                                <th className="px-3 py-2.5 text-left font-bold uppercase tracking-wide text-sm">Filial</th>
-                                <th className="px-3 py-2.5 text-left font-bold uppercase tracking-wide text-sm">Indicador</th>
-                                <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-sm">REAL {selectedYear}</th>
-                                <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-sm">META {selectedYear}</th>
-                                <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-sm">R{yy}-M{yy}</th>
-                                <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-sm">%</th>
-                                <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-sm">REAL {(selectedYear || new Date().getFullYear()) - 1}</th>
-                                <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-sm">R{yy}-R{yyLY}</th>
-                                <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wide text-sm">%</th>
-                                <th className="px-3 py-2.5 text-center font-bold uppercase tracking-wide text-sm">GOP PPM</th>
+                                <th className="px-2 py-2 text-center font-bold uppercase tracking-wide">Filial</th>
+                                <th className="px-2 py-2 text-left font-bold uppercase tracking-wide">Indicador</th>
+                                <th className="px-2 py-2 text-right font-bold uppercase tracking-wide">REAL {selectedYear}</th>
+                                <th className="px-2 py-2 text-right font-bold uppercase tracking-wide">META {selectedYear}</th>
+                                <th className="px-2 py-2 text-right font-bold uppercase tracking-wide">R{yy}-M{yy}</th>
+                                <th className="px-2 py-2 text-right font-bold uppercase tracking-wide">%</th>
+                                <th className="px-2 py-2 text-right font-bold uppercase tracking-wide">REAL {(selectedYear || new Date().getFullYear()) - 1}</th>
+                                <th className="px-2 py-2 text-right font-bold uppercase tracking-wide">R{yy}-R{yyLY}</th>
+                                <th className="px-2 py-2 text-right font-bold uppercase tracking-wide">%</th>
+                                <th className="px-2 py-2 text-center font-bold uppercase tracking-wide">GOP PPM</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -320,20 +357,20 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
                                 return (
                                     <tr key={`${block.key}-${i}`} className={`${blockIdx % 2 === 1 ? 'bg-gray-50/60' : 'bg-white'} border-b border-gray-100`}>
                                         {i === 0 && (
-                                            <td rowSpan={block.rows.length} className="px-3 py-2 align-middle font-black text-gray-900 border-r border-gray-200 whitespace-nowrap">
+                                            <td rowSpan={block.rows.length} className="px-2 py-1.5 text-center align-middle font-black text-gray-900 border-r border-gray-200 truncate">
                                                 {block.name}
                                             </td>
                                         )}
-                                        <td className="px-3 py-1.5 text-gray-600 font-semibold whitespace-nowrap">{row.label}</td>
-                                        <td className="px-3 py-1.5 text-right tabular-nums font-semibold text-gray-800">{formatValue(row.values.previa, row.format)}</td>
-                                        <td className="px-3 py-1.5 text-right tabular-nums text-gray-500">{formatValue(row.values.budget, row.format)}</td>
+                                        <td className="px-2 py-1 text-gray-600 font-semibold truncate">{row.label}</td>
+                                        <td className="px-2 py-1 text-right tabular-nums font-semibold text-gray-800 truncate">{formatValue(row.values.previa, row.format)}</td>
+                                        <td className="px-2 py-1 text-right tabular-nums text-gray-500 truncate">{formatValue(row.values.budget, row.format)}</td>
                                         <td className={diffCellClass(diffMeta, row.kind)}>{formatDelta(diffMeta, row.format)}</td>
                                         <td className={diffCellClass(diffMeta, row.kind)}>{formatDeltaPct(diffMeta, row.values.budget, row.format)}</td>
-                                        <td className="px-3 py-1.5 text-right tabular-nums text-gray-500">{formatValue(row.values.lastYear, row.format)}</td>
+                                        <td className="px-2 py-1 text-right tabular-nums text-gray-500 truncate">{formatValue(row.values.lastYear, row.format)}</td>
                                         <td className={diffCellClass(diffLY, row.kind)}>{formatDelta(diffLY, row.format)}</td>
                                         <td className={diffCellClass(diffLY, row.kind)}>{formatDeltaPct(diffLY, row.values.lastYear, row.format)}</td>
                                         {i === 0 && (
-                                            <td rowSpan={block.rows.length} className={`px-3 py-2 text-center align-middle font-black border-l border-gray-200 ${block.isAdm ? despesaPpmClass(block.ppm) : gopPpmClass(block.ppm)}`}>
+                                            <td rowSpan={block.rows.length} className={`px-2 py-1.5 text-center align-middle font-black border-l border-gray-200 ${block.isAdm ? despesaPpmClass(block.ppm) : gopPpmClass(block.ppm)}`}>
                                                 {block.ppm === null ? '-' : formatValue(block.ppm, 'percent')}
                                             </td>
                                         )}
