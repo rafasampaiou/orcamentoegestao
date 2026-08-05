@@ -40,9 +40,8 @@ export const SLIDES_CAPTURE_TARGETS: SlideCaptureTarget[] = [
         title: 'DRE',
         view: 'dashboard',
         captures: [
-            // Do topo da tabela até "Receita de ISS" (inclusive) — Impostos e Receita Líquida
-            // ficam pro início do slide de despesas/GOP, não são perdidos.
-            { kind: 'region', containerId: 'dre-scroll-container', topMarkerId: 'dre-scroll-container', bottomMarkerId: 'dre-row-REV-ISS' },
+            // Do topo da tabela até "Receita Líquida" (inclusive).
+            { kind: 'region', containerId: 'dre-scroll-container', topMarkerId: 'dre-scroll-container', bottomMarkerId: 'dre-row-REV-NET' },
         ],
     },
     {
@@ -53,9 +52,9 @@ export const SLIDES_CAPTURE_TARGETS: SlideCaptureTarget[] = [
             // Cabeçalho da tabela (colunas OTBS/PRÉVIA/FORECAST/META/Δ etc.) empilhado em cima do
             // recorte — sem ele, quem visse só essa parte não saberia a qual coluna cada valor pertence.
             { kind: 'region', containerId: 'dre-scroll-container', topMarkerId: 'dre-scroll-container', bottomMarkerId: 'dre-table-header' },
-            // De "Impostos" (linha seguinte à Receita de ISS do slide anterior) até "GOP com dedução
-            // de impostos (%)", seguido dos cards de Transformação/Reatividade.
-            { kind: 'region', containerId: 'dre-scroll-container', topMarkerId: 'dre-row-REV-IMP', bottomMarkerId: 'dre-row-RES-OP-COM-IMP-PCT' },
+            // De "Custos e Despesas Operacionais" até "GOP com dedução de impostos (%)", seguido dos
+            // cards de Transformação/Reatividade.
+            { kind: 'region', containerId: 'dre-scroll-container', topMarkerId: 'dre-row-CST-HEAD', bottomMarkerId: 'dre-row-RES-OP-COM-IMP-PCT' },
             { kind: 'element', elementId: 'slides-capture-dre-cards' },
         ],
     },
