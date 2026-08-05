@@ -57,20 +57,35 @@ export async function ensureGoogleAccessToken(): Promise<string> {
     });
 }
 
+// Erros 429/5xx da API do Google costumam ser passageiros (sobrecarga momentânea do servidor,
+// "Internal Error" etc.) — o próprio Google recomenda tentar de novo com espera progressiva em
+// vez de falhar na primeira. Não repete em erros 4xx "de verdade" (404, 403, etc.), só nesses.
+const TRANSIENT_STATUS = new Set([429, 500, 502, 503, 504]);
+
+async function fetchWithRetry(doFetch: () => Promise<Response>, maxRetries = 3): Promise<Response> {
+    let lastRes: Response = await doFetch();
+    for (let attempt = 0; attempt < maxRetries && !lastRes.ok && TRANSIENT_STATUS.has(lastRes.status); attempt++) {
+        const delayMs = 800 * Math.pow(2, attempt) + Math.random() * 300;
+        await new Promise(r => setTimeout(r, delayMs));
+        lastRes = await doFetch();
+    }
+    return lastRes;
+}
+
 async function driveFetch(path: string, token: string, init: RequestInit = {}): Promise<any> {
-    const res = await fetch(`https://www.googleapis.com/drive/v3/${path}`, {
+    const res = await fetchWithRetry(() => fetch(`https://www.googleapis.com/drive/v3/${path}`, {
         ...init,
         headers: { ...(init.headers || {}), Authorization: `Bearer ${token}` },
-    });
+    }));
     if (!res.ok) throw new Error(`Drive API (${path}) falhou: ${res.status} ${await res.text()}`);
     return res.status === 204 ? null : res.json();
 }
 
 async function slidesFetch(path: string, token: string, init: RequestInit = {}): Promise<any> {
-    const res = await fetch(`https://slides.googleapis.com/v1/${path}`, {
+    const res = await fetchWithRetry(() => fetch(`https://slides.googleapis.com/v1/${path}`, {
         ...init,
         headers: { ...(init.headers || {}), Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    });
+    }));
     if (!res.ok) throw new Error(`Slides API (${path}) falhou: ${res.status} ${await res.text()}`);
     return res.json();
 }
@@ -117,11 +132,11 @@ export async function uploadImageAndGetPublicUrl(token: string, blob: Blob, name
     form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
     form.append('file', blob);
 
-    const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+    const res = await fetchWithRetry(() => fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: form,
-    });
+    }));
     if (!res.ok) throw new Error(`Upload da imagem falhou: ${res.status} ${await res.text()}`);
     const { id } = await res.json();
 
