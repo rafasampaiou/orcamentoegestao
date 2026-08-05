@@ -756,7 +756,7 @@ const GMDView: React.FC<GMDViewProps> = ({
         
         {/* --- TAB 1: MONITOR (FORECAST STYLE) --- */}
         {activeTab === 'monitor' && (
-            <div className="inline-block max-w-full bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+            <div id="slides-capture-gmd" className="inline-block max-w-full bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
                 <table className="table-fixed text-base">
                     <thead className="bg-emerald-800 text-white">
                         <tr>

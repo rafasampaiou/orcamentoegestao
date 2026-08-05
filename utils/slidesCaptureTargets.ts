@@ -25,7 +25,7 @@ export interface SlideCaptureTarget {
     title: string;
     // Em qual tela (ViewState) os elementos existem — a geração troca de tela quando necessário,
     // espera renderizar, captura, e segue pro próximo (ou volta pra tela original ao final).
-    view: 'dashboard' | 'ab_analysis';
+    view: 'dashboard' | 'ab_analysis' | 'gmd';
     // Uma ou mais capturas, empilhadas verticalmente numa imagem só (ex.: recorte da tabela +
     // card de Transformação/Reatividade, que é um elemento separado abaixo da tabela).
     captures: CaptureSpec[];
@@ -52,6 +52,12 @@ export const SLIDES_CAPTURE_TARGETS: SlideCaptureTarget[] = [
             { kind: 'region', containerId: 'dre-scroll-container', topMarkerId: 'dre-row-CST-HEAD', bottomMarkerId: 'dre-row-RES-OP-COM-IMP-PCT' },
             { kind: 'element', elementId: 'slides-capture-dre-cards' },
         ],
+    },
+    {
+        id: 'gmd',
+        title: 'GMD',
+        view: 'gmd',
+        captures: [{ kind: 'element', elementId: 'slides-capture-gmd' }],
     },
     {
         id: 'analise-ab',
