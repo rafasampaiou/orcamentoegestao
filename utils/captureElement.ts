@@ -16,8 +16,15 @@ import { CaptureSpec, SlideCaptureTarget } from './slidesCaptureTargets';
 export async function captureElementToCanvas(element: HTMLElement): Promise<HTMLCanvasElement> {
     const prevMaxHeight = element.style.maxHeight;
     const prevOverflow = element.style.overflow;
+    const prevWidth = element.style.width;
+    // Fixa a largura no valor real já renderizado na tela antes de capturar — sem isso, elementos
+    // "inline-block"/flex-wrap (ex.: os cards de Análise de A&B lado a lado) podem ser reclonados
+    // pelo html2canvas assumindo uma largura de layout diferente da tela, o que fazia colunas que
+    // deveriam ficar coladas uma na outra aparecerem bem separadas, com um vão em branco enorme.
+    const measuredWidth = element.getBoundingClientRect().width;
     element.style.maxHeight = 'none';
     element.style.overflow = 'visible';
+    element.style.width = `${measuredWidth}px`;
     try {
         return await html2canvas(element, {
             scale: 2, // retina — texto pequeno da DRE Forecast fica legível no slide
@@ -27,6 +34,7 @@ export async function captureElementToCanvas(element: HTMLElement): Promise<HTML
     } finally {
         element.style.maxHeight = prevMaxHeight;
         element.style.overflow = prevOverflow;
+        element.style.width = prevWidth;
     }
 }
 
