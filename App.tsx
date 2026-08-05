@@ -109,6 +109,7 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
   // "Gerar Apresentação" (Google Slides, botão na DRE Forecast) — ver handleGenerateSlides.
   const [isGeneratingSlides, setIsGeneratingSlides] = useState(false);
+  const [slideGenProgress, setSlideGenProgress] = useState<{ label: string; percent: number } | null>(null);
   const [pendingSlideRegen, setPendingSlideRegen] = useState<{ existingId: string; presentationId: string } | null>(null);
   const slideRegenChoiceRef = useRef<((choice: 'update' | 'new' | null) => void) | null>(null);
   const [selectedHotel, setSelectedHotel] = useState('Atibaia');
@@ -768,6 +769,17 @@ const App: React.FC = () => {
     if (isGeneratingSlides) return;
     setIsGeneratingSlides(true);
     const originalView = currentView;
+    const targets = SLIDES_CAPTURE_TARGETS;
+    // Passos fixos (login, checagem de duplicidade, pastas do Drive, cópia do modelo, capa,
+    // finalização) + 1 por slide de conteúdo — só pra render de uma barra de progresso com %,
+    // não precisa ser exato, só dar uma noção real de andamento.
+    const totalSteps = targets.length + 6;
+    let stepsDone = 0;
+    const setProgress = (label: string) => {
+      stepsDone++;
+      setSlideGenProgress({ label, percent: Math.min(100, Math.round((stepsDone / totalSteps) * 100)) });
+    };
+    setSlideGenProgress({ label: 'Conectando à sua conta Google...', percent: 0 });
     try {
       const token = await ensureGoogleAccessToken();
       const hotelName = selectedHotel;
@@ -779,6 +791,7 @@ const App: React.FC = () => {
       const slug = (s: string) => (s || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
       const comboId = `slidedeck_${slug(hotelName)}_${year}_${month}_${slug(projectionType)}`;
 
+      setProgress('Verificando apresentações existentes...');
       const existing = await supabaseService.getSlidePresentation(hotelName, year, month, projectionType);
       let mode: 'update' | 'new' = 'new';
       let recordId = `${comboId}_${Date.now()}`;
@@ -793,10 +806,12 @@ const App: React.FC = () => {
         if (mode === 'update') recordId = existing.id;
       }
 
+      setProgress('Preparando pastas no Google Drive...');
       const rootFolderId = await ensureDriveFolder(token, 'Apresentações Forecast');
       const hotelFolderId = await ensureDriveFolder(token, hotelName, rootFolderId);
       const yearFolderId = await ensureDriveFolder(token, String(year), hotelFolderId);
 
+      setProgress('Copiando o modelo da apresentação...');
       const deckName = `Forecast - ${hotelName} - ${monthName} ${year} - ${projectionType}`;
       const { id: presentationId, url } = await copyTemplatePresentation(token, deckName, yearFolderId);
 
@@ -806,27 +821,34 @@ const App: React.FC = () => {
       }
       const moldSlideId = structure.slideIds[2];
 
+      setProgress('Preenchendo a capa...');
       // Nomes dos placeholders assumidos no template — ajuste aqui se forem diferentes.
       await fillCoverPlaceholders(token, presentationId, {
         '{{VERSAO}}': projectionType,
         '{{HOTEL_DATA}}': `${hotelName} — ${new Date().toLocaleDateString('pt-BR')}`,
       });
 
-      for (let i = 0; i < SLIDES_CAPTURE_TARGETS.length; i++) {
-        const target = SLIDES_CAPTURE_TARGETS[i];
-        if (currentView !== target.view) {
-          setCurrentView(target.view);
-          const firstCapture = target.captures[0];
-          const firstElementId = firstCapture.kind === 'element' ? firstCapture.elementId : firstCapture.containerId;
-          await waitForElement(firstElementId);
-          await new Promise(r => setTimeout(r, 300)); // layout/gráficos terminarem de assentar
-        }
+      for (let i = 0; i < targets.length; i++) {
+        const target = targets[i];
+        setProgress(`Capturando: ${target.title} (${i + 1}/${targets.length})`);
+        // Sempre troca (mesmo repetindo a mesma tela do slide anterior) e sempre espera o elemento
+        // + um instante de assentamento — depender de comparar com a tela atual pra decidir se
+        // troca é arriscado aqui: essa comparação usa o valor de currentView "congelado" no exato
+        // instante em que este clique começou (closure do React), que nunca muda dentro da mesma
+        // execução mesmo depois de setCurrentView já ter trocado a tela de fato — então sempre
+        // trocar/esperar é o jeito confiável de garantir que a captura reflete a tela certa.
+        setCurrentView(target.view);
+        const firstCapture = target.captures[0];
+        const firstElementId = firstCapture.kind === 'element' ? firstCapture.elementId : firstCapture.containerId;
+        await waitForElement(firstElementId);
+        await new Promise(r => setTimeout(r, 300)); // layout/gráficos terminarem de assentar
         const blob = await captureSlideTarget(target);
         const imageSize = await getPngBlobSize(blob);
         const imageUrl = await uploadImageAndGetPublicUrl(token, blob, `${target.id}.png`, yearFolderId);
         await addContentSlideFromMold(token, presentationId, moldSlideId, 2 + i, target.title, imageUrl, imageSize, structure.pageSize);
       }
 
+      setProgress('Finalizando apresentação...');
       await deleteSlide(token, presentationId, moldSlideId);
 
       if (mode === 'update' && existing) {
@@ -844,6 +866,7 @@ const App: React.FC = () => {
         presentationId, presentationUrl: url, driveFolderId: yearFolderId,
         createdByUserId: currentUser?.id, createdByUserName: currentUser?.name,
       });
+      setSlideGenProgress({ label: 'Concluído!', percent: 100 });
 
       setCurrentView(originalView);
       toast.success((t) => (
@@ -858,6 +881,7 @@ const App: React.FC = () => {
       setCurrentView(originalView);
     } finally {
       setIsGeneratingSlides(false);
+      setSlideGenProgress(null);
     }
   };
 
@@ -1574,9 +1598,18 @@ const App: React.FC = () => {
 
       {isGeneratingSlides && !pendingSlideRegen && (
         <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center">
-          <div className="bg-white rounded-xl shadow-2xl p-6 flex items-center gap-3">
-            <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-            <span className="font-bold text-gray-700">Gerando apresentação...</span>
+          <div className="bg-white rounded-xl shadow-2xl p-6 w-96">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin shrink-0" />
+              <span className="font-bold text-gray-700 text-sm truncate">{slideGenProgress?.label || 'Gerando apresentação...'}</span>
+            </div>
+            <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-indigo-600 rounded-full transition-all duration-300"
+                style={{ width: `${slideGenProgress?.percent ?? 0}%` }}
+              />
+            </div>
+            <div className="text-right text-xs font-bold text-gray-400 mt-1">{slideGenProgress?.percent ?? 0}%</div>
           </div>
         </div>
       )}
