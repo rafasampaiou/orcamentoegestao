@@ -1,6 +1,18 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import jsPDF from 'jspdf';
+import toast from 'react-hot-toast';
 import { Account, CostPackage, Hotel, ImportedRow, ProjectionType, ValidationRecord } from '../types';
 import { buildForecastRows, formatValue, formatPercentDiff, formatPointsDiff } from './ForecastTable';
+import { captureElementByIdAsPngBlob, getPngBlobSize } from '../utils/captureElement';
+
+const TABLE_WRAPPER_ID = 'tabela-gop-projecao-wrapper';
+
+const blobToDataUrl = (blob: Blob): Promise<string> => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+});
 
 interface ComparativesViewProps {
     selectedMonth?: number;
@@ -39,6 +51,14 @@ const PROJECTION_TYPE_OPTIONS: { value: ProjectionType; label: string }[] = [
 const DIACRITICS_REGEX = new RegExp("[\u0300-\u036f]", "g");
 const normalizeName = (s: string) => s.trim().toLowerCase().normalize('NFD').replace(DIACRITICS_REGEX, '');
 const isJoaoPessoa = (name: string) => normalizeName(name) === 'joao pessoa';
+
+// Ordem fixa pedida pelo usu\u00e1rio (2026-08-05), independente da ordem que `hotels` venha do
+// backend \u2014 hot\u00e9is fora dessa lista entram no final, na ordem em que j\u00e1 vinham.
+const HOTEL_ORDER = ['Atibaia', 'Caet\u00e9', 'Alex\u00e2nia', 'Arax\u00e1', 'Alegro', 'Administradora'];
+const hotelOrderIndex = (name: string): number => {
+    const idx = HOTEL_ORDER.findIndex(n => normalizeName(n) === normalizeName(name));
+    return idx === -1 ? HOTEL_ORDER.length : idx;
+};
 
 interface PeriodTotals { previa: number; budget: number; lastYear: number; }
 const zeroTotals = (): PeriodTotals => ({ previa: 0, budget: 0, lastYear: 0 });
@@ -117,6 +137,33 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
     // a Meta (escalada pelo WHAT IF % daquele hotel). Simulação client-side, não persiste.
     const [projectionMode, setProjectionMode] = useState(false);
     const [whatIfByHotel, setWhatIfByHotel] = useState<Record<string, number>>({});
+    const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+    // Print da tabela (exatamente como está na tela, com o WHAT IF de cada hotel) num PDF pra
+    // baixar — mesma técnica de captura (html2canvas) já usada na feature "Gerar Apresentação".
+    const handleGeneratePdf = async () => {
+        setIsGeneratingPdf(true);
+        try {
+            const blob = await captureElementByIdAsPngBlob(TABLE_WRAPPER_ID);
+            const { width, height } = await getPngBlobSize(blob);
+            const dataUrl = await blobToDataUrl(blob);
+            // A captura sai em retina (scale 2) — desfaz pra converter px@96dpi em pt (72/96).
+            const widthPt = (width / 2) * 0.75;
+            const heightPt = (height / 2) * 0.75;
+            const marginTop = 40;
+            const doc = new jsPDF({ unit: 'pt', format: [Math.max(widthPt, 300), heightPt + marginTop + 20] });
+            doc.setFontSize(14);
+            doc.text(`Tabela de GOP — Projeção ${selectedYear}`, 20, 24);
+            doc.addImage(dataUrl, 'PNG', 0, marginTop, widthPt, heightPt);
+            doc.save(`tabela-de-gop-projecao-${selectedYear}.pdf`);
+            toast.success('PDF gerado!');
+        } catch (err: any) {
+            console.error('Erro ao gerar PDF da projeção:', err);
+            toast.error('Erro ao gerar o PDF: ' + (err?.message || String(err)));
+        } finally {
+            setIsGeneratingPdf(false);
+        }
+    };
 
     // Só conta como "mês já trabalhado" se existir uma validação com status "Validado" pra esse
     // hotel+ano+mês — "Em construção" ainda entra na repetição de Meta.
@@ -268,7 +315,8 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
         // como hotel próprio (se selecionado), e por fim "Grupo com JP" (soma incluindo ele) — pra
         // comparar o resultado do grupo com e sem esse hotel.
         const jpRaw = raw.find(b => isJoaoPessoa(b.hotel.name));
-        const nonJpRaw = raw.filter(b => !isJoaoPessoa(b.hotel.name));
+        const nonJpRaw = raw.filter(b => !isJoaoPessoa(b.hotel.name))
+            .sort((a, b) => hotelOrderIndex(a.hotel.name) - hotelOrderIndex(b.hotel.name));
 
         const blocks: GopBlock[] = nonJpRaw.map(blockFor);
 
@@ -296,14 +344,25 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
             <div className="inline-block max-w-full bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-6">
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="text-xl font-black text-gray-900">Tabela de GOP</h2>
-                    <button
-                        onClick={() => setProjectionMode(v => !v)}
-                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${projectionMode
-                            ? 'bg-indigo-600 text-white shadow-sm'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'}`}
-                    >
-                        {projectionMode ? 'Projeção ativa — clique pra sair' : 'Projetar'}
-                    </button>
+                    <div className="flex items-center gap-2">
+                        {projectionMode && (
+                            <button
+                                onClick={handleGeneratePdf}
+                                disabled={isGeneratingPdf}
+                                className="px-4 py-2 rounded-lg text-sm font-bold transition-all bg-white text-indigo-700 border border-indigo-200 hover:bg-indigo-50 disabled:opacity-50"
+                            >
+                                {isGeneratingPdf ? 'Gerando PDF...' : 'Gerar PDF'}
+                            </button>
+                        )}
+                        <button
+                            onClick={() => setProjectionMode(v => !v)}
+                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${projectionMode
+                                ? 'bg-indigo-600 text-white shadow-sm'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'}`}
+                        >
+                            {projectionMode ? 'Projeção ativa — clique pra sair' : 'Projetar'}
+                        </button>
+                    </div>
                 </div>
 
                 {projectionMode && (
@@ -396,7 +455,7 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
                     </p>
                 )}
 
-                <div className="inline-block max-w-full overflow-x-auto border border-gray-200 rounded-xl">
+                <div id={TABLE_WRAPPER_ID} className="inline-block max-w-full overflow-x-auto border border-gray-200 rounded-xl">
                     <table className="text-xs table-fixed">
                         <colgroup>
                             <col style={{ width: '88px' }} />
@@ -458,14 +517,18 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
                                                 {(block.key === 'grupo' || block.key === 'grupo-com-jp') ? (
                                                     <span className="text-gray-400">-</span>
                                                 ) : (
-                                                    <div className="flex flex-col items-center gap-1">
+                                                    <div className="flex items-center justify-center gap-1">
                                                         <input
-                                                            type="range" min={0} max={100}
+                                                            type="number" min={0} max={100}
                                                             value={whatIfByHotel[block.key] ?? 100}
-                                                            onChange={e => setWhatIfByHotel(prev => ({ ...prev, [block.key]: Number(e.target.value) }))}
-                                                            className="w-16 accent-indigo-600"
+                                                            onChange={e => {
+                                                                const raw = Number(e.target.value);
+                                                                const clamped = Math.min(100, Math.max(0, isNaN(raw) ? 100 : raw));
+                                                                setWhatIfByHotel(prev => ({ ...prev, [block.key]: clamped }));
+                                                            }}
+                                                            className="w-12 text-center font-black text-indigo-700 border border-indigo-200 rounded px-1 py-0.5 focus:outline-none focus:ring-2 focus:ring-indigo-300"
                                                         />
-                                                        <span className="text-[11px] font-black text-indigo-700">{whatIfByHotel[block.key] ?? 100}%</span>
+                                                        <span className="text-[11px] font-black text-indigo-700">%</span>
                                                     </div>
                                                 )}
                                             </td>
