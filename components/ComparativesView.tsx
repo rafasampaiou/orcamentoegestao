@@ -31,6 +31,22 @@ interface ComparativesViewProps {
 }
 
 const MONTH_LABELS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+const MONTH_FULL_NAMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+// Agrupa uma lista de rótulos (um por mês, índice 0 = Janeiro) em faixas de meses consecutivos
+// com o mesmo rótulo — "Jan/Fev/Mar: Realizado" vira uma linha só ("Janeiro a Março: Realizado").
+const groupConsecutiveMonths = (labelForMonthIdx: (idx: number) => string): { range: string; label: string }[] => {
+    const out: { range: string; label: string }[] = [];
+    let i = 0;
+    while (i < 12) {
+        const label = labelForMonthIdx(i);
+        let j = i;
+        while (j + 1 < 12 && labelForMonthIdx(j + 1) === label) j++;
+        const range = i === j ? MONTH_FULL_NAMES[i] : `${MONTH_FULL_NAMES[i]} a ${MONTH_FULL_NAMES[j]}`;
+        out.push({ range, label });
+        i = j + 1;
+    }
+    return out;
+};
 const ALL_MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 // Ordem de "mais avançado" — usada pra achar, dado um mês já validado em mais de uma versão
 // (raro, mas possível), qual delas prevalece. Mesma ordem de PROJECTION_TYPE_OPTIONS, invertida.
@@ -138,32 +154,6 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
     const [projectionMode, setProjectionMode] = useState(false);
     const [whatIfByHotel, setWhatIfByHotel] = useState<Record<string, number>>({});
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-
-    // Print da tabela (exatamente como está na tela, com o WHAT IF de cada hotel) num PDF pra
-    // baixar — mesma técnica de captura (html2canvas) já usada na feature "Gerar Apresentação".
-    const handleGeneratePdf = async () => {
-        setIsGeneratingPdf(true);
-        try {
-            const blob = await captureElementByIdAsPngBlob(TABLE_WRAPPER_ID);
-            const { width, height } = await getPngBlobSize(blob);
-            const dataUrl = await blobToDataUrl(blob);
-            // A captura sai em retina (scale 2) — desfaz pra converter px@96dpi em pt (72/96).
-            const widthPt = (width / 2) * 0.75;
-            const heightPt = (height / 2) * 0.75;
-            const marginTop = 40;
-            const doc = new jsPDF({ unit: 'pt', format: [Math.max(widthPt, 300), heightPt + marginTop + 20] });
-            doc.setFontSize(14);
-            doc.text(`Tabela de GOP — Projeção ${selectedYear}`, 20, 24);
-            doc.addImage(dataUrl, 'PNG', 0, marginTop, widthPt, heightPt);
-            doc.save(`tabela-de-gop-projecao-${selectedYear}.pdf`);
-            toast.success('PDF gerado!');
-        } catch (err: any) {
-            console.error('Erro ao gerar PDF da projeção:', err);
-            toast.error('Erro ao gerar o PDF: ' + (err?.message || String(err)));
-        } finally {
-            setIsGeneratingPdf(false);
-        }
-    };
 
     // Só conta como "mês já trabalhado" se existir uma validação com status "Validado" pra esse
     // hotel+ano+mês — "Em construção" ainda entra na repetição de Meta.
@@ -339,21 +329,96 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
         return blocks;
     }, [perHotelMonthlyRows, perHotelProjectedTotals, projectionMode, hideSemImposto]);
 
+    // Linhas do subtítulo do PDF — no modo Projeção, descreve por mês se o grupo está usando
+    // Realizado/Prévia/Meta (com o WHAT IF médio dos hotéis selecionados); fora do modo Projeção,
+    // descreve a Versão e o(s) mês(es) que o filtro normal está considerando.
+    const buildPdfSubtitleLines = (): string[] => {
+        const realHotels = hotels.filter(h => effectiveSelectedNames.includes(h.name));
+        if (projectionMode) {
+            const avgWhatIf = realHotels.length
+                ? Math.round(realHotels.reduce((s, h) => s + (whatIfByHotel[h.id] ?? 100), 0) / realHotels.length)
+                : 100;
+            const labelForMonthIdx = (idx: number): 'Realizado' | 'Prévia' | 'Meta' => {
+                const versions = realHotels.map(h => findValidatedVersion(h.id, idx + 1)).filter((v): v is ProjectionType => !!v);
+                if (versions.length === 0) return 'Meta';
+                return versions.every(v => v === 'Realizado') ? 'Realizado' : 'Prévia';
+            };
+            return groupConsecutiveMonths(labelForMonthIdx).map(({ range, label }) => {
+                const suffix = label === 'Meta'
+                    ? ` (cenário de atingimento de ${avgWhatIf}% da meta no grupo)`
+                    : label === 'Prévia' ? ' (unidade com prévia atualizada nesse mês)' : '';
+                return `${range}: ${label}${suffix}`;
+            });
+        }
+        const versionLabel = PROJECTION_TYPE_OPTIONS.find(o => o.value === activeProjectionType)?.label || activeProjectionType || '';
+        const sortedMonths = [...visibleMonths].sort((a, b) => a - b);
+        const monthRanges: string[] = [];
+        let i = 0;
+        while (i < sortedMonths.length) {
+            let j = i;
+            while (j + 1 < sortedMonths.length && sortedMonths[j + 1] === sortedMonths[j] + 1) j++;
+            monthRanges.push(i === j ? MONTH_FULL_NAMES[sortedMonths[i] - 1] : `${MONTH_FULL_NAMES[sortedMonths[i] - 1]} a ${MONTH_FULL_NAMES[sortedMonths[j] - 1]}`);
+            i = j + 1;
+        }
+        const periodoText = monthRanges.length === 12 ? 'Ano inteiro' : monthRanges.join(', ');
+        return [`Versão: ${versionLabel}`, `Período: ${periodoText} de ${selectedYear}`];
+    };
+
+    // Print da tabela (exatamente como está na tela, com o WHAT IF de cada hotel quando em modo
+    // Projeção) num PDF pra baixar — mesma técnica de captura (html2canvas) já usada na feature
+    // "Gerar Apresentação". A tabela entra no tamanho natural (sem esticar pra caber numa página
+    // maior) — a página do PDF é dimensionada pra abraçar exatamente o título+subtítulo+tabela.
+    const handleGeneratePdf = async () => {
+        setIsGeneratingPdf(true);
+        try {
+            const blob = await captureElementByIdAsPngBlob(TABLE_WRAPPER_ID);
+            const { width, height } = await getPngBlobSize(blob);
+            const dataUrl = await blobToDataUrl(blob);
+            // A captura sai em retina (scale 2) — desfaz pra converter px@96dpi em pt (72/96), o
+            // mesmo tamanho "natural" que a tabela já tem no sistema (nem esticada, nem reduzida).
+            const imgWidthPt = (width / 2) * 0.75;
+            const imgHeightPt = (height / 2) * 0.75;
+            const margin = 24;
+            const titleLineHeight = 20;
+            const subtitleLineHeight = 13;
+            const subtitleLines = buildPdfSubtitleLines();
+            const headerHeight = titleLineHeight + subtitleLines.length * subtitleLineHeight + 12;
+            const pageWidth = Math.max(imgWidthPt, 320) + margin * 2;
+            const pageHeight = headerHeight + imgHeightPt + margin * 2;
+
+            const doc = new jsPDF({ unit: 'pt', format: [pageWidth, pageHeight] });
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(15);
+            doc.text('Tabela de GOP', margin, margin + 14);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9.5);
+            subtitleLines.forEach((line, idx) => {
+                doc.text(line, margin, margin + titleLineHeight + 10 + idx * subtitleLineHeight);
+            });
+            doc.addImage(dataUrl, 'PNG', margin, margin + headerHeight, imgWidthPt, imgHeightPt);
+            doc.save(`tabela-de-gop-${projectionMode ? 'projecao-' : ''}${selectedYear}.pdf`);
+            toast.success('PDF gerado!');
+        } catch (err: any) {
+            console.error('Erro ao gerar PDF da Tabela de GOP:', err);
+            toast.error('Erro ao gerar o PDF: ' + (err?.message || String(err)));
+        } finally {
+            setIsGeneratingPdf(false);
+        }
+    };
+
     return (
         <div className="px-4 py-6 min-h-[calc(100vh-5rem)] space-y-4">
             <div className="inline-block max-w-full bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-6">
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="text-xl font-black text-gray-900">Tabela de GOP</h2>
                     <div className="flex items-center gap-2">
-                        {projectionMode && (
-                            <button
-                                onClick={handleGeneratePdf}
-                                disabled={isGeneratingPdf}
-                                className="px-4 py-2 rounded-lg text-sm font-bold transition-all bg-white text-indigo-700 border border-indigo-200 hover:bg-indigo-50 disabled:opacity-50"
-                            >
-                                {isGeneratingPdf ? 'Gerando PDF...' : 'Gerar PDF'}
-                            </button>
-                        )}
+                        <button
+                            onClick={handleGeneratePdf}
+                            disabled={isGeneratingPdf}
+                            className="px-4 py-2 rounded-lg text-sm font-bold transition-all bg-white text-indigo-700 border border-indigo-200 hover:bg-indigo-50 disabled:opacity-50"
+                        >
+                            {isGeneratingPdf ? 'Gerando PDF...' : 'Gerar PDF'}
+                        </button>
                         <button
                             onClick={() => setProjectionMode(v => !v)}
                             className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${projectionMode
@@ -537,9 +602,10 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
                                     </tr>
                                 );
                                 });
-                                // Pequeno espaço em branco entre "Grupo" e "João Pessoa" — deixa claro que o que vem
-                                // depois é uma comparação separada (com/sem esse hotel), não parte do mesmo bloco.
-                                if (block.key === 'grupo') {
+                                // Pequeno espaço em branco entre "Grupo"/"João Pessoa" e entre "João Pessoa"/"Grupo
+                                // com JP" — separa visualmente as 3 comparações (parecem 3 tabelas, mesmo sendo
+                                // uma só, com os mesmos filtros por trás).
+                                if (block.key === 'grupo' || isJoaoPessoa(block.name)) {
                                     rowsJsx.push(
                                         <tr key={`${block.key}-spacer`}>
                                             <td colSpan={projectionMode ? 11 : 10} className="h-3 p-0 bg-white border-0"></td>
