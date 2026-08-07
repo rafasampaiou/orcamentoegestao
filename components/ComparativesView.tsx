@@ -489,7 +489,8 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
                             {gopBlocks.length === 0 && (
                                 <tr><td colSpan={projectionMode ? 11 : 10} className="text-center text-gray-400 italic py-8">Selecione ao menos um hotel.</td></tr>
                             )}
-                            {gopBlocks.map((block, blockIdx) => block.rows.map((row, i) => {
+                            {gopBlocks.map((block, blockIdx) => {
+                                const rowsJsx = block.rows.map((row, i) => {
                                 const diffMeta = row.values.previa - row.values.budget;
                                 const diffLY = row.values.previa - row.values.lastYear;
                                 return (
@@ -535,7 +536,18 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
                                         )}
                                     </tr>
                                 );
-                            }))}
+                                });
+                                // Pequeno espaço em branco entre "Grupo" e "João Pessoa" — deixa claro que o que vem
+                                // depois é uma comparação separada (com/sem esse hotel), não parte do mesmo bloco.
+                                if (block.key === 'grupo') {
+                                    rowsJsx.push(
+                                        <tr key={`${block.key}-spacer`}>
+                                            <td colSpan={projectionMode ? 11 : 10} className="h-3 p-0 bg-white border-0"></td>
+                                        </tr>
+                                    );
+                                }
+                                return rowsJsx;
+                            })}
                         </tbody>
                     </table>
                 </div>
