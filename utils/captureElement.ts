@@ -34,7 +34,17 @@ function prepareCloneForCapture(clonedDoc: Document) {
 // que estiver rolado pra fora ficaria de fora do print). Por isso, antes de capturar, remove
 // temporariamente max-height/overflow do próprio elemento (e restaura em seguida) pra garantir
 // que o conteúdo inteiro entre no print, não só o que cabia na tela.
-export async function captureElementToCanvas(element: HTMLElement): Promise<HTMLCanvasElement> {
+export interface CaptureOptions {
+    // O renderer clássico (canvas 2D, default) reconstrói o CSS manualmente e é o mais confiável
+    // pra layouts complexos (flex-wrap, cards) — mas tem suporte fraco a rowSpan/colSpan em
+    // tabelas grandes, deslocando a célula mesclada da linha errada. foreignObjectRendering (usa
+    // o próprio motor do navegador via SVG) resolve rowSpan/colSpan perfeitamente, mas já chegou a
+    // renderizar só parte do conteúdo em telas com flex-wrap complexo (Análise de A&B) — por isso
+    // não é o default, só ligar pra tabelas simples (ex.: a Tabela de GOP, que usa rowSpan).
+    foreignObjectRendering?: boolean;
+}
+
+export async function captureElementToCanvas(element: HTMLElement, options: CaptureOptions = {}): Promise<HTMLCanvasElement> {
     const prevMaxHeight = element.style.maxHeight;
     const prevOverflow = element.style.overflow;
     const prevWidth = element.style.width;
@@ -51,10 +61,7 @@ export async function captureElementToCanvas(element: HTMLElement): Promise<HTML
             scale: 2, // retina — texto pequeno da DRE Forecast fica legível no slide
             backgroundColor: '#ffffff',
             useCORS: true,
-            // foreignObjectRendering (renderização via SVG) chegou a ser testada aqui, mas em telas
-            // mais complexas (Análise de A&B) renderizava só parte do conteúdo (resto ficava em
-            // branco) — voltado pro modo padrão (canvas 2D, mais lento porém mais confiável nesses
-            // layouts).
+            foreignObjectRendering: !!options.foreignObjectRendering,
             onclone: prepareCloneForCapture,
         });
     } finally {
@@ -73,14 +80,14 @@ function canvasToPngBlob(canvas: HTMLCanvasElement): Promise<Blob> {
     });
 }
 
-export async function captureElementAsPngBlob(element: HTMLElement): Promise<Blob> {
-    return canvasToPngBlob(await captureElementToCanvas(element));
+export async function captureElementAsPngBlob(element: HTMLElement, options?: CaptureOptions): Promise<Blob> {
+    return canvasToPngBlob(await captureElementToCanvas(element, options));
 }
 
-export async function captureElementByIdAsPngBlob(elementId: string): Promise<Blob> {
+export async function captureElementByIdAsPngBlob(elementId: string, options?: CaptureOptions): Promise<Blob> {
     const el = document.getElementById(elementId);
     if (!el) throw new Error(`Elemento "${elementId}" não encontrado pra captura.`);
-    return captureElementAsPngBlob(el);
+    return captureElementAsPngBlob(el, options);
 }
 
 // Captura um elemento inteiro e recorta só o trecho vertical entre dois elementos-marcadores

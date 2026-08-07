@@ -14,6 +14,33 @@ const blobToDataUrl = (blob: Blob): Promise<string> => new Promise((resolve, rej
     reader.readAsDataURL(blob);
 });
 
+const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    const chunkSize = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+    }
+    return btoa(binary);
+};
+
+// jsPDF só vem com Helvetica/Times/Courier — pra usar Montserrat é preciso embutir o TTF de
+// verdade (arquivos estáticos em public/fonts/, baixados do Google Fonts). Carrega uma vez só
+// (cache no módulo) e reaproveita em toda geração de PDF depois da primeira.
+let montserratFontsPromise: Promise<{ black: string; regular: string }> | null = null;
+const loadMontserratFonts = (): Promise<{ black: string; regular: string }> => {
+    if (!montserratFontsPromise) {
+        montserratFontsPromise = Promise.all([
+            fetch('/fonts/Montserrat-Black.ttf').then(r => r.arrayBuffer()),
+            fetch('/fonts/Montserrat-Regular.ttf').then(r => r.arrayBuffer()),
+        ]).then(([black, regular]) => ({
+            black: arrayBufferToBase64(black),
+            regular: arrayBufferToBase64(regular),
+        }));
+    }
+    return montserratFontsPromise;
+};
+
 interface ComparativesViewProps {
     selectedMonth?: number;
     selectedYear?: number;
@@ -371,7 +398,11 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
     const handleGeneratePdf = async () => {
         setIsGeneratingPdf(true);
         try {
-            const blob = await captureElementByIdAsPngBlob(TABLE_WRAPPER_ID);
+            // foreignObjectRendering: o renderer padrão (canvas 2D) tem suporte fraco a rowSpan em
+            // tabelas grandes — a célula mesclada de "Filial"/GOP PPM saía desalinhada da linha
+            // certa no PDF. Como essa tabela não usa flex-wrap complexo (só <table>+rowSpan), dá
+            // pra usar o renderer via SVG aqui sem o problema que ele causou na Análise de A&B.
+            const blob = await captureElementByIdAsPngBlob(TABLE_WRAPPER_ID, { foreignObjectRendering: true });
             const { width, height } = await getPngBlobSize(blob);
             const dataUrl = await blobToDataUrl(blob);
             // A captura sai em retina (scale 2) — desfaz pra converter px@96dpi em pt (72/96), o
@@ -387,10 +418,18 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
             const pageHeight = headerHeight + imgHeightPt + margin * 2;
 
             const doc = new jsPDF({ unit: 'pt', format: [pageWidth, pageHeight] });
-            doc.setFont('helvetica', 'bold');
+            // Fontes reais embutidas (Montserrat Black pro título, Montserrat pro subtítulo) —
+            // jsPDF só vem com Helvetica/Times/Courier por padrão.
+            const { black, regular } = await loadMontserratFonts();
+            doc.addFileToVFS('Montserrat-Black.ttf', black);
+            doc.addFont('Montserrat-Black.ttf', 'MontserratBlack', 'normal');
+            doc.addFileToVFS('Montserrat-Regular.ttf', regular);
+            doc.addFont('Montserrat-Regular.ttf', 'Montserrat', 'normal');
+
+            doc.setFont('MontserratBlack');
             doc.setFontSize(15);
             doc.text('Tabela de GOP', margin, margin + 14);
-            doc.setFont('helvetica', 'normal');
+            doc.setFont('Montserrat');
             doc.setFontSize(9.5);
             subtitleLines.forEach((line, idx) => {
                 doc.text(line, margin, margin + titleLineHeight + 10 + idx * subtitleLineHeight);
