@@ -1,18 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import toast from 'react-hot-toast';
 import { Account, CostPackage, Hotel, ImportedRow, ProjectionType, ValidationRecord } from '../types';
 import { buildForecastRows, formatValue, formatPercentDiff, formatPointsDiff } from './ForecastTable';
-import { captureElementByIdAsPngBlob, getPngBlobSize } from '../utils/captureElement';
 
 const TABLE_WRAPPER_ID = 'tabela-gop-projecao-wrapper';
-
-const blobToDataUrl = (blob: Blob): Promise<string> => new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-});
 
 const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
     let binary = '';
@@ -39,6 +32,46 @@ const loadMontserratFonts = (): Promise<{ black: string; regular: string }> => {
         }));
     }
     return montserratFontsPromise;
+};
+
+// Cores em RGB equivalentes às classes Tailwind usadas na tela — o PDF desenha a tabela direto
+// (jspdf-autotable), sem depender de capturar a tela em imagem, então as cores são fixadas aqui
+// em vez de vir do CSS. Ver as classes correspondentes (gopPpmClass, despesaPpmClass,
+// diffCellClass) mais abaixo, usadas na versão em tela.
+const PDF_COLORS = {
+    headerBg: [6, 95, 70] as [number, number, number], // emerald-800
+    headerText: [255, 255, 255] as [number, number, number],
+    gopRowBg: [243, 244, 246] as [number, number, number], // gray-100
+    zebraBg: [249, 250, 251] as [number, number, number], // gray-50
+    whiteBg: [255, 255, 255] as [number, number, number],
+    diffGoodBg: [236, 253, 245] as [number, number, number], diffGoodText: [4, 120, 87] as [number, number, number], // emerald-50/700
+    diffBadBg: [254, 242, 242] as [number, number, number], diffBadText: [185, 28, 28] as [number, number, number], // red-50/700
+    diffNeutralText: [156, 163, 175] as [number, number, number], // gray-400
+    ppmGreenBg: [209, 250, 229] as [number, number, number], ppmGreenText: [6, 95, 70] as [number, number, number], // emerald-100/800
+    ppmYellowBg: [254, 243, 199] as [number, number, number], ppmYellowText: [146, 64, 14] as [number, number, number], // amber-100/800
+    ppmRedBg: [254, 226, 226] as [number, number, number], ppmRedText: [153, 27, 27] as [number, number, number], // red-100/800
+    ppmNeutralBg: [249, 250, 251] as [number, number, number], ppmNeutralText: [156, 163, 175] as [number, number, number],
+    filialText: [17, 24, 39] as [number, number, number], // gray-900
+    labelText: [75, 85, 99] as [number, number, number], // gray-600
+    valueText: [31, 41, 55] as [number, number, number], // gray-800
+    mutedText: [107, 114, 128] as [number, number, number], // gray-500
+    whatIfText: [67, 56, 202] as [number, number, number], // indigo-700
+};
+
+const diffCellRgb = (diff: number, kind: RowKind) => {
+    if (!diff) return { fillColor: PDF_COLORS.whiteBg, textColor: PDF_COLORS.diffNeutralText };
+    const isGood = kind === 'receita' ? diff > 0 : diff < 0;
+    return isGood
+        ? { fillColor: PDF_COLORS.diffGoodBg, textColor: PDF_COLORS.diffGoodText }
+        : { fillColor: PDF_COLORS.diffBadBg, textColor: PDF_COLORS.diffBadText };
+};
+const ppmCellRgb = (ppm: number | null, isAdm: boolean) => {
+    if (ppm === null || !isFinite(ppm)) return { fillColor: PDF_COLORS.ppmNeutralBg, textColor: PDF_COLORS.ppmNeutralText };
+    const good = isAdm ? ppm <= 100 : ppm >= 100;
+    const mid = isAdm ? ppm <= 120 : ppm >= 80;
+    if (good) return { fillColor: PDF_COLORS.ppmGreenBg, textColor: PDF_COLORS.ppmGreenText };
+    if (mid) return { fillColor: PDF_COLORS.ppmYellowBg, textColor: PDF_COLORS.ppmYellowText };
+    return { fillColor: PDF_COLORS.ppmRedBg, textColor: PDF_COLORS.ppmRedText };
 };
 
 interface ComparativesViewProps {
@@ -391,35 +424,17 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
         return [`Versão: ${versionLabel}`, `Período: ${periodoText} de ${selectedYear}`];
     };
 
-    // Print da tabela (exatamente como está na tela, com o WHAT IF de cada hotel quando em modo
-    // Projeção) num PDF pra baixar — mesma técnica de captura (html2canvas) já usada na feature
-    // "Gerar Apresentação". A tabela entra no tamanho natural (sem esticar pra caber numa página
-    // maior) — a página do PDF é dimensionada pra abraçar exatamente o título+subtítulo+tabela.
+    // Desenha a tabela direto no PDF (jspdf-autotable) a partir dos mesmos dados/regras de cor da
+    // tela — capturar a tela em imagem (html2canvas) já falhou de 3 jeitos diferentes pra essa
+    // tabela (rowSpan desalinhado, imagem em branco, sem estilo nenhum), então em vez de imagem é
+    // uma tabela nativa: garante as cores certas e paginação automática se tiver muitos hotéis.
     const handleGeneratePdf = async () => {
         setIsGeneratingPdf(true);
         try {
-            // foreignObjectRendering (SVG) chegou a ser testado aqui pra corrigir o desalinhamento
-            // do rowSpan, mas falhou silenciosamente pra essa tabela também (PDF saía sem erro,
-            // porém com a imagem da tabela em branco — mesmo tipo de falha que já tinha acontecido
-            // na Análise de A&B). Revertido pro renderer padrão, que garante o conteúdo aparecer.
-            const blob = await captureElementByIdAsPngBlob(TABLE_WRAPPER_ID);
-            const { width, height } = await getPngBlobSize(blob);
-            const dataUrl = await blobToDataUrl(blob);
-            // A captura sai em retina (scale 2) — desfaz pra converter px@96dpi em pt (72/96), o
-            // mesmo tamanho "natural" que a tabela já tem no sistema (nem esticada, nem reduzida).
-            const imgWidthPt = (width / 2) * 0.75;
-            const imgHeightPt = (height / 2) * 0.75;
-            const margin = 24;
-            const titleLineHeight = 20;
-            const subtitleLineHeight = 13;
-            const subtitleLines = buildPdfSubtitleLines();
-            const headerHeight = titleLineHeight + subtitleLines.length * subtitleLineHeight + 12;
-            const pageWidth = Math.max(imgWidthPt, 320) + margin * 2;
-            const pageHeight = headerHeight + imgHeightPt + margin * 2;
-
-            const doc = new jsPDF({ unit: 'pt', format: [pageWidth, pageHeight] });
-            // Fontes reais embutidas (Montserrat Black pro título, Montserrat pro subtítulo) —
-            // jsPDF só vem com Helvetica/Times/Courier por padrão.
+            const margin = 28;
+            const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'landscape' });
+            // Fontes reais embutidas (Montserrat Black pro título, Montserrat pro resto) — jsPDF
+            // só vem com Helvetica/Times/Courier por padrão.
             const { black, regular } = await loadMontserratFonts();
             doc.addFileToVFS('Montserrat-Black.ttf', black);
             doc.addFont('Montserrat-Black.ttf', 'MontserratBlack', 'normal');
@@ -428,13 +443,72 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
 
             doc.setFont('MontserratBlack');
             doc.setFontSize(15);
-            doc.text('Tabela de GOP', margin, margin + 14);
+            doc.text('Tabela de GOP', margin, margin + 4);
             doc.setFont('Montserrat');
-            doc.setFontSize(9.5);
+            doc.setFontSize(9);
+            const subtitleLines = buildPdfSubtitleLines();
+            const subtitleLineHeight = 12;
             subtitleLines.forEach((line, idx) => {
-                doc.text(line, margin, margin + titleLineHeight + 10 + idx * subtitleLineHeight);
+                doc.text(line, margin, margin + 18 + idx * subtitleLineHeight);
             });
-            doc.addImage(dataUrl, 'PNG', margin, margin + headerHeight, imgWidthPt, imgHeightPt);
+            const tableStartY = margin + 22 + subtitleLines.length * subtitleLineHeight;
+
+            const yy2 = String(selectedYear || new Date().getFullYear()).slice(-2);
+            const yyLY2 = String((selectedYear || new Date().getFullYear()) - 1).slice(-2);
+            const head: any[] = [[
+                'Filial', 'Indicador', `REAL ${selectedYear}`, `META ${selectedYear}`, `R${yy2}-M${yy2}`, '%',
+                `REAL ${(selectedYear || new Date().getFullYear()) - 1}`, `R${yy2}-R${yyLY2}`, '%', 'GOP PPM',
+                ...(projectionMode ? ['WHAT IF %'] : []),
+            ]];
+
+            const body: any[] = [];
+            gopBlocks.forEach((block, blockIdx) => {
+                const rowBg = blockIdx % 2 === 1 ? PDF_COLORS.zebraBg : PDF_COLORS.whiteBg;
+                block.rows.forEach((row, i) => {
+                    const diffMeta = row.values.previa - row.values.budget;
+                    const diffLY = row.values.previa - row.values.lastYear;
+                    const baseBg = row.label.startsWith('GOP') ? PDF_COLORS.gopRowBg : rowBg;
+                    const metaStyle = diffCellRgb(diffMeta, row.kind);
+                    const lyStyle = diffCellRgb(diffLY, row.kind);
+                    const cells: any[] = [];
+                    if (i === 0) {
+                        cells.push({ content: block.name, rowSpan: block.rows.length, styles: { fillColor: PDF_COLORS.whiteBg, textColor: PDF_COLORS.filialText, font: 'MontserratBlack', halign: 'center', valign: 'middle' } });
+                    }
+                    cells.push({ content: row.label, styles: { fillColor: baseBg, textColor: PDF_COLORS.labelText, halign: 'left' } });
+                    cells.push({ content: formatValue(row.values.previa, row.format), styles: { fillColor: baseBg, textColor: PDF_COLORS.valueText, font: 'MontserratBlack', halign: 'right' } });
+                    cells.push({ content: formatValue(row.values.budget, row.format), styles: { fillColor: baseBg, textColor: PDF_COLORS.mutedText, halign: 'right' } });
+                    cells.push({ content: formatDelta(diffMeta, row.format), styles: { ...metaStyle, halign: 'right' } });
+                    cells.push({ content: formatDeltaPct(diffMeta, row.values.budget, row.format), styles: { ...metaStyle, halign: 'right' } });
+                    cells.push({ content: formatValue(row.values.lastYear, row.format), styles: { fillColor: baseBg, textColor: PDF_COLORS.mutedText, halign: 'right' } });
+                    cells.push({ content: formatDelta(diffLY, row.format), styles: { ...lyStyle, halign: 'right' } });
+                    cells.push({ content: formatDeltaPct(diffLY, row.values.lastYear, row.format), styles: { ...lyStyle, halign: 'right' } });
+                    if (i === 0) {
+                        const ppmStyle = ppmCellRgb(block.ppm, block.isAdm);
+                        cells.push({ content: block.ppm === null ? '-' : formatValue(block.ppm, 'percent'), rowSpan: block.rows.length, styles: { ...ppmStyle, font: 'MontserratBlack', halign: 'center', valign: 'middle' } });
+                        if (projectionMode) {
+                            const isGroupBlock = block.key === 'grupo' || block.key === 'grupo-com-jp';
+                            cells.push({ content: isGroupBlock ? '-' : `${whatIfByHotel[block.key] ?? 100}%`, rowSpan: block.rows.length, styles: { fillColor: PDF_COLORS.whiteBg, textColor: PDF_COLORS.whatIfText, font: 'MontserratBlack', halign: 'center', valign: 'middle' } });
+                        }
+                    }
+                    body.push(cells);
+                });
+                if (block.key === 'grupo' || isJoaoPessoa(block.name)) {
+                    body.push([{ content: '', colSpan: projectionMode ? 11 : 10, styles: { fillColor: PDF_COLORS.whiteBg, minCellHeight: 5, lineWidth: 0 } }]);
+                }
+            });
+
+            autoTable(doc, {
+                head, body,
+                startY: tableStartY,
+                margin: { left: margin, right: margin },
+                theme: 'grid',
+                styles: { font: 'Montserrat', fontSize: 6.5, cellPadding: 3, lineColor: [229, 231, 235], lineWidth: 0.4, valign: 'middle' },
+                headStyles: { fillColor: PDF_COLORS.headerBg, textColor: PDF_COLORS.headerText, font: 'MontserratBlack', fontSize: 6.5, halign: 'center' },
+                columnStyles: {
+                    0: { cellWidth: 55 }, 1: { cellWidth: 78 },
+                },
+            });
+
             doc.save(`tabela-de-gop-${projectionMode ? 'projecao-' : ''}${selectedYear}.pdf`);
             toast.success('PDF gerado!');
         } catch (err: any) {
