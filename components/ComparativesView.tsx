@@ -398,11 +398,11 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
     const handleGeneratePdf = async () => {
         setIsGeneratingPdf(true);
         try {
-            // foreignObjectRendering: o renderer padrão (canvas 2D) tem suporte fraco a rowSpan em
-            // tabelas grandes — a célula mesclada de "Filial"/GOP PPM saía desalinhada da linha
-            // certa no PDF. Como essa tabela não usa flex-wrap complexo (só <table>+rowSpan), dá
-            // pra usar o renderer via SVG aqui sem o problema que ele causou na Análise de A&B.
-            const blob = await captureElementByIdAsPngBlob(TABLE_WRAPPER_ID, { foreignObjectRendering: true });
+            // foreignObjectRendering (SVG) chegou a ser testado aqui pra corrigir o desalinhamento
+            // do rowSpan, mas falhou silenciosamente pra essa tabela também (PDF saía sem erro,
+            // porém com a imagem da tabela em branco — mesmo tipo de falha que já tinha acontecido
+            // na Análise de A&B). Revertido pro renderer padrão, que garante o conteúdo aparecer.
+            const blob = await captureElementByIdAsPngBlob(TABLE_WRAPPER_ID);
             const { width, height } = await getPngBlobSize(blob);
             const dataUrl = await blobToDataUrl(blob);
             // A captura sai em retina (scale 2) — desfaz pra converter px@96dpi em pt (72/96), o
