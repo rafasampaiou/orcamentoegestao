@@ -121,7 +121,12 @@ const ExpensesBudgetImportModal: React.FC<ExpensesBudgetImportModalProps> = ({ r
         matchedEntries.forEach(({ item, rowLabel }) => {
             matched[rowLabel] = { ...(matched[rowLabel] || {}) };
             MONTHS.forEach(m => {
-                if (item.values[m] !== undefined) matched[rowLabel][m] = String(item.values[m]);
+                // Grava no formato BR (vírgula decimal) — é o que o resto do sistema espera ao
+                // reler essa célula (parseFinanceValue, em UnifiedAdministrationView.tsx, trata
+                // QUALQUER ponto como separador de milhar). Gravar "54651.24" (String() puro do
+                // JS, com ponto decimal) fazia o ponto ser removido na releitura — "54651.24"
+                // virava "5465124", inflando o valor em ordens de grandeza.
+                if (item.values[m] !== undefined) matched[rowLabel][m] = String(item.values[m]).replace('.', ',');
             });
         });
         onConfirm(matched);
