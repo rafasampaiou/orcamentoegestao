@@ -8,6 +8,7 @@ import KpiCalculationEditor from './KpiCalculationEditor';
 import TimelineView from './TimelineView';
 import ReplicateBudgetModal, { ReplicationOptions } from './ReplicateBudgetModal';
 import RevenueStandaloneImportModal from './RevenueStandaloneImportModal';
+import ExpensesBudgetImportModal from './ExpensesBudgetImportModal';
 import { supabaseService } from '../services/supabaseService';
 import { supabaseTemp } from '../services/supabaseClient';
 import { toast } from 'react-hot-toast';
@@ -873,6 +874,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   // Table-based import data (rowLabel -> monthIndex 1-12 -> string value)
   const [dreForecastData, setDreForecastData] = useState<Record<string, Record<number, string>>>({});
   const [dreBudgetData, setDreBudgetData] = useState<Record<string, Record<number, string>>>({});
+  // Modal de importação por arquivo da tabela principal de Despesas do Budget — só preenche
+  // dreBudgetData (igual colar do Excel manualmente); salvar continua sendo o botão já existente.
+  const [showExpensesBudgetImportModal, setShowExpensesBudgetImportModal] = useState(false);
   // Segmentação informativa pra Metas GMD (Tech HUB Marketing/Martech dentro de Despesas
   // Administrativas; Marketing/Martech dentro de Despesas com Vendas e Marketing) — não altera
   // financial_data, só alimenta a tela de Metas GMD. Fica embaixo da tabela de Despesas (Real),
@@ -4867,6 +4871,12 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
             </div>
             <div className="flex-1 min-w-[24px]" />
             <button
+              onClick={() => setShowExpensesBudgetImportModal(true)}
+              className="bg-white text-orange-700 border border-orange-300 px-4 py-2 rounded-lg font-bold text-sm hover:bg-orange-50 transition-all flex items-center gap-2"
+            >
+              <Upload size={16} /> Importar Arquivo
+            </button>
+            <button
               onClick={() => handleSaveExpensesForecast('BUDGET')}
               disabled={isSavingDre || !budgetImportHotelId || !(targetBudgetVersionId || activeBudgetVersionId)}
               className="bg-orange-600 text-white px-6 py-2 rounded-lg font-bold text-sm hover:bg-orange-700 shadow-lg shadow-orange-100 transition-all flex items-center gap-2 disabled:opacity-50"
@@ -4894,6 +4904,21 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               setDreBudgetData(newData);
             }}
           />
+          {showExpensesBudgetImportModal && (
+            <ExpensesBudgetImportModal
+              rowLabels={dynamicExpenseRows}
+              onClose={() => setShowExpensesBudgetImportModal(false)}
+              onConfirm={(matched) => {
+                setDreBudgetData(prev => {
+                  const next = { ...prev };
+                  Object.entries(matched).forEach(([rowLabel, monthValues]) => {
+                    next[rowLabel] = { ...(next[rowLabel] || {}), ...monthValues };
+                  });
+                  return next;
+                });
+              }}
+            />
+          )}
         </div>
       )}
 
