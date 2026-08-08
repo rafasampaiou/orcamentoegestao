@@ -432,7 +432,7 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
         setIsGeneratingPdf(true);
         try {
             const margin = 28;
-            const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'landscape' });
+            const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait' });
             // Fontes reais embutidas (Montserrat Black pro título, Montserrat pro resto) — jsPDF
             // só vem com Helvetica/Times/Courier por padrão.
             const { black, regular } = await loadMontserratFonts();
