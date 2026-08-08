@@ -873,6 +873,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
 
   // Table-based import data (rowLabel -> monthIndex 1-12 -> string value)
   const [dreForecastData, setDreForecastData] = useState<Record<string, Record<number, string>>>({});
+  // Modal de importação por arquivo da tabela principal de Despesas (Forecast/Real) — mesmo
+  // componente do Budget, só preenche dreForecastData; salvar continua no botão já existente.
+  const [showExpensesForecastImportModal, setShowExpensesForecastImportModal] = useState(false);
   const [dreBudgetData, setDreBudgetData] = useState<Record<string, Record<number, string>>>({});
   // Modal de importação por arquivo da tabela principal de Despesas do Budget — só preenche
   // dreBudgetData (igual colar do Excel manualmente); salvar continua sendo o botão já existente.
@@ -4433,6 +4436,12 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 </div>
                 <div className="flex-1 min-w-[24px]" />
                 <button
+                  onClick={() => setShowExpensesForecastImportModal(true)}
+                  className="bg-white text-indigo-700 border border-indigo-300 px-4 py-2 rounded-lg font-bold text-sm hover:bg-indigo-50 transition-all flex items-center gap-2"
+                >
+                  <Upload size={16} /> Importar Arquivo
+                </button>
+                <button
                   onClick={() => handleSaveExpensesForecast('REAL')}
                   disabled={isSavingDre || !importHotelId || (!targetRealVersionId && !activeRealVersionId)}
                   className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all flex items-center gap-2 disabled:opacity-50"
@@ -4460,6 +4469,21 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                   setDreForecastData(newData);
                 }}
               />
+              {showExpensesForecastImportModal && (
+                <ExpensesBudgetImportModal
+                  rowLabels={dynamicExpenseRows}
+                  onClose={() => setShowExpensesForecastImportModal(false)}
+                  onConfirm={(matched) => {
+                    setDreForecastData(prev => {
+                      const next = { ...prev };
+                      Object.entries(matched).forEach(([rowLabel, monthValues]) => {
+                        next[rowLabel] = { ...(next[rowLabel] || {}), ...monthValues };
+                      });
+                      return next;
+                    });
+                  }}
+                />
+              )}
 
               {expenseMasterTotals.masters.length > 0 && (
                 <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
