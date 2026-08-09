@@ -229,7 +229,6 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
         setVisibleMonths(selectedMonth ? [selectedMonth] : [1]);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedYear]);
-    const isSingleMonth = visibleMonths.length === 1;
 
     // Hotéis incluídos na comparativa — múltipla escolha, default = todos (a tela é
     // inerentemente comparativa entre filiais, não faz sentido restringir a um único hotel).
@@ -618,6 +617,12 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
                                     </button>
                                 );
                             })}
+                            <button
+                                onClick={() => setSelectedHotelNames(effectiveSelectedNames.length === hotels.length ? [] : hotels.map(h => h.name))}
+                                className="px-3 py-1 text-sm font-bold rounded-md transition-all bg-gray-100 text-gray-600 hover:bg-gray-200 ml-2 border border-gray-200"
+                            >
+                                {effectiveSelectedNames.length === hotels.length ? 'Deselecionar Todos' : 'Selecionar Todos'}
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -626,12 +631,6 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
                     <input type="checkbox" checked={hideSemImposto} onChange={e => setHideSemImposto(e.target.checked)} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
                     <span className="text-sm font-bold text-gray-600">Ocultar GOP R$ / GOP % sem imposto</span>
                 </label>
-
-                {!isSingleMonth && !projectionMode && (
-                    <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 font-bold mb-4">
-                        Vários meses selecionados — os valores mostrados são a soma do período.
-                    </p>
-                )}
 
                 <div id={TABLE_WRAPPER_ID} className="inline-block max-w-full overflow-x-auto border border-gray-200 rounded-xl">
                     <table className="text-xs table-fixed">
