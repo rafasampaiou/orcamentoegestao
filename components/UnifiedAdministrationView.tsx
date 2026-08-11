@@ -4521,22 +4521,29 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                               {new Date(2024, m - 1).toLocaleString('pt-BR', { month: 'short' })}
                             </th>
                           ))}
+                          <th className="px-3 py-2 font-bold text-indigo-700 bg-indigo-50">Total</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {expenseMasterTotals.masters.map(master => (
-                          <tr key={master} className="hover:bg-gray-50">
-                            <td className="px-3 py-2 text-left font-bold text-gray-700 sticky left-0 bg-white truncate max-w-[220px]">{master}</td>
-                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => {
-                              const val = expenseMasterTotals.totals[master]?.[m] || 0;
-                              return (
-                                <td key={m} className="px-3 py-2 tabular-nums text-gray-600">
-                                  {val === 0 ? '-' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(val)}
-                                </td>
-                              );
-                            })}
-                          </tr>
-                        ))}
+                        {expenseMasterTotals.masters.map(master => {
+                          const rowTotal = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].reduce((sum, m) => sum + (expenseMasterTotals.totals[master]?.[m] || 0), 0);
+                          return (
+                            <tr key={master} className="hover:bg-gray-50">
+                              <td className="px-3 py-2 text-left font-bold text-gray-700 sticky left-0 bg-white truncate max-w-[220px]">{master}</td>
+                              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => {
+                                const val = expenseMasterTotals.totals[master]?.[m] || 0;
+                                return (
+                                  <td key={m} className="px-3 py-2 tabular-nums text-gray-600">
+                                    {val === 0 ? '-' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(val)}
+                                  </td>
+                                );
+                              })}
+                              <td className="px-3 py-2 tabular-nums font-black text-indigo-900 bg-indigo-50/40">
+                                {rowTotal === 0 ? '-' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(rowTotal)}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                       <tfoot>
                         <tr className="bg-indigo-50 border-t-2 border-indigo-200">
@@ -4549,6 +4556,12 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                               </td>
                             );
                           })}
+                          <td className="px-3 py-2 tabular-nums font-black text-indigo-900">
+                            {(() => {
+                              const grand = expenseMasterTotals.masters.reduce((sum, master) => sum + [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].reduce((s, m) => s + (expenseMasterTotals.totals[master]?.[m] || 0), 0), 0);
+                              return grand === 0 ? '-' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(grand);
+                            })()}
+                          </td>
                         </tr>
                       </tfoot>
                     </table>

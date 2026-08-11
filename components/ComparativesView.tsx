@@ -595,7 +595,7 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
                                 onClick={() => setVisibleMonths(visibleMonths.length === 12 ? [selectedMonth || 1] : Array.from({ length: 12 }, (_, i) => i + 1))}
                                 className="px-3 py-1 text-sm font-bold rounded-md transition-all bg-gray-100 text-gray-600 hover:bg-gray-200 ml-2 border border-gray-200"
                             >
-                                {visibleMonths.length === 12 ? 'Deselecionar Todos' : 'Selecionar Todos'}
+                                {visibleMonths.length === 12 ? 'Desmarcar Todos' : 'Selecionar Todos'}
                             </button>
                         </div>
                     </div>
@@ -621,7 +621,7 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
                                 onClick={() => setSelectedHotelNames(effectiveSelectedNames.length === hotels.length ? [] : hotels.map(h => h.name))}
                                 className="px-3 py-1 text-sm font-bold rounded-md transition-all bg-gray-100 text-gray-600 hover:bg-gray-200 ml-2 border border-gray-200"
                             >
-                                {effectiveSelectedNames.length === hotels.length ? 'Deselecionar Todos' : 'Selecionar Todos'}
+                                {effectiveSelectedNames.length === hotels.length ? 'Desmarcar Todos' : 'Selecionar Todos'}
                             </button>
                         </div>
                     </div>

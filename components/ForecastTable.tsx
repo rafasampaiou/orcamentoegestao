@@ -1061,6 +1061,11 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     );
     const isMeetingVersionCompleted = isMeetingVersion && currentValidation?.status === 'Validado';
     const isLocked = ((isMonthClosed && isAlreadyValidated) || isMeetingVersionCompleted) && !forceUnlockValidated;
+    // Só pro RÓTULO da coluna Prévia/Real (cabeçalhos, KPIs, deltas) — a versão "Realizado" já é
+    // o fechamento gerencial oficial, então essa coluna deve se chamar "Real" nela também, sem
+    // mudar o comportamento de bloqueio de edição (isLocked/isMonthClosed continuam só olhando
+    // Fechamento oficial, que é uma decisão separada).
+    const showPreviaAsReal = isMonthClosed || activeProjectionType === 'Realizado';
 
     // "Calcular Forecast" só fica disponível (com aparência ativa) exatamente na etapa de mesmo
     // nome — etapas 1 a 4 (escolher o dia final, ocupação/despesas On the books, ocupação/receita
@@ -1627,18 +1632,18 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             <div className="space-y-2">
                                 {[
                                     ...(isMeetingVersion ? [{ key: 'otb', label: otbColumnLabel }] : []),
-                                    { key: 'previa', label: isMonthClosed ? 'Real' : 'Prévia' },
+                                    { key: 'previa', label: showPreviaAsReal ? 'Real' : 'Prévia' },
                                     { key: 'real', label: 'Forecast (Real)' },
                                     { key: 'budget', label: 'Meta (Budget)' },
-                                    { key: 'deltaPreviaBudget', label: isMonthClosed ? 'Δ Real - Meta R$' : 'Δ Prévia - Meta R$' },
-                                    { key: 'deltaPreviaBudgetPct', label: isMonthClosed ? 'Δ Real - Meta %' : 'Δ Prévia - Meta %' },
-                                    { key: 'deltaPreviaForecast', label: isMonthClosed ? 'Δ Real - Forecast R$' : 'Δ Prévia - Forecast R$' },
-                                    { key: 'deltaPreviaForecastPct', label: isMonthClosed ? 'Δ Real - Forecast %' : 'Δ Prévia - Forecast %' },
+                                    { key: 'deltaPreviaBudget', label: showPreviaAsReal ? 'Δ Real - Meta R$' : 'Δ Prévia - Meta R$' },
+                                    { key: 'deltaPreviaBudgetPct', label: showPreviaAsReal ? 'Δ Real - Meta %' : 'Δ Prévia - Meta %' },
+                                    { key: 'deltaPreviaForecast', label: showPreviaAsReal ? 'Δ Real - Forecast R$' : 'Δ Prévia - Forecast R$' },
+                                    { key: 'deltaPreviaForecastPct', label: showPreviaAsReal ? 'Δ Real - Forecast %' : 'Δ Prévia - Forecast %' },
                                     { key: 'lastYear', label: 'Ano anterior' },
                                     { key: 'deltaLY', label: `Δ ${selectedYear} x Ano anterior R$` },
                                     { key: 'deltaLYPct', label: `Δ ${selectedYear} x Ano anterior %` },
                                     ...(isMeetingVersion ? [{ key: 'driverOtb', label: 'KPI (OTB)' }] : []),
-                                    { key: 'driverPrevia', label: isMonthClosed ? 'Driver (Real)' : 'Driver (Prévia)' },
+                                    { key: 'driverPrevia', label: showPreviaAsReal ? 'Driver (Real)' : 'Driver (Prévia)' },
                                     { key: 'driverForecast', label: 'Driver (Forecast)' },
                                     { key: 'driverBudget', label: 'Driver (Meta)' },
                                 ].map(col => (
@@ -1688,7 +1693,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         style={{ width: columnWidths.previa }}
                                         className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 border-l border-sky-200 group relative"
                                     >
-                                        {isMonthClosed ? 'REAL' : 'PRÉVIA'}
+                                        {showPreviaAsReal ? 'REAL' : 'PRÉVIA'}
                                         <div
                                             onMouseDown={(e) => handleResizeStart(e, 'previa')}
                                             className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
@@ -1727,7 +1732,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         style={{ width: columnWidths.deltaPreviaBudget }}
                                         className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 whitespace-pre-line leading-tight group relative"
                                     >
-                                        Δ<br />{isMonthClosed ? 'REAL' : 'PRÉVIA'} - META
+                                        Δ<br />{showPreviaAsReal ? 'REAL' : 'PRÉVIA'} - META
                                         <div
                                             onMouseDown={(e) => handleResizeStart(e, 'deltaPreviaBudget')}
                                             className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
@@ -1740,7 +1745,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         style={{ width: columnWidths.deltaPreviaBudgetPct }}
                                         className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 whitespace-pre-line leading-tight group relative"
                                     >
-                                        Δ %<br />{isMonthClosed ? 'REAL' : 'PRÉVIA'} - META
+                                        Δ %<br />{showPreviaAsReal ? 'REAL' : 'PRÉVIA'} - META
                                         <div
                                             onMouseDown={(e) => handleResizeStart(e, 'deltaPreviaBudgetPct')}
                                             className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
@@ -1753,7 +1758,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         style={{ width: columnWidths.deltaPreviaForecast }}
                                         className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 whitespace-pre-line leading-tight group relative"
                                     >
-                                        Δ<br />{isMonthClosed ? 'REAL' : 'PRÉVIA'} - Forecast
+                                        Δ<br />{showPreviaAsReal ? 'REAL' : 'PRÉVIA'} - Forecast
                                         <div
                                             onMouseDown={(e) => handleResizeStart(e, 'deltaPreviaForecast')}
                                             className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
@@ -1766,7 +1771,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         style={{ width: columnWidths.deltaPreviaForecastPct }}
                                         className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 border-r border-sky-200 whitespace-pre-line leading-tight group relative"
                                     >
-                                        Δ %<br />{isMonthClosed ? 'REAL' : 'PRÉVIA'} - Forecast
+                                        Δ %<br />{showPreviaAsReal ? 'REAL' : 'PRÉVIA'} - Forecast
                                         <div
                                             onMouseDown={(e) => handleResizeStart(e, 'deltaPreviaForecastPct')}
                                             className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
@@ -1792,7 +1797,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         style={{ width: columnWidths.deltaLY }}
                                         className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 whitespace-pre-line leading-tight group relative"
                                     >
-                                        Δ<br />{isMonthClosed ? 'REAL' : 'PRÉVIA'} - LY
+                                        Δ<br />{showPreviaAsReal ? 'REAL' : 'PRÉVIA'} - LY
                                         <div
                                             onMouseDown={(e) => handleResizeStart(e, 'deltaLY')}
                                             className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
@@ -1805,7 +1810,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         style={{ width: columnWidths.deltaLYPct }}
                                         className="px-2 py-3 text-center bg-sky-100 text-sky-900 border-b border-sky-200 whitespace-pre-line leading-tight group relative"
                                     >
-                                        Δ %<br />{isMonthClosed ? 'REAL' : 'PRÉVIA'} - LY
+                                        Δ %<br />{showPreviaAsReal ? 'REAL' : 'PRÉVIA'} - LY
                                         <div
                                             onMouseDown={(e) => handleResizeStart(e, 'deltaLYPct')}
                                             className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-sky-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
@@ -1835,7 +1840,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         style={{ width: columnWidths.driverPrevia }}
                                         className="px-2 py-3 text-center bg-slate-50 text-slate-700 border-b border-slate-200 border-l border-slate-200 group relative text-xs"
                                     >
-                                        KPI<br />({isMonthClosed ? 'REAL' : 'PRÉVIA'})
+                                        KPI<br />({showPreviaAsReal ? 'REAL' : 'PRÉVIA'})
                                         <div
                                             onMouseDown={(e) => handleResizeStart(e, 'driverPrevia')}
                                             className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-slate-300 opacity-0 group-hover:opacity-100 transition-opacity z-50"
@@ -2717,7 +2722,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                             </div>
                                             <div className="flex items-center gap-4 text-sm">
                                                 <div className="text-right">
-                                                    <span className="block text-xs text-gray-500">{isMonthClosed ? 'Real' : 'Prévia'}</span>
+                                                    <span className="block text-xs text-gray-500">{showPreviaAsReal ? 'Real' : 'Prévia'}</span>
                                                     <span className="font-medium text-gray-900">
                                                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(row.previa || 0)}
                                                     </span>
