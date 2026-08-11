@@ -361,6 +361,10 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     const [showAlertModal, setShowAlertModal] = useState(false);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    // Versão "Realizado": se já existe Forecast salvo no Fechamento oficial pra esse hotel/mês,
+    // "Calcular Forecast" pergunta se quer replicar esses valores em vez de recalcular do zero
+    // (fórmulas/Meta) — ver handleCalcularForecast/confirmCalcularForecast.
+    const [pendingFechamentoOverrides, setPendingFechamentoOverrides] = useState<Record<string, number> | null>(null);
 
     // Comentários por célula (linha+coluna, clique com botão direito) — salvos por
     // hotel/ano/mês/Versão do Forecast (activeProjectionType, o mesmo valor do seletor "Versão
@@ -1338,13 +1342,53 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         }
     };
 
+    // Na versão Realizado, se o Fechamento oficial já tem Forecast salvo (override) pra esse
+    // hotel/mês, oferece replicar esses valores em vez de recalcular do zero — reaproveita o
+    // mesmo mecanismo de override que "Salvar Projeção"/"Validar fechamento" já grava
+    // (financial_data, conta = "override_<rowId>", scenario 'Real', projectionType do Fechamento).
+    const findFechamentoOverrides = (): Record<string, number> | null => {
+        if (!financialData) return null;
+        const overrides: Record<string, number> = {};
+        financialData.forEach(r => {
+            if (!r.conta.startsWith('override_')) return;
+            if (r.hotel !== selectedHotel) return;
+            if (String(r.mes) !== String(selectedMonth) || String(r.ano) !== String(selectedYear)) return;
+            if ((r.versionId || '') !== (activeRealVersionId || '')) return;
+            if (r.projectionType !== 'Fechamento oficial') return;
+            if (r.cenario !== 'Real') return;
+            const rowId = r.conta.slice('override_'.length);
+            const val = parseFloat(r.valor);
+            if (!isNaN(val)) overrides[rowId] = val;
+        });
+        return Object.keys(overrides).length > 0 ? overrides : null;
+    };
+
     const handleCalcularForecast = () => {
+        if (activeProjectionType === 'Realizado') {
+            const overrides = findFechamentoOverrides();
+            if (overrides) {
+                setPendingFechamentoOverrides(overrides);
+                return;
+            }
+        }
+        runCalcularForecast();
+    };
+
+    const runCalcularForecast = (fechamentoOverrides?: Record<string, number> | null) => {
         setData(prevData => {
             const newData = prevData.map(row => {
                 if (row.isHeader || row.isTotal || row.category === 'Spacer' || row.category === 'Indicators') {
                     return row;
                 }
-                
+
+                // Replicando do Fechamento oficial: usa o valor salvo lá direto, sem rodar
+                // fórmula/Meta — só pras linhas que de fato têm um valor salvo por lá.
+                if (fechamentoOverrides && fechamentoOverrides[row.id] !== undefined) {
+                    const replicatedValue = fechamentoOverrides[row.id];
+                    const newConfig = { ...(row.forecastConfig || { method: 'Fixed' as const }), method: 'Fixed' as const, manualValue: replicatedValue };
+                    return { ...row, forecastConfig: newConfig, real: replicatedValue };
+                }
+
                 const account = accounts.find(a => a.id === row.id || (a.code && a.code === row.accountCode));
 
                 if (account) {
@@ -1541,7 +1585,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 )
                             )
                         ) : (
-                            canEditForecast && onNavigateToOccupancy && (
+                            // Na versão Realizado não faz sentido "iniciar projeção" (é o fechamento
+                            // gerencial oficial, não uma prévia em construção) — só "Calcular Forecast".
+                            activeProjectionType !== 'Realizado' && canEditForecast && onNavigateToOccupancy && (
                                 <button
                                     onClick={handleIniciarProjecao}
                                     className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-base font-bold transition-colors border bg-white text-gray-600 border-gray-300 hover:bg-gray-50 shadow-sm"
@@ -3074,6 +3120,44 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 className="px-6 py-2.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors shadow-md shadow-emerald-200 active:scale-95"
                             >
                                 Entendi
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {pendingFechamentoOverrides && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col scale-in-center">
+                        <div className="p-6 bg-gradient-to-r from-indigo-600 to-blue-600 text-white flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                                <Activity size={24} className="text-white" />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-black">Replicar do Fechamento?</h3>
+                                <p className="text-sm text-indigo-100 font-medium">Já existe Forecast salvo no Fechamento oficial</p>
+                            </div>
+                        </div>
+                        <div className="p-6 bg-slate-50">
+                            <p className="text-slate-700 text-base text-center font-medium">
+                                Encontramos o Forecast já calculado na versão "Fechamento oficial" pra esse hotel/mês.
+                            </p>
+                            <p className="text-xs text-slate-500 text-center mt-2">
+                                Replicar copia esses valores pro Forecast do Realizado. Cancelar calcula do jeito normal (fórmulas/Meta), sem alterar nada do Fechamento.
+                            </p>
+                        </div>
+                        <div className="p-4 border-t border-gray-100 flex justify-end gap-3 bg-white">
+                            <button
+                                onClick={() => { setPendingFechamentoOverrides(null); runCalcularForecast(null); }}
+                                className="px-5 py-2.5 bg-white text-slate-600 border border-slate-300 font-bold rounded-xl hover:bg-slate-50 transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={() => { const overrides = pendingFechamentoOverrides; setPendingFechamentoOverrides(null); runCalcularForecast(overrides); }}
+                                className="px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-200 active:scale-95"
+                            >
+                                Replicar
                             </button>
                         </div>
                     </div>

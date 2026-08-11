@@ -85,23 +85,22 @@ interface ComparativesViewProps {
     activeRealVersionId?: string;
     activeBudgetVersionId?: string;
     budgetOccupancyData?: Record<string, number[]>;
-    activeProjectionType?: ProjectionType;
-    setActiveProjectionType?: React.Dispatch<React.SetStateAction<ProjectionType>>;
     validations?: ValidationRecord[];
 }
 
 const MONTH_LABELS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 const MONTH_FULL_NAMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-// Agrupa uma lista de rótulos (um por mês, índice 0 = Janeiro) em faixas de meses consecutivos
-// com o mesmo rótulo — "Jan/Fev/Mar: Realizado" vira uma linha só ("Janeiro a Março: Realizado").
-const groupConsecutiveMonths = (labelForMonthIdx: (idx: number) => string): { range: string; label: string }[] => {
+// Agrupa uma lista de meses (números 1-12, já na ordem certa) em faixas consecutivas com o mesmo
+// rótulo — "Jan/Fev/Mar: Realizado" vira uma linha só ("Janeiro a Março: Realizado"). Usada tanto
+// pro resumo do modo normal (só os meses selecionados) quanto pro modo Projeção (ano inteiro).
+const groupConsecutiveMonths = (months: number[], labelFor: (m: number) => string): { range: string; label: string }[] => {
     const out: { range: string; label: string }[] = [];
     let i = 0;
-    while (i < 12) {
-        const label = labelForMonthIdx(i);
+    while (i < months.length) {
+        const label = labelFor(months[i]);
         let j = i;
-        while (j + 1 < 12 && labelForMonthIdx(j + 1) === label) j++;
-        const range = i === j ? MONTH_FULL_NAMES[i] : `${MONTH_FULL_NAMES[i]} a ${MONTH_FULL_NAMES[j]}`;
+        while (j + 1 < months.length && months[j + 1] === months[j] + 1 && labelFor(months[j + 1]) === label) j++;
+        const range = i === j ? MONTH_FULL_NAMES[months[i] - 1] : `${MONTH_FULL_NAMES[months[i] - 1]} a ${MONTH_FULL_NAMES[months[j] - 1]}`;
         out.push({ range, label });
         i = j + 1;
     }
@@ -109,28 +108,23 @@ const groupConsecutiveMonths = (labelForMonthIdx: (idx: number) => string): { ra
 };
 const ALL_MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 // Ordem de "mais avançado" — usada pra achar, dado um mês já validado em mais de uma versão
-// (raro, mas possível), qual delas prevalece. Mesma ordem de PROJECTION_TYPE_OPTIONS, invertida.
+// (raro, mas possível), qual delas prevalece.
 const PROJECTION_RANK: ProjectionType[] = ['Realizado', 'Fechamento oficial', 'FCA N1', 'FCA N2', 'Reunião de Ritmo'];
-
-// Mesmas 5 versões do resto do app — ver AnaliseABView.tsx.
-const PROJECTION_TYPE_OPTIONS: { value: ProjectionType; label: string }[] = [
-    { value: 'Reunião de Ritmo', label: 'Reunião de Ritmo' },
-    { value: 'FCA N2', label: 'FCA N2' },
-    { value: 'FCA N1', label: 'FCA N1' },
-    { value: 'Fechamento oficial', label: 'Fechamento' },
-    { value: 'Realizado', label: 'Realizado' },
-];
+// A tela não tem mais filtro de Versão — pra meses sem nenhuma versão validada, o valor usado é a
+// Meta, que não depende de qual ProjectionType é passado pra buildForecastRows; esse valor é só
+// pra satisfazer a assinatura da função.
+const DEFAULT_PROJECTION_TYPE: ProjectionType = 'Reunião de Ritmo';
 
 // "João Pessoa" entra 2x na ordem final (ver montagem de gopBlocks): uma vez como hotel próprio,
 // e o hotel some/entra na comparação do "Grupo" x "Grupo com JP" — pedido explícito do usuário
 // pra poder comparar o resultado do grupo com e sem esse hotel.
-const DIACRITICS_REGEX = new RegExp("[\u0300-\u036f]", "g");
+const DIACRITICS_REGEX = new RegExp("[̀-ͯ]", "g");
 const normalizeName = (s: string) => s.trim().toLowerCase().normalize('NFD').replace(DIACRITICS_REGEX, '');
 const isJoaoPessoa = (name: string) => normalizeName(name) === 'joao pessoa';
 
-// Ordem fixa pedida pelo usu\u00e1rio (2026-08-05), independente da ordem que `hotels` venha do
-// backend \u2014 hot\u00e9is fora dessa lista entram no final, na ordem em que j\u00e1 vinham.
-const HOTEL_ORDER = ['Atibaia', 'Caet\u00e9', 'Alex\u00e2nia', 'Arax\u00e1', 'Alegro', 'Administradora'];
+// Ordem fixa pedida pelo usuário (2026-08-05), independente da ordem que `hotels` venha do
+// backend — hotéis fora dessa lista entram no final, na ordem em que já vinham.
+const HOTEL_ORDER = ['Atibaia', 'Caeté', 'Alexânia', 'Araxá', 'Alegro', 'Administradora'];
 const hotelOrderIndex = (name: string): number => {
     const idx = HOTEL_ORDER.findIndex(n => normalizeName(n) === normalizeName(name));
     return idx === -1 ? HOTEL_ORDER.length : idx;
@@ -204,10 +198,16 @@ const formatDeltaPct = (diff: number, base: number, format: RowFormat): string =
     return formatPercentDiff((diff / base) * 100);
 };
 
+// Classe compartilhada pelos 3 filtros (Versão antes, Mês/Hotel agora) — grupo de pills com fundo
+// cinza, a pill ativa em branco com sombra leve.
+const FILTER_GROUP_CLASS = 'flex items-center flex-wrap gap-0.5 bg-gray-100 p-1 rounded-lg';
+const filterPillClass = (active: boolean) => `px-2.5 py-1 text-sm font-bold rounded-md transition-all ${active
+    ? 'bg-white text-indigo-600 shadow-sm border border-gray-200'
+    : 'text-gray-500 hover:text-gray-700'}`;
+
 const ComparativesView: React.FC<ComparativesViewProps> = ({
     selectedMonth, selectedYear, financialData, accounts, packages, hotels,
-    realOccupancyData, activeRealVersionId, activeBudgetVersionId, budgetOccupancyData,
-    activeProjectionType, setActiveProjectionType, validations,
+    realOccupancyData, activeRealVersionId, activeBudgetVersionId, budgetOccupancyData, validations,
 }) => {
     // "Projetar": ano inteiro por hotel — meses já validados usam Real/Prévia, os demais repetem
     // a Meta (escalada pelo WHAT IF % daquele hotel). Simulação client-side, não persiste.
@@ -216,14 +216,17 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
     // Só conta como "mês já trabalhado" se existir uma validação com status "Validado" pra esse
-    // hotel+ano+mês — "Em construção" ainda entra na repetição de Meta.
+    // hotel+ano+mês — "Em construção" ainda entra na repetição de Meta (modo Projeção) ou fica
+    // zerado (modo normal).
     const findValidatedVersion = (hotelId: string, month: number): ProjectionType | null => {
         const matches = (validations || []).filter(v => v.hotelId === hotelId && v.year === selectedYear && v.month === month && v.status === 'Validado');
         if (matches.length === 0) return null;
         return PROJECTION_RANK.find(rank => matches.some(v => v.projectionType === rank)) || null;
     };
     // Meses considerados — por padrão só o mês corrente, mas dá pra acumular vários (soma do
-    // período), mesmo padrão/UI do filtro "Filtrar Meses" da Análise de A&B.
+    // período), mesmo padrão/UI do filtro "Filtrar Meses" da Análise de A&B. Cada mês selecionado
+    // resolve por conta própria pra Real ou Prévia (ver perHotelMonthlyAnnual) — não é mais um
+    // "filtro de versão" único pra todos.
     const [visibleMonths, setVisibleMonths] = useState<number[]>(() => selectedMonth ? [selectedMonth] : [1]);
     useEffect(() => {
         setVisibleMonths(selectedMonth ? [selectedMonth] : [1]);
@@ -248,33 +251,13 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
     const yy = String(selectedYear || new Date().getFullYear()).slice(-2);
     const yyLY = String((selectedYear || new Date().getFullYear()) - 1).slice(-2);
 
-    // Uma chamada de buildForecastRows por hotel selecionado × mês selecionado — mesma função
-    // que já monta a DRE Forecast completa (ForecastTable.tsx:3603), reaproveitada sem duplicar
-    // lógica de cálculo (mesmo padrão usado em AnaliseABView.tsx:177-181).
-    const perHotelMonthlyRows = useMemo(() => {
-        const selected = hotels.filter(h => effectiveSelectedNames.includes(h.name));
-        return selected.map(hotel => ({
-            hotel,
-            monthsRows: visibleMonths.map(m => buildForecastRows(
-                undefined, m, selectedYear, financialData, hotel.name, hotels,
-                realOccupancyData || {}, activeRealVersionId, activeBudgetVersionId, accounts, packages,
-                budgetOccupancyData || {}, activeProjectionType
-            )),
-        }));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [hotels, effectiveSelectedNames, visibleMonths, selectedYear, financialData, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData, activeProjectionType]);
-
-    const sumField = (monthsRows: ReturnType<typeof buildForecastRows>[], rowId: string): PeriodTotals =>
-        monthsRows.reduce((acc, rows) => {
-            const r = rows.find(x => x.id === rowId);
-            return { previa: acc.previa + (r?.previa || 0), budget: acc.budget + (r?.budget || 0), lastYear: acc.lastYear + (r?.lastYear || 0) };
-        }, zeroTotals());
-
-    // Estágio 1 (caro): pra cada hotel × cada um dos 12 meses do ano, descobre se o mês já foi
-    // validado (e em qual versão) e busca Receita/Imposto/Despesa desse mês nessa versão — não
-    // depende do WHAT IF, só recalcula se os dados/hotéis/validações mudarem.
+    // Pra cada hotel selecionado × cada um dos 12 meses do ano, descobre se o mês já foi validado
+    // (e em qual versão) e busca Receita/Imposto/Despesa desse mês nessa versão (ou na Meta, se
+    // não tiver nada validado ainda) — sempre os 12 meses, independente do filtro de Mês/modo
+    // Projeção (que só decidem o que fazer com esse dado depois, ver perHotelNormalTotals/
+    // perHotelProjectedTotals). Mesma função que já monta a DRE Forecast completa
+    // (ForecastTable.tsx:3603), reaproveitada sem duplicar lógica de cálculo.
     const perHotelMonthlyAnnual = useMemo(() => {
-        if (!projectionMode) return [];
         const selected = hotels.filter(h => effectiveSelectedNames.includes(h.name));
         return selected.map(hotel => ({
             hotel,
@@ -283,7 +266,7 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
                 const rows = buildForecastRows(
                     undefined, m, selectedYear, financialData, hotel.name, hotels,
                     realOccupancyData || {}, activeRealVersionId, activeBudgetVersionId, accounts, packages,
-                    budgetOccupancyData || {}, validated || activeProjectionType
+                    budgetOccupancyData || {}, validated || DEFAULT_PROJECTION_TYPE
                 );
                 return {
                     worked: !!validated,
@@ -294,10 +277,28 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
             }),
         }));
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [projectionMode, hotels, effectiveSelectedNames, selectedYear, financialData, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData, activeProjectionType, validations]);
+    }, [hotels, effectiveSelectedNames, selectedYear, financialData, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData, validations]);
 
-    // Estágio 2 (barato): aplica o WHAT IF % de cada hotel nos meses ainda não trabalhados —
-    // arrastar o slider só recalcula isso, não repete as 12 chamadas de buildForecastRows.
+    // Modo normal: soma só os meses selecionados no filtro de Mês; mês sem versão validada
+    // contribui zero pro Real/Prévia (mas Meta/Ano anterior somam de qualquer jeito, já que não
+    // dependem de ter ou não uma versão validada).
+    const perHotelNormalTotals = useMemo(() => perHotelMonthlyAnnual.map(({ hotel, months }) => {
+        const combine = (field: 'revenue' | 'tax' | 'expense'): PeriodTotals => months.reduce((acc, mo, idx) => {
+            const monthNum = idx + 1;
+            if (!visibleMonths.includes(monthNum)) return acc;
+            const r = mo[field];
+            return {
+                previa: acc.previa + (mo.worked ? (r?.previa || 0) : 0),
+                budget: acc.budget + (r?.budget || 0),
+                lastYear: acc.lastYear + (r?.lastYear || 0),
+            };
+        }, zeroTotals());
+        return { hotel, isAdm: hotel.type === 'Administradora', revenue: combine('revenue'), tax: combine('tax'), expense: combine('expense') };
+    }), [perHotelMonthlyAnnual, visibleMonths]);
+
+    // Modo Projeção: soma os 12 meses do ano (ignora o filtro de Mês); mês sem versão validada
+    // usa a Meta escalada pelo WHAT IF % daquele hotel — arrastar/digitar o WHAT IF só recalcula
+    // isso, não repete as 12 chamadas de buildForecastRows por hotel.
     const perHotelProjectedTotals = useMemo(() => perHotelMonthlyAnnual.map(({ hotel, months }) => {
         const pct = (whatIfByHotel[hotel.id] ?? 100) / 100;
         const combine = (field: 'revenue' | 'tax' | 'expense'): PeriodTotals => months.reduce((acc, mo) => {
@@ -314,13 +315,7 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
 
     const gopBlocks: GopBlock[] = useMemo(() => {
         type RawBlock = { hotel: Hotel; isAdm: boolean; revenue: PeriodTotals; tax: PeriodTotals; expense: PeriodTotals };
-        const raw: RawBlock[] = projectionMode ? perHotelProjectedTotals : perHotelMonthlyRows.map(({ hotel, monthsRows }) => ({
-            hotel,
-            isAdm: hotel.type === 'Administradora',
-            revenue: sumField(monthsRows, 'REV-TOTAL'),
-            tax: sumField(monthsRows, 'REV-IMP'),
-            expense: sumField(monthsRows, 'CST-HEAD'),
-        }));
+        const raw: RawBlock[] = projectionMode ? perHotelProjectedTotals : perHotelNormalTotals;
 
         // Receita total do grupo (só hotéis com receita própria) — usada no "% da receita" da
         // Administradora, já que ela não tem receita própria pra comparar a despesa contra.
@@ -386,41 +381,37 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
             blocks.push({ key: 'grupo-com-jp', name: 'Grupo com JP', isAdm: false, ppm, rows });
         }
         return blocks;
-    }, [perHotelMonthlyRows, perHotelProjectedTotals, projectionMode, hideSemImposto]);
+    }, [perHotelNormalTotals, perHotelProjectedTotals, projectionMode, hideSemImposto]);
 
-    // Linhas do subtítulo do PDF — no modo Projeção, descreve por mês se o grupo está usando
-    // Realizado/Prévia/Meta (com o WHAT IF médio dos hotéis selecionados); fora do modo Projeção,
-    // descreve a Versão e o(s) mês(es) que o filtro normal está considerando.
-    const buildPdfSubtitleLines = (): string[] => {
+    // Resumo do que está sendo considerado em cada mês — mostrado acima da tabela e reaproveitado
+    // no subtítulo do PDF. Modo normal: só os meses selecionados no filtro, Realizado/Prévia/"Sem
+    // dados" (mês selecionado mas sem nenhuma versão validada, contribui zero). Modo Projeção:
+    // sempre os 12 meses, com "Meta" no lugar de "Sem dados" (mostrando o cenário de WHAT IF).
+    const buildConsideringLines = (): string[] => {
         const realHotels = hotels.filter(h => effectiveSelectedNames.includes(h.name));
         if (projectionMode) {
             const avgWhatIf = realHotels.length
                 ? Math.round(realHotels.reduce((s, h) => s + (whatIfByHotel[h.id] ?? 100), 0) / realHotels.length)
                 : 100;
-            const labelForMonthIdx = (idx: number): 'Realizado' | 'Prévia' | 'Meta' => {
-                const versions = realHotels.map(h => findValidatedVersion(h.id, idx + 1)).filter((v): v is ProjectionType => !!v);
+            const labelForMonth = (m: number): 'Realizado' | 'Prévia' | 'Meta' => {
+                const versions = realHotels.map(h => findValidatedVersion(h.id, m)).filter((v): v is ProjectionType => !!v);
                 if (versions.length === 0) return 'Meta';
                 return versions.every(v => v === 'Realizado') ? 'Realizado' : 'Prévia';
             };
-            return groupConsecutiveMonths(labelForMonthIdx).map(({ range, label }) => {
+            return groupConsecutiveMonths(ALL_MONTHS, labelForMonth).map(({ range, label }) => {
                 const suffix = label === 'Meta'
                     ? ` (cenário de atingimento de ${avgWhatIf}% da meta no grupo)`
                     : label === 'Prévia' ? ' (unidade com prévia atualizada nesse mês)' : '';
                 return `${range}: ${label}${suffix}`;
             });
         }
-        const versionLabel = PROJECTION_TYPE_OPTIONS.find(o => o.value === activeProjectionType)?.label || activeProjectionType || '';
+        const labelForMonth = (m: number): 'Realizado' | 'Prévia' | 'Sem dados' => {
+            const versions = realHotels.map(h => findValidatedVersion(h.id, m)).filter((v): v is ProjectionType => !!v);
+            if (versions.length === 0) return 'Sem dados';
+            return versions.every(v => v === 'Realizado') ? 'Realizado' : 'Prévia';
+        };
         const sortedMonths = [...visibleMonths].sort((a, b) => a - b);
-        const monthRanges: string[] = [];
-        let i = 0;
-        while (i < sortedMonths.length) {
-            let j = i;
-            while (j + 1 < sortedMonths.length && sortedMonths[j + 1] === sortedMonths[j] + 1) j++;
-            monthRanges.push(i === j ? MONTH_FULL_NAMES[sortedMonths[i] - 1] : `${MONTH_FULL_NAMES[sortedMonths[i] - 1]} a ${MONTH_FULL_NAMES[sortedMonths[j] - 1]}`);
-            i = j + 1;
-        }
-        const periodoText = monthRanges.length === 12 ? 'Ano inteiro' : monthRanges.join(', ');
-        return [`Versão: ${versionLabel}`, `Período: ${periodoText} de ${selectedYear}`];
+        return groupConsecutiveMonths(sortedMonths, labelForMonth).map(({ range, label }) => `${range}: ${label}`);
     };
 
     // Desenha a tabela direto no PDF (jspdf-autotable) a partir dos mesmos dados/regras de cor da
@@ -445,7 +436,7 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
             doc.text('Tabela de GOP', margin, margin + 4);
             doc.setFont('Montserrat');
             doc.setFontSize(9);
-            const subtitleLines = buildPdfSubtitleLines();
+            const subtitleLines = buildConsideringLines();
             const subtitleLineHeight = 12;
             subtitleLines.forEach((line, idx) => {
                 doc.text(line, margin, margin + 18 + idx * subtitleLineHeight);
@@ -549,51 +540,32 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
                 )}
 
                 <div className="flex flex-wrap items-start gap-6 mb-3">
-                    {setActiveProjectionType && (
-                        <div>
-                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Versão</p>
-                            <div className="flex items-center bg-gray-100 p-1 rounded-lg">
-                                {PROJECTION_TYPE_OPTIONS.map(opt => (
-                                    <button
-                                        key={opt.value}
-                                        onClick={() => setActiveProjectionType(opt.value)}
-                                        className={`px-3 py-1.5 text-sm font-bold rounded-md transition-all ${activeProjectionType === opt.value
-                                            ? 'bg-white text-indigo-600 shadow-sm border border-gray-200'
-                                            : 'text-gray-500 hover:text-gray-700'}`}
-                                    >
-                                        {opt.label}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    <div className={projectionMode ? 'opacity-40 pointer-events-none' : ''}>
+                    <div>
                         <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Mês {projectionMode && '(ano inteiro no modo Projeção)'}</p>
-                        <div className="flex items-center flex-wrap gap-1">
-                            {MONTH_LABELS.map((label, idx) => {
-                                const monthNum = idx + 1;
-                                const active = visibleMonths.includes(monthNum);
-                                return (
-                                    <button
-                                        key={label}
-                                        disabled={projectionMode}
-                                        onClick={() => setVisibleMonths(prev => {
-                                            const next = prev.includes(monthNum) ? prev.filter(m => m !== monthNum) : [...prev, monthNum].sort((a, b) => a - b);
-                                            return next.length === 0 ? prev : next;
-                                        })}
-                                        className={`px-2.5 py-1 text-sm font-bold rounded-md transition-all ${active
-                                            ? 'bg-indigo-100 text-indigo-700 border border-indigo-200 shadow-sm'
-                                            : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'}`}
-                                    >
-                                        {label}
-                                    </button>
-                                );
-                            })}
+                        <div className="flex items-center gap-2">
+                            <div className={`${FILTER_GROUP_CLASS} max-w-xl ${projectionMode ? 'opacity-40 pointer-events-none' : ''}`}>
+                                {MONTH_LABELS.map((label, idx) => {
+                                    const monthNum = idx + 1;
+                                    const active = visibleMonths.includes(monthNum);
+                                    return (
+                                        <button
+                                            key={label}
+                                            disabled={projectionMode}
+                                            onClick={() => setVisibleMonths(prev => {
+                                                const next = prev.includes(monthNum) ? prev.filter(m => m !== monthNum) : [...prev, monthNum].sort((a, b) => a - b);
+                                                return next.length === 0 ? prev : next;
+                                            })}
+                                            className={filterPillClass(active)}
+                                        >
+                                            {label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
                             <button
                                 disabled={projectionMode}
                                 onClick={() => setVisibleMonths(visibleMonths.length === 12 ? [selectedMonth || 1] : Array.from({ length: 12 }, (_, i) => i + 1))}
-                                className="px-3 py-1 text-sm font-bold rounded-md transition-all bg-gray-100 text-gray-600 hover:bg-gray-200 ml-2 border border-gray-200"
+                                className="px-3 py-1 text-sm font-bold rounded-md transition-all bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200 disabled:opacity-40"
                             >
                                 {visibleMonths.length === 12 ? 'Desmarcar Todos' : 'Selecionar Todos'}
                             </button>
@@ -602,29 +574,36 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
 
                     <div>
                         <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Hotel</p>
-                        <div className="flex items-center flex-wrap gap-1 max-w-2xl">
-                            {hotels.map(h => {
-                                const active = effectiveSelectedNames.includes(h.name);
-                                return (
-                                    <button
-                                        key={h.id}
-                                        onClick={() => toggleHotel(h.name)}
-                                        className={`px-2.5 py-1 text-sm font-bold rounded-md transition-all ${active
-                                            ? 'bg-indigo-100 text-indigo-700 border border-indigo-200 shadow-sm'
-                                            : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'}`}
-                                    >
-                                        {h.name}
-                                    </button>
-                                );
-                            })}
+                        <div className="flex items-center gap-2">
+                            <div className={`${FILTER_GROUP_CLASS} max-w-2xl`}>
+                                {hotels.map(h => {
+                                    const active = effectiveSelectedNames.includes(h.name);
+                                    return (
+                                        <button
+                                            key={h.id}
+                                            onClick={() => toggleHotel(h.name)}
+                                            className={filterPillClass(active)}
+                                        >
+                                            {h.name}
+                                        </button>
+                                    );
+                                })}
+                            </div>
                             <button
                                 onClick={() => setSelectedHotelNames(effectiveSelectedNames.length === hotels.length ? [] : hotels.map(h => h.name))}
-                                className="px-3 py-1 text-sm font-bold rounded-md transition-all bg-gray-100 text-gray-600 hover:bg-gray-200 ml-2 border border-gray-200"
+                                className="px-3 py-1 text-sm font-bold rounded-md transition-all bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200"
                             >
                                 {effectiveSelectedNames.length === hotels.length ? 'Desmarcar Todos' : 'Selecionar Todos'}
                             </button>
                         </div>
                     </div>
+                </div>
+
+                <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-4">
+                    <p className="text-[11px] font-black text-gray-500 uppercase tracking-wide mb-1">Considerando nos meses</p>
+                    {buildConsideringLines().map((line, i) => (
+                        <p key={i} className="text-sm font-semibold text-gray-700">{line}</p>
+                    ))}
                 </div>
 
                 <label className="flex items-center gap-2 mb-4 cursor-pointer select-none">

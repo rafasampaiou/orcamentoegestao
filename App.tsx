@@ -1420,8 +1420,6 @@ const App: React.FC = () => {
           activeRealVersionId={activeRealVersionId}
           activeBudgetVersionId={activeBudgetVersionId}
           budgetOccupancyData={budgetOccupancyDataMap[activeBudgetVersionId] || {}}
-          activeProjectionType={activeProjectionType}
-          setActiveProjectionType={setActiveProjectionType}
           validations={validations}
         />
       );
