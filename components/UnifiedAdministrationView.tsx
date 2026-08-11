@@ -229,9 +229,12 @@ interface SpreadsheetTableProps {
   onCellChange: (rowLabel: string, month: number, value: string) => void;
   onPaste?: (startRowLabel: string, startMonth: number, pastedData: string[][]) => void;
   readOnlyRows?: string[];
+  // Coluna extra depois de Dez com a soma dos 12 meses da linha — só pra conferência, não é
+  // um campo editável nem entra em nenhum salvamento.
+  showTotal?: boolean;
 }
 
-const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({ rows, data, onCellChange, onPaste, readOnlyRows = [] }) => {
+const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({ rows, data, onCellChange, onPaste, readOnlyRows = [], showTotal = false }) => {
   const months = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
   const handlePaste = (e: React.ClipboardEvent, rowLabel: string, startMonth: number) => {
@@ -255,11 +258,17 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({ rows, data, onCellC
                 {new Date(2024, m - 1).toLocaleString('pt-BR', { month: 'short' })}
               </th>
             ))}
+            {showTotal && (
+              <th className="px-2 py-3 text-center font-black text-indigo-700 w-28 border-l border-gray-200 uppercase tracking-widest bg-indigo-50">
+                Total
+              </th>
+            )}
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
           {rows.map((rowLabel, idx) => {
             const isReadOnly = readOnlyRows.includes(rowLabel);
+            const rowTotal = showTotal ? months.reduce((sum, m) => sum + parseFinanceValue(data[rowLabel]?.[m]), 0) : 0;
             return (
               <tr key={idx} className={`hover:bg-indigo-50/30 transition-colors ${isReadOnly ? 'bg-slate-50/50' : ''}`}>
                 <td className={`px-4 py-2 font-bold sticky left-0 z-10 border-r border-gray-200 truncate max-w-[240px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] ${isReadOnly ? 'bg-slate-50 text-slate-500 italic font-medium' : 'bg-white text-gray-700'}`} title={rowLabel}>
@@ -281,6 +290,11 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({ rows, data, onCellC
                     />
                   </td>
                 ))}
+                {showTotal && (
+                  <td className="px-3 py-2.5 text-right font-mono font-black text-indigo-900 border-l border-gray-200 bg-indigo-50/40 tabular-nums">
+                    {rowTotal === 0 ? '-' : rowTotal.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}
+                  </td>
+                )}
               </tr>
             );
           })}
@@ -3067,7 +3081,13 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     // "Ano Anterior" column reads year-1 tagged as Real, not a literal "Ano Anterior" scenario.
     const targetYear = importRealTarget === 'ANO_ANTERIOR' ? baseYear - 1 : baseYear;
     const dataToUse = scenario === 'BUDGET' ? dreBudgetData : dreForecastData;
-    const cenario = scenario === 'BUDGET' ? 'BUDGET' : (importRealTarget === 'ANO_ANTERIOR' ? 'Real' : importRealTarget);
+    // "Realizado" (opção "PREVIA" no seletor, por compatibilidade com importações antigas) grava
+    // no cenário 'REAL' — é o fechamento gerencial oficial, tem prioridade sobre 'PREVIA' na
+    // hora de montar a DRE Forecast (getPreviaOrReal em services/mockData.ts checa REAL antes de
+    // cair pra PREVIA). Usa 'REAL' (maiúsculo) e não 'Real' pra não colidir, no reload de uma
+    // importação existente (handleEditExpensesImport), com o cenário 'Real' já usado por "Ano
+    // Anterior" — a comparação ali é sensível a maiúscula/minúscula de propósito.
+    const cenario = scenario === 'BUDGET' ? 'BUDGET' : (importRealTarget === 'ANO_ANTERIOR' ? 'Real' : (importRealTarget === 'PREVIA' ? 'REAL' : importRealTarget));
 
     Object.entries(dataToUse).forEach(([rowLabel, months]) => {
       Object.entries(months).forEach(([month, value]) => {
@@ -4429,7 +4449,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                     onChange={e => setImportRealTarget(e.target.value as any)}
                     className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[200px]"
                   >
-                    <option value="PREVIA">Prévia (Fechamento)</option>
+                    <option value="PREVIA">Realizado</option>
                     <option value="META">Meta</option>
                     <option value="ANO_ANTERIOR">Ano Anterior</option>
                   </select>
@@ -4452,6 +4472,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
               <SpreadsheetTable
                 rows={dynamicExpenseRows}
                 data={dreForecastData}
+                showTotal
                 onCellChange={(row, month, val) => setDreForecastData(prev => ({ ...prev, [row]: { ...(prev[row] || {}), [month]: val } }))}
                 onPaste={(row, month, pasted) => {
                   const newData = { ...dreForecastData };
@@ -4911,6 +4932,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
           <SpreadsheetTable
             rows={dynamicExpenseRows}
             data={dreBudgetData}
+            showTotal
             onCellChange={(row, month, val) => setDreBudgetData(prev => ({ ...prev, [row]: { ...(prev[row] || {}), [month]: val } }))}
             onPaste={(row, month, pasted) => {
               const newData = { ...dreBudgetData };
