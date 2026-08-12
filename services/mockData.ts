@@ -21,7 +21,7 @@ export const normalizeAccountName = (str: string) => {
 // normalizações de plural/sufixo de normalizeAccountName, que fazem sentido pra conta contábil,
 // não pra nome de hotel). Sem isso, "Alexânia" (cadastro) x "Alexania" (planilha importada, sem
 // acento) nunca batem, e TODO o Realizado desse hotel fica invisível na Tabela de GOP/DRE Forecast.
-const normalizeHotelName = (str: string) => {
+export const normalizeHotelName = (str: string) => {
     if (!str) return '';
     const upper = str.trim().toUpperCase().normalize('NFD');
     let out = '';

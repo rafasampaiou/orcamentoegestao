@@ -1,4 +1,5 @@
 import { ImportedRow, ProjectionType, ValidationRecord } from '../types';
+import { normalizeHotelName } from '../services/mockData';
 
 export const OTB_STEP_LABELS = [
     'Escolher o dia final On the books',
@@ -41,7 +42,12 @@ export function computeOtbProgress(params: ComputeOtbProgressParams): boolean[] 
     const otbData = realOccupancyData[otbKey] || {};
     const normalData = realOccupancyData[normalKey] || {};
 
-    const hotelUpper = hotel.trim().toUpperCase();
+    // normalizeHotelName ignora acento além de caixa/espaço — sem isso, um hotel com acento
+    // (ex. "Alexânia", "Araxá") cujo balancete OTB foi importado com grafia levemente diferente
+    // nunca teria o passo 3 marcado, travando a timeline antes de 8/8 e desabilitando "Gerar
+    // Apresentação" mesmo com o balancete de fato importado (mesma causa já corrigida em
+    // services/mockData.ts/ComparativesView.tsx pra Despesa/Imposto/Receita).
+    const hotelUpper = normalizeHotelName(hotel);
 
     const step1 = !!otbData['__otb_day'];
     const step2 = hasOccupancyData(otbData);
@@ -49,7 +55,7 @@ export function computeOtbProgress(params: ComputeOtbProgressParams): boolean[] 
         (r.cenario || '').trim().toLowerCase() === 'otb' &&
         parseInt(r.mes) === month &&
         parseInt(r.ano) === year &&
-        (r.hotel || '').trim().toUpperCase() === hotelUpper
+        normalizeHotelName(r.hotel || '') === hotelUpper
     );
     const step4 = hasOccupancyData(normalData);
     // Ordem trocada a pedido: passo 5 é "Calcular Forecast" (flag manual), passo 6 é
