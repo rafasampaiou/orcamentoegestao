@@ -215,13 +215,35 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
     const [whatIfByHotel, setWhatIfByHotel] = useState<Record<string, number>>({});
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
-    // Só conta como "mês já trabalhado" se existir uma validação com status "Validado" pra esse
-    // hotel+ano+mês — "Em construção" ainda entra na repetição de Meta (modo Projeção) ou fica
-    // zerado (modo normal).
+    // Dado importado direto (Administração > Importação > Despesas, destino "Realizado") grava
+    // cenário 'REAL' em financial_data sem passar pelo wizard da DRE Forecast — não gera
+    // ValidationRecord nenhum. Então "tem Realizado preenchido" pra esse hotel/mês não pode
+    // depender só de `validations`; precisa também checar a presença direta desse dado bruto
+    // (exclui linhas de override — essas são Forecast calculado/salvo de uma versão de reunião
+    // específica, não literalmente "Realizado").
+    const hasRealizadoData = (hotelName: string, month: number): boolean => {
+        return (financialData || []).some(r => {
+            if (r.hotel !== hotelName) return false;
+            if (String(r.mes) !== String(month) || String(r.ano) !== String(selectedYear)) return false;
+            if (r.conta.startsWith('override_')) return false;
+            const scen = (r.cenario || '').trim().toLowerCase();
+            return scen === 'real' || scen === 'realizado';
+        });
+    };
+    // Só conta como "mês já trabalhado" (numa das 4 versões de reunião) se existir uma validação
+    // com status "Validado" pra esse hotel+ano+mês — "Em construção" ainda entra na repetição de
+    // Meta (modo Projeção) ou fica zerado (modo normal).
     const findValidatedVersion = (hotelId: string, month: number): ProjectionType | null => {
         const matches = (validations || []).filter(v => v.hotelId === hotelId && v.year === selectedYear && v.month === month && v.status === 'Validado');
         if (matches.length === 0) return null;
         return PROJECTION_RANK.find(rank => matches.some(v => v.projectionType === rank)) || null;
+    };
+    // Resolve qual versão usar pra um hotel+mês: Realizado (se tiver dado importado direto)
+    // primeiro; senão, a versão de reunião mais avançada já validada; senão, nenhuma (o mês entra
+    // como "sem dados"/repete Meta, dependendo do modo).
+    const resolveMonthVersion = (hotel: Hotel, month: number): ProjectionType | null => {
+        if (hasRealizadoData(hotel.name, month)) return 'Realizado';
+        return findValidatedVersion(hotel.id, month);
     };
     // Meses considerados — por padrão só o mês corrente, mas dá pra acumular vários (soma do
     // período), mesmo padrão/UI do filtro "Filtrar Meses" da Análise de A&B. Cada mês selecionado
@@ -262,7 +284,7 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
         return selected.map(hotel => ({
             hotel,
             months: ALL_MONTHS.map(m => {
-                const validated = findValidatedVersion(hotel.id, m);
+                const validated = resolveMonthVersion(hotel, m);
                 const rows = buildForecastRows(
                     undefined, m, selectedYear, financialData, hotel.name, hotels,
                     realOccupancyData || {}, activeRealVersionId, activeBudgetVersionId, accounts, packages,
@@ -394,7 +416,7 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
                 ? Math.round(realHotels.reduce((s, h) => s + (whatIfByHotel[h.id] ?? 100), 0) / realHotels.length)
                 : 100;
             const labelForMonth = (m: number): 'Realizado' | 'Prévia' | 'Meta' => {
-                const versions = realHotels.map(h => findValidatedVersion(h.id, m)).filter((v): v is ProjectionType => !!v);
+                const versions = realHotels.map(h => resolveMonthVersion(h, m)).filter((v): v is ProjectionType => !!v);
                 if (versions.length === 0) return 'Meta';
                 return versions.every(v => v === 'Realizado') ? 'Realizado' : 'Prévia';
             };
@@ -406,7 +428,7 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
             });
         }
         const labelForMonth = (m: number): 'Realizado' | 'Prévia' | 'Sem dados' => {
-            const versions = realHotels.map(h => findValidatedVersion(h.id, m)).filter((v): v is ProjectionType => !!v);
+            const versions = realHotels.map(h => resolveMonthVersion(h, m)).filter((v): v is ProjectionType => !!v);
             if (versions.length === 0) return 'Sem dados';
             return versions.every(v => v === 'Realizado') ? 'Realizado' : 'Prévia';
         };
