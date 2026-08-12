@@ -1409,6 +1409,7 @@ const App: React.FC = () => {
         <OccupancyMonthlyRealView
           selectedYear={selectedDate.getFullYear()}
           selectedHotel={selectedHotel}
+          hotels={hotels}
           realOccupancyData={realOccupancyData}
           setRealOccupancyData={setRealOccupancyData}
           onSaveOccupancy={handleSaveRealOccupancy}

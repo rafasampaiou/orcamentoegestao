@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Save, CheckCircle } from 'lucide-react';
-import { User, UserRole, ProjectionType, ImportedRow, ValidationRecord, hasRole } from '../types';
+import { User, UserRole, ProjectionType, ImportedRow, ValidationRecord, Hotel, hasRole } from '../types';
 import { BudgetRow, BudgetOccupancyTable, geralRows, lazerRows, eventRows, OccupancyVersionOption, MEETING_VERSIONS, OWN_SNAPSHOT_VERSIONS } from './OccupancyView';
 import OtbProgressTimeline from './OtbProgressTimeline';
 import { computeOtbProgress } from '../utils/otbProgress';
@@ -8,6 +8,9 @@ import { computeOtbProgress } from '../utils/otbProgress';
 interface OccupancyMonthlyRealViewProps {
     selectedYear: number;
     selectedHotel: string;
+    // Só pra saber o TIPO do hotel selecionado (badge "Unidade" + guard de hotel Administradora,
+    // que não tem ocupação própria).
+    hotels?: Hotel[];
     realOccupancyData: Record<string, Record<string, number>>;
     setRealOccupancyData: React.Dispatch<React.SetStateAction<Record<string, Record<string, number>>>>;
     budgetData: Record<string, number[]>;
@@ -86,6 +89,7 @@ const getOtbRows = (baseRows: BudgetRow[], prefix: string): BudgetRow[] => {
 const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
     selectedYear,
     selectedHotel,
+    hotels,
     realOccupancyData,
     setRealOccupancyData,
     budgetData,
@@ -106,6 +110,11 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
     const canEditOccupancy = hasRole(currentUser, UserRole.ADMIN) ||
         hasRole(currentUser, UserRole.ENTITY_MANAGER) ||
         hasRole(currentUser, UserRole.COST_ANALYST);
+
+    // Hotel Administradora (ex.: ADM, JDL) não tem ocupação própria — a tabela não faz sentido
+    // pra ele, mostra um aviso no lugar (mesmo critério usado em ForecastTable.tsx/
+    // DreSegmentadaView.tsx).
+    const isAdminEntity = hotels?.find(h => h.name === selectedHotel)?.type === 'Administradora';
 
     const [decimalOverrides, setDecimalOverrides] = useState<Record<string, number>>({});
     const [savedIndicator, setSavedIndicator] = useState(false);
@@ -730,6 +739,11 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
                 <div>
                     <div className="flex items-center gap-3">
                         <h2 className="text-2xl font-bold text-gray-900">Ocupação</h2>
+                        {selectedHotel && (
+                            <span className="bg-gray-100 border border-gray-200 text-gray-600 text-sm rounded-lg py-1 px-3 font-bold">
+                                Unidade {selectedHotel}
+                            </span>
+                        )}
                         <span className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-sm rounded-lg py-1 px-3 font-bold">
                             {PERIOD_LABELS[period]}
                         </span>
@@ -831,39 +845,47 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
         <div className="flex-1 overflow-y-auto px-8 pt-6 pb-8" style={{ scrollbarGutter: 'stable both-edges' }}>
         <div className="max-w-[1600px] mx-auto">
 
-            <BudgetOccupancyTable
-                title="Geral"
-                rows={isMeetingMode ? (otbMode ? getOtbRows(geralRows, 'geral') : getMeetingRows(geralRows, 'geral')) : geralRows}
-                data={tableData}
-                onUpdate={handleUpdate}
-                decimalOverrides={decimalOverrides}
-                onToggleDecimals={toggleDecimals}
-                canEdit={canEditOccupancy}
-                isRealMode={true}
-                visibleMonths={visibleMonthsFilter}
-            />
-            <BudgetOccupancyTable
-                title="Lazer"
-                rows={isMeetingMode ? (otbMode ? getOtbRows(lazerRows, 'lazer') : getMeetingRows(lazerRows, 'lazer')) : lazerRows}
-                data={tableData}
-                onUpdate={handleUpdate}
-                decimalOverrides={decimalOverrides}
-                onToggleDecimals={toggleDecimals}
-                canEdit={canEditOccupancy}
-                isRealMode={true}
-                visibleMonths={visibleMonthsFilter}
-            />
-            <BudgetOccupancyTable
-                title="Eventos Corporativos"
-                rows={isMeetingMode ? (otbMode ? getOtbRows(eventRows, 'event') : getMeetingRows(eventRows, 'event')) : eventRows}
-                data={tableData}
-                onUpdate={handleUpdate}
-                decimalOverrides={decimalOverrides}
-                onToggleDecimals={toggleDecimals}
-                canEdit={canEditOccupancy}
-                isRealMode={true}
-                visibleMonths={visibleMonthsFilter}
-            />
+            {isAdminEntity ? (
+                <div className="bg-white border border-gray-200 rounded-2xl p-6 text-gray-500">
+                    {selectedHotel} não tem ocupação própria (hotel Administradora) — essa tabela não se aplica a ele.
+                </div>
+            ) : (
+                <>
+                    <BudgetOccupancyTable
+                        title="Geral"
+                        rows={isMeetingMode ? (otbMode ? getOtbRows(geralRows, 'geral') : getMeetingRows(geralRows, 'geral')) : geralRows}
+                        data={tableData}
+                        onUpdate={handleUpdate}
+                        decimalOverrides={decimalOverrides}
+                        onToggleDecimals={toggleDecimals}
+                        canEdit={canEditOccupancy}
+                        isRealMode={true}
+                        visibleMonths={visibleMonthsFilter}
+                    />
+                    <BudgetOccupancyTable
+                        title="Lazer"
+                        rows={isMeetingMode ? (otbMode ? getOtbRows(lazerRows, 'lazer') : getMeetingRows(lazerRows, 'lazer')) : lazerRows}
+                        data={tableData}
+                        onUpdate={handleUpdate}
+                        decimalOverrides={decimalOverrides}
+                        onToggleDecimals={toggleDecimals}
+                        canEdit={canEditOccupancy}
+                        isRealMode={true}
+                        visibleMonths={visibleMonthsFilter}
+                    />
+                    <BudgetOccupancyTable
+                        title="Eventos Corporativos"
+                        rows={isMeetingMode ? (otbMode ? getOtbRows(eventRows, 'event') : getMeetingRows(eventRows, 'event')) : eventRows}
+                        data={tableData}
+                        onUpdate={handleUpdate}
+                        decimalOverrides={decimalOverrides}
+                        onToggleDecimals={toggleDecimals}
+                        canEdit={canEditOccupancy}
+                        isRealMode={true}
+                        visibleMonths={visibleMonthsFilter}
+                    />
+                </>
+            )}
         </div>
         </div>
         </div>
