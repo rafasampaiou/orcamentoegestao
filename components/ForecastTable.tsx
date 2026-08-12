@@ -319,7 +319,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     const [forceUnlockValidated, setForceUnlockValidated] = useState(false);
     useEffect(() => {
         setForceUnlockValidated(false);
-        setAdminDespesaText(null);
     }, [selectedHotel, selectedMonth, selectedYear, activeProjectionType]);
 
     const [data, setData] = useState<ForecastRow[]>(() => buildForecastRows(
@@ -328,15 +327,16 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         budgetOccupancyData, activeProjectionType
     ));
 
-    // Receita Líquida (REV-NET) somada de todos os hotéis QUE TÊM receita própria (exclui outras
+    // Receita Líquida (REV-NET) de cada hotel que TEM receita própria (exclui outras
     // Administradoras) — mesmo padrão de loop-por-hotel+buildForecastRows já usado em
     // ComparativesView.tsx pra montar a Tabela de GOP, só que aqui somando REV-NET em vez de
-    // REV-TOTAL/CST-HEAD. Só calcula de verdade quando é preciso (hotel Administradora).
-    const groupReceitaLiquida = useMemo(() => {
-        const zero = { previa: 0, budget: 0, real: 0, lastYear: 0 };
-        if (!isAdminEntity) return zero;
+    // REV-TOTAL/CST-HEAD. Guardado por hotel (não só a soma) pra montar a linha "Receita por
+    // hotel" abaixo da Receita Líquida do grupo. Só calcula de verdade quando é preciso (hotel
+    // Administradora).
+    const groupReceitaLiquidaByHotel = useMemo(() => {
+        if (!isAdminEntity) return [];
         const otherHotels = hotels.filter(h => h.type !== 'Administradora');
-        return otherHotels.reduce((acc, hotel) => {
+        return otherHotels.map(hotel => {
             const rows = buildForecastRows(
                 dreConfigs, selectedMonth, selectedYear, financialData, hotel.name, hotels,
                 realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages,
@@ -344,41 +344,102 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             );
             const revNet = rows.find(r => r.id === 'REV-NET');
             return {
-                previa: acc.previa + (revNet?.previa || 0),
-                budget: acc.budget + (revNet?.budget || 0),
-                real: acc.real + (revNet?.real || 0),
-                lastYear: acc.lastYear + (revNet?.lastYear || 0),
+                hotel,
+                previa: revNet?.previa || 0, budget: revNet?.budget || 0,
+                real: revNet?.real || 0, lastYear: revNet?.lastYear || 0,
             };
-        }, zero);
+        });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isAdminEntity, hotels, dreConfigs, selectedMonth, selectedYear, financialData, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData, activeProjectionType]);
 
-    // Pra hotéis Administradora: Forecast da despesa = mesmo % que a Meta da despesa representa
-    // sobre a Receita Líquida (Meta) do grupo, aplicado sobre a Receita Líquida (Forecast/Real)
-    // do grupo. GOP passa a ser só % (despesa ÷ Receita Líquida do grupo), uma % por coluna —
-    // não faz sentido GOP em R$ pra quem não tem receita própria (essas linhas ficam ocultas,
-    // ver visibleData). Aplicado como uma camada de exibição (displayData), sem alterar `data` —
-    // evita entrar em conflito com o resto do sistema, que trata CST-HEAD como soma das contas
-    // (recalculateTotals recalcula isso toda vez, em várias chamadas espalhadas pelo arquivo).
+    const groupReceitaLiquida = useMemo(() => groupReceitaLiquidaByHotel.reduce((acc, h) => ({
+        previa: acc.previa + h.previa, budget: acc.budget + h.budget, real: acc.real + h.real, lastYear: acc.lastYear + h.lastYear,
+    }), { previa: 0, budget: 0, real: 0, lastYear: 0 }), [groupReceitaLiquidaByHotel]);
+
+    // Recalcula as colunas de Δ/% de uma linha depois de sobrescrever previa/budget/real/
+    // lastYear — mesmas fórmulas de recalculateTotals ("DELTAS CALCULATIONS"), só que aplicadas
+    // aqui (camada de exibição) em vez de mexer no estado `data` de verdade.
+    const withDeltas = (row: ForecastRow): ForecastRow => {
+        const r = { ...row };
+        r.deltaBudgetVal = r.real - r.budget;
+        r.deltaBudgetPct = r.budget === 0 ? 0 : ((r.real - r.budget) / Math.abs(r.budget)) * 100;
+        r.deltaLYVal = (r.previa || 0) - r.lastYear;
+        r.deltaLYPct = r.lastYear === 0 ? 0 : (((r.previa || 0) - r.lastYear) / Math.abs(r.lastYear)) * 100;
+        r.deltaPreviaVal = r.real - (r.previa || 0);
+        r.deltaPreviaPct = (r.previa || 0) === 0 ? 0 : ((r.real - (r.previa || 0)) / Math.abs(r.previa || 0)) * 100;
+        r.deltaPreviaBudgetVal = (r.previa || 0) - r.budget;
+        r.deltaPreviaBudgetPct = r.budget === 0 ? 0 : (((r.previa || 0) - r.budget) / Math.abs(r.budget)) * 100;
+        r.deltaPreviaForecastVal = (r.previa || 0) - r.real;
+        r.deltaPreviaForecastPct = r.real === 0 ? 0 : (((r.previa || 0) - r.real) / Math.abs(r.real)) * 100;
+        return r;
+    };
+
+    // Pra hotéis Administradora: em vez das linhas normais de Receita/Ocupação, mostra só UMA
+    // linha "Receita Líquida (soma dos hotéis)" (expansível, com a receita de cada hotel como
+    // filha — reaproveita expandedPackages/togglePackage) + a despesa de sempre (pacotes/contas,
+    // sem mudar os valores). O Forecast da despesa total e o GOP (só 1 linha, % — não existe
+    // imposto aqui) usam a Receita Líquida do grupo em vez da receita própria (que não existe).
+    // Cada linha de despesa (pacote/conta) ganha um KPI = % daquela despesa sobre a Receita
+    // Líquida do grupo, na coluna de KPI (sem alterar o valor "de verdade" da linha).
+    // Aplicado como uma camada de exibição (displayData) — não mexe em `data`, que o resto do
+    // sistema (recalculateTotals, em ~12 chamadas espalhadas pelo arquivo) continua tratando
+    // normalmente (soma de pacotes/contas), evitando um cabo de guerra entre os dois.
     const displayData = useMemo(() => {
         if (!isAdminEntity) return data;
         const cstHead = data.find(r => r.id === 'CST-HEAD');
-        if (!cstHead) return data;
+        const revNetTemplate = data.find(r => r.id === 'REV-NET');
+        if (!cstHead || !revNetTemplate) return data;
+
         const pctMeta = groupReceitaLiquida.budget ? (cstHead.budget || 0) / groupReceitaLiquida.budget : 0;
         const forecastDespesa = pctMeta * groupReceitaLiquida.real;
         const gopPct = (denom: number, num: number) => denom ? (num / denom) * 100 : 0;
-        const gopPreviaCol = gopPct(groupReceitaLiquida.previa, cstHead.previa || 0);
-        const gopBudgetCol = gopPct(groupReceitaLiquida.budget, cstHead.budget || 0);
-        const gopLYCol = gopPct(groupReceitaLiquida.lastYear, cstHead.lastYear || 0);
-        const gopRealCol = pctMeta * 100; // = forecastDespesa / groupReceitaLiquida.real, por construção
-        return data.map(row => {
-            if (row.id === 'CST-HEAD') return { ...row, real: forecastDespesa };
-            if (row.id === 'RES-OP-COM-IMP-PCT' || row.id === 'RES-OP-SEM-IMP-PCT') {
-                return { ...row, previa: gopPreviaCol, budget: gopBudgetCol, lastYear: gopLYCol, real: gopRealCol };
+
+        const groupRevRow = withDeltas({
+            ...revNetTemplate,
+            id: 'GROUP-REV-NET', label: 'RECEITA LÍQUIDA (SOMA DOS HOTÉIS)', category: 'Package',
+            isHeader: true, isTotal: true, indentLevel: 0,
+            previa: groupReceitaLiquida.previa, budget: groupReceitaLiquida.budget,
+            real: groupReceitaLiquida.real, lastYear: groupReceitaLiquida.lastYear,
+        });
+        const perHotelRevRows = groupReceitaLiquidaByHotel.map(h => withDeltas({
+            ...revNetTemplate,
+            id: `GROUP-REV-NET-${h.hotel.id}`, label: h.hotel.name, category: 'Account',
+            isHeader: false, isTotal: false, indentLevel: 1,
+            previa: h.previa, budget: h.budget, real: h.real, lastYear: h.lastYear,
+        }));
+
+        const restRows = data.map(row => {
+            if (row.id === 'CST-HEAD') return withDeltas({ ...row, real: forecastDespesa });
+            if (row.id === 'RES-OP-COM-IMP-PCT') {
+                return withDeltas({
+                    ...row, label: '% DE DESPESA SOBRE A RECEITA LÍQUIDA',
+                    previa: gopPct(groupReceitaLiquida.previa, cstHead.previa || 0),
+                    budget: gopPct(groupReceitaLiquida.budget, cstHead.budget || 0),
+                    lastYear: gopPct(groupReceitaLiquida.lastYear, cstHead.lastYear || 0),
+                    real: pctMeta * 100, // = forecastDespesa / groupReceitaLiquida.real, por construção
+                });
+            }
+            if (row.category === 'Costs' || row.category === 'Account' || row.category === 'Package') {
+                const kpiPct = (val: number | undefined, denom: number) => denom ? ((val || 0) / denom) * 100 : 0;
+                return {
+                    ...row,
+                    rowConfig: {
+                        ...row.rowConfig,
+                        precomputedKpi: {
+                            previa: kpiPct(row.previa, groupReceitaLiquida.previa),
+                            real: kpiPct(row.real, groupReceitaLiquida.real),
+                            budget: kpiPct(row.budget, groupReceitaLiquida.budget),
+                            otb: kpiPct(row.otb, groupReceitaLiquida.previa),
+                            format: 'percent' as const,
+                        },
+                    },
+                };
             }
             return row;
         });
-    }, [data, isAdminEntity, groupReceitaLiquida]);
+
+        return [groupRevRow, ...perHotelRevRows, ...restRows];
+    }, [data, isAdminEntity, groupReceitaLiquida, groupReceitaLiquidaByHotel]);
 
     const [showDetails, setShowDetails] = useState(false);
     const [expandedPackages, setExpandedPackages] = useState<Set<string>>(new Set());
@@ -421,10 +482,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     const [showAlertModal, setShowAlertModal] = useState(false);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
-    // Texto do campo único de despesa da tela simplificada (hotéis Administradora, versões de
-    // prévia) — precisa ficar aqui (não dentro do `if` que usa) pra não violar as Rules of Hooks
-    // (useState sempre tem que ser chamado incondicionalmente, na mesma ordem, todo render).
-    const [adminDespesaText, setAdminDespesaText] = useState<string | null>(null);
     // Versão "Realizado": se já existe Forecast salvo no Fechamento oficial pra esse hotel/mês,
     // "Calcular Forecast" pergunta se quer replicar esses valores em vez de recalcular do zero
     // (fórmulas/Meta) — ver handleCalcularForecast/confirmCalcularForecast.
@@ -1028,7 +1085,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         return displayData.filter(row => {
             // Hotéis Administradora não têm receita/ocupação própria — só a despesa e o GOP (%)
             // fazem sentido pra eles; GOP em R$ também não (não tem receita própria pra comparar).
-            if (isAdminEntity && (row.category === 'Revenue' || row.category === 'Indicators' || row.id === 'RES-OP-COM-IMP' || row.id === 'RES-OP-SEM-IMP')) {
+            if (isAdminEntity && (row.category === 'Revenue' || row.category === 'Indicators' || row.id === 'RES-OP-COM-IMP' || row.id === 'RES-OP-SEM-IMP' || row.id === 'RES-OP-SEM-IMP-PCT')) {
                 return false;
             }
             // Transformação/Reatividade rows are shown as cards below the table, not as rows.
@@ -1458,6 +1515,19 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                     return { ...row, forecastConfig: newConfig, real: replicatedValue };
                 }
 
+                // Hotel Administradora, versão de prévia: o Forecast de CADA linha de despesa
+                // (pacote/conta) replica o mesmo % que a Meta daquela linha representa sobre a
+                // Receita Líquida (Meta) do grupo, aplicado sobre a Receita Líquida do grupo
+                // conforme está na Prévia agora ("a receita líquida projetada conforme vai puxar
+                // na prévia") — em vez da lógica normal de Fixo/Variável (que só repetiria a
+                // Meta da própria linha).
+                if (isAdminEntity && activeProjectionType !== 'Realizado' && (row.category === 'Costs' || row.category === 'Account' || row.category === 'Package')) {
+                    const ratio = groupReceitaLiquida.budget ? (row.budget || 0) / groupReceitaLiquida.budget : 0;
+                    const projected = ratio * groupReceitaLiquida.previa;
+                    const newConfig = { ...(row.forecastConfig || { method: 'Fixed' as const }), method: 'Fixed' as const, manualValue: projected };
+                    return { ...row, forecastConfig: newConfig, real: projected };
+                }
+
                 const account = accounts.find(a => a.id === row.id || (a.code && a.code === row.accountCode));
 
                 if (account) {
@@ -1545,65 +1615,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         columnVisibility.deltaPreviaForecast, columnVisibility.deltaPreviaForecastPct,
         columnVisibility.lastYear, columnVisibility.deltaLY, columnVisibility.deltaLYPct
     ].filter(Boolean).length;
-
-    // Hotel Administradora, versão de prévia (não Realizado): a tela inteira vira só um campo de
-    // despesa do mês + "Salvar Versão" — sem timeline OTB, sem ocupação/receita. O valor editado
-    // é `previa` da linha CST-HEAD; o salvamento reaproveita o mesmo confirmSaveResults de sempre
-    // (já inclui CST-HEAD, categoria 'Costs') — mesmo ValidationRecord/financial_data de qualquer
-    // hotel, só que essa é a ÚNICA linha editável aqui.
-    if (isAdminEntity && activeProjectionType !== 'Realizado') {
-        const cstHeadRow = data.find(r => r.id === 'CST-HEAD');
-        const despesaText = adminDespesaText ?? formatValue(cstHeadRow?.previa || 0, 'currency');
-        return (
-            <div className="flex flex-col w-full items-center pt-10">
-                <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-8 w-full max-w-md">
-                    <h2 className="text-xl font-bold text-gray-800 capitalize">{selectedHotel}</h2>
-                    <p className="text-sm text-gray-500 mb-6">{monthName} de {selectedYear} — {activeProjectionType}</p>
-                    <label className="block text-xs font-black text-gray-500 uppercase tracking-wide mb-2">Despesa do mês</label>
-                    <input
-                        type="text"
-                        disabled={!canEditForecast || isLocked}
-                        value={despesaText}
-                        onChange={e => setAdminDespesaText(e.target.value)}
-                        onBlur={() => {
-                            const numVal = parseNum(despesaText);
-                            setAdminDespesaText(formatValue(numVal, 'currency'));
-                            setData(prev => prev.map(row => row.id === 'CST-HEAD' ? { ...row, previa: numVal } : row));
-                        }}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-3 text-lg font-bold text-indigo-900 text-right focus:ring-2 focus:ring-indigo-500 outline-none mb-6 disabled:bg-gray-50 disabled:text-gray-400"
-                    />
-                    {canValidate && (
-                        <button
-                            onClick={handleSaveResultsDirectly}
-                            disabled={isLocked}
-                            className="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
-                        >
-                            Salvar Versão
-                        </button>
-                    )}
-                </div>
-                {showConfirmModal && (
-                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-                            <div className="p-6">
-                                <p className="text-slate-700 text-base text-center font-medium">Tem certeza que deseja salvar essa versão?</p>
-                            </div>
-                            <div className="p-4 border-t border-gray-100 flex justify-end gap-3 bg-white">
-                                <button onClick={() => setShowConfirmModal(false)} className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 rounded-lg">Cancelar</button>
-                                <button
-                                    onClick={async () => { await confirmSaveResults(); setShowConfirmModal(false); }}
-                                    disabled={isSaving}
-                                    className="px-4 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50"
-                                >
-                                    {isSaving ? 'Salvando...' : 'Confirmar'}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </div>
-        );
-    }
 
     return (
         <div className="flex flex-col w-full">
