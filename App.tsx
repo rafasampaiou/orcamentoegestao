@@ -8,6 +8,7 @@ import GMDView from './components/GMDView';
 import OccupancyView from './components/OccupancyView';
 import OccupancyMonthlyRealView from './components/OccupancyMonthlyRealView';
 import ComparativesView from './components/ComparativesView';
+import DreSegmentadaView from './components/DreSegmentadaView';
 import AnaliseABView from './components/AnaliseABView';
 import BudgetLaborView from './components/BudgetLaborView';
 import BudgetExtraRevView from './components/BudgetExtraRevView';
@@ -1346,6 +1347,21 @@ const App: React.FC = () => {
             />
           </div>
         </div>
+      );
+      case 'dre_segmentada': return (
+        <DreSegmentadaView
+          selectedMonth={selectedDate.getMonth() + 1}
+          selectedYear={selectedDate.getFullYear()}
+          financialData={importedFinancialData}
+          selectedHotel={selectedHotel}
+          accounts={accounts}
+          packages={packages}
+          hotels={hotels}
+          realOccupancyData={realOccupancyData}
+          activeRealVersionId={activeRealVersionId}
+          activeBudgetVersionId={activeBudgetVersionId}
+          budgetOccupancyData={budgetOccupancyDataMap[activeBudgetVersionId] || {}}
+        />
       );
       case 'ab_analysis': return (
         <AnaliseABView

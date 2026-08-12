@@ -271,6 +271,7 @@ export type ViewState =
   | 'occupancy_real'
   | 'ab_analysis'
   | 'comparatives'
+  | 'dre_segmentada'
   | 'gmd'
   | 'validations'
 
