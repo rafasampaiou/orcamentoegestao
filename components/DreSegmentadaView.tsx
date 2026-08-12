@@ -344,8 +344,8 @@ const DreSegmentadaView: React.FC<DreSegmentadaViewProps> = ({
                         <div className="text-right px-3 py-2 bg-gray-50 text-gray-500 text-xs font-black uppercase tracking-wide">Ano Atual</div>
                         <div className="text-right px-3 py-2 bg-gray-50 text-gray-500 text-xs font-black uppercase tracking-wide">Diferença</div>
                         <div />
-                        <div className="text-center px-2 py-2 bg-indigo-50 text-indigo-600 text-xs font-black uppercase tracking-wide">% Lazer</div>
-                        <div className="text-center px-2 py-2 bg-indigo-50 text-indigo-600 text-xs font-black uppercase tracking-wide">% Eventos</div>
+                        <div className="text-center px-1 py-2 bg-indigo-50 text-indigo-600 text-[9px] font-black uppercase whitespace-nowrap">% Lazer</div>
+                        <div className="text-center px-1 py-2 bg-indigo-50 text-indigo-600 text-[9px] font-black uppercase whitespace-nowrap">% Eventos</div>
                         <div />
                         <div className="text-left px-3 py-2 bg-gray-50 text-gray-500 text-xs font-black uppercase tracking-wide">Descrição</div>
                         <div className="text-right px-3 py-2 bg-gray-50 text-gray-500 text-xs font-black uppercase tracking-wide">Ano Anterior</div>
@@ -365,7 +365,7 @@ const DreSegmentadaView: React.FC<DreSegmentadaViewProps> = ({
                                     <div className={`text-right px-3 py-1.5 tabular-nums border-b border-gray-100 ${rowBg}`}>{formatValue(row.lazerAtual, row.format)}</div>
                                     <div className={`text-right px-3 py-1.5 tabular-nums border-b border-gray-100 ${rowBg}`}>{renderDiffCell(diffLazer, row.format, row.higherIsWorse)}</div>
                                     <div />
-                                    <div className="text-center px-2 py-1 border-b border-gray-100 bg-indigo-50/40">
+                                    <div className={`text-center px-2 py-1 border-b border-gray-100 ${row.editablePkgId ? 'bg-indigo-50/40' : ''}`}>
                                         {row.editablePkgId ? (
                                             <input
                                                 type="number" min={0} max={100} step={0.1}
@@ -375,7 +375,7 @@ const DreSegmentadaView: React.FC<DreSegmentadaViewProps> = ({
                                             />
                                         ) : <span className="text-gray-300">—</span>}
                                     </div>
-                                    <div className="text-center px-2 py-1 border-b border-gray-100 bg-indigo-50/40">
+                                    <div className={`text-center px-2 py-1 border-b border-gray-100 ${row.editablePkgId ? 'bg-indigo-50/40' : ''}`}>
                                         {row.editablePkgId ? (
                                             <input
                                                 type="number" min={0} max={100} step={0.1}
