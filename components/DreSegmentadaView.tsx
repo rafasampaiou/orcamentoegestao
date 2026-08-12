@@ -37,6 +37,9 @@ interface DisplayRow {
     bold: boolean;
     // Pra despesa/imposto, "subir" (atual > anterior) é ruim — inverte a cor do Δ.
     higherIsWorse?: boolean;
+    // Linha de conta contábil (category 'Account' na DRE Forecast) — some quando "Ocultar Contas"
+    // está ativo, deixando só Receita/Impostos/Receita Líquida/pacotes/GOP.
+    isAccountRow?: boolean;
 }
 
 const diffColorClass = (diff: number, higherIsWorse?: boolean) => {
@@ -64,6 +67,11 @@ const DreSegmentadaView: React.FC<DreSegmentadaViewProps> = ({
     // de GOP).
     const [despesaPctEventos, setDespesaPctEventos] = useState<number | null>(null);
     const [impostoPctEventos, setImpostoPctEventos] = useState<number | null>(null);
+
+    // "Ocultar Contas" (mesmo nome/comportamento do botão da DRE Forecast, ForecastTable.tsx) —
+    // esconde as linhas de conta contábil (category 'Account'), deixando só Receita/Impostos/
+    // Receita Líquida/cabeçalhos de pacote/GOP.
+    const [showAccounts, setShowAccounts] = useState(false);
 
     const hotelObj = hotels.find(h => h.name === selectedHotel);
     const isAdminEntity = hotelObj?.type === 'Administradora';
@@ -164,6 +172,7 @@ const DreSegmentadaView: React.FC<DreSegmentadaViewProps> = ({
                 return {
                     id: r.id, label: r.label, atual: a.atual * despesaFrac, anterior: a.anterior * despesaFrac,
                     format: 'currency' as const, indentLevel: r.indentLevel || 0, bold: !!(r.isHeader || r.isTotal), higherIsWorse: true,
+                    isAccountRow: r.category === 'Account',
                 };
             }),
             { id: 'GOP-SEG', label: 'GOP (R$)', atual: gopAtual, anterior: gopAnterior, format: 'currency', indentLevel: 0, bold: true },
@@ -196,7 +205,7 @@ const DreSegmentadaView: React.FC<DreSegmentadaViewProps> = ({
     );
 
     const renderTable = (title: string, data: { rows: DisplayRow[] }) => (
-        <div className="bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-6">
+        <div className="bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-6 min-w-0">
             <h3 className="text-lg font-black text-gray-900 mb-3">{title}</h3>
             <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -209,7 +218,7 @@ const DreSegmentadaView: React.FC<DreSegmentadaViewProps> = ({
                         </tr>
                     </thead>
                     <tbody>
-                        {data.rows.map(row => {
+                        {data.rows.filter(row => showAccounts || !row.isAccountRow).map(row => {
                             const diff = row.atual - row.anterior;
                             return (
                                 <tr key={row.id} className={`border-b border-gray-100 ${row.bold ? 'bg-gray-50/60 font-black' : ''}`}>
@@ -253,6 +262,16 @@ const DreSegmentadaView: React.FC<DreSegmentadaViewProps> = ({
             <div className="bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-6">
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="text-xl font-black text-gray-900">DRE Segmentada — Lazer vs Eventos</h2>
+                    <button
+                        onClick={() => setShowAccounts(prev => !prev)}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-colors border ${!showAccounts
+                            ? 'bg-indigo-100 text-indigo-700 border-indigo-200'
+                            : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 shadow-sm'
+                            }`}
+                        title={showAccounts ? 'Ocultar contas contábeis, deixando só Receita/Impostos/pacotes' : 'Mostrar as contas contábeis dentro de cada pacote'}
+                    >
+                        {showAccounts ? 'Ocultar Contas' : 'Mostrar Contas'}
+                    </button>
                 </div>
 
                 <div className="mb-4">
@@ -311,8 +330,10 @@ const DreSegmentadaView: React.FC<DreSegmentadaViewProps> = ({
                 </p>
             </div>
 
-            {renderTable(`Lazer — ${selectedHotel}`, lazerData)}
-            {renderTable(`Eventos — ${selectedHotel}`, eventosData)}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {renderTable(`Lazer — ${selectedHotel}`, lazerData)}
+                {renderTable(`Eventos — ${selectedHotel}`, eventosData)}
+            </div>
 
             <p className="text-[11px] text-gray-400 px-2">
                 Receitas de "Outras Receitas" (OR), Cancelamento de Time Share e ISS não têm segmento próprio nos dados — ficam de fora das duas tabelas acima, então a soma delas não bate 100% com a Receita Bruta Total do hotel.
