@@ -25,21 +25,20 @@ const filterPillClass = (active: boolean) => `px-2.5 py-1 text-sm font-bold roun
 interface Agg { atual: number; anterior: number; }
 const zeroAgg = (): Agg => ({ atual: 0, anterior: 0 });
 
-// Uma linha já pronta pra exibir numa das 2 tabelas (Lazer/Eventos) — currency ou percent, com
-// indentação/negrito reaproveitados das linhas de despesa originais da DRE Forecast.
-interface DisplayRow {
+// Uma linha já pronta pra exibir na tabela única (Lazer | distribuição | Eventos).
+interface CombinedRow {
     id: string;
     label: string;
-    atual: number;
-    anterior: number;
     format: 'currency' | 'percent';
     indentLevel: number;
     bold: boolean;
     // Pra despesa/imposto, "subir" (atual > anterior) é ruim — inverte a cor do Δ.
     higherIsWorse?: boolean;
-    // Linha de conta contábil (category 'Account' na DRE Forecast) — some quando "Ocultar Contas"
-    // está ativo, deixando só Receita/Impostos/Receita Líquida/pacotes/GOP.
     isAccountRow?: boolean;
+    lazerAtual: number; lazerAnterior: number;
+    eventosAtual: number; eventosAnterior: number;
+    // Só pras linhas de PACOTE de despesa — id do pacote pra achar/editar o % de distribuição.
+    editablePkgId?: string;
 }
 
 const diffColorClass = (diff: number, higherIsWorse?: boolean) => {
@@ -47,6 +46,12 @@ const diffColorClass = (diff: number, higherIsWorse?: boolean) => {
     const good = higherIsWorse ? diff < 0 : diff > 0;
     return good ? 'text-emerald-700' : 'text-red-700';
 };
+
+const renderDiffCell = (diff: number, format: 'currency' | 'percent', higherIsWorse?: boolean) => (
+    <span className={`font-bold ${diffColorClass(diff, higherIsWorse)}`}>
+        {format === 'percent' ? formatPointsDiff(diff) : `${diff >= 0 ? '+' : ''}${formatValue(diff, 'currency')}`}
+    </span>
+);
 
 const DreSegmentadaView: React.FC<DreSegmentadaViewProps> = ({
     selectedMonth, selectedYear, financialData, selectedHotel, accounts, packages, hotels,
@@ -61,12 +66,11 @@ const DreSegmentadaView: React.FC<DreSegmentadaViewProps> = ({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedYear]);
 
-    // % de Despesas/Impostos alocado a Eventos (o resto vai pra Lazer) — null enquanto o usuário
-    // não tiver ajustado manualmente, usando como default a mesma % que a Receita (ano atual) já
-    // tem entre os dois segmentos. Client-side, não persiste (mesmo padrão do WHAT IF % da Tabela
-    // de GOP).
-    const [despesaPctEventos, setDespesaPctEventos] = useState<number | null>(null);
-    const [impostoPctEventos, setImpostoPctEventos] = useState<number | null>(null);
+    // % de Eventos na distribuição da Despesa, POR PACOTE (o resto do pacote vai pra Lazer) — só
+    // guarda os pacotes que o usuário já ajustou manualmente; os demais usam como default a mesma
+    // % que a Receita (ano atual) tem entre os dois segmentos (ver `receitaSplit`). Client-side,
+    // não persiste (mesmo padrão do WHAT IF % da Tabela de GOP).
+    const [despesaPctByPackage, setDespesaPctByPackage] = useState<Record<string, number>>({});
 
     // "Ocultar Contas" (mesmo nome/comportamento do botão da DRE Forecast, ForecastTable.tsx) —
     // esconde as linhas de conta contábil (category 'Account'), deixando só Receita/Impostos/
@@ -89,10 +93,11 @@ const DreSegmentadaView: React.FC<DreSegmentadaViewProps> = ({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [visibleMonths, selectedYear, financialData, selectedHotel, hotels, isAdminEntity, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData]);
 
-    // Estrutura (ids/labels/indentação) não varia por mês — usa o primeiro conjunto disponível só
-    // pra saber QUAIS linhas de despesa existem e em que ordem/indentação mostrar.
+    // Estrutura (ids/labels/indentação/categoria) não varia por mês — usa o primeiro conjunto
+    // disponível só pra saber QUAIS linhas de despesa existem e em que ordem/indentação mostrar.
     const referenceRows: ForecastRow[] = monthlyDreRows[0] || [];
     const despesaRows = useMemo(() => referenceRows.filter(r => r.category === 'Costs' || r.category === 'Package' || r.category === 'Account'), [referenceRows]);
+    const packageRows = useMemo(() => despesaRows.filter(r => r.category === 'Package'), [despesaRows]);
 
     // Soma (Ano Atual = .previa, Ano Anterior = .lastYear) de cada linha across os meses
     // selecionados — um Map por id, montado uma vez só (não recalcula por linha).
@@ -114,8 +119,9 @@ const DreSegmentadaView: React.FC<DreSegmentadaViewProps> = ({
     }, [monthlyDreRows, despesaRows]);
     const agg = (id: string): Agg => aggMap.get(id) || zeroAgg();
 
-    // % de receita Lazer/Eventos, ano atual e ano anterior — alimenta os cards informativos E o
-    // default dos sliders de Despesa/Imposto.
+    // % de receita Eventos, ano atual e ano anterior — alimenta o card informativo, o % de
+    // Impostos (sempre igual ao da Receita, por pedido do usuário) e o default do % de cada
+    // pacote de despesa (até o usuário ajustar manualmente).
     const receitaSplit = useMemo(() => {
         const lazerAtual = agg('REV-APT-LAZER').atual + agg('REV-EXTRA-LAZER').atual;
         const eventosAtual = agg('REV-APT-EVENTOS').atual + agg('REV-EXTRA-EVENTOS').atual;
@@ -130,112 +136,93 @@ const DreSegmentadaView: React.FC<DreSegmentadaViewProps> = ({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [aggMap]);
 
-    const effectiveDespesaPctEventos = despesaPctEventos ?? receitaSplit.pctEventosAtual;
-    const effectiveImpostoPctEventos = impostoPctEventos ?? receitaSplit.pctEventosAtual;
-
-    // Monta as linhas de exibição de UM segmento (Lazer ou Eventos) — mesma % de Despesa/Imposto
-    // aplicada igual no Ano Atual e no Ano Anterior (não tem um slicer por ano).
-    const buildSegmentRows = (segment: 'lazer' | 'eventos'): { rows: DisplayRow[]; receitaAtual: number; receitaAnterior: number } => {
-        const isEventos = segment === 'eventos';
-        const despesaFrac = (isEventos ? effectiveDespesaPctEventos : (100 - effectiveDespesaPctEventos)) / 100;
-        const impostoFrac = (isEventos ? effectiveImpostoPctEventos : (100 - effectiveImpostoPctEventos)) / 100;
-
-        const revApt = agg(isEventos ? 'REV-APT-EVENTOS' : 'REV-APT-LAZER');
-        const revExtra = agg(isEventos ? 'REV-EXTRA-EVENTOS' : 'REV-EXTRA-LAZER');
-        const receitaAtual = revApt.atual + revExtra.atual;
-        const receitaAnterior = revApt.anterior + revExtra.anterior;
-
-        const impostoTotal = agg('REV-IMP');
-        const impostoAtual = impostoTotal.atual * impostoFrac;
-        const impostoAnterior = impostoTotal.anterior * impostoFrac;
-
-        const receitaLiqAtual = receitaAtual - impostoAtual;
-        const receitaLiqAnterior = receitaAnterior - impostoAnterior;
-
-        const despesaTotal = agg('CST-HEAD');
-        const despesaTotalAtual = despesaTotal.atual * despesaFrac;
-        const despesaTotalAnterior = despesaTotal.anterior * despesaFrac;
-
-        const gopAtual = receitaLiqAtual - despesaTotalAtual;
-        const gopAnterior = receitaLiqAnterior - despesaTotalAnterior;
-        const gopPctAtual = receitaLiqAtual ? (gopAtual / receitaLiqAtual) * 100 : 0;
-        const gopPctAnterior = receitaLiqAnterior ? (gopAnterior / receitaLiqAnterior) * 100 : 0;
-
-        const rows: DisplayRow[] = [
-            { id: 'REV-APT', label: 'Receita de Apartamentos', atual: revApt.atual, anterior: revApt.anterior, format: 'currency', indentLevel: 1, bold: false },
-            { id: 'REV-EXTRA', label: 'Receitas Extras', atual: revExtra.atual, anterior: revExtra.anterior, format: 'currency', indentLevel: 1, bold: false },
-            { id: 'REV-TOTAL-SEG', label: 'RECEITA BRUTA', atual: receitaAtual, anterior: receitaAnterior, format: 'currency', indentLevel: 0, bold: true },
-            { id: 'REV-IMP-SEG', label: 'IMPOSTOS', atual: impostoAtual, anterior: impostoAnterior, format: 'currency', indentLevel: 0, bold: false, higherIsWorse: true },
-            { id: 'REV-NET-SEG', label: 'RECEITA LÍQUIDA', atual: receitaLiqAtual, anterior: receitaLiqAnterior, format: 'currency', indentLevel: 0, bold: true },
-            ...despesaRows.map(r => {
-                const a = agg(r.id);
-                return {
-                    id: r.id, label: r.label, atual: a.atual * despesaFrac, anterior: a.anterior * despesaFrac,
-                    format: 'currency' as const, indentLevel: r.indentLevel || 0, bold: !!(r.isHeader || r.isTotal), higherIsWorse: true,
-                    isAccountRow: r.category === 'Account',
-                };
-            }),
-            { id: 'GOP-SEG', label: 'GOP (R$)', atual: gopAtual, anterior: gopAnterior, format: 'currency', indentLevel: 0, bold: true },
-            { id: 'GOP-PCT-SEG', label: 'GOP (%)', atual: gopPctAtual, anterior: gopPctAnterior, format: 'percent', indentLevel: 0, bold: true },
-        ];
-        return { rows, receitaAtual, receitaAnterior };
+    const pkgPctEventos = (pkgId: string): number => despesaPctByPackage[pkgId] ?? receitaSplit.pctEventosAtual;
+    const setPkgPctEventos = (pkgId: string, raw: number) => {
+        const clamped = Math.min(100, Math.max(0, isNaN(raw) ? 0 : raw));
+        setDespesaPctByPackage(prev => ({ ...prev, [pkgId]: clamped }));
     };
 
-    const lazerData = useMemo(() => buildSegmentRows('lazer'), [aggMap, despesaRows, effectiveDespesaPctEventos, effectiveImpostoPctEventos]);
-    const eventosData = useMemo(() => buildSegmentRows('eventos'), [aggMap, despesaRows, effectiveDespesaPctEventos, effectiveImpostoPctEventos]);
+    // Todas as linhas da tabela única — Receita (já vem segmentada, sem % nenhum), Impostos
+    // (% igual ao da Receita, cada ano com a sua própria %), Receita Líquida, Despesa (cada
+    // pacote com seu próprio % de distribuição, contas herdam o % do pacote-pai) e GOP.
+    const allRows: CombinedRow[] = useMemo(() => {
+        const revAptLazer = agg('REV-APT-LAZER'), revAptEventos = agg('REV-APT-EVENTOS');
+        const revExtraLazer = agg('REV-EXTRA-LAZER'), revExtraEventos = agg('REV-EXTRA-EVENTOS');
+        const receitaLazerAtual = revAptLazer.atual + revExtraLazer.atual;
+        const receitaEventosAtual = revAptEventos.atual + revExtraEventos.atual;
+        const receitaLazerAnterior = revAptLazer.anterior + revExtraLazer.anterior;
+        const receitaEventosAnterior = revAptEventos.anterior + revExtraEventos.anterior;
 
-    const renderPctInput = (label: string, value: number, onChange: (v: number) => void) => (
-        <div>
-            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">{label}</p>
-            <div className="flex items-center gap-2">
-                <input
-                    type="number" min={0} max={100} step={0.1}
-                    value={Math.round(value * 10) / 10}
-                    onChange={e => {
-                        const raw = Number(e.target.value);
-                        const clamped = Math.min(100, Math.max(0, isNaN(raw) ? 0 : raw));
-                        onChange(clamped);
-                    }}
-                    className="w-16 text-center font-black text-indigo-700 border border-indigo-200 rounded px-1 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                />
-                <span className="text-[11px] font-black text-indigo-700">% Eventos</span>
-                <span className="text-[11px] text-gray-400">({(100 - value).toFixed(1)}% Lazer)</span>
-            </div>
-        </div>
-    );
+        const impostoTotal = agg('REV-IMP');
+        const impostoEventosAtual = impostoTotal.atual * (receitaSplit.pctEventosAtual / 100);
+        const impostoLazerAtual = impostoTotal.atual - impostoEventosAtual;
+        const impostoEventosAnterior = impostoTotal.anterior * (receitaSplit.pctEventosAnterior / 100);
+        const impostoLazerAnterior = impostoTotal.anterior - impostoEventosAnterior;
 
-    const renderTable = (title: string, data: { rows: DisplayRow[] }) => (
-        <div className="bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-6 min-w-0">
-            <h3 className="text-lg font-black text-gray-900 mb-3">{title}</h3>
-            <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                    <thead>
-                        <tr className="bg-gray-50 text-gray-500 text-xs font-black uppercase tracking-wide">
-                            <th className="text-left px-3 py-2">Descrição</th>
-                            <th className="text-right px-3 py-2">Ano Anterior</th>
-                            <th className="text-right px-3 py-2">Ano Atual</th>
-                            <th className="text-right px-3 py-2">Diferença</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {data.rows.filter(row => showAccounts || !row.isAccountRow).map(row => {
-                            const diff = row.atual - row.anterior;
-                            return (
-                                <tr key={row.id} className={`border-b border-gray-100 ${row.bold ? 'bg-gray-50/60 font-black' : ''}`}>
-                                    <td className="px-3 py-1.5" style={{ paddingLeft: `${0.75 + row.indentLevel * 1.25}rem` }}>{row.label}</td>
-                                    <td className="text-right px-3 py-1.5 tabular-nums">{formatValue(row.anterior, row.format)}</td>
-                                    <td className="text-right px-3 py-1.5 tabular-nums">{formatValue(row.atual, row.format)}</td>
-                                    <td className={`text-right px-3 py-1.5 tabular-nums font-bold ${diffColorClass(diff, row.higherIsWorse)}`}>
-                                        {row.format === 'percent' ? formatPointsDiff(diff) : `${diff >= 0 ? '+' : ''}${formatValue(diff, 'currency')}`}
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    );
+        const receitaLiqLazerAtual = receitaLazerAtual - impostoLazerAtual;
+        const receitaLiqEventosAtual = receitaEventosAtual - impostoEventosAtual;
+        const receitaLiqLazerAnterior = receitaLazerAnterior - impostoLazerAnterior;
+        const receitaLiqEventosAnterior = receitaEventosAnterior - impostoEventosAnterior;
+
+        let cstLazerAtual = 0, cstLazerAnterior = 0, cstEventosAtual = 0, cstEventosAnterior = 0;
+        packageRows.forEach(p => {
+            const a = agg(p.id);
+            const fracEventos = pkgPctEventos(p.id) / 100;
+            cstEventosAtual += a.atual * fracEventos;
+            cstLazerAtual += a.atual * (1 - fracEventos);
+            cstEventosAnterior += a.anterior * fracEventos;
+            cstLazerAnterior += a.anterior * (1 - fracEventos);
+        });
+
+        let currentPkgId: string | null = null;
+        const despesaCombined: CombinedRow[] = despesaRows.map(r => {
+            if (r.category === 'Package') currentPkgId = r.id;
+            if (r.id === 'CST-HEAD') {
+                return {
+                    id: r.id, label: r.label, format: 'currency', indentLevel: 0, bold: true, higherIsWorse: true,
+                    lazerAtual: cstLazerAtual, lazerAnterior: cstLazerAnterior, eventosAtual: cstEventosAtual, eventosAnterior: cstEventosAnterior,
+                };
+            }
+            const pkgId = r.category === 'Account' ? currentPkgId : r.id;
+            const fracEventos = pkgId ? pkgPctEventos(pkgId) / 100 : 0;
+            const a = agg(r.id);
+            return {
+                id: r.id, label: r.label, format: 'currency', indentLevel: r.indentLevel || 0,
+                bold: !!(r.isHeader || r.isTotal), higherIsWorse: true, isAccountRow: r.category === 'Account',
+                lazerAtual: a.atual * (1 - fracEventos), lazerAnterior: a.anterior * (1 - fracEventos),
+                eventosAtual: a.atual * fracEventos, eventosAnterior: a.anterior * fracEventos,
+                editablePkgId: r.category === 'Package' ? r.id : undefined,
+            };
+        });
+
+        const gopLazerAtual = receitaLiqLazerAtual - cstLazerAtual;
+        const gopEventosAtual = receitaLiqEventosAtual - cstEventosAtual;
+        const gopLazerAnterior = receitaLiqLazerAnterior - cstLazerAnterior;
+        const gopEventosAnterior = receitaLiqEventosAnterior - cstEventosAnterior;
+        const gopPctLazerAtual = receitaLiqLazerAtual ? (gopLazerAtual / receitaLiqLazerAtual) * 100 : 0;
+        const gopPctEventosAtual = receitaLiqEventosAtual ? (gopEventosAtual / receitaLiqEventosAtual) * 100 : 0;
+        const gopPctLazerAnterior = receitaLiqLazerAnterior ? (gopLazerAnterior / receitaLiqLazerAnterior) * 100 : 0;
+        const gopPctEventosAnterior = receitaLiqEventosAnterior ? (gopEventosAnterior / receitaLiqEventosAnterior) * 100 : 0;
+
+        return [
+            { id: 'REV-APT', label: 'Receita de Apartamentos', format: 'currency', indentLevel: 1, bold: false,
+                lazerAtual: revAptLazer.atual, lazerAnterior: revAptLazer.anterior, eventosAtual: revAptEventos.atual, eventosAnterior: revAptEventos.anterior },
+            { id: 'REV-EXTRA', label: 'Receitas Extras', format: 'currency', indentLevel: 1, bold: false,
+                lazerAtual: revExtraLazer.atual, lazerAnterior: revExtraLazer.anterior, eventosAtual: revExtraEventos.atual, eventosAnterior: revExtraEventos.anterior },
+            { id: 'REV-TOTAL-SEG', label: 'RECEITA BRUTA', format: 'currency', indentLevel: 0, bold: true,
+                lazerAtual: receitaLazerAtual, lazerAnterior: receitaLazerAnterior, eventosAtual: receitaEventosAtual, eventosAnterior: receitaEventosAnterior },
+            { id: 'REV-IMP-SEG', label: 'IMPOSTOS', format: 'currency', indentLevel: 0, bold: false, higherIsWorse: true,
+                lazerAtual: impostoLazerAtual, lazerAnterior: impostoLazerAnterior, eventosAtual: impostoEventosAtual, eventosAnterior: impostoEventosAnterior },
+            { id: 'REV-NET-SEG', label: 'RECEITA LÍQUIDA', format: 'currency', indentLevel: 0, bold: true,
+                lazerAtual: receitaLiqLazerAtual, lazerAnterior: receitaLiqLazerAnterior, eventosAtual: receitaLiqEventosAtual, eventosAnterior: receitaLiqEventosAnterior },
+            ...despesaCombined,
+            { id: 'GOP-SEG', label: 'GOP (R$)', format: 'currency', indentLevel: 0, bold: true,
+                lazerAtual: gopLazerAtual, lazerAnterior: gopLazerAnterior, eventosAtual: gopEventosAtual, eventosAnterior: gopEventosAnterior },
+            { id: 'GOP-PCT-SEG', label: 'GOP (%)', format: 'percent', indentLevel: 0, bold: true,
+                lazerAtual: gopPctLazerAtual, lazerAnterior: gopPctLazerAnterior, eventosAtual: gopPctEventosAtual, eventosAnterior: gopPctEventosAnterior },
+        ];
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [aggMap, despesaRows, packageRows, despesaPctByPackage, receitaSplit]);
 
     if (!selectedHotel) {
         return (
@@ -304,7 +291,7 @@ const DreSegmentadaView: React.FC<DreSegmentadaViewProps> = ({
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="grid grid-cols-2 gap-4">
                     <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                         <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Receita — Ano Anterior</p>
                         <div className="flex justify-between text-sm font-black text-gray-700">
@@ -320,23 +307,76 @@ const DreSegmentadaView: React.FC<DreSegmentadaViewProps> = ({
                         </div>
                     </div>
                 </div>
-
-                <div className="flex flex-wrap gap-6 mb-2">
-                    {renderPctInput('% Despesas alocado', effectiveDespesaPctEventos, v => setDespesaPctEventos(v))}
-                    {renderPctInput('% Impostos alocado', effectiveImpostoPctEventos, v => setImpostoPctEventos(v))}
-                </div>
-                <p className="text-[11px] text-gray-400">
-                    Despesa e Imposto não são lançados por segmento — esses % distribuem o total real (sempre da versão Realizado) entre Lazer e Eventos, e valem igual pro Ano Atual e pro Ano Anterior. Ajuste livremente; o valor inicial acompanha a % da Receita.
-                </p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {renderTable(`Lazer — ${selectedHotel}`, lazerData)}
-                {renderTable(`Eventos — ${selectedHotel}`, eventosData)}
+            <div className="bg-white rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-6">
+                <h3 className="text-lg font-black text-gray-900 mb-1">{selectedHotel}</h3>
+                <p className="text-[11px] text-gray-400 mb-3">
+                    Impostos usam sempre o mesmo % de distribuição da Receita (de cada ano). Despesa não é lançada por segmento — ajuste o % de cada pacote nas colunas do meio; o valor inicial acompanha a % da Receita do ano atual, e vale igual pro Ano Atual e pro Ano Anterior desse pacote.
+                </p>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="bg-gray-50 text-gray-500 text-[10px] font-black uppercase tracking-wide">
+                                <th rowSpan={2} className="text-left px-3 py-2 align-bottom">Descrição</th>
+                                <th colSpan={3} className="text-center px-3 py-1 border-l border-gray-200">Lazer</th>
+                                <th colSpan={2} className="text-center px-3 py-1 border-l border-gray-200 bg-indigo-50 text-indigo-600">Distribuição da Despesa</th>
+                                <th colSpan={3} className="text-center px-3 py-1 border-l border-gray-200">Eventos</th>
+                            </tr>
+                            <tr className="bg-gray-50 text-gray-500 text-xs font-black uppercase tracking-wide">
+                                <th className="text-right px-3 py-2 border-l border-gray-200">Ano Anterior</th>
+                                <th className="text-right px-3 py-2">Ano Atual</th>
+                                <th className="text-right px-3 py-2">Diferença</th>
+                                <th className="text-center px-3 py-2 border-l border-gray-200 bg-indigo-50 text-indigo-600">% Lazer</th>
+                                <th className="text-center px-3 py-2 bg-indigo-50 text-indigo-600">% Eventos</th>
+                                <th className="text-right px-3 py-2 border-l border-gray-200">Ano Anterior</th>
+                                <th className="text-right px-3 py-2">Ano Atual</th>
+                                <th className="text-right px-3 py-2">Diferença</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {allRows.filter(row => showAccounts || !row.isAccountRow).map(row => {
+                                const diffLazer = row.lazerAtual - row.lazerAnterior;
+                                const diffEventos = row.eventosAtual - row.eventosAnterior;
+                                return (
+                                    <tr key={row.id} className={`border-b border-gray-100 ${row.bold ? 'bg-gray-50/60 font-black' : ''}`}>
+                                        <td className="px-3 py-1.5" style={{ paddingLeft: `${0.75 + row.indentLevel * 1.25}rem` }}>{row.label}</td>
+                                        <td className="text-right px-3 py-1.5 tabular-nums border-l border-gray-200">{formatValue(row.lazerAnterior, row.format)}</td>
+                                        <td className="text-right px-3 py-1.5 tabular-nums">{formatValue(row.lazerAtual, row.format)}</td>
+                                        <td className="text-right px-3 py-1.5 tabular-nums">{renderDiffCell(diffLazer, row.format, row.higherIsWorse)}</td>
+                                        <td className="text-center px-2 py-1 border-l border-gray-200 bg-indigo-50/40">
+                                            {row.editablePkgId ? (
+                                                <input
+                                                    type="number" min={0} max={100} step={0.1}
+                                                    value={Math.round((100 - pkgPctEventos(row.editablePkgId)) * 10) / 10}
+                                                    onChange={e => setPkgPctEventos(row.editablePkgId!, 100 - Number(e.target.value))}
+                                                    className="w-14 text-center font-black text-indigo-700 border border-indigo-200 rounded px-1 py-0.5 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                                                />
+                                            ) : <span className="text-gray-300">—</span>}
+                                        </td>
+                                        <td className="text-center px-2 py-1 bg-indigo-50/40">
+                                            {row.editablePkgId ? (
+                                                <input
+                                                    type="number" min={0} max={100} step={0.1}
+                                                    value={Math.round(pkgPctEventos(row.editablePkgId) * 10) / 10}
+                                                    onChange={e => setPkgPctEventos(row.editablePkgId!, Number(e.target.value))}
+                                                    className="w-14 text-center font-black text-indigo-700 border border-indigo-200 rounded px-1 py-0.5 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                                                />
+                                            ) : <span className="text-gray-300">—</span>}
+                                        </td>
+                                        <td className="text-right px-3 py-1.5 tabular-nums border-l border-gray-200">{formatValue(row.eventosAnterior, row.format)}</td>
+                                        <td className="text-right px-3 py-1.5 tabular-nums">{formatValue(row.eventosAtual, row.format)}</td>
+                                        <td className="text-right px-3 py-1.5 tabular-nums">{renderDiffCell(diffEventos, row.format, row.higherIsWorse)}</td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             <p className="text-[11px] text-gray-400 px-2">
-                Receitas de "Outras Receitas" (OR), Cancelamento de Time Share e ISS não têm segmento próprio nos dados — ficam de fora das duas tabelas acima, então a soma delas não bate 100% com a Receita Bruta Total do hotel.
+                Receitas de "Outras Receitas" (OR), Cancelamento de Time Share e ISS não têm segmento próprio nos dados — ficam de fora da tabela acima, então a soma de Lazer + Eventos não bate 100% com a Receita Bruta Total do hotel.
             </p>
         </div>
     );
