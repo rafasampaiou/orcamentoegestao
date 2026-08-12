@@ -110,6 +110,12 @@ const formatPointsDiff = (val: number | undefined) => {
 
 const blueRowIds = ['REV-TOTAL', 'REV-NET', 'CST-HEAD', 'RES-OP', 'RES-PCT', 'REV-IMP', 'RES-OP-SEM-IMP', 'RES-OP-COM-IMP', 'RES-OP-SEM-IMP-PCT', 'RES-OP-COM-IMP-PCT', 'LABOR-TOTAL'];
 
+// Espaçadores de `services/mockData.ts` que só faziam sentido separando o bloco original de
+// Receita/Indicadores/Mão de obra (várias linhas) dos Custos — pra hotel Administradora (ver
+// `isAdminEntity`) esse bloco todo é ocultado e substituído por 1-2 linhas de Receita Líquida
+// injetadas em `displayData`, então empilhá-los sobraria como um vão vazio enorme.
+const ADMIN_HIDDEN_SPACER_IDS = new Set(['SPACER-IND-REV', 'SPACER-LABOR-REV', 'SPACER-BEFORE-IMP', 'SPACER-AFTER-IMP', 'SPACER-REV-CST', 'SPACER-RES-GOP']);
+
 // Linhas mostradas no resumo do passo 7 (Validar informações) do timeline OTB — null vira uma
 // linha em branco separando os grupos.
 const VALIDATION_SUMMARY_ROWS: ({ id: string; label: string; bold?: boolean } | null)[] = [
@@ -1090,6 +1096,11 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             }
             // Transformação/Reatividade rows are shown as cards below the table, not as rows.
             if (row.id.startsWith('KPI-TRANS-')) return false;
+            // Esses espaçadores existiam pra separar o bloco de Receita/Indicadores/Mão de obra
+            // (várias linhas) dos Custos — pra Administradora esse bloco inteiro fica reduzido a
+            // 1-2 linhas de Receita Líquida injetadas em displayData, então empilhar todos eles
+            // deixaria um vão enorme sem conteúdo nenhum.
+            if (isAdminEntity && ADMIN_HIDDEN_SPACER_IDS.has(row.id)) return false;
             if (row.category === 'Spacer') return true;
             if (row.category === 'Indicators') {
                 if (showDetails) return true;
@@ -2521,6 +2532,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 const kpiBudgetSemRow = data.find(r => r.id === 'KPI-TRANS-BUDGET-SEM');
                 const kpiLYSemRow = data.find(r => r.id === 'KPI-TRANS-LY-SEM');
                 const kpiMetaLYSemRow = data.find(r => r.id === 'KPI-TRANS-M-LY-SEM');
+                if (isAdminEntity) return null;
                 if (!revTotalRow || !kpiBudgetRow || !kpiLYRow || !kpiMetaLYRow || !kpiBudgetSemRow || !kpiLYSemRow || !kpiMetaLYSemRow) return null;
 
                 const yy = String(selectedYear || new Date().getFullYear()).slice(-2);
