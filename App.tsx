@@ -1421,6 +1421,9 @@ const App: React.FC = () => {
           activeBudgetVersionId={activeBudgetVersionId}
           budgetOccupancyData={budgetOccupancyDataMap[activeBudgetVersionId] || {}}
           validations={validations}
+          realVersions={realVersions}
+          budgetVersions={budgetVersions}
+          budgetOccupancyDataMap={budgetOccupancyDataMap}
         />
       );
       case 'gmd': return (

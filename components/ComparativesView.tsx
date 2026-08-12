@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import toast from 'react-hot-toast';
-import { Account, CostPackage, Hotel, ImportedRow, ProjectionType, ValidationRecord } from '../types';
+import { Account, BudgetVersion, CostPackage, Hotel, ImportedRow, ProjectionType, ValidationRecord } from '../types';
 import { buildForecastRows, formatValue, formatPercentDiff, formatPointsDiff } from './ForecastTable';
 
 const TABLE_WRAPPER_ID = 'tabela-gop-projecao-wrapper';
@@ -86,6 +86,13 @@ interface ComparativesViewProps {
     activeBudgetVersionId?: string;
     budgetOccupancyData?: Record<string, number[]>;
     validations?: ValidationRecord[];
+    // Cada hotel pode ter sua PRÓPRIA "Versão Real"/"Versão Budget" (hotelId específico) — como
+    // esta tela compara vários hotéis ao mesmo tempo, não basta a versão ativa do hotel
+    // selecionado no menu principal (`activeRealVersionId`/`activeBudgetVersionId`); precisa da
+    // lista completa pra resolver a versão de CADA hotel (ver `resolveHotelVersionId`).
+    realVersions?: BudgetVersion[];
+    budgetVersions?: BudgetVersion[];
+    budgetOccupancyDataMap?: Record<string, Record<string, number[]>>;
 }
 
 const MONTH_LABELS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -121,6 +128,23 @@ const DEFAULT_PROJECTION_TYPE: ProjectionType = 'Reunião de Ritmo';
 const DIACRITICS_REGEX = new RegExp("[̀-ͯ]", "g");
 const normalizeName = (s: string) => s.trim().toLowerCase().normalize('NFD').replace(DIACRITICS_REGEX, '');
 const isJoaoPessoa = (name: string) => normalizeName(name) === 'joao pessoa';
+
+// Resolve a "Versão Real"/"Versão Budget" de UM hotel específico — mesma lógica de resolução que
+// App.tsx já usa pra decidir a versão ativa do hotel selecionado no menu principal (App.tsx,
+// bloco "REAL VERSION SYNC"/"BUDGET VERSION SYNC"): versão marcada `isMain` pra esse hotel, senão
+// qualquer versão desse hotel, senão a versão global (`!v.hotelId`) marcada `isMain`, senão
+// qualquer versão global. Necessário aqui porque `activeRealVersionId`/`activeBudgetVersionId`
+// (props) só refletem o hotel selecionado no menu principal no momento — essa tela compara VÁRIOS
+// hotéis ao mesmo tempo, cada um podendo ter sua própria versão.
+const resolveHotelVersionId = (hotel: Hotel, versions: BudgetVersion[]): string | undefined => {
+    const matchesHotel = (v: BudgetVersion) => v.hotelId === hotel.id || v.hotelId === hotel.code || v.hotel === hotel.name;
+    const match =
+        versions.find(v => matchesHotel(v) && v.isMain) ||
+        versions.find(v => matchesHotel(v)) ||
+        versions.find(v => !v.hotelId && v.isMain) ||
+        versions.find(v => !v.hotelId);
+    return match?.id;
+};
 
 // Ordem fixa pedida pelo usuário (2026-08-05), independente da ordem que `hotels` venha do
 // backend — hotéis fora dessa lista entram no final, na ordem em que já vinham.
@@ -208,6 +232,7 @@ const filterPillClass = (active: boolean) => `px-2.5 py-1 text-sm font-bold roun
 const ComparativesView: React.FC<ComparativesViewProps> = ({
     selectedMonth, selectedYear, financialData, accounts, packages, hotels,
     realOccupancyData, activeRealVersionId, activeBudgetVersionId, budgetOccupancyData, validations,
+    realVersions = [], budgetVersions = [], budgetOccupancyDataMap = {},
 }) => {
     // "Projetar": ano inteiro por hotel — meses já validados usam Real/Prévia, os demais repetem
     // a Meta (escalada pelo WHAT IF % daquele hotel). Simulação client-side, não persiste.
@@ -222,8 +247,9 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
     // (exclui linhas de override — essas são Forecast calculado/salvo de uma versão de reunião
     // específica, não literalmente "Realizado").
     const hasRealizadoData = (hotelName: string, month: number): boolean => {
+        const targetHotel = hotelName.trim().toUpperCase();
         return (financialData || []).some(r => {
-            if (r.hotel !== hotelName) return false;
+            if ((r.hotel || '').trim().toUpperCase() !== targetHotel) return false;
             if (String(r.mes) !== String(month) || String(r.ano) !== String(selectedYear)) return false;
             if (r.conta.startsWith('override_')) return false;
             const scen = (r.cenario || '').trim().toLowerCase();
@@ -281,25 +307,34 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
     // (ForecastTable.tsx:3603), reaproveitada sem duplicar lógica de cálculo.
     const perHotelMonthlyAnnual = useMemo(() => {
         const selected = hotels.filter(h => effectiveSelectedNames.includes(h.name));
-        return selected.map(hotel => ({
-            hotel,
-            months: ALL_MONTHS.map(m => {
-                const validated = resolveMonthVersion(hotel, m);
-                const rows = buildForecastRows(
-                    undefined, m, selectedYear, financialData, hotel.name, hotels,
-                    realOccupancyData || {}, activeRealVersionId, activeBudgetVersionId, accounts, packages,
-                    budgetOccupancyData || {}, validated || DEFAULT_PROJECTION_TYPE
-                );
-                return {
-                    worked: !!validated,
-                    revenue: rows.find(r => r.id === 'REV-TOTAL'),
-                    tax: rows.find(r => r.id === 'REV-IMP'),
-                    expense: rows.find(r => r.id === 'CST-HEAD'),
-                };
-            }),
-        }));
+        return selected.map(hotel => {
+            // Resolve a versão de CADA hotel individualmente — não dá pra usar direto
+            // activeRealVersionId/activeBudgetVersionId (só refletem o hotel selecionado no menu
+            // principal); sem isso, financial_data importado com versionId de um hotel específico
+            // (ex. JDL) fica de fora do índice de getForecastData quando outro hotel está ativo.
+            const hotelRealVersionId = resolveHotelVersionId(hotel, realVersions) || activeRealVersionId;
+            const hotelBudgetVersionId = resolveHotelVersionId(hotel, budgetVersions) || activeBudgetVersionId;
+            const hotelBudgetOccupancyData = (hotelBudgetVersionId && budgetOccupancyDataMap[hotelBudgetVersionId]) || budgetOccupancyData || {};
+            return {
+                hotel,
+                months: ALL_MONTHS.map(m => {
+                    const validated = resolveMonthVersion(hotel, m);
+                    const rows = buildForecastRows(
+                        undefined, m, selectedYear, financialData, hotel.name, hotels,
+                        realOccupancyData || {}, hotelRealVersionId, hotelBudgetVersionId, accounts, packages,
+                        hotelBudgetOccupancyData, validated || DEFAULT_PROJECTION_TYPE
+                    );
+                    return {
+                        worked: !!validated,
+                        revenue: rows.find(r => r.id === 'REV-TOTAL'),
+                        tax: rows.find(r => r.id === 'REV-IMP'),
+                        expense: rows.find(r => r.id === 'CST-HEAD'),
+                    };
+                }),
+            };
+        });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [hotels, effectiveSelectedNames, selectedYear, financialData, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData, validations]);
+    }, [hotels, effectiveSelectedNames, selectedYear, financialData, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData, validations, realVersions, budgetVersions, budgetOccupancyDataMap]);
 
     // Modo normal: soma só os meses selecionados no filtro de Mês; mês sem versão validada
     // contribui zero pro Real/Prévia (mas Meta/Ano anterior somam de qualquer jeito, já que não
