@@ -330,7 +330,7 @@ const DreSegmentadaView: React.FC<DreSegmentadaViewProps> = ({
                         (16px, sem borda/fundo) que abre um vão real entre as tabelas. Por ser tudo
                         UM grid só (não <table>s separadas), cabeçalho e linhas ficam sempre
                         perfeitamente alinhados entre si. */}
-                    <div className="grid min-w-[1300px]" style={{ gridTemplateColumns: GRID_TEMPLATE }}>
+                    <div className="grid min-w-[1300px] text-xs" style={{ gridTemplateColumns: GRID_TEMPLATE }}>
                         {/* Cabeçalho — linha 1: grupos */}
                         <div className="col-span-4 text-center px-3 py-1 bg-gray-50 text-gray-500 text-[10px] font-black uppercase tracking-wide rounded-t-lg">Lazer</div>
                         <div />
