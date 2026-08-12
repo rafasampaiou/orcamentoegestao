@@ -22,11 +22,13 @@ const filterPillClass = (active: boolean) => `px-2.5 py-1 text-sm font-bold roun
     ? 'bg-white text-indigo-600 shadow-sm border border-gray-200'
     : 'text-gray-500 hover:text-gray-700'}`;
 
-// 11 "colunas" de grid: label + 3 (Lazer) + 1 espaço + 2 (% distribuição) + 1 espaço + 3 (Eventos).
-// As colunas de espaço (16px, sem borda/fundo) são o que cria o vão real entre as duas tabelas —
-// e por ser tudo UM grid só (não duas <table> lado a lado), cabeçalho e linhas ficam sempre
-// alinhados entre si, mesmo quando o conteúdo de uma coluna é mais largo que o da outra.
-const GRID_TEMPLATE = 'minmax(220px,2fr) repeat(3, minmax(96px,1fr)) 16px repeat(2, 68px) 16px repeat(3, minmax(96px,1fr))';
+// 12 "colunas" de grid: as 2 tabelas (Descrição + Ano Anterior + Ano Atual + Diferença) usando
+// EXATAMENTE o mesmo template de largura dos 2 lados (pra ficarem do mesmo tamanho), com as 2
+// colunas de % de distribuição no meio, cada uma flanqueada por uma coluna de espaço (16px, sem
+// borda/fundo) que abre um vão real entre as tabelas. Por ser tudo UM grid só (não duas <table>
+// lado a lado), cabeçalho e linhas ficam sempre alinhados entre si.
+const TABLE_COLS = 'minmax(200px,2fr) repeat(3, minmax(96px,1fr))';
+const GRID_TEMPLATE = `${TABLE_COLS} 16px repeat(2, 68px) 16px ${TABLE_COLS}`;
 
 interface Agg { atual: number; anterior: number; }
 const zeroAgg = (): Agg => ({ atual: 0, anterior: 0 });
@@ -321,19 +323,20 @@ const DreSegmentadaView: React.FC<DreSegmentadaViewProps> = ({
                     Impostos usam sempre o mesmo % de distribuição da Receita (de cada ano). Despesa não é lançada por segmento — ajuste o % de cada pacote nas colunas do meio; o valor inicial acompanha a % da Receita do ano atual, e vale igual pro Ano Atual e pro Ano Anterior desse pacote.
                 </p>
                 <div className="overflow-x-auto">
-                    {/* Grid (não <table>) de propósito: as 11 "colunas" (label + 3 Lazer + espaço +
-                        2 distribuição + espaço + 3 Eventos) usam o MESMO template em toda linha —
-                        cabeçalho e dados —, então Lazer/Eventos ficam sempre perfeitamente
-                        alinhados entre si, e as duas colunas "espaço" abrem um vão real (sem borda,
-                        sem fundo) entre as tabelas em vez de só uma linha divisória. */}
-                    <div className="grid min-w-[1100px]" style={{ gridTemplateColumns: GRID_TEMPLATE }}>
+                    {/* Grid (não <table>) de propósito: as 12 "colunas" — 2 tabelas completas
+                        (Descrição + Ano Anterior + Ano Atual + Diferença), cada uma com o MESMO
+                        template de largura (`TABLE_COLS`, ficam do mesmo tamanho), e as 2 colunas
+                        de % de distribuição no meio, cada uma flanqueada por uma coluna de espaço
+                        (16px, sem borda/fundo) que abre um vão real entre as tabelas. Por ser tudo
+                        UM grid só (não <table>s separadas), cabeçalho e linhas ficam sempre
+                        perfeitamente alinhados entre si. */}
+                    <div className="grid min-w-[1300px]" style={{ gridTemplateColumns: GRID_TEMPLATE }}>
                         {/* Cabeçalho — linha 1: grupos */}
-                        <div />
-                        <div className="col-span-3 text-center px-3 py-1 bg-gray-50 text-gray-500 text-[10px] font-black uppercase tracking-wide rounded-t-lg">Lazer</div>
+                        <div className="col-span-4 text-center px-3 py-1 bg-gray-50 text-gray-500 text-[10px] font-black uppercase tracking-wide rounded-t-lg">Lazer</div>
                         <div />
                         <div className="col-span-2 text-center px-3 py-1 bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-wide rounded-t-lg">Distribuição da Despesa</div>
                         <div />
-                        <div className="col-span-3 text-center px-3 py-1 bg-gray-50 text-gray-500 text-[10px] font-black uppercase tracking-wide rounded-t-lg">Eventos</div>
+                        <div className="col-span-4 text-center px-3 py-1 bg-gray-50 text-gray-500 text-[10px] font-black uppercase tracking-wide rounded-t-lg">Eventos</div>
 
                         {/* Cabeçalho — linha 2: colunas */}
                         <div className="text-left px-3 py-2 bg-gray-50 text-gray-500 text-xs font-black uppercase tracking-wide">Descrição</div>
@@ -344,6 +347,7 @@ const DreSegmentadaView: React.FC<DreSegmentadaViewProps> = ({
                         <div className="text-center px-2 py-2 bg-indigo-50 text-indigo-600 text-xs font-black uppercase tracking-wide">% Lazer</div>
                         <div className="text-center px-2 py-2 bg-indigo-50 text-indigo-600 text-xs font-black uppercase tracking-wide">% Eventos</div>
                         <div />
+                        <div className="text-left px-3 py-2 bg-gray-50 text-gray-500 text-xs font-black uppercase tracking-wide">Descrição</div>
                         <div className="text-right px-3 py-2 bg-gray-50 text-gray-500 text-xs font-black uppercase tracking-wide">Ano Anterior</div>
                         <div className="text-right px-3 py-2 bg-gray-50 text-gray-500 text-xs font-black uppercase tracking-wide">Ano Atual</div>
                         <div className="text-right px-3 py-2 bg-gray-50 text-gray-500 text-xs font-black uppercase tracking-wide">Diferença</div>
@@ -353,9 +357,10 @@ const DreSegmentadaView: React.FC<DreSegmentadaViewProps> = ({
                             const diffLazer = row.lazerAtual - row.lazerAnterior;
                             const diffEventos = row.eventosAtual - row.eventosAnterior;
                             const rowBg = row.bold ? 'bg-gray-50/60 font-black' : '';
+                            const labelStyle = { paddingLeft: `${0.75 + row.indentLevel * 1.25}rem` };
                             return (
                                 <React.Fragment key={row.id}>
-                                    <div className={`px-3 py-1.5 border-b border-gray-100 ${rowBg}`} style={{ paddingLeft: `${0.75 + row.indentLevel * 1.25}rem` }}>{row.label}</div>
+                                    <div className={`px-3 py-1.5 border-b border-gray-100 ${rowBg}`} style={labelStyle}>{row.label}</div>
                                     <div className={`text-right px-3 py-1.5 tabular-nums border-b border-gray-100 ${rowBg}`}>{formatValue(row.lazerAnterior, row.format)}</div>
                                     <div className={`text-right px-3 py-1.5 tabular-nums border-b border-gray-100 ${rowBg}`}>{formatValue(row.lazerAtual, row.format)}</div>
                                     <div className={`text-right px-3 py-1.5 tabular-nums border-b border-gray-100 ${rowBg}`}>{renderDiffCell(diffLazer, row.format, row.higherIsWorse)}</div>
@@ -381,6 +386,7 @@ const DreSegmentadaView: React.FC<DreSegmentadaViewProps> = ({
                                         ) : <span className="text-gray-300">—</span>}
                                     </div>
                                     <div />
+                                    <div className={`px-3 py-1.5 border-b border-gray-100 ${rowBg}`} style={labelStyle}>{row.label}</div>
                                     <div className={`text-right px-3 py-1.5 tabular-nums border-b border-gray-100 ${rowBg}`}>{formatValue(row.eventosAnterior, row.format)}</div>
                                     <div className={`text-right px-3 py-1.5 tabular-nums border-b border-gray-100 ${rowBg}`}>{formatValue(row.eventosAtual, row.format)}</div>
                                     <div className={`text-right px-3 py-1.5 tabular-nums border-b border-gray-100 ${rowBg}`}>{renderDiffCell(diffEventos, row.format, row.higherIsWorse)}</div>
