@@ -1085,7 +1085,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         return displayData.filter(row => {
             // Hotéis Administradora não têm receita/ocupação própria — só a despesa e o GOP (%)
             // fazem sentido pra eles; GOP em R$ também não (não tem receita própria pra comparar).
-            if (isAdminEntity && (row.category === 'Revenue' || row.category === 'Indicators' || row.id === 'RES-OP-COM-IMP' || row.id === 'RES-OP-SEM-IMP' || row.id === 'RES-OP-SEM-IMP-PCT')) {
+            if (isAdminEntity && (row.category === 'Revenue' || row.category === 'Indicators' || row.category === 'Labor' || row.id === 'RES-OP-COM-IMP' || row.id === 'RES-OP-SEM-IMP' || row.id === 'RES-OP-SEM-IMP-PCT')) {
                 return false;
             }
             // Transformação/Reatividade rows are shown as cards below the table, not as rows.
@@ -1202,7 +1202,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     // do Forecast) já concluídas, e a própria etapa "Calcular Forecast" ainda não. Em qualquer
     // outra etapa (antes de chegar nela, ou depois de já ter passado) o botão fica com aparência
     // inativa; clicar mesmo assim só mostra um aviso, não desabilita o clique de verdade.
-    const isOnCalcularForecastStep = !isMeetingVersion || !!(otbProgress[0] && otbProgress[1] && otbProgress[2] && otbProgress[3] && !otbProgress[4]);
+    // Hotéis Administradora não têm o timeline de ocupação/OTB (sem etapas pra concluir), então
+    // "Calcular Forecast" fica sempre disponível pra eles, sem depender de nenhuma etapa.
+    const isOnCalcularForecastStep = isAdminEntity || !isMeetingVersion || !!(otbProgress[0] && otbProgress[1] && otbProgress[2] && otbProgress[3] && !otbProgress[4]);
 
     // Assim que pelo menos uma despesa da Prévia foi preenchida (e a etapa ainda não foi
     // confirmada), o badge da etapa 6 pulsa convidando o usuário a marcar como concluída — em vez
@@ -1700,7 +1702,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         Versão concluída (clique para editá-la)
                                     </button>
                                 )
-                            ) : !otbDaySaved ? (
+                            ) : !isAdminEntity && !otbDaySaved ? (
+                                // Hotéis Administradora não têm ocupação/OTB — pulam direto pra
+                                // "Salvar Projeção" (ver branch abaixo), sem o botão "Iniciar Projeção".
                                 canEditForecast && onNavigateToOccupancy && (
                                     <button
                                         onClick={handleIniciarProjecao}
@@ -1726,7 +1730,8 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                         ) : (
                             // Na versão Realizado não faz sentido "iniciar projeção" (é o fechamento
                             // gerencial oficial, não uma prévia em construção) — só "Calcular Forecast".
-                            activeProjectionType !== 'Realizado' && canEditForecast && onNavigateToOccupancy && (
+                            // Hotéis Administradora também não têm ocupação/OTB, então nunca mostram esse botão.
+                            activeProjectionType !== 'Realizado' && !isAdminEntity && canEditForecast && onNavigateToOccupancy && (
                                 <button
                                     onClick={handleIniciarProjecao}
                                     className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-base font-bold transition-colors border bg-white text-gray-600 border-gray-300 hover:bg-gray-50 shadow-sm"
@@ -1778,7 +1783,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             )
                         )}
 
-                        {isMeetingVersion && canValidate && (
+                        {isMeetingVersion && !isAdminEntity && canValidate && (
                             <button
                                 onClick={() => onGenerateSlides?.()}
                                 disabled={!otbProgress.every(Boolean) || !!isGeneratingSlides}
@@ -1816,7 +1821,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             </div>
                             <div className="space-y-2">
                                 {[
-                                    ...(isMeetingVersion ? [{ key: 'otb', label: otbColumnLabel }] : []),
+                                    ...(isMeetingVersion && !isAdminEntity ? [{ key: 'otb', label: otbColumnLabel }] : []),
                                     { key: 'previa', label: showPreviaAsReal ? 'Real' : 'Prévia' },
                                     { key: 'real', label: 'Forecast (Real)' },
                                     { key: 'budget', label: 'Meta (Budget)' },
@@ -1860,7 +1865,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     />
                                 </th>
 
-                                {columnVisibility.otb && isMeetingVersion && (
+                                {columnVisibility.otb && isMeetingVersion && !isAdminEntity && (
                                     <th
                                         style={{ width: columnWidths.otb }}
                                         className="px-2 py-3 text-center bg-amber-100 text-amber-900 border-b border-amber-200 border-l border-amber-200 group relative"
@@ -2264,7 +2269,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
                                     return (
                                         <>
-                                            {columnVisibility.otb && isMeetingVersion && (
+                                            {columnVisibility.otb && isMeetingVersion && !isAdminEntity && (
                                                 <CommentableCell rowId={row.id} columnId="otb" style={textStyle} className="px-2 py-px text-right border-r border-gray-100 tabular-nums bg-amber-50/30 truncate">
                                                     {row.otb !== undefined ? formatValue(row.otb, formatType) : '-'}
                                                 </CommentableCell>
