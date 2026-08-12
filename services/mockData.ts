@@ -15,6 +15,24 @@ export const normalizeAccountName = (str: string) => {
         .replace(/[^a-z0-9]/g, ""); // Remove spaces and special chars
 };
 
+// Helper pra casar nome/código de hotel entre financial_data (importado — às vezes com grafia de
+// acento diferente da que está cadastrada em `hotels`, ex. planilha externa) e o valor usado nas
+// telas — ignora acentos/caixa/espaços nas pontas, mas preserva espaços internos (não usa as
+// normalizações de plural/sufixo de normalizeAccountName, que fazem sentido pra conta contábil,
+// não pra nome de hotel). Sem isso, "Alexânia" (cadastro) x "Alexania" (planilha importada, sem
+// acento) nunca batem, e TODO o Realizado desse hotel fica invisível na Tabela de GOP/DRE Forecast.
+const normalizeHotelName = (str: string) => {
+    if (!str) return '';
+    const upper = str.trim().toUpperCase().normalize('NFD');
+    let out = '';
+    for (let i = 0; i < upper.length; i++) {
+        const code = upper.charCodeAt(i);
+        if (code >= 0x0300 && code <= 0x036f) continue; // combining diacritical marks
+        out += upper[i];
+    }
+    return out;
+};
+
 export const mockHotels: Hotel[] = [
     { id: '1', code: 'ATB', name: 'Atibaia', type: 'Hotéis próprios', category: 'Resort', region: 'Sudeste' },
     { id: '2', code: 'ALX', name: 'Alexania', type: 'Hotéis próprios', category: 'Resort', region: 'Centro-Oeste' },
@@ -678,7 +696,7 @@ export const getForecastData = (
             }
 
             // 4. Normalize Hotel
-            const normHotel = row.hotel.trim().toUpperCase();
+            const normHotel = normalizeHotelName(row.hotel);
 
             // 5. Parse Value
             const val = parseFloat(row.valor.replace(',', '.'));
@@ -744,7 +762,7 @@ export const getForecastData = (
         const hotelsToTry = Array.from(new Set([selectedHotelName, activeHotelCode].filter(Boolean) as string[]));
 
         hotelsToTry.forEach(h => {
-            const baseKey = `${targetYear}|${selectedMonth}|${h.trim().toUpperCase()}|${targetScenario}|${targetName}`;
+            const baseKey = `${targetYear}|${selectedMonth}|${normalizeHotelName(h)}|${targetScenario}|${targetName}`;
             if (crFilter === 'OTHER_EXCEPT_MKT_MAR') {
                 // Special: use base key (no CR suffix) so we can do Total - Martech - Marketing
                 keysToCheck.add(baseKey);
@@ -1061,10 +1079,16 @@ export const getForecastData = (
     rows.push(generateRow('SPACER-BEFORE-IMP', '', 'Spacer', '', 0, 0, 0, 0, false, false, 0));
 
     // 1.05 Impostos (Azul conforme Receita Líquida, recuo zero)
-    const valBudgetImp = budgetOccupancyData['geral_impostos'] ? budgetOccupancyData['geral_impostos'][monthIdx] : 0;
-    const valRealImp = getRealOccValue('geral_impostos_forecast') || 0;
-    const valPreviaImp = getRealOccValue('geral_impostos_previa') || 0;
-    const valLYImp = getLYOccValue('geral_impostos_forecast') || 0;
+    // Duas fontes possíveis: aba Ocupação (tabela Geral, linha "IMPOSTOS", `geral_impostos_*`,
+    // digitada manualmente) OU a importação dedicada de Impostos em Administração
+    // (financial_data, conta 'Impostos', handleSaveTaxes em UnifiedAdministrationView.tsx) — até
+    // 2026-08-12 essa segunda fonte era gravada mas NUNCA lida aqui (código morto). Agora tem
+    // prioridade quando tiver valor (é o fechamento oficial/Meta importado), com fallback pra
+    // Ocupação pra não quebrar hotéis que já preenchem só por lá.
+    const valBudgetImp = getImportedValue('Impostos', selectedYear, 'Budget') || (budgetOccupancyData['geral_impostos'] ? budgetOccupancyData['geral_impostos'][monthIdx] : 0);
+    const valRealImp = getImportedValue('Impostos', selectedYear, 'Forecast') || getRealOccValue('geral_impostos_forecast') || 0;
+    const valPreviaImp = getPreviaOrReal('Impostos', selectedYear) || getRealOccValue('geral_impostos_previa') || 0;
+    const valLYImp = getImportedValue('Impostos', (selectedYear || 0) - 1, 'Real') || getLYOccValue('geral_impostos_forecast') || 0;
     const revImpRow = generateRow('REV-IMP', '1.05', 'Revenue', 'IMPOSTOS', valBudgetImp, valRealImp, valLYImp, valPreviaImp, true, true, 0, undefined, {
         // % de imposto sobre a receita = Imposto / Receita Bruta Total — auto-calculado na
         // Prévia a partir do % da Meta (ver recalculateTotals em ForecastTable.tsx), mas
@@ -1198,8 +1222,8 @@ export const getForecastData = (
     rows.push(generateRow('KPI-TRANS-M-LY-SEM', '', 'Result', 'Transformação/Reatividade (M x R Ant.) - GOP s/ Imp.', 0, 0, 0, 0, true, true, 0));
 
     const applyOverrides = () => {
-        const activeHotelCodeUpper = activeHotelCode.trim().toUpperCase();
-        const selHotelNameUpper = (selectedHotelName || '').trim().toUpperCase();
+        const activeHotelCodeUpper = normalizeHotelName(activeHotelCode);
+        const selHotelNameUpper = normalizeHotelName(selectedHotelName || '');
 
         // Validated Forecast snapshots (override_<rowId> rows) get their own index, scoped by
         // Versão do Forecast (activeProjectionType) — kept separate from dataIndex/getImportedValue's
@@ -1228,7 +1252,7 @@ export const getForecastData = (
                 const val = parseFloat((row.valor || '').replace(',', '.'));
                 if (isNaN(val)) return;
 
-                const normHotel = row.hotel.trim().toUpperCase();
+                const normHotel = normalizeHotelName(row.hotel);
                 overrideIndex.set(`${normHotel}|${normScenario}|${conta}`, val);
             });
         }
@@ -1328,7 +1352,7 @@ export const getDynamicForecastData = (
                     }
                 }
             }
-            const normHotel = row.hotel.trim().toUpperCase();
+            const normHotel = normalizeHotelName(row.hotel);
             const val = parseFloat(row.valor.replace(',', '.'));
             if (isNaN(val)) return;
             const normConta = normalizeAccountName(row.conta);
@@ -1357,7 +1381,7 @@ export const getDynamicForecastData = (
         const hotelsToTry = Array.from(new Set([selectedHotelName, activeHotelCode].filter(Boolean) as string[]));
         let total = 0;
         hotelsToTry.forEach(h => {
-            const baseKey = `${targetYear}|${selectedMonth}|${h.trim().toUpperCase()}|${targetScenario}|${targetName}`;
+            const baseKey = `${targetYear}|${selectedMonth}|${normalizeHotelName(h)}|${targetScenario}|${targetName}`;
             if (targetCR) {
                 total += dataIndex.get(`${baseKey}|${targetCR}`) || 0;
             } else {
@@ -1475,8 +1499,8 @@ export const getDynamicForecastData = (
     });
 
     const applyOverrides = () => {
-        const activeHotelCodeUpper = activeHotelCode.trim().toUpperCase();
-        const selHotelNameUpper = (selectedHotelName || '').trim().toUpperCase();
+        const activeHotelCodeUpper = normalizeHotelName(activeHotelCode);
+        const selHotelNameUpper = normalizeHotelName(selectedHotelName || '');
 
         rows.forEach(r => {
             const targetName = `override_${r.id}`.toLowerCase();

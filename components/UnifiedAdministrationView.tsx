@@ -3259,7 +3259,12 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     const versionId = scenario === 'BUDGET'
       ? (targetBudgetVersionId || activeBudgetVersionId)
       : (targetRealVersionId || activeRealVersionId);
-    const cenario = scenario === 'BUDGET' ? 'BUDGET' : importRealTarget;
+    // Mesmo ajuste já feito em handleSaveExpensesForecast (~linha 3090): "Realizado" (opção
+    // "PREVIA" no seletor) grava cenário 'REAL' — é o fechamento gerencial oficial, tem
+    // prioridade na hora de montar a linha IMPOSTOS da DRE Forecast (getForecastData em
+    // services/mockData.ts, que agora também lê 'Impostos' de financial_data, não só da aba
+    // Ocupação). Sem esse ajuste, o valor ficava gravado como 'PREVIA' e nunca era lido.
+    const cenario = scenario === 'BUDGET' ? 'BUDGET' : (importRealTarget === 'ANO_ANTERIOR' ? 'Real' : (importRealTarget === 'PREVIA' ? 'REAL' : importRealTarget));
 
     Object.entries(dataToUse).forEach(([hotelName, months]) => {
       Object.entries(months).forEach(([month, value]) => {

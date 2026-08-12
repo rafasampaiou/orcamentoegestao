@@ -247,9 +247,12 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
     // (exclui linhas de override — essas são Forecast calculado/salvo de uma versão de reunião
     // específica, não literalmente "Realizado").
     const hasRealizadoData = (hotelName: string, month: number): boolean => {
-        const targetHotel = hotelName.trim().toUpperCase();
+        // normalizeName (já usado pra HOTEL_ORDER/isJoaoPessoa acima) ignora acento além de
+        // caixa/espaço — sem isso, "Alexânia" (cadastro) x "Alexania" (planilha importada sem
+        // acento, ex.) nunca bateriam e o Realizado desse hotel ficaria invisível aqui.
+        const targetHotel = normalizeName(hotelName);
         return (financialData || []).some(r => {
-            if ((r.hotel || '').trim().toUpperCase() !== targetHotel) return false;
+            if (normalizeName(r.hotel || '') !== targetHotel) return false;
             if (String(r.mes) !== String(month) || String(r.ano) !== String(selectedYear)) return false;
             if (r.conta.startsWith('override_')) return false;
             const scen = (r.cenario || '').trim().toLowerCase();
