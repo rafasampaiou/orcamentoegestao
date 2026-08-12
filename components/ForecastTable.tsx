@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { getForecastData, getDynamicForecastData } from '../services/mockData';
 import { Upload, ListFilter, LayoutList, Settings2, ChevronUp, Activity, TrendingUp, Lock, LockOpen, CheckCircle2, X, FileSpreadsheet, AlertCircle, CheckCircle, ChevronRight, ChevronDown, Presentation } from 'lucide-react';
-import { ExpenseDriver, ImportedRow, Account, CostPackage, Hotel, ForecastRow, ForecastConfig, ForecastOperator, ColumnVisibility, UserRole, KpiCalculation, hasRole } from '../types';
+import { ExpenseDriver, ImportedRow, Account, CostPackage, Hotel, BudgetVersion, ForecastRow, ForecastConfig, ForecastOperator, ColumnVisibility, UserRole, KpiCalculation, hasRole } from '../types';
 import { evaluateFormula } from '../utils/formulaEngine';
 import { supabaseService } from '../services/supabaseService';
 import { MEETING_VERSIONS } from './OccupancyView';
@@ -56,6 +56,12 @@ interface ForecastTableProps {
     activeRealVersionName?: string;
     activeBudgetVersionId?: string;
     budgetOccupancyData?: Record<string, number[]>;
+    // Cada hotel pode ter sua PRÓPRIA "Versão Real"/"Versão Budget" — necessário pra somar a
+    // Receita Líquida do grupo (hotel Administradora) usando a versão de CADA hotel, não a do
+    // hotel selecionado no menu principal (ver `resolveHotelVersionId`/`groupReceitaLiquidaByHotel`).
+    realVersions?: BudgetVersion[];
+    budgetVersions?: BudgetVersion[];
+    budgetOccupancyDataMap?: Record<string, Record<string, number[]>>;
 
     // Projections & Validation
     activeProjectionType?: import('../types').ProjectionType;
@@ -109,6 +115,23 @@ const formatPointsDiff = (val: number | undefined) => {
 };
 
 const blueRowIds = ['REV-TOTAL', 'REV-NET', 'CST-HEAD', 'RES-OP', 'RES-PCT', 'REV-IMP', 'RES-OP-SEM-IMP', 'RES-OP-COM-IMP', 'RES-OP-SEM-IMP-PCT', 'RES-OP-COM-IMP-PCT', 'LABOR-TOTAL'];
+
+// Resolve a "Versão Real"/"Versão Budget" de UM hotel específico — mesma lógica de resolução que
+// App.tsx usa pra decidir a versão ativa do hotel selecionado no menu principal (App.tsx, bloco
+// "REAL VERSION SYNC"/"BUDGET VERSION SYNC"), e mesmo helper já usado em ComparativesView.tsx pra
+// resolver por hotel na Tabela de GOP. Necessário aqui porque `activeRealVersionId`/
+// `activeBudgetVersionId` (props) só refletem o hotel selecionado no menu principal (JDL/ADM,
+// nesta tela) — `groupReceitaLiquidaByHotel` precisa da versão de CADA outro hotel do grupo, não a
+// da própria Administradora.
+const resolveHotelVersionId = (hotel: Hotel, versions: BudgetVersion[]): string | undefined => {
+    const matchesHotel = (v: BudgetVersion) => v.hotelId === hotel.id || v.hotelId === hotel.code || v.hotel === hotel.name;
+    const match =
+        versions.find(v => matchesHotel(v) && v.isMain) ||
+        versions.find(v => matchesHotel(v)) ||
+        versions.find(v => !v.hotelId && v.isMain) ||
+        versions.find(v => !v.hotelId);
+    return match?.id;
+};
 
 // Espaçadores de `services/mockData.ts` que só faziam sentido separando o bloco original de
 // Receita/Indicadores/Mão de obra (várias linhas) dos Custos — pra hotel Administradora (ver
@@ -280,6 +303,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     activeRealVersionId,
     activeRealVersionName,
     activeBudgetVersionId,
+    realVersions = [],
+    budgetVersions = [],
+    budgetOccupancyDataMap = {},
     activeProjectionType,
     setActiveProjectionType,
     validations,
@@ -343,10 +369,17 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         if (!isAdminEntity) return [];
         const otherHotels = hotels.filter(h => h.type !== 'Administradora');
         return otherHotels.map(hotel => {
+            // Cada hotel usa a PRÓPRIA "Versão Real"/"Versão Budget" — activeRealVersionId/
+            // activeBudgetVersionId (props) só refletem a Administradora selecionada no menu
+            // principal, não os outros hotéis do grupo (mesmo bug/fix já aplicado em
+            // ComparativesView.tsx pra Tabela de GOP).
+            const hotelRealVersionId = resolveHotelVersionId(hotel, realVersions) || activeRealVersionId;
+            const hotelBudgetVersionId = resolveHotelVersionId(hotel, budgetVersions) || activeBudgetVersionId;
+            const hotelBudgetOccupancyData = (hotelBudgetVersionId && budgetOccupancyDataMap[hotelBudgetVersionId]) || budgetOccupancyData || {};
             const rows = buildForecastRows(
                 dreConfigs, selectedMonth, selectedYear, financialData, hotel.name, hotels,
-                realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages,
-                budgetOccupancyData, activeProjectionType
+                realOccupancyData, hotelRealVersionId, hotelBudgetVersionId, accounts, packages,
+                hotelBudgetOccupancyData, activeProjectionType
             );
             const revNet = rows.find(r => r.id === 'REV-NET');
             return {
@@ -356,7 +389,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             };
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isAdminEntity, hotels, dreConfigs, selectedMonth, selectedYear, financialData, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData, activeProjectionType]);
+    }, [isAdminEntity, hotels, dreConfigs, selectedMonth, selectedYear, financialData, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData, activeProjectionType, realVersions, budgetVersions, budgetOccupancyDataMap]);
 
     const groupReceitaLiquida = useMemo(() => groupReceitaLiquidaByHotel.reduce((acc, h) => ({
         previa: acc.previa + h.previa, budget: acc.budget + h.budget, real: acc.real + h.real, lastYear: acc.lastYear + h.lastYear,

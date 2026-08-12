@@ -1333,6 +1333,9 @@ const App: React.FC = () => {
               activeRealVersionId={activeRealVersionId}
               activeRealVersionName={activeRealVersionName}
               activeBudgetVersionId={activeBudgetVersionId}
+              realVersions={realVersions}
+              budgetVersions={budgetVersions}
+              budgetOccupancyDataMap={budgetOccupancyDataMap}
               activeProjectionType={activeProjectionType}
               setActiveProjectionType={setActiveProjectionType}
               validations={validations}
