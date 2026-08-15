@@ -29,6 +29,11 @@ interface OccupancyViewProps {
     hotels?: Hotel[];
     budgetVersions?: BudgetVersion[];
     budgetOccupancyDataMap?: Record<string, Record<string, number[]>>;
+    // Cada hotel pode ter sua PRÓPRIA "Versão Real" — necessário pra resolver o contextKey de
+    // CADA hotel no filtro comparativo (ver `getRealVersionIdForHotel`), não só o do hotel ativo
+    // no menu principal (`activeRealVersionId`). Mesmo padrão já usado por `getBudgetDataForHotel`
+    // pro lado da Meta.
+    realVersions?: BudgetVersion[];
     realOccupancyData?: Record<string, Record<string, number>>;
     setRealOccupancyData?: React.Dispatch<React.SetStateAction<Record<string, Record<string, number>>>>;
     financialData?: ImportedRow[];
@@ -446,6 +451,7 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
     hotels,
     budgetVersions,
     budgetOccupancyDataMap,
+    realVersions,
     realOccupancyData,
     setRealOccupancyData,
     financialData,
@@ -870,6 +876,19 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             return (version && budgetOccupancyDataMap?.[version.id]) || {};
         };
 
+        // Mesma ideia de `getBudgetDataForHotel` pro lado Real/Prévia — `activeRealVersionId` só
+        // reflete o hotel ativo no menu principal; qualquer OUTRO hotel do filtro comparativo
+        // precisa da sua PRÓPRIA "Versão Real" pra achar o contextKey certo em
+        // `realOccupancyData`, senão a soma nunca muda ao marcar outro hotel no filtro (fica lendo
+        // um contextKey de versão que não existe pra ele).
+        const getRealVersionIdForHotel = (hotelName: string): string => {
+            if (hotelName === selectedHotel) return activeRealVersionId || '';
+            const hotel = hotels?.find(h => h.name === hotelName);
+            const version = realVersions?.find(v => v.isMain && (v.hotelId === hotel?.code || v.hotelId === hotel?.id || v.hotel === hotelName))
+                || realVersions?.find(v => v.hotelId === hotel?.code || v.hotelId === hotel?.id || v.hotel === hotelName);
+            return version?.id || activeRealVersionId || '';
+        };
+
         const sumMetaAcross = (rowId: string, months: number[]) =>
             hotelsToUse.reduce((hotelSum, hotelName) => {
                 const hotelBudget = getBudgetDataForHotel(hotelName);
@@ -878,8 +897,9 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
 
         const sumRealAcross = (rowId: string, suffix: 'forecast' | 'previa', months: number[]) =>
             hotelsToUse.reduce((hotelSum, hotelName) => {
+                const hotelRealVersionId = getRealVersionIdForHotel(hotelName);
                 return hotelSum + months.reduce((sum, m) => {
-                    const key = `${hotelName}_${selectedYear}_${m}_${activeRealVersionId || ''}`;
+                    const key = `${hotelName}_${selectedYear}_${m}_${hotelRealVersionId}`;
                     const monthData = realOccupancyData?.[key] || {};
                     return sum + (monthData[`${rowId}_${suffix}`] || 0);
                 }, 0);

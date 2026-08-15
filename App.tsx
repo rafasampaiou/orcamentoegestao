@@ -1393,6 +1393,7 @@ const App: React.FC = () => {
           hotels={hotels}
           budgetVersions={budgetVersions}
           budgetOccupancyDataMap={budgetOccupancyDataMap}
+          realVersions={realVersions}
           budgetData={budgetOccupancyDataMap[activeBudgetVersionId] || {}}
           realOccupancyData={realOccupancyData}
           setRealOccupancyData={setRealOccupancyData}
