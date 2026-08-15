@@ -530,9 +530,21 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             const currentCap = currentData[`geral_capacity_${s}`];
             const baseCap = currentCap !== undefined ? currentCap : (budgetData['geral_capacity']?.[monthIdx] || budgetData['lazer_capacity']?.[monthIdx] || 0);
 
+            // "Aptos disponíveis" (avail) = capacidade × dias — mas isso só é uma multiplicação
+            // válida MÊS A MÊS. Quando várias meses são somados antes de chegar aqui (comparativo
+            // com "Filtrar Meses"/vários hotéis, ver accumulatedReal/accumulatedLY), `days`/`baseCap`
+            // acima já vêm como a SOMA de vários meses — multiplicar duas somas (Σcap × Σdias) infla
+            // o resultado bem além do avail real (capacidade é ~constante mês a mês, então Σcap já
+            // é maior que qualquer capacidade mensal isolada). Por isso o cálculo acumulado injeta
+            // um `__availOverride_<suffix>` (soma mês a mês de cap×dias, já calculada certa) que,
+            // quando presente, tem prioridade sobre o cap×dias daqui — nunca fica gravado no
+            // balde persistido de um mês só (só existe nesse objeto `agg` em memória), então não
+            // arrisca reaproveitar um avail velho na edição normal de um mês.
+            const availOverride = currentData[`__availOverride_${s}`];
+
             const lzCap = baseCap;
             set(`lazer_capacity_${s}`, lzCap);
-            const lzAvail = lzCap * days;
+            const lzAvail = availOverride !== undefined ? availOverride : lzCap * days;
             set(`lazer_avail_${s}`, lzAvail);
 
             const lzSold = get(`lazer_sold_${s}`);
@@ -563,7 +575,7 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
 
             const evCap = baseCap;
             set(`event_capacity_${s}`, evCap);
-            const evAvail = evCap * days;
+            const evAvail = availOverride !== undefined ? availOverride : evCap * days;
             set(`event_avail_${s}`, evAvail);
 
             const evSold = get(`event_sold_${s}`);
@@ -594,7 +606,7 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
 
             const gCap = baseCap;
             set(`geral_capacity_${s}`, gCap);
-            const gAvail = gCap * days;
+            const gAvail = availOverride !== undefined ? availOverride : gCap * days;
             set(`geral_avail_${s}`, gAvail);
 
             const gSold = lzSold + evSold;
@@ -901,6 +913,20 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
                 return hotelSum + months.reduce((sum, m) => sum + (hotelBudget?.[rowId]?.[m - 1] || 0), 0);
             }, 0);
 
+        // "Aptos disponíveis" (avail) = capacidade × dias, mas só é uma multiplicação válida MÊS A
+        // MÊS — soma o PRODUTO de cada mês (não a soma de capacidades vezes a soma de dias, que
+        // infla o resultado quando mais de 1 mês está selecionado). Vira o `__availOverride_*` que
+        // `recalculateReal` usa em vez de recalcular via cap×dias quando presente.
+        const sumAvailAcross = (months: number[]) =>
+            hotelsToUse.reduce((hotelSum, hotelName) => {
+                const hotelBudget = getBudgetDataForHotel(hotelName);
+                return hotelSum + months.reduce((sum, m) => {
+                    const cap = hotelBudget?.['geral_capacity']?.[m - 1] ?? hotelBudget?.['lazer_capacity']?.[m - 1] ?? 0;
+                    const days = hotelBudget?.['days_month']?.[m - 1] || 0;
+                    return sum + cap * days;
+                }, 0);
+            }, 0);
+
         const sumRealAcross = (rowId: string, suffix: 'forecast' | 'previa', months: number[]) =>
             hotelsToUse.reduce((hotelSum, hotelName) => {
                 const hotelRealVersionId = getRealVersionIdForHotel(hotelName);
@@ -979,10 +1005,14 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
         // instead of being (wrongly) summed directly.
         const accumulatedReal = useMemo(() => {
             const agg: Record<string, number> = {};
+            const availSum = sumAvailAcross(accumMonths);
             (['forecast', 'previa'] as const).forEach(s => {
                 // Fixed fields: forecast/previa always mirror the Meta sum, same as the single-month rule.
                 agg[`days_month_${s}`] = sumMetaAcross('days_month', accumMonths);
                 agg[`geral_capacity_${s}`] = sumMetaAcross('geral_capacity', accumMonths);
+                // Avail somado mês a mês (ver sumAvailAcross) — não deixa recalculateReal
+                // recalcular via cap×dias já somados (isso infla o resultado quando >1 mês).
+                agg[`__availOverride_${s}`] = availSum;
                 OCCUPANCY_BASE_FIELDS.forEach(f => { agg[`${f}_${s}`] = sumRealAcross(f, s, accumMonths); });
             });
             return recalculateReal(agg);
@@ -1006,11 +1036,14 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
                 }, 0);
 
             const agg: Record<string, number> = {};
+            const availSum = sumAvailAcross(accumMonths);
             (['forecast', 'previa'] as const).forEach(s => {
                 // Same fallback as the "Ocupação" tab: capacity/days reuse the CURRENT year's
                 // Meta, since a prior year's Meta isn't tracked as a separate figure here.
                 agg[`days_month_${s}`] = sumMetaAcross('days_month', accumMonths);
                 agg[`geral_capacity_${s}`] = sumMetaAcross('geral_capacity', accumMonths);
+                // Mesmo motivo de accumulatedReal — avail somado mês a mês, não Σcap × Σdias.
+                agg[`__availOverride_${s}`] = availSum;
                 OCCUPANCY_BASE_FIELDS.forEach(f => { agg[`${f}_${s}`] = sumRealAcrossLY(f, s); });
             });
             return recalculateReal(agg);
