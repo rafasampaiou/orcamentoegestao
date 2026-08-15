@@ -868,11 +868,17 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
 
         // budgetData (Meta) is scoped to whichever budget version is currently active, which
         // only matches ONE hotel (the global one). For any OTHER hotel in the filter, look up
-        // that hotel's own "main" budget version to get its Meta figures instead.
+        // that hotel's own budget version to get its Meta figures instead — versão "isMain"
+        // primeiro, mas com fallback pra QUALQUER versão desse hotel (mesmos 2 níveis de
+        // `getRealVersionIdForHotel` logo abaixo). Sem o fallback, um hotel cuja versão de Budget
+        // não estivesse marcada como principal ficava com Meta (e tudo que deriva dela: Dias do
+        // Mês, Quartos, Aptos Disponíveis) sempre zerado no comparativo, mesmo tendo dado — só o
+        // hotel ativo no menu principal (que usa `budgetData` direto, sem essa busca) escapava.
         const getBudgetDataForHotel = (hotelName: string): Record<string, number[]> => {
             if (hotelName === selectedHotel) return budgetData || {};
             const hotel = hotels?.find(h => h.name === hotelName);
-            const version = budgetVersions?.find(v => v.isMain && (v.hotelId === hotel?.code || v.hotelId === hotel?.id || v.hotel === hotelName));
+            const version = budgetVersions?.find(v => v.isMain && (v.hotelId === hotel?.code || v.hotelId === hotel?.id || v.hotel === hotelName))
+                || budgetVersions?.find(v => v.hotelId === hotel?.code || v.hotelId === hotel?.id || v.hotel === hotelName);
             return (version && budgetOccupancyDataMap?.[version.id]) || {};
         };
 
