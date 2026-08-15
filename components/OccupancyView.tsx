@@ -991,8 +991,9 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             const lyYear = (selectedYear || 0) - 1;
             const sumRealAcrossLY = (rowId: string, suffix: 'forecast' | 'previa') =>
                 hotelsToUse.reduce((hotelSum, hotelName) => {
+                    const hotelRealVersionId = getRealVersionIdForHotel(hotelName);
                     return hotelSum + accumMonths.reduce((sum, m) => {
-                        const key = `${hotelName}_${lyYear}_${m}_${activeRealVersionId || ''}`;
+                        const key = `${hotelName}_${lyYear}_${m}_${hotelRealVersionId}`;
                         const monthData = realOccupancyData?.[key] || {};
                         return sum + (monthData[`${rowId}_${suffix}`] || 0);
                     }, 0);
