@@ -1205,6 +1205,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     const [highlightRowId, setHighlightRowId] = useState<string | null>(null);
     // Resumo mostrado no passo 7 (Validar informações) do timeline.
     const [showValidationSummaryModal, setShowValidationSummaryModal] = useState(false);
+    // "Salvar Projeção" pulsa devagar (3x, ~45 bpm) por alguns segundos assim que o usuário marca
+    // o passo 7 (Validar informações) como concluído — convite visual pra não esquecer o passo 8.
+    const [pulseSaveButton, setPulseSaveButton] = useState(false);
     const toggleValidadoManual = () => {
         if (!setRealOccupancyData) return;
         setRealOccupancyData(prev => {
@@ -1427,6 +1430,16 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         } else if (index === 7) {
             onResetValidation?.(selectedHotel || '', selectedYear || 0, selectedMonth || 0, activeProjectionType || 'Reunião de Ritmo');
         }
+    };
+
+    // Reabrir uma versão já concluída pra edição implica, quase sempre, que ela vai precisar ser
+    // validada/salva de novo — reseta os passos 7 (Validar informações) e 8 (Salvar projeção) do
+    // Status da prévia junto com o desbloqueio, em vez de deixar os dois marcados como já feitos
+    // enquanto o usuário mexe em algo que ainda não foi revalidado.
+    const handleReopenForEdit = () => {
+        setForceUnlockValidated(true);
+        handleOtbStepReset(6);
+        handleOtbStepReset(7);
     };
 
     const handleSaveResultsDirectly = () => {
@@ -1738,9 +1751,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             isMeetingVersionCompleted && !forceUnlockValidated ? (
                                 canValidate && (
                                     <button
-                                        onClick={() => setForceUnlockValidated(true)}
+                                        onClick={handleReopenForEdit}
                                         className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors shadow-sm text-base font-bold"
-                                        title="Clique para reabrir esta versão para edição"
+                                        title="Clique para reabrir esta versão para edição — os passos Validar informações e Salvar projeção voltam a ficar pendentes"
                                     >
                                         <Lock size={20} />
                                         Versão concluída (clique para editá-la)
@@ -1763,7 +1776,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 canValidate && (
                                     <button
                                         onClick={handleSaveResultsDirectly}
-                                        className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-md text-base font-bold"
+                                        className={`flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-md text-base font-bold ${pulseSaveButton ? 'animate-[pulse_1.33s_ease-in-out_3]' : ''}`}
                                         title="Salva o progresso mesmo sem terminar todas as etapas — pode continuar depois"
                                     >
                                         <CheckCircle2 size={20} />
@@ -3191,7 +3204,17 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                         <div className="flex justify-end items-center gap-3 px-6 py-4 border-t border-gray-200">
                             <button onClick={() => setShowValidationSummaryModal(false)} className="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-lg">Fechar</button>
                             <button
-                                onClick={() => { toggleValidadoManual(); setShowValidationSummaryModal(false); }}
+                                onClick={() => {
+                                    const wasValidated = !!realOccupancyData[otbContextKey]?.['__validado_manual'];
+                                    toggleValidadoManual();
+                                    setShowValidationSummaryModal(false);
+                                    // Só pulsa ao MARCAR como validado (não ao desmarcar) — convite
+                                    // pra não esquecer de "Salvar Projeção" logo em seguida.
+                                    if (!wasValidated) {
+                                        setPulseSaveButton(true);
+                                        setTimeout(() => setPulseSaveButton(false), 4000);
+                                    }
+                                }}
                                 className="px-5 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg"
                             >
                                 {realOccupancyData[otbContextKey]?.['__validado_manual'] ? 'Desmarcar validado' : 'Marcar como validado'}
