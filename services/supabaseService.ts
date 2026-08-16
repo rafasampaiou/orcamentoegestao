@@ -1,5 +1,5 @@
 import { supabase, SITE_URL } from './supabaseClient';
-import { Account, CostCenter, Hotel, BudgetVersion, User, GMDConfiguration, UserRole, ImportedRow, KpiCalculation, ValidationRecord } from '../types';
+import { Account, CostCenter, Hotel, BudgetVersion, User, GMDConfiguration, UserRole, ImportedRow, KpiCalculation, ValidationRecord, PermissionMatrix } from '../types';
 
 // Supabase/PostgREST caps rows per request (default 1000) regardless of .limit(),
 // so tables that can exceed that must be paged with .range() to retrieve every row.
@@ -548,7 +548,7 @@ export const supabaseService = {
   // ═══════════════════════════════════════════════════════════════════════════
   // PERMISSIONS (Matriz de Permissões)
   // ═══════════════════════════════════════════════════════════════════════════
-  async getPermissions(): Promise<Record<string, Record<string, Record<UserRole, boolean>>>> {
+  async getPermissions(): Promise<PermissionMatrix> {
     const { data, error } = await supabase
       .from('permissions')
       .select('*');

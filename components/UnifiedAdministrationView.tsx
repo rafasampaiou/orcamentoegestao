@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { getForecastData, normalizeAccountName } from '../services/mockData';
 import { Plus, Trash2, X, Save, Briefcase, Pencil, Calendar, PieChart, Lock, Settings as SettingsIcon, Users, Search, Upload, Settings, Eye, FileText, Layout, Info, ChevronUp, GripVertical, Database, BedDouble, DollarSign, Target, LayoutList, ArrowUp, ArrowDown, Copy, Loader2 } from 'lucide-react';
-import { User, UserRole, CostCenter, ImportedRow, Hotel, Account, BudgetVersion, LaborParameters, ScheduleItem, ImportedCostCenter, CostPackage, GMDConfiguration, ViewState, DreSection, HotelCategory, HotelRegion, ImportedAccount, KpiCalculation, userRoles, hasRole } from '../types';
+import { User, UserRole, CostCenter, ImportedRow, Hotel, Account, BudgetVersion, LaborParameters, ScheduleItem, ImportedCostCenter, CostPackage, GMDConfiguration, ViewState, DreSection, HotelCategory, HotelRegion, ImportedAccount, KpiCalculation, PermissionMatrix, userRoles, hasRole } from '../types';
 import { getDreReferenceOptions } from '../utils/dreReferences';
 import KpiCalculationEditor from './KpiCalculationEditor';
 import TimelineView from './TimelineView';
@@ -795,7 +795,19 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     { id: '2', userId: 'u2', userName: 'Ana Souza', userUnit: 'Tauá Resort Atibaia', action: 'Criou Nova Versão GMD', timestamp: new Date(Date.now() - 86400000).toISOString() }
   ]);
 
-  const [permissionsMatrix, setPermissionsMatrix] = useState<Record<string, Record<string, Record<UserRole, boolean>>>>({
+  // Catálogo de permissões: cada linha nova usa `rolesFor(...)` (lista só os perfis que já podem
+  // fazer aquilo HOJE de verdade no código, via `hasRole`/gate de tela — não é uma restrição nova
+  // inventada, é uma foto do comportamento atual) em vez de escrever os 7 campos por extenso, pra
+  // ficar rápido de estender. IMPORTANTE: sempre que uma função/ação nova for adicionada ao
+  // sistema, adicionar também uma linha aqui (ver memória do projeto sobre isso).
+  const ALL_ROLES = Object.values(UserRole);
+  const rolesFor = (...trueRoles: UserRole[]): Record<UserRole, boolean> => {
+    const map = {} as Record<UserRole, boolean>;
+    ALL_ROLES.forEach(r => { map[r] = trueRoles.includes(r); });
+    return map;
+  };
+
+  const [permissionsMatrix, setPermissionsMatrix] = useState<PermissionMatrix>({
     'GMD': {
       'Criar Nova Versão GMD': {
         [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false,
@@ -811,7 +823,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         [UserRole.ADMIN]: true, [UserRole.DIRETORIA]: false,
         [UserRole.ENTITY_MANAGER]: true, [UserRole.PACKAGE_MANAGER]: true, [UserRole.AREA_MANAGER]: true,
         [UserRole.COST_ANALYST]: true, [UserRole.AREA_ANALYST]: true
-      }
+      },
+      'Confirmar Conclusão / Marcar Atrasado (Plano de Ação)': rolesFor(UserRole.ADMIN, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST),
+      'Salvar Progresso da Execução (Plano de Ação)': rolesFor(UserRole.ADMIN, UserRole.ENTITY_MANAGER, UserRole.PACKAGE_MANAGER, UserRole.AREA_MANAGER, UserRole.COST_ANALYST, UserRole.AREA_ANALYST)
     },
     'Cadastros e Configurações': {
       'Tabela de Usuários': {
@@ -829,19 +843,90 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         [UserRole.ENTITY_MANAGER]: false, [UserRole.PACKAGE_MANAGER]: false, [UserRole.AREA_MANAGER]: false,
         [UserRole.COST_ANALYST]: true, [UserRole.AREA_ANALYST]: false
       }
-    }
+    },
+    'DRE Forecast': {
+      'Editar Valores da Prévia/Real (contas, pacotes, indicadores)': rolesFor(UserRole.ADMIN, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST, UserRole.PACKAGE_MANAGER),
+      'Calcular Forecast / Iniciar Projeção': rolesFor(UserRole.ADMIN, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST, UserRole.PACKAGE_MANAGER),
+      'Salvar Projeção / Validar Fechamento': rolesFor(UserRole.ADMIN, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST),
+      'Reabrir Versão Validada para Edição': rolesFor(UserRole.ADMIN, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST),
+      'Selecionar Versão "Realizado"': rolesFor(UserRole.ADMIN),
+      'Gerar Apresentação (Google Slides)': rolesFor(UserRole.ADMIN, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST),
+      'Editar Comentários nas Células': rolesFor(...ALL_ROLES),
+    },
+    'Ocupação': {
+      'Editar Ocupação (Real/Prévia)': rolesFor(UserRole.ADMIN, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST),
+      'Salvar / Limpar Dados de Ocupação': rolesFor(UserRole.ADMIN, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST),
+    },
+    'Tabela de GOP': {
+      'Gerar PDF da Tabela de GOP': rolesFor(...ALL_ROLES),
+      'Usar Modo Projeção (Simulação WHAT IF)': rolesFor(...ALL_ROLES),
+    },
+    'Validações': {
+      'Acessar Tela de Validações': rolesFor(UserRole.ADMIN),
+    },
+    'Administração — Acesso': {
+      'Acessar Área de Administração': rolesFor(UserRole.ADMIN),
+    },
+    'Administração — Usuários': {
+      'Gerenciar Usuários (criar/editar/excluir)': rolesFor(UserRole.ADMIN),
+    },
+    'Administração — Hotéis': {
+      'Gerenciar Hotéis, Categorias e Regiões': rolesFor(UserRole.ADMIN),
+    },
+    'Administração — Setores': {
+      'Gerenciar Setores (Centros de Custo)': rolesFor(UserRole.ADMIN),
+    },
+    'Administração — Plano de Contas e Pacotes': {
+      'Gerenciar Plano de Contas e Pacotes': rolesFor(UserRole.ADMIN),
+      'Configurar Estrutura da DRE': rolesFor(UserRole.ADMIN),
+    },
+    'Administração — GMD (Configurações)': {
+      'Gerenciar Configurações de GMD': rolesFor(UserRole.ADMIN),
+    },
+    'Administração — Permissões': {
+      'Editar Matriz de Permissões': rolesFor(UserRole.ADMIN),
+    },
+    'Administração — Importação': {
+      'Importar Despesas / Receitas / Impostos (Real e Budget)': rolesFor(UserRole.ADMIN),
+      'Importar Ocupação': rolesFor(UserRole.ADMIN),
+      'Importar Plano de Contas / Setores (balancete, CSV)': rolesFor(UserRole.ADMIN),
+      'Editar ou Excluir Importação Existente': rolesFor(UserRole.ADMIN),
+    },
+    'Administração — Versões': {
+      'Criar Nova Versão (Real ou Budget)': rolesFor(UserRole.ADMIN),
+      'Tornar Versão Principal': rolesFor(UserRole.ADMIN),
+      'Bloquear / Desbloquear Versão': rolesFor(UserRole.ADMIN),
+      'Excluir Versão': rolesFor(UserRole.ADMIN),
+      'Replicar Orçamento': rolesFor(UserRole.ADMIN),
+    },
+    'Administração — Logs': {
+      'Acessar Logs de Importação': rolesFor(UserRole.ADMIN),
+    },
   });
 
 
-  // Load permissions matrix from Supabase
+  // Load permissions matrix from Supabase — MESCLA por cima do catálogo do código, nunca
+  // substitui o estado inteiro. O catálogo (quais categorias/ações existem) sempre vem do código;
+  // só os valores marcados/desmarcados de cada célula vêm do banco quando já tiverem sido salvos.
+  // Sem isso, toda vez que uma categoria/ação nova fosse adicionada aqui no código, abrir esta aba
+  // sobrescreveria o estado com a matriz ANTIGA (menor) já salva no Supabase, fazendo o catálogo
+  // novo sumir da tela até alguém salvar de novo. Categoria/ação que exista no banco mas não exista
+  // mais no catálogo do código é ignorada (mesma ideia do filtro de "Orçamento" que já existia).
   React.useEffect(() => {
     const loadPerms = async () => {
       try {
-        const matrix = await supabaseService.getPermissions();
-        if (Object.keys(matrix).length > 0) {
-          // Remove Orçamento from loaded matrix
-          const { Orçamento, ...filteredMatrix } = matrix as any;
-          setPermissionsMatrix(filteredMatrix);
+        const saved = await supabaseService.getPermissions();
+        if (Object.keys(saved).length > 0) {
+          setPermissionsMatrix(prevCatalog => {
+            const merged: PermissionMatrix = {};
+            Object.entries(prevCatalog).forEach(([category, actions]) => {
+              merged[category] = {};
+              Object.entries(actions).forEach(([action, defaultRoles]) => {
+                merged[category][action] = saved[category]?.[action] || defaultRoles;
+              });
+            });
+            return merged;
+          });
         }
       } catch (e) {
         console.error("Failed to load permissions", e);
