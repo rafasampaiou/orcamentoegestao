@@ -3,6 +3,7 @@ import { Account, CostPackage, Hotel, ImportedRow, ProjectionType, ForecastRow }
 import { buildForecastRows, formatValue, formatPointsDiff, parseNum } from './ForecastTable';
 import { normalizeAccountName } from '../services/mockData';
 import { supabaseService } from '../services/supabaseService';
+import LoadingPanel from './LoadingPanel';
 import toast from 'react-hot-toast';
 
 interface AnaliseABViewProps {
@@ -562,7 +563,11 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                     </p>
                 )}
 
-                {isLoading && <div data-slide-loading-indicator="true" className="py-6 text-center text-gray-400 italic text-sm">Carregando...</div>}
+                {isLoading && (
+                    <div data-slide-loading-indicator="true">
+                        <LoadingPanel label="Carregando Análise de A&B..." minHeight={220} />
+                    </div>
+                )}
 
                 <div>
                     <TableShell>
