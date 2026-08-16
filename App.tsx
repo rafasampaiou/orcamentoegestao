@@ -19,6 +19,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import Header from './components/Header';
 import Auth from './components/Auth';
 import DefinePasswordView from './components/DefinePasswordView';
+import LoadingScreen from './components/LoadingScreen';
 import ValidationsView from './components/ValidationsView';
 import { supabase } from './services/supabaseClient';
 import { supabaseService } from './services/supabaseService';
@@ -1572,6 +1573,12 @@ const App: React.FC = () => {
 
   if (!session) {
     return <Auth />;
+  }
+
+  // Dados iniciais (hotéis, contas, financeiro etc.) ainda não chegaram do Supabase — sem isso,
+  // a tela renderizava na hora com tudo zerado e só preenchia alguns segundos depois.
+  if (!profilesLoaded) {
+    return <LoadingScreen />;
   }
 
   // Authenticated with Supabase but no matching row in `profiles` — this can happen with
