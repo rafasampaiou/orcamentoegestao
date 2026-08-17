@@ -27,6 +27,7 @@ export const DEFAULT_PERMISSIONS_MATRIX: PermissionMatrix = {
     'Configuração de Setores (CR/PDV)': rolesFor(UserRole.ADMIN, UserRole.COST_ANALYST),
   },
   'DRE Forecast': {
+    'Criar Nova Reunião (Prévia)': rolesFor(UserRole.ADMIN, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST, UserRole.PACKAGE_MANAGER),
     'Editar Valores da Prévia/Real (contas, pacotes, indicadores)': rolesFor(UserRole.ADMIN, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST, UserRole.PACKAGE_MANAGER),
     'Calcular Forecast / Iniciar Projeção': rolesFor(UserRole.ADMIN, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST, UserRole.PACKAGE_MANAGER),
     'Salvar Projeção / Validar Fechamento': rolesFor(UserRole.ADMIN, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST),

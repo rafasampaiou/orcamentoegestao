@@ -483,7 +483,34 @@ export interface RevenueDriverConfig {
 
 // 'Realizado' é a versão que representa o dado real já existente hoje (o balde original, sem
 // sufixo, da aba Ocupação) — só o ADMIN pode selecioná-la/salvá-la na DRE Forecast.
-export type ProjectionType = 'Reunião de Ritmo' | 'FCA N1' | 'FCA N2' | 'Fechamento oficial' | 'Realizado';
+//
+// ProjectionType NÃO é mais uma union fixa — cada "reunião" criada pelo usuário (ver `Meeting`
+// abaixo) tem um ID único, e é esse ID (nunca o nome/categoria) que circula como
+// `activeProjectionType`/`ValidationRecord.projectionType` pelo app inteiro (junto com o literal
+// fixo 'Realizado', que continua como está). O tipo fica `string` de propósito — mantém o MESMO
+// nome em ~10 arquivos que já tipam props como `ProjectionType` sem precisar re-tipar nada.
+export type ProjectionType = string;
+
+// Categoria/nome escolhido no popup "Criar nova reunião" — usado só como CLASSIFICAÇÃO/exibição
+// (rótulo do dropdown, filtro em ValidationsView etc.), NUNCA como chave de armazenamento — isso
+// é papel do `Meeting.id`. Ver utils/meetings.ts pra resolver um `ProjectionType` (id) de volta
+// pro `MeetingKind` correspondente.
+export type MeetingKind = 'Reunião de Ritmo' | 'FCA N1' | 'FCA N2' | 'Fechamento' | 'Prévia';
+
+// Uma "reunião"/prévia criada pelo usuário pra um hotel/mês/ano — substitui a lista fixa antiga
+// de 5 nomes. Pode existir mais de uma por mês, inclusive repetindo `kind` (datas diferentes).
+export interface Meeting {
+    id: string;              // mtg_<slug-hotel>_<ano>_<mes>_<random> — é isso que vira ProjectionType
+    hotelId: string;         // nome do hotel (mesma convenção de ValidationRecord.hotelId)
+    year: number;
+    month: number;           // 1-12
+    meetingDate: string;     // 'YYYY-MM-DD'
+    kind: MeetingKind;
+    displayLabel: string;    // kind literal, ou "Prévia de DD/MM/AAAA" pro kind 'Prévia'
+    createdByUserId?: string;
+    createdByUserName?: string;
+    createdAt: string;
+}
 
 export interface ValidationRecord {
     id: string;
@@ -493,6 +520,12 @@ export interface ValidationRecord {
     month: number;
     year: number;
     projectionType: ProjectionType;
+    // Denormalizado na hora de salvar (ver ForecastTable.tsx confirmSaveResults) — só pra
+    // exibição/filtro (ex.: ValidationsView), nunca comparado como chave. undefined quando
+    // projectionType === 'Realizado'.
+    meetingKind?: MeetingKind;
+    meetingLabel?: string;
+    meetingDate?: string;
     validatedAt: string;
     status: 'Validado' | 'Em construção';
 }

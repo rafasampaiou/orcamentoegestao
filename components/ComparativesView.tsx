@@ -114,13 +114,15 @@ const groupConsecutiveMonths = (months: number[], labelFor: (m: number) => strin
     return out;
 };
 const ALL_MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-// Ordem de "mais avançado" — usada pra achar, dado um mês já validado em mais de uma versão
-// (raro, mas possível), qual delas prevalece.
-const PROJECTION_RANK: ProjectionType[] = ['Realizado', 'Fechamento oficial', 'FCA N1', 'FCA N2', 'Reunião de Ritmo'];
+// Ranking usado só pra registros legados (de antes da migração pra reuniões dinâmicas) que ainda
+// tenham o nome literal salvo em `projectionType` em vez de um `meetingDate` — ver
+// `findValidatedVersion` abaixo, que resolve o caso normal por data, não por nome.
+const LEGACY_PROJECTION_RANK: ProjectionType[] = ['Fechamento oficial', 'FCA N1', 'FCA N2', 'Reunião de Ritmo'];
 // A tela não tem mais filtro de Versão — pra meses sem nenhuma versão validada, o valor usado é a
 // Meta, que não depende de qual ProjectionType é passado pra buildForecastRows; esse valor é só
-// pra satisfazer a assinatura da função.
-const DEFAULT_PROJECTION_TYPE: ProjectionType = 'Reunião de Ritmo';
+// pra satisfazer a assinatura da função. Não existe mais um nome fixo de "versão padrão" (as
+// reuniões agora são dinâmicas), então fica vazio mesmo.
+const DEFAULT_PROJECTION_TYPE: ProjectionType = '';
 
 // "João Pessoa" entra 2x na ordem final (ver montagem de gopBlocks): uma vez como hotel próprio,
 // e o hotel some/entra na comparação do "Grupo" x "Grupo com JP" — pedido explícito do usuário
@@ -265,7 +267,20 @@ const ComparativesView: React.FC<ComparativesViewProps> = ({
     const findValidatedVersion = (hotelId: string, month: number): ProjectionType | null => {
         const matches = (validations || []).filter(v => v.hotelId === hotelId && v.year === selectedYear && v.month === month && v.status === 'Validado');
         if (matches.length === 0) return null;
-        return PROJECTION_RANK.find(rank => matches.some(v => v.projectionType === rank)) || null;
+        // 'Realizado' não tem meetingDate (é sempre 1 por hotel/mês) e prevalece sobre qualquer
+        // reunião validada no mesmo mês — mesma prioridade que já tinha como 1º item do ranking
+        // antigo por nome.
+        const realizado = matches.find(v => v.projectionType === 'Realizado');
+        if (realizado) return realizado.projectionType;
+        // Caso normal (reuniões dinâmicas): a reunião validada mais recente (maior meetingDate)
+        // prevalece — não dá mais pra rankear por nome, já que projectionType agora é um ID opaco.
+        const withDate = matches.filter(v => v.meetingDate);
+        if (withDate.length > 0) {
+            return withDate.sort((a, b) => (b.meetingDate as string).localeCompare(a.meetingDate as string))[0].projectionType;
+        }
+        // Fallback só pra registros legados sem meetingDate (de antes desta migração) — mantém o
+        // ranking antigo por nome, já que projectionType deles ainda é o nome literal.
+        return LEGACY_PROJECTION_RANK.find(rank => matches.some(v => v.projectionType === rank)) || matches[0].projectionType;
     };
     // Resolve qual versão usar pra um hotel+mês: Realizado (se tiver dado importado direto)
     // primeiro; senão, a versão de reunião mais avançada já validada; senão, nenhuma (o mês entra

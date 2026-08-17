@@ -24,8 +24,9 @@ import ValidationsView from './components/ValidationsView';
 import { supabase } from './services/supabaseClient';
 import { supabaseService } from './services/supabaseService';
 import { Session } from '@supabase/supabase-js';
-import { ViewState, ImportedRow, User, Hotel, HotelCategory, HotelRegion, CostCenter, CostPackage, Account, GMDConfiguration, ModuleType, UserRole, BudgetVersion, LaborParameters, ScheduleItem, ProjectionType, ValidationRecord, DreSection, KpiCalculation, hasRole, hasPermission, PermissionMatrix } from './types';
+import { ViewState, ImportedRow, User, Hotel, HotelCategory, HotelRegion, CostCenter, CostPackage, Account, GMDConfiguration, ModuleType, UserRole, BudgetVersion, LaborParameters, ScheduleItem, ProjectionType, ValidationRecord, DreSection, KpiCalculation, hasRole, hasPermission, PermissionMatrix, Meeting } from './types';
 import { DEFAULT_PERMISSIONS_MATRIX, mergePermissionsMatrix } from './utils/permissionsCatalog';
+import { resolveMeetingKind, getMeetingLabel, LEGACY_MEETING_VALUES } from './utils/meetings';
 import { SLIDES_CAPTURE_TARGETS } from './utils/slidesCaptureTargets';
 import { captureSlideTarget, getPngBlobSize } from './utils/captureElement';
 import {
@@ -36,22 +37,29 @@ import { Calendar, ArrowLeft, ArrowRight, Building2 as Building2Icon, Layers } f
 import { mockUsers, mockHotels, mockCostCenters, mockPackages, mockAccounts, mockGMDConfigs } from './services/mockData';
 import { Toaster, toast } from 'react-hot-toast';
 
-const PROJECTION_TYPES: ProjectionType[] = ['Reunião de Ritmo', 'FCA N1', 'FCA N2', 'Fechamento oficial'];
-
 // Reads OccupancyView's `${hotel}_${year}_${month}_${versionId}__${projectionType}` in-memory
 // keys and rebuilds the `__projections` snapshot to merge back into a real BudgetVersion's
 // `occupancy_data` JSONB on save. Always rebuilt from the FULL realOccupancyData map — never
 // only when a projection version happens to be the one currently selected on screen — so a
-// plain Realizado edit/save never clobbers previously saved Reunião de Ritmo/FCA N1/FCA N2/
-// Fechamento history.
+// plain Realizado edit/save never clobbers previously saved reunião/Fechamento history.
+// Sonda tanto os IDs de reunião dinâmicos (qualquer `Meeting` desse hotel+ano, de qualquer mês —
+// cada um só vai ter dado de fato no mês a que pertence) quanto as 4 strings LEGADAS de antes
+// desta migração (`LEGACY_MEETING_VALUES`) — sem isso, um save feito depois da migração
+// reconstruiria o snapshot só com os IDs novos e perderia silenciosamente dado antigo ainda em
+// memória.
 function buildProjectionsSnapshot(
   realOccMap: Record<string, Record<string, number>>,
   hotel: string,
   year: number,
-  versionId: string
+  versionId: string,
+  meetings: Meeting[]
 ): Record<string, Record<string, (number | null)[]>> {
   const projections: Record<string, Record<string, (number | null)[]>> = {};
-  PROJECTION_TYPES.forEach(pt => {
+  const probeValues = [
+    ...meetings.filter(m => m.hotelId === hotel && m.year === year).map(m => m.id),
+    ...LEGACY_MEETING_VALUES,
+  ];
+  probeValues.forEach(pt => {
     const rowsForType: Record<string, (number | null)[]> = {};
     let hasAny = false;
     for (let i = 0; i < 12; i++) {
@@ -74,18 +82,24 @@ function buildProjectionsSnapshot(
 }
 
 // OTB (On the books) — mesma ideia de buildProjectionsSnapshot, mas lendo a chave com o sufixo
-// extra "__OTB" (Reunião de Ritmo/FCA N1/FCA N2, cada uma com seu próprio OTB isolado;
-// Fechamento oficial não tem OTB). Guardado num campo IRMÃO (__otbProjections), não aninhado
-// dentro de __projections, pra não quebrar o formato Record<rowId, number[12]> que já existe lá.
-const OTB_VERSIONS: ProjectionType[] = ['Reunião de Ritmo', 'FCA N1', 'FCA N2'];
+// extra "__OTB". Antes desta migração só Reunião de Ritmo/FCA N1/FCA N2 tinham OTB (Fechamento
+// oficial não tinha) — agora TODA reunião criada tem o fluxo completo de OTB (decisão do usuário),
+// então sonda qualquer `Meeting` do hotel+ano, sem exceção de kind, junto das 3 strings legadas
+// que já tinham OTB antes. Guardado num campo IRMÃO (__otbProjections), não aninhado dentro de
+// __projections, pra não quebrar o formato Record<rowId, number[12]> que já existe lá.
 function buildOtbProjectionsSnapshot(
   realOccMap: Record<string, Record<string, number>>,
   hotel: string,
   year: number,
-  versionId: string
+  versionId: string,
+  meetings: Meeting[]
 ): Record<string, Record<string, (number | null)[]>> {
   const projections: Record<string, Record<string, (number | null)[]>> = {};
-  OTB_VERSIONS.forEach(pt => {
+  const probeValues = [
+    ...meetings.filter(m => m.hotelId === hotel && m.year === year).map(m => m.id),
+    'Reunião de Ritmo', 'FCA N1', 'FCA N2', // legado — Fechamento oficial nunca teve OTB
+  ];
+  probeValues.forEach(pt => {
     const rowsForType: Record<string, (number | null)[]> = {};
     let hasAny = false;
     for (let i = 0; i < 12; i++) {
@@ -156,8 +170,15 @@ const App: React.FC = () => {
   const [projectedBudgetVersionId] = useState<string>('v2');
   
   // --- PROJECTION TYPE STATE ---
-  const [activeProjectionType, setActiveProjectionType] = useState<ProjectionType>('Reunião de Ritmo');
+  // Sem valor fixo de fábrica — as "reuniões" agora são criadas dinamicamente (ver `meetings`
+  // abaixo), então não existe mais um "Reunião de Ritmo" que já exista de saída. Fica vazio até
+  // o usuário escolher uma reunião existente ou criar uma nova (ForecastTable abre o popup de
+  // criação sozinho quando não há nenhuma reunião pro hotel/mês/ano selecionado).
+  const [activeProjectionType, setActiveProjectionType] = useState<ProjectionType>('');
   const [validations, setValidations] = useState<ValidationRecord[]>([]);
+  // Reuniões dinâmicas da "Versão do Forecast" (substituem a lista fixa de 5 nomes) — carregadas
+  // 1x no boot, junto de `validations`.
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
   // Sinalizado pelo wizard "Iniciar Projeção" (OTB) na DRE Forecast — semeia o modo "On the
   // books" já ligado ao chegar na Ocupação, mesmo mecanismo de activeProjectionType semeando
   // `period` lá.
@@ -165,6 +186,9 @@ const App: React.FC = () => {
   // Mês que estava ativo na DRE Forecast no momento de "Iniciar Projeção" — semeia o filtro de
   // meses da aba Ocupação, já mostrando só o mês em questão em vez dos 12.
   const [occupancyNavMonth, setOccupancyNavMonth] = useState<number | null>(null);
+  // Sinalizado pelo "Iniciar Fechamento" (Realizado) — pede pra Administração → Importação já
+  // abrir direto na sub-aba de Despesas.
+  const [importNavSignal, setImportNavSignal] = useState<'expenses' | undefined>(undefined);
 
   // --- REAL VERSIONING STATE ---
   const [realVersions, setRealVersions] = useState<BudgetVersion[]>([]);
@@ -325,8 +349,8 @@ const App: React.FC = () => {
         // Sempre reconstrói __projections a partir do mapa completo — independente de qual
         // Versão do Forecast está selecionada na tela agora — para nunca apagar o histórico de
         // Reunião de Ritmo/FCA N1/FCA N2/Fechamento com um autosave disparado por uma edição comum.
-        const projections = buildProjectionsSnapshot(realOccupancyDataRef.current, selectedHotel, selectedDate.getFullYear(), activeRealVersionId);
-        const otbProjections = buildOtbProjectionsSnapshot(realOccupancyDataRef.current, selectedHotel, selectedDate.getFullYear(), activeRealVersionId);
+        const projections = buildProjectionsSnapshot(realOccupancyDataRef.current, selectedHotel, selectedDate.getFullYear(), activeRealVersionId, meetings);
+        const otbProjections = buildOtbProjectionsSnapshot(realOccupancyDataRef.current, selectedHotel, selectedDate.getFullYear(), activeRealVersionId, meetings);
         const finalOccupancyData: any = { ...occupancyDataToSave, __projections: projections, __otbProjections: otbProjections };
 
         if (hasData || Object.keys(occupancyDataToSave).length > 0 || Object.keys(projections).length > 0) {
@@ -335,7 +359,7 @@ const App: React.FC = () => {
       }
     }, 2000);
     return () => clearTimeout(timeout);
-  }, [realOccupancyData, activeRealVersionId, selectedHotel, selectedDate, realVersions, activeBudgetVersionId]);
+  }, [realOccupancyData, activeRealVersionId, selectedHotel, selectedDate, realVersions, activeBudgetVersionId, meetings]);
 
   // --- REGISTRY STATE (LIFTED FROM SETTINGS) ---
   // This ensures data persists when switching tabs
@@ -509,7 +533,8 @@ const App: React.FC = () => {
           remoteRegions,
           remoteVersions,
           remoteFinancial,
-          remotePermissions
+          remotePermissions,
+          remoteMeetings
         ] = await Promise.all([
           supabaseService.getHotels(),
           supabaseService.getCostCenters(),
@@ -537,6 +562,13 @@ const App: React.FC = () => {
           supabaseService.getPermissions().catch(permError => {
             console.warn('Could not fetch permissions from Supabase.', permError);
             return {} as PermissionMatrix;
+          }),
+          // Reuniões dinâmicas da "Versão do Forecast" — mesmo padrão defensivo: uma falha aqui
+          // não pode travar o boot; sem nenhuma reunião carregada, o pior caso é o popup de
+          // criação abrir de novo (nada é perdido, os dados legados continuam com fallback).
+          supabaseService.getMeetings().catch(meetingsError => {
+            console.warn('Could not fetch meetings from Supabase.', meetingsError);
+            return [] as Meeting[];
           })
         ]);
 
@@ -577,6 +609,7 @@ const App: React.FC = () => {
 
         if (remotePackageKpiConfigs) setPackageKpiConfigs(remotePackageKpiConfigs);
         if (remoteValidations) setValidations(remoteValidations);
+        if (remoteMeetings) setMeetings(remoteMeetings);
         if (remoteCategories) setHotelCategories(remoteCategories);
         if (remoteRegions) setHotelRegions(remoteRegions);
         setPermissionsMatrix(mergePermissionsMatrix(DEFAULT_PERMISSIONS_MATRIX, remotePermissions || {}));
@@ -831,6 +864,9 @@ const App: React.FC = () => {
       const year = selectedDate.getFullYear();
       const month = selectedDate.getMonth() + 1;
       const projectionType = activeProjectionType;
+      // Só pra EXIBIÇÃO (nome do arquivo, capa) — projectionType em si continua sendo o ID/chave
+      // de armazenamento (comboId), nunca o label.
+      const projectionLabel = getMeetingLabel(projectionType, meetings);
       const monthName = selectedDate.toLocaleString('pt-BR', { month: 'long' });
 
       const slug = (s: string) => (s || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -849,7 +885,7 @@ const App: React.FC = () => {
       const yearFolderId = await ensureDriveFolder(token, String(year), hotelFolderId);
 
       setProgress('Copiando o modelo da apresentação...');
-      const deckName = `Forecast - ${hotelName} - ${monthName} ${year} - ${projectionType} (V${versionNumber})`;
+      const deckName = `Forecast - ${hotelName} - ${monthName} ${year} - ${projectionLabel} (V${versionNumber})`;
       const { id: presentationId, url } = await copyTemplatePresentation(token, deckName, yearFolderId);
 
       const structure = await getPresentationStructure(token, presentationId);
@@ -861,7 +897,7 @@ const App: React.FC = () => {
       setProgress('Preenchendo a capa...');
       // Nomes dos placeholders assumidos no template — ajuste aqui se forem diferentes.
       await fillCoverPlaceholders(token, presentationId, {
-        '{{VERSAO}}': projectionType,
+        '{{VERSAO}}': projectionLabel,
         '{{HOTEL_DATA}}': `${hotelName} — ${new Date().toLocaleDateString('pt-BR')}`,
       });
 
@@ -979,8 +1015,8 @@ const App: React.FC = () => {
     // Mesma regra do autosave debounced: reconstrói __projections do zero, sempre, a partir do
     // mapa completo — nunca só quando a versão ativa é uma das 4 — para o salvamento manual
     // também não apagar o histórico de outras Versões do Forecast.
-    const projections = buildProjectionsSnapshot(realOccupancyData, selectedHotel, selectedDate.getFullYear(), activeRealVersionId);
-    const otbProjections = buildOtbProjectionsSnapshot(realOccupancyData, selectedHotel, selectedDate.getFullYear(), activeRealVersionId);
+    const projections = buildProjectionsSnapshot(realOccupancyData, selectedHotel, selectedDate.getFullYear(), activeRealVersionId, meetings);
+    const otbProjections = buildOtbProjectionsSnapshot(realOccupancyData, selectedHotel, selectedDate.getFullYear(), activeRealVersionId, meetings);
     const finalOccupancyData: any = { ...occupancyDataToSave, __projections: projections, __otbProjections: otbProjections };
 
     const updatedVersion = {
@@ -1244,8 +1280,8 @@ const App: React.FC = () => {
 
   const renderContent = () => {
     // Whether the month is "closed" is now controlled entirely by which Forecast version is
-    // selected — selecting "Fechamento oficial" is what marks the month as closed/official.
-    const isClosed = activeProjectionType === 'Fechamento oficial';
+    // selected — selecting a reunião do tipo "Fechamento" é o que marca o mês como fechado.
+    const isClosed = resolveMeetingKind(activeProjectionType, meetings) === 'Fechamento';
     const activeRealVersionName = realVersions.find(v => v.id === activeRealVersionId)?.name;
 
     switch (currentView) {
@@ -1378,12 +1414,15 @@ const App: React.FC = () => {
               budgetOccupancyDataMap={budgetOccupancyDataMap}
               activeProjectionType={activeProjectionType}
               setActiveProjectionType={setActiveProjectionType}
+              meetings={meetings}
+              setMeetings={setMeetings}
               validations={validations}
               setValidations={setValidations}
               currentUser={currentUser}
               permissionsMatrix={permissionsMatrix}
               onLogAction={logUserAction}
               onNavigateToOccupancy={(otbMode) => { setOtbNavSignal(!!otbMode); setOccupancyNavMonth(selectedDate.getMonth() + 1); setCurrentView('occupancy_monthly'); }}
+              onNavigateToImportacao={(tab) => { setImportNavSignal(tab); setCurrentView('admin_geral_import'); }}
               onImportData={handleImportData}
               onDeleteOtbBalancete={handleDeleteOtbBalancete}
               onResetValidation={handleResetValidation}
@@ -1424,6 +1463,9 @@ const App: React.FC = () => {
           budgetOccupancyData={budgetOccupancyDataMap[activeBudgetVersionId] || {}}
           activeProjectionType={activeProjectionType}
           setActiveProjectionType={setActiveProjectionType}
+          meetings={meetings}
+          currentUser={currentUser}
+          permissionsMatrix={permissionsMatrix}
         />
       );
       case 'occupancy_real': return (
@@ -1467,6 +1509,7 @@ const App: React.FC = () => {
           permissionsMatrix={permissionsMatrix}
           activeProjectionType={activeProjectionType}
           setActiveProjectionType={setActiveProjectionType}
+          meetings={meetings}
           initialOtbMode={otbNavSignal}
           initialSelectedMonth={occupancyNavMonth || undefined}
           financialData={importedFinancialData}
@@ -1509,6 +1552,7 @@ const App: React.FC = () => {
           activeRealVersionId={activeRealVersionId}
           activeProjectionType={activeProjectionType}
           setActiveProjectionType={setActiveProjectionType}
+          meetings={meetings}
           currentUser={currentUser}
           permissionsMatrix={permissionsMatrix}
           onLogAction={logUserAction}
@@ -1565,6 +1609,7 @@ const App: React.FC = () => {
             currentView={currentView}
             currentUser={currentUser}
             permissionsMatrix={permissionsMatrix}
+            initialImportTab={importNavSignal}
             onPermissionsChange={setPermissionsMatrix}
             users={users}
             setUsers={setUsers}

@@ -1,4 +1,5 @@
-import { Account, BudgetVersion, CostPackage, DreSection, ForecastConfig, ForecastOperator, ForecastRow, Hotel, ImportedRow, User, UserRole, ExpenseType, ExpenseDriver, CostCenter, GMDConfiguration, DrePackage, KpiCalculation } from '../types';
+import { Account, BudgetVersion, CostPackage, DreSection, ForecastConfig, ForecastOperator, ForecastRow, Hotel, ImportedRow, Meeting, User, UserRole, ExpenseType, ExpenseDriver, CostCenter, GMDConfiguration, DrePackage, KpiCalculation } from '../types';
+import { RESTRICTED_TABLE_KINDS, resolveMeetingKind } from '../utils/meetings';
 
 // Helper for robust string matching (ignores accents, case, and plural suffix 's')
 export const normalizeAccountName = (str: string) => {
@@ -636,8 +637,11 @@ export const getForecastData = (
     currentAccounts: Account[] = mockAccounts,
     currentPackages: CostPackage[] = mockPackages,
     budgetOccupancyData: Record<string, number[]> = {},
-    activeProjectionType?: string
+    activeProjectionType?: string,
+    meetings?: Meeting[]
 ): ForecastRow[] => {
+
+    const safeMeetings = meetings || [];
 
     const rows: ForecastRow[] = [];
 
@@ -863,7 +867,7 @@ export const getForecastData = (
     // enquanto o usuário não tiver digitado o próprio número na Ocupação — mesmo padrão de default
     // usado em Coef. Occ Adultos/CHD ali (get*Otb acima não entra nessa regra: OTB precisa ser
     // preenchido de verdade, sem herdar a Meta).
-    const isMeetingVersionForLabor = activeProjectionType === 'Reunião de Ritmo' || activeProjectionType === 'FCA N1' || activeProjectionType === 'FCA N2';
+    const isMeetingVersionForLabor = RESTRICTED_TABLE_KINDS.includes(resolveMeetingKind(activeProjectionType, safeMeetings) as any);
     const moCltMetaFallback = isMeetingVersionForLabor ? (budgetOccupancyData['geral_mo_clt']?.[selectedMonth ? selectedMonth - 1 : 0] ?? 0) : 0;
     const moExtraMetaFallback = isMeetingVersionForLabor ? (budgetOccupancyData['geral_mo_extra']?.[selectedMonth ? selectedMonth - 1 : 0] ?? 0) : 0;
 

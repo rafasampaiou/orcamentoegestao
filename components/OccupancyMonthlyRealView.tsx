@@ -1,7 +1,8 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Save, CheckCircle } from 'lucide-react';
-import { User, ProjectionType, ImportedRow, ValidationRecord, Hotel, PermissionMatrix, hasPermission } from '../types';
-import { BudgetRow, BudgetOccupancyTable, geralRows, lazerRows, eventRows, OccupancyVersionOption, MEETING_VERSIONS, OWN_SNAPSHOT_VERSIONS } from './OccupancyView';
+import { User, ProjectionType, ImportedRow, ValidationRecord, Hotel, PermissionMatrix, hasPermission, Meeting } from '../types';
+import { BudgetRow, BudgetOccupancyTable, geralRows, lazerRows, eventRows, OccupancyVersionOption } from './OccupancyView';
+import { resolveMeetingKind, getMeetingLabel, RESTRICTED_TABLE_KINDS } from '../utils/meetings';
 import OtbProgressTimeline from './OtbProgressTimeline';
 import { computeOtbProgress } from '../utils/otbProgress';
 
@@ -23,6 +24,8 @@ interface OccupancyMonthlyRealViewProps {
     onSaveOccupancy?: () => void;
     activeProjectionType?: ProjectionType;
     setActiveProjectionType?: React.Dispatch<React.SetStateAction<ProjectionType>>;
+    // Reuniões dinâmicas da "Versão do Forecast" (substituem a lista fixa de 5 nomes).
+    meetings: Meeting[];
     // Sinalizado pelo wizard "Iniciar Projeção" (OTB) na DRE Forecast — semeia o modo "On the
     // books" já ligado ao chegar aqui, mesmo padrão de activeProjectionType semeando `period`.
     initialOtbMode?: boolean;
@@ -38,19 +41,11 @@ interface OccupancyMonthlyRealViewProps {
     onLogAction?: (action: string) => void;
 }
 
-// Rótulo curto de cada Versão do Forecast pra exibir nos botões/badge (mesmo padrão do
-// dropdown "Versão do Forecast" na DRE Forecast, que já mostra "Fechamento" em vez do valor
-// completo do enum "Fechamento oficial").
-const PERIOD_LABELS: Record<OccupancyVersionOption, string> = {
-    'Reunião de Ritmo': 'Reunião de Ritmo',
-    'FCA N2': 'FCA N2',
-    'FCA N1': 'FCA N1',
-    'Fechamento oficial': 'Fechamento',
-    'Realizado': 'Realizado',
-    'Meta': 'Meta',
-    'Ano anterior': 'Ano anterior',
-};
-const PERIOD_ORDER: OccupancyVersionOption[] = ['Reunião de Ritmo', 'FCA N2', 'FCA N1', 'Fechamento oficial', 'Realizado', 'Meta', 'Ano anterior'];
+// Rótulo de exibição de um `period` — pode ser o ID de uma reunião criada, ou um dos 3 literais
+// fixos que não são reunião (Realizado/Meta/Ano anterior). `getMeetingLabel` já resolve reuniões
+// e dados legados; os 3 literais são só devolvidos como estão.
+const periodLabel = (p: OccupancyVersionOption, meetings: Meeting[]): string =>
+    (p === 'Meta' || p === 'Ano anterior') ? p : getMeetingLabel(p, meetings);
 
 // Reunião de Ritmo / FCA N1 / FCA N2 — linhas restritas para preenchimento manual: só Aptos
 // vendidos, DM bruta e os Coef. Occ ficam editáveis (Coef. Occ vem sugerido da Meta, mas o
@@ -104,6 +99,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
     onSaveOccupancy,
     activeProjectionType,
     setActiveProjectionType,
+    meetings,
     initialOtbMode,
     initialSelectedMonth,
     financialData,
@@ -113,6 +109,13 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
 }) => {
     const canEditOccupancyValues = hasPermission(permissionsMatrix, currentUser, 'Ocupação', 'Editar Ocupação (Real/Prévia)');
     const canSaveClearOccupancy = hasPermission(permissionsMatrix, currentUser, 'Ocupação', 'Salvar / Limpar Dados de Ocupação');
+    const canSelectRealizado = hasPermission(permissionsMatrix, currentUser, 'DRE Forecast', 'Selecionar Versão "Realizado"');
+    // Todas as reuniões do hotel/ano (não filtra por mês — uma reunião guarda ocupação do ANO
+    // inteiro, não só do mês em que foi criada; o mês só decide o filtro inicial de colunas).
+    const yearMeetings = useMemo(
+        () => meetings.filter(m => m.hotelId === selectedHotel && m.year === selectedYear).sort((a, b) => a.meetingDate.localeCompare(b.meetingDate)),
+        [meetings, selectedHotel, selectedYear]
+    );
 
     // Hotel Administradora (ex.: ADM, JDL) não tem ocupação própria — a tabela não faz sentido
     // pra ele, mostra um aviso no lugar (mesmo critério usado em ForecastTable.tsx/
@@ -130,20 +133,23 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
     // `initialSelectedHotel` em GMDView) — assim "Iniciar Projeção" na DRE Forecast já chega
     // aqui filtrado na versão certa.
     const [period, setPeriod] = useState<OccupancyVersionOption>(activeProjectionType || 'Realizado');
-    // Controla qual tabela/fórmula renderiza (restrita vs. completa).
-    const isMeetingMode = MEETING_VERSIONS.includes(period);
-    // Controla a CHAVE DE CONTEXTO usada para ler/escrever em realOccupancyData — mais ampla que
-    // isMeetingMode, pois Fechamento oficial também precisa do próprio snapshot isolado (mesmo
-    // usando a tabela completa). "Realizado" fica de fora de propósito: é o único que continua
-    // no balde original sem sufixo, preservando qualquer dado já existente.
-    const usesProjectionSnapshot = OWN_SNAPSHOT_VERSIONS.includes(period);
-    // "On the books" é um MODO dentro de Reunião de Ritmo/FCA N1/FCA N2, não uma versão nova —
-    // cada versão guarda seu próprio OTB isolado (chave de contexto com sufixo extra "__OTB").
+    // Controla qual tabela/fórmula renderiza (restrita vs. completa) — só Reunião de Ritmo/FCA
+    // N1/FCA N2 usam a tabela restrita; Fechamento/Prévia (novas) usam a completa, igual
+    // Fechamento oficial já usava antes desta migração.
+    const isMeetingMode = RESTRICTED_TABLE_KINDS.includes(resolveMeetingKind(period, meetings) as any);
+    // "period" é uma reunião de verdade (não Realizado/Meta/Ano anterior) — controla a CHAVE DE
+    // CONTEXTO usada pra ler/escrever em realOccupancyData (toda reunião tem snapshot isolado
+    // agora, decisão do usuário) e se o toggle "On the books" aparece. "Realizado" fica de fora
+    // de propósito: é o único que continua no balde original sem sufixo, preservando qualquer
+    // dado já existente.
+    const usesProjectionSnapshot = period !== 'Realizado' && period !== 'Meta' && period !== 'Ano anterior';
+    // "On the books" é um MODO dentro de qualquer reunião, não uma versão nova — cada reunião
+    // guarda seu próprio OTB isolado (chave de contexto com sufixo extra "__OTB").
     const [otbMode, setOtbMode] = useState(initialOtbMode || false);
 
     // Timeline dos 8 passos — mesma condição de ForecastTable.tsx (baseada na Versão do Forecast
     // ativa, não no toggle local "period", pra ficar consistente com a DRE Forecast).
-    const isMeetingVersion = !!activeProjectionType && MEETING_VERSIONS.includes(activeProjectionType);
+    const isMeetingVersion = !!activeProjectionType && activeProjectionType !== 'Realizado';
     // Mesma chave/campo que ForecastTable.tsx usa pra saber se o wizard "Iniciar Projeção" já
     // foi concluído — a timeline só deve aparecer depois disso, não só por estar numa versão
     // de reunião.
@@ -212,7 +218,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
     };
     const handlePeriodChange = (value: OccupancyVersionOption) => {
         setPeriod(value);
-        if (!MEETING_VERSIONS.includes(value)) setOtbMode(false);
+        if (value === 'Realizado' || value === 'Meta' || value === 'Ano anterior') setOtbMode(false);
         if (setActiveProjectionType && value !== 'Meta' && value !== 'Ano anterior') {
             setActiveProjectionType(value);
         }
@@ -748,7 +754,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
                             </span>
                         )}
                         <span className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-sm rounded-lg py-1 px-3 font-bold">
-                            {PERIOD_LABELS[period]}
+                            {periodLabel(period, meetings)}
                         </span>
                     </div>
                     <p className="text-gray-500 mt-1">Visão anual de ocupação. As alterações feitas aqui alimentam automaticamente as colunas correspondentes no DRE Forecast.</p>
@@ -770,23 +776,20 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
             </div>
 
             <div className="flex flex-wrap gap-4 items-center">
-                <div className="flex items-center bg-gray-100 p-1 rounded-lg">
-                    {PERIOD_ORDER.map(p => (
-                        <button
-                            key={p}
-                            onClick={() => handlePeriodChange(p)}
-                            className={`px-4 py-1.5 text-sm font-bold rounded-md transition-all ${
-                                period === p
-                                    ? 'bg-white text-indigo-600 shadow-sm border border-gray-200'
-                                    : 'text-gray-500 hover:text-gray-700'
-                            }`}
-                        >
-                            {PERIOD_LABELS[p]}
-                        </button>
+                <select
+                    value={period}
+                    onChange={(e) => handlePeriodChange(e.target.value as OccupancyVersionOption)}
+                    className="bg-gray-100 border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-bold text-indigo-600"
+                >
+                    {yearMeetings.map(m => (
+                        <option key={m.id} value={m.id}>{m.displayLabel}</option>
                     ))}
-                </div>
+                    {canSelectRealizado && <option value="Realizado">Realizado</option>}
+                    <option value="Meta">Meta</option>
+                    <option value="Ano anterior">Ano anterior</option>
+                </select>
 
-                {isMeetingMode && (
+                {usesProjectionSnapshot && (
                     <div className="flex items-center bg-gray-100 p-1 rounded-lg">
                         <button
                             onClick={() => setOtbMode(false)}
@@ -794,7 +797,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
                                 !otbMode ? 'bg-white text-indigo-600 shadow-sm border border-gray-200' : 'text-gray-500 hover:text-gray-700'
                             }`}
                         >
-                            {PERIOD_LABELS[period]}
+                            {periodLabel(period, meetings)}
                         </button>
                         <button
                             onClick={() => setOtbMode(true)}

@@ -19,7 +19,12 @@ const ValidationsView: React.FC<ValidationsViewProps> = ({ validations, hotels, 
     if (v.month !== selectedMonth) return false;
     if (v.year !== selectedYear) return false;
     if (selectedHotel !== 'all' && v.hotelId !== selectedHotel) return false;
-    if (selectedProjection !== 'all' && v.projectionType !== selectedProjection) return false;
+    if (selectedProjection !== 'all') {
+        const matches = selectedProjection === 'Realizado'
+            ? v.projectionType === 'Realizado'
+            : v.meetingKind === selectedProjection;
+        if (!matches) return false;
+    }
     return true;
   });
 
@@ -102,7 +107,8 @@ const ValidationsView: React.FC<ValidationsViewProps> = ({ validations, hotels, 
                 <option value="Reunião de Ritmo">Reunião de Ritmo</option>
                 <option value="FCA N2">FCA N2</option>
                 <option value="FCA N1">FCA N1</option>
-                <option value="Fechamento oficial">Fechamento oficial</option>
+                <option value="Fechamento">Fechamento</option>
+                <option value="Realizado">Realizado</option>
               </select>
             </div>
           </div>
@@ -147,7 +153,7 @@ const ValidationsView: React.FC<ValidationsViewProps> = ({ validations, hotels, 
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-lg text-sm font-bold border border-blue-100">
-                                                {validation.projectionType}
+                                                {validation.meetingLabel || validation.projectionType}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-right">

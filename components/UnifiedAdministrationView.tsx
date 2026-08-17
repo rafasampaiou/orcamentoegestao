@@ -367,6 +367,11 @@ interface UnifiedAdministrationViewProps {
   currentUser?: User;
   permissionsMatrix: PermissionMatrix;
   onPermissionsChange?: (matrix: PermissionMatrix) => void;
+
+  // Sinalizado pelo "Iniciar Fechamento" (Realizado, DRE Forecast) — pede pra essa tela já abrir
+  // direto na sub-aba de Importação de Despesas, em vez do default. Único valor usado por
+  // enquanto (só Despesas tem esse deep-link), mas o tipo já é extensível se precisar de outros.
+  initialImportTab?: 'expenses';
 }
 
 // Botão "Ver" (ícone de olho) na tabela de Usuários — ao clicar, abre um balão com os Pacotes/
@@ -473,6 +478,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   currentUser,
   permissionsMatrix: permissionsMatrixProp,
   onPermissionsChange,
+  initialImportTab,
 }) => {
   // Main Module Tabs
   const [mainTab, setMainTab] = useState<'real' | 'geral'>('real');
@@ -890,7 +896,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   const [importYear, setImportYear] = useState<number>(new Date().getFullYear());
 
   // New Structured Import State
-  const [importCategory, setImportCategory] = useState<'financial' | 'revenue' | 'expenses' | 'occupancy' | 'taxes'>('expenses');
+  const [importCategory, setImportCategory] = useState<'financial' | 'revenue' | 'expenses' | 'occupancy' | 'taxes'>(initialImportTab || 'expenses');
   const [importProjectionType, setImportProjectionType] = useState<import('../types').ProjectionType>('Reunião de Ritmo');
   const [expenseImportMode, setExpenseImportMode] = useState<'forecast' | 'detailed'>('forecast');
   const [importHotelId, setImportHotelId] = useState<string>('');

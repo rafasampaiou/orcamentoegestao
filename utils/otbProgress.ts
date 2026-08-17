@@ -27,7 +27,7 @@ const GERAL_BASE_IDS = ['geral_sold', 'geral_dm_fap', 'lazer_sold', 'lazer_dm_fa
 
 // Um "bucket" de ocupação guarda tanto valores brutos (modo On the books/Fechamento, sem
 // sufixo) quanto _forecast/_previa (modo Realizado/comparativo) — checa os três formatos.
-const hasOccupancyData = (bucket: Record<string, number>) =>
+export const hasOccupancyData = (bucket: Record<string, number>) =>
     GERAL_BASE_IDS.some(id => (bucket[id] || bucket[`${id}_forecast`] || bucket[`${id}_previa`] || 0) !== 0);
 
 // 6 dos 8 passos são detectados automaticamente a partir do que já foi preenchido; os passos 6

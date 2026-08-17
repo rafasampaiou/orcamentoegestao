@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Account, CostPackage, Hotel, ImportedRow, ProjectionType, ForecastRow } from '../types';
+import { Account, CostPackage, Hotel, ImportedRow, ProjectionType, ForecastRow, Meeting, User, PermissionMatrix, hasPermission } from '../types';
 import { buildForecastRows, formatValue, formatPointsDiff, parseNum } from './ForecastTable';
 import { normalizeAccountName } from '../services/mockData';
 import { supabaseService } from '../services/supabaseService';
+import { buildProjectionOptions } from '../utils/meetings';
 import LoadingPanel from './LoadingPanel';
 import toast from 'react-hot-toast';
 
@@ -21,6 +22,10 @@ interface AnaliseABViewProps {
     budgetOccupancyData?: Record<string, number[]>;
     activeProjectionType?: ProjectionType;
     setActiveProjectionType?: React.Dispatch<React.SetStateAction<ProjectionType>>;
+    // Reuniões dinâmicas da "Versão do Forecast" (substituem a lista fixa de 5 nomes).
+    meetings: Meeting[];
+    currentUser?: User;
+    permissionsMatrix: PermissionMatrix;
 }
 
 const MONTH_LABELS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -34,18 +39,6 @@ const addAgg = (a: AggregatedFields, row: ForecastRow | undefined): AggregatedFi
     lastYear: a.lastYear + (row?.lastYear || 0),
     previa: a.previa + (row?.previa || 0),
 });
-
-// Mesmas 5 versões que já existem no resto do app (Reunião de Ritmo/FCA N1/FCA N2/Fechamento/
-// Realizado) — é esse seletor, e não o filtro genérico de Tipo/Categoria/Região do topo, que
-// define de qual versão a Análise de A&B está puxando os dados (inclusive os que vêm da DRE
-// Forecast), igual ao padrão já usado na aba Ocupação.
-const PROJECTION_TYPE_OPTIONS: { value: ProjectionType; label: string }[] = [
-    { value: 'Reunião de Ritmo', label: 'Reunião de Ritmo' },
-    { value: 'FCA N2', label: 'FCA N2' },
-    { value: 'FCA N1', label: 'FCA N1' },
-    { value: 'Fechamento oficial', label: 'Fechamento' },
-    { value: 'Realizado', label: 'Realizado' },
-];
 
 type Scenario = 'REALIZADO' | 'META' | 'ANO_ANTERIOR';
 const SCENARIOS: Scenario[] = ['REALIZADO', 'META', 'ANO_ANTERIOR'];
@@ -136,7 +129,7 @@ const EditableCell: React.FC<{ value: number; onCommit: (v: number) => void }> =
 const AnaliseABView: React.FC<AnaliseABViewProps> = ({
     selectedMonth, selectedYear, financialData, selectedHotel, accounts, packages, hotels,
     realOccupancyData, activeRealVersionId, activeRealVersionName, activeBudgetVersionId,
-    budgetOccupancyData, activeProjectionType, setActiveProjectionType,
+    budgetOccupancyData, activeProjectionType, setActiveProjectionType, meetings, currentUser, permissionsMatrix,
 }) => {
     const [revenueRows, setRevenueRows] = useState<any[]>([]);
     const [overrides, setOverrides] = useState<any[]>([]);
@@ -510,20 +503,18 @@ const AnaliseABView: React.FC<AnaliseABViewProps> = ({
                 <h2 className="text-xl font-black text-gray-900 mb-4">Análise de A&B</h2>
 
                 <div data-slide-capture-hide="true" className="flex flex-wrap items-center gap-4 mb-6">
-                    <div className="flex items-center bg-gray-100 p-1 rounded-lg">
-                        {PROJECTION_TYPE_OPTIONS.map(opt => (
-                            <button
-                                key={opt.value}
-                                onClick={() => setActiveProjectionType?.(opt.value)}
-                                className={`px-4 py-1.5 text-sm font-bold rounded-md transition-all ${activeProjectionType === opt.value
-                                    ? 'bg-white text-indigo-600 shadow-sm border border-gray-200'
-                                    : 'text-gray-500 hover:text-gray-700'
-                                    }`}
-                            >
-                                {opt.label}
-                            </button>
+                    <select
+                        value={activeProjectionType || ''}
+                        onChange={(e) => setActiveProjectionType?.(e.target.value)}
+                        className="bg-gray-100 border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-bold text-indigo-600"
+                    >
+                        {buildProjectionOptions(
+                            meetings, selectedHotel || '', selectedYear || 0, selectedMonth || 0,
+                            hasPermission(permissionsMatrix, currentUser, 'DRE Forecast', 'Selecionar Versão "Realizado"')
+                        ).map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
                         ))}
-                    </div>
+                    </select>
 
                     <div className="h-6 w-px bg-gray-300"></div>
 

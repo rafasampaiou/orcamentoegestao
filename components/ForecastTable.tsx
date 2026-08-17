@@ -1,13 +1,15 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { getForecastData, getDynamicForecastData } from '../services/mockData';
+import { getForecastData, getDynamicForecastData, normalizeHotelName } from '../services/mockData';
 import { Upload, ListFilter, LayoutList, Settings2, ChevronUp, Activity, TrendingUp, Lock, LockOpen, CheckCircle2, X, FileSpreadsheet, AlertCircle, CheckCircle, ChevronRight, ChevronDown, Presentation } from 'lucide-react';
-import { ExpenseDriver, ImportedRow, Account, CostPackage, Hotel, BudgetVersion, ForecastRow, ForecastConfig, ForecastOperator, ColumnVisibility, UserRole, KpiCalculation, hasRole, PermissionMatrix, hasPermission } from '../types';
+import { ExpenseDriver, ImportedRow, Account, CostPackage, Hotel, BudgetVersion, ForecastRow, ForecastConfig, ForecastOperator, ColumnVisibility, UserRole, KpiCalculation, hasRole, PermissionMatrix, hasPermission, Meeting, MeetingKind } from '../types';
 import { evaluateFormula } from '../utils/formulaEngine';
 import { supabaseService } from '../services/supabaseService';
-import { MEETING_VERSIONS } from './OccupancyView';
 import OtbProgressTimeline from './OtbProgressTimeline';
+import RealizadoProgressTimeline from './RealizadoProgressTimeline';
+import CreateMeetingModal from './CreateMeetingModal';
 import BalanceteImportModal from './BalanceteImportModal';
-import { computeOtbProgress } from '../utils/otbProgress';
+import { computeOtbProgress, hasOccupancyData } from '../utils/otbProgress';
+import { resolveMeetingKind, getMeetingLabel } from '../utils/meetings';
 import toast from 'react-hot-toast';
 
 // Nomes amigáveis das colunas comentáveis (usado só no rótulo do modal de comentário).
@@ -66,12 +68,19 @@ interface ForecastTableProps {
     // Projections & Validation
     activeProjectionType?: import('../types').ProjectionType;
     setActiveProjectionType?: React.Dispatch<React.SetStateAction<import('../types').ProjectionType>>;
+    // Reuniões dinâmicas da "Versão do Forecast" (substituem a lista fixa de 5 nomes) — carregadas
+    // uma vez no boot de App.tsx.
+    meetings: Meeting[];
+    setMeetings?: React.Dispatch<React.SetStateAction<Meeting[]>>;
     validations?: import('../types').ValidationRecord[];
     setValidations?: React.Dispatch<React.SetStateAction<import('../types').ValidationRecord[]>>;
     currentUser?: import('../types').User;
     permissionsMatrix: PermissionMatrix;
     dreConfigs?: Record<string, import('../types').DreSection[]>;
     onNavigateToOccupancy?: (otbMode?: boolean) => void;
+    // "Iniciar Fechamento" (Realizado) — "Inserir despesas" navega pra Administração →
+    // Importação, já direto na sub-aba de Despesas.
+    onNavigateToImportacao?: (tab: 'expenses') => void;
     onImportData?: (rows: ImportedRow[], mode: 'append' | 'replace') => void;
     onDeleteOtbBalancete?: (hotel: string, year: number, month: number, versionId: string) => void;
     onResetValidation?: (hotelId: string, year: number, month: number, projectionType: import('../types').ProjectionType) => void;
@@ -310,12 +319,15 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     budgetOccupancyDataMap = {},
     activeProjectionType,
     setActiveProjectionType,
+    meetings,
+    setMeetings,
     validations,
     setValidations,
     currentUser,
     permissionsMatrix,
     dreConfigs,
     onNavigateToOccupancy,
+    onNavigateToImportacao,
     onImportData,
     onDeleteOtbBalancete,
     onResetValidation,
@@ -336,12 +348,22 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     const canReopenValidated    = hasPermission(permissionsMatrix, currentUser, 'DRE Forecast', 'Reabrir Versão Validada para Edição');
     const canSelectRealizado    = hasPermission(permissionsMatrix, currentUser, 'DRE Forecast', 'Selecionar Versão "Realizado"');
     const canGenerateSlides     = hasPermission(permissionsMatrix, currentUser, 'DRE Forecast', 'Gerar Apresentação (Google Slides)');
+    const canCreateMeeting      = hasPermission(permissionsMatrix, currentUser, 'DRE Forecast', 'Criar Nova Reunião (Prévia)');
 
-    // Selecting "Fechamento" as the Forecast version only swaps labels (Prévia → Real) — it
-    // does NOT lock editing by itself. Editing only locks once THIS specific closing has
-    // actually been validated/saved (a matching ValidationRecord already exists).
+    // Reuniões dinâmicas do hotel/mês/ano selecionado (substituem a lista fixa de 5 nomes) —
+    // ordenadas por data pro dropdown "Versão do Forecast".
+    const meetingsForContext = useMemo(
+        () => meetings
+            .filter(m => m.hotelId === selectedHotel && m.year === selectedYear && m.month === selectedMonth)
+            .sort((a, b) => a.meetingDate.localeCompare(b.meetingDate)),
+        [meetings, selectedHotel, selectedYear, selectedMonth]
+    );
+
+    // Selecionar QUALQUER reunião do tipo "Fechamento" só troca labels (Prévia → Real) — não
+    // trava a edição por si só. A edição só trava quando ESSE fechamento específico do mês (uma
+    // reunião "Fechamento" QUALQUER, validada) já foi validado/salvo.
     const isAlreadyValidated = (validations || []).some(v =>
-        v.projectionType === 'Fechamento oficial' &&
+        resolveMeetingKind(v.projectionType, meetings) === 'Fechamento' &&
         v.hotelId === selectedHotel &&
         v.month === selectedMonth &&
         v.year === selectedYear
@@ -354,6 +376,61 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     useEffect(() => {
         setForceUnlockValidated(false);
     }, [selectedHotel, selectedMonth, selectedYear, activeProjectionType]);
+
+    // Dados legados (de antes desta migração) — strings literais antigas que ainda podem ter
+    // dado preenchido pra este hotel/mês/ano, mesmo sem registro correspondente em `meetings`.
+    // Aparecem no dropdown como opções extras, usando o próprio nome literal como valor — a
+    // chave de armazenamento já funciona com ele, sem precisar de nenhum backfill no banco.
+    const legacyOptionsForContext = useMemo(() => {
+        const LEGACY_KINDS_TO_PROBE = ['Reunião de Ritmo', 'FCA N1', 'FCA N2', 'Fechamento oficial'];
+        return LEGACY_KINDS_TO_PROBE
+            .filter(legacy => {
+                const key = `${selectedHotel}_${selectedYear}_${selectedMonth}_${activeRealVersionId || ''}__${legacy}`;
+                const hasOcc = Object.keys(realOccupancyData[key] || {}).length > 0;
+                const hasValidation = (validations || []).some(v => v.projectionType === legacy && v.hotelId === selectedHotel && v.month === selectedMonth && v.year === selectedYear);
+                return hasOcc || hasValidation;
+            })
+            .map(legacy => ({ id: legacy, displayLabel: `${legacy === 'Fechamento oficial' ? 'Fechamento' : legacy} (dado antigo)` }));
+    }, [selectedHotel, selectedYear, selectedMonth, activeRealVersionId, realOccupancyData, validations]);
+
+    // Popup "Criar nova reunião" — substitui a antiga lista fixa de 5 nomes no seletor "Versão
+    // do Forecast". Abre sozinho quando o hotel/mês/ano não tem nenhuma reunião criada ainda
+    // (nem legada) e nenhuma seleção válida ativa, guiando o usuário direto pra ação.
+    const [showCreateMeetingModal, setShowCreateMeetingModal] = useState(false);
+    const [dismissedAutoOpenKey, setDismissedAutoOpenKey] = useState<string | null>(null);
+    useEffect(() => {
+        if (!canCreateMeeting) return;
+        const autoOpenKey = `${selectedHotel}_${selectedYear}_${selectedMonth}`;
+        const allOptions = [...meetingsForContext, ...legacyOptionsForContext];
+        const hasValidSelection = activeProjectionType === 'Realizado' || allOptions.some(o => o.id === activeProjectionType);
+        if (allOptions.length === 0 && !hasValidSelection && dismissedAutoOpenKey !== autoOpenKey) {
+            setShowCreateMeetingModal(true);
+        }
+    }, [meetingsForContext, legacyOptionsForContext, activeProjectionType, canCreateMeeting, selectedHotel, selectedYear, selectedMonth, dismissedAutoOpenKey]);
+
+    const handleCreateMeeting = async (meetingDate: string, kind: MeetingKind) => {
+        const displayLabel = kind === 'Prévia'
+            ? `Prévia de ${new Date(meetingDate + 'T00:00:00').toLocaleDateString('pt-BR')}`
+            : kind;
+        const slug = (s: string) => (s || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        const id = `mtg_${slug(selectedHotel || '')}_${selectedYear}_${selectedMonth}_${Math.random().toString(36).slice(2, 10)}`;
+        const newMeeting: Meeting = {
+            id, hotelId: selectedHotel || '', year: selectedYear || 0, month: selectedMonth || 0,
+            meetingDate, kind, displayLabel,
+            createdByUserId: currentUser?.id, createdByUserName: currentUser?.name,
+            createdAt: new Date().toISOString(),
+        };
+        try {
+            await supabaseService.saveMeeting(newMeeting);
+            setMeetings?.(prev => [...prev, newMeeting]);
+            setActiveProjectionType?.(id);
+            setShowCreateMeetingModal(false);
+            onLogAction?.(`Criou a reunião "${displayLabel}" de ${selectedHotel} — ${selectedMonth}/${selectedYear}`);
+        } catch (e) {
+            console.error(e);
+            toast.error('Erro ao criar a reunião. Tente novamente.');
+        }
+    };
 
     const [data, setData] = useState<ForecastRow[]>(() => buildForecastRows(
         dreConfigs, selectedMonth, selectedYear, financialData, selectedHotel, hotels,
@@ -1175,11 +1252,27 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     // isola cada Versão do Forecast).
     const [showOtbWizard, setShowOtbWizard] = useState(false);
     const [otbDayPicked, setOtbDayPicked] = useState<number | null>(null);
-    const isMeetingVersion = !!activeProjectionType && MEETING_VERSIONS.includes(activeProjectionType as any);
+    // Toda reunião criada (Reunião de Ritmo/FCA N2/FCA N1/Fechamento/Prévia) tem o MESMO fluxo
+    // completo (checklist de 8 passos, wizard OTB, Gerar Apresentação) — só "Realizado" é
+    // diferente (ganha "Iniciar Fechamento"/"Status de fechamento" no lugar, ver mais abaixo).
+    const isMeetingVersion = !!activeProjectionType && activeProjectionType !== 'Realizado';
+    const isRealizadoVersion = activeProjectionType === 'Realizado';
     const otbContextKey = `${selectedHotel}_${selectedYear}_${selectedMonth}_${activeRealVersionId || ''}__${activeProjectionType}__OTB`;
     const otbDaySaved = realOccupancyData[otbContextKey]?.['__otb_day'];
     const otbColumnLabel = otbDaySaved ? `OTBs ${String(otbDaySaved).padStart(2, '0')}/${String(selectedMonth || 1).padStart(2, '0')}` : 'OTBs';
     const daysInSelectedMonth = new Date(selectedYear || 2024, selectedMonth || 1, 0).getDate();
+
+    // "Status de fechamento" (Realizado) — 2 passos, auto-detectados (sem flag manual): ocupação
+    // concluída se existe QUALQUER dado no balde original (sem sufixo, o mesmo que Realizado
+    // sempre usou); despesas concluídas se existe alguma linha de Despesa Real importada pra
+    // esse hotel/mês/ano.
+    const realizadoOccupancyDone = isRealizadoVersion && hasOccupancyData(realOccupancyData[`${selectedHotel}_${selectedYear}_${selectedMonth}_${activeRealVersionId || ''}`] || {});
+    const realizadoExpensesDone = isRealizadoVersion && (financialData || []).some(r =>
+        normalizeHotelName(r.hotel || '') === normalizeHotelName(selectedHotel || '') &&
+        String(r.mes) === String(selectedMonth) && String(r.ano) === String(selectedYear) &&
+        !r.conta.startsWith('override_') &&
+        ['real', 'realizado'].includes((r.cenario || '').trim().toLowerCase())
+    );
 
     const handleIniciarProjecao = () => {
         if (isMeetingVersion && !otbDaySaved) {
@@ -1433,7 +1526,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 return { ...prev, [otbContextKey]: current };
             });
         } else if (index === 7) {
-            onResetValidation?.(selectedHotel || '', selectedYear || 0, selectedMonth || 0, activeProjectionType || 'Reunião de Ritmo');
+            onResetValidation?.(selectedHotel || '', selectedYear || 0, selectedMonth || 0, activeProjectionType || '');
         }
     };
 
@@ -1445,7 +1538,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         setForceUnlockValidated(true);
         handleOtbStepReset(6);
         handleOtbStepReset(7);
-        onLogAction?.(`Reabriu a versão validada de ${selectedHotel} — ${selectedMonth}/${selectedYear} (${activeProjectionType}) para edição`);
+        onLogAction?.(`Reabriu a versão validada de ${selectedHotel} — ${selectedMonth}/${selectedYear} (${getMeetingLabel(activeProjectionType, meetings)}) para edição`);
     };
 
     const handleSaveResultsDirectly = () => {
@@ -1489,6 +1582,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             // tiver sido confirmada — senão fica "Em construção" (aparece assim em Validações, e
             // o usuário pode continuar de onde parou depois).
             const isFullyComplete = !isMeetingVersion || !!otbProgress[6];
+            const activeMeeting = meetings.find(m => m.id === activeProjectionType);
 
             const newValidation: import('../types').ValidationRecord = {
                 id: validationId,
@@ -1497,7 +1591,10 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 userName: currentUser?.name || 'Desconhecido',
                 month: selectedMonth || 1,
                 year: selectedYear || 2026,
-                projectionType: activeProjectionType || 'Reunião de Ritmo',
+                projectionType: activeProjectionType || '',
+                meetingKind: activeMeeting?.kind,
+                meetingLabel: activeMeeting?.displayLabel ?? (activeProjectionType === 'Realizado' ? 'Realizado' : undefined),
+                meetingDate: activeMeeting?.meetingDate,
                 validatedAt: new Date().toISOString(),
                 status: isFullyComplete ? 'Validado' : 'Em construção'
             };
@@ -1510,10 +1607,10 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             setForceUnlockValidated(false);
 
             onLogAction?.(isFullyComplete
-                ? `Validou a projeção de ${selectedHotel} — ${monthName}/${selectedYear} (${activeProjectionType})`
-                : `Salvou (em construção) a projeção de ${selectedHotel} — ${monthName}/${selectedYear} (${activeProjectionType})`);
+                ? `Validou a projeção de ${selectedHotel} — ${monthName}/${selectedYear} (${getMeetingLabel(activeProjectionType, meetings)})`
+                : `Salvou (em construção) a projeção de ${selectedHotel} — ${monthName}/${selectedYear} (${getMeetingLabel(activeProjectionType, meetings)})`);
 
-            const notificationMsg = `A unidade ${selectedHotel} salvou os resultados de ${activeProjectionType} para ${monthName}/${selectedYear}. Dados salvos no banco.`;
+            const notificationMsg = `A unidade ${selectedHotel} salvou os resultados de ${getMeetingLabel(activeProjectionType, meetings)} para ${monthName}/${selectedYear}. Dados salvos no banco.`;
             console.log('Notification sent to Admin:', notificationMsg);
 
             setShowDetails(false);
@@ -1543,13 +1640,21 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     // (financial_data, conta = "override_<rowId>", scenario 'Real', projectionType do Fechamento).
     const findFechamentoOverrides = (): Record<string, number> | null => {
         if (!financialData) return null;
+        // Com múltiplas reuniões "Fechamento" possíveis no mesmo mês, "o Fechamento" deixa de
+        // ser único — usa o Fechamento CRIADO mais recentemente por data (mesmo critério de
+        // desempate do ranking em ComparativesView).
+        const fechamentoMeetings = meetings
+            .filter(m => m.hotelId === selectedHotel && m.year === selectedYear && m.month === selectedMonth && m.kind === 'Fechamento')
+            .sort((a, b) => b.meetingDate.localeCompare(a.meetingDate));
+        const targetId = fechamentoMeetings[0]?.id;
+        if (!targetId) return null;
         const overrides: Record<string, number> = {};
         financialData.forEach(r => {
             if (!r.conta.startsWith('override_')) return;
             if (r.hotel !== selectedHotel) return;
             if (String(r.mes) !== String(selectedMonth) || String(r.ano) !== String(selectedYear)) return;
             if ((r.versionId || '') !== (activeRealVersionId || '')) return;
-            if (r.projectionType !== 'Fechamento oficial') return;
+            if (r.projectionType !== targetId) return;
             if (r.cenario !== 'Real') return;
             const rowId = r.conta.slice('override_'.length);
             const val = parseFloat(r.valor);
@@ -1708,14 +1813,23 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                         <div className="flex flex-col">
                             <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Versão do Forecast</span>
                             <select
-                                value={activeProjectionType || 'Reunião de Ritmo'}
-                                onChange={(e) => setActiveProjectionType && setActiveProjectionType(e.target.value as any)}
+                                value={activeProjectionType || ''}
+                                onChange={(e) => {
+                                    if (e.target.value === '__create_new__') {
+                                        setShowCreateMeetingModal(true);
+                                        return; // não muda activeProjectionType — o select "volta" pro valor anterior
+                                    }
+                                    setActiveProjectionType && setActiveProjectionType(e.target.value);
+                                }}
                                 className={`border rounded-md px-2 py-1 text-xs font-bold outline-none ${isMonthClosed ? 'bg-red-50 text-red-700 border-red-200' : 'bg-white border-gray-300 text-gray-700 focus:ring-0 focus:border-indigo-500'}`}
                             >
-                                <option value="Reunião de Ritmo">Reunião de Ritmo</option>
-                                <option value="FCA N2">FCA N2</option>
-                                <option value="FCA N1">FCA N1</option>
-                                <option value="Fechamento oficial">Fechamento</option>
+                                {meetingsForContext.map(m => (
+                                    <option key={m.id} value={m.id}>{m.displayLabel}</option>
+                                ))}
+                                {legacyOptionsForContext.map(o => (
+                                    <option key={o.id} value={o.id}>{o.displayLabel}</option>
+                                ))}
+                                {canCreateMeeting && <option value="__create_new__">+ Criar nova</option>}
                                 {canSelectRealizado && <option value="Realizado">Realizado</option>}
                             </select>
                         </div>
@@ -1795,17 +1909,19 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 )
                             )
                         ) : (
-                            // Na versão Realizado não faz sentido "iniciar projeção" (é o fechamento
-                            // gerencial oficial, não uma prévia em construção) — só "Calcular Forecast".
-                            // Hotéis Administradora também não têm ocupação/OTB, então nunca mostram esse botão.
-                            activeProjectionType !== 'Realizado' && !isAdminEntity && canCalcularForecast && onNavigateToOccupancy && (
+                            // Realizado é o fechamento gerencial oficial, não uma prévia em
+                            // construção — ganha "Iniciar Fechamento" (leva pra Ocupação) em vez
+                            // de "Iniciar Projeção"; o "Status de fechamento" abaixo substitui o
+                            // checklist de 8 passos. Hotéis Administradora não têm ocupação/OTB,
+                            // então nunca mostram esse botão.
+                            isRealizadoVersion && !isAdminEntity && canCalcularForecast && onNavigateToOccupancy && (
                                 <button
-                                    onClick={handleIniciarProjecao}
+                                    onClick={() => onNavigateToOccupancy(false)}
                                     className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-base font-bold transition-colors border bg-white text-gray-600 border-gray-300 hover:bg-gray-50 shadow-sm"
-                                    title="Ir para a aba Ocupação já filtrada nesta Versão do Forecast"
+                                    title="Ir para a aba Ocupação"
                                 >
                                     <TrendingUp size={20} />
-                                    Iniciar Projeção
+                                    Iniciar Fechamento
                                 </button>
                             )
                         )}
@@ -1873,6 +1989,19 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 {isMeetingVersion && !!otbDaySaved && (!isMeetingVersionCompleted || forceUnlockValidated) && (
                     <div className="px-5 py-2 border-b border-gray-200 bg-gray-50/50 shrink-0">
                         <OtbProgressTimeline completed={otbProgress} onStepClick={handleOtbStepClick} onStepReset={handleOtbStepReset} pulsingSteps={otbPulsingSteps} onStepConfirm={handleOtbStepConfirm} title="Status da prévia" />
+                    </div>
+                )}
+
+                {isRealizadoVersion && (
+                    <div className="px-5 py-2 border-b border-gray-200 bg-gray-50/50 shrink-0">
+                        <RealizadoProgressTimeline
+                            occupancyDone={realizadoOccupancyDone}
+                            expensesDone={realizadoExpensesDone}
+                            hideOccupancy={isAdminEntity}
+                            onClickOccupancy={() => onNavigateToOccupancy?.(false)}
+                            onClickExpenses={() => onNavigateToImportacao?.('expenses')}
+                            title="Status de fechamento"
+                        />
                     </div>
                 )}
 
@@ -3100,6 +3229,16 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             )}
 
             {/* Wizard OTB (On the books) — passo único: mensagem + dia de corte do mês */}
+            {showCreateMeetingModal && (
+                <CreateMeetingModal
+                    onClose={() => {
+                        setDismissedAutoOpenKey(`${selectedHotel}_${selectedYear}_${selectedMonth}`);
+                        setShowCreateMeetingModal(false);
+                    }}
+                    onCreate={handleCreateMeeting}
+                />
+            )}
+
             {showOtbWizard && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95">
@@ -3928,7 +4067,8 @@ export function buildForecastRows(
     accounts: Account[],
     packages: CostPackage[],
     budgetOccupancyData: Record<string, number[]>,
-    activeProjectionType: import('../types').ProjectionType | undefined
+    activeProjectionType: import('../types').ProjectionType | undefined,
+    meetings: Meeting[] = []
 ): ForecastRow[] {
     const forecastStructure = dreConfigs?.['Forecast'] || [];
 
@@ -3936,7 +4076,7 @@ export function buildForecastRows(
     if (forecastStructure.length > 0) {
         newData = getDynamicForecastData(forecastStructure, selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData);
     } else {
-        newData = getForecastData(selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData, activeProjectionType);
+        newData = getForecastData(selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData, activeProjectionType, meetings);
     }
 
     const initializedData = newData.map(row => {

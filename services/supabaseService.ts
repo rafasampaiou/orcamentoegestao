@@ -1,5 +1,5 @@
 import { supabase, SITE_URL } from './supabaseClient';
-import { Account, CostCenter, Hotel, BudgetVersion, User, GMDConfiguration, UserRole, ImportedRow, KpiCalculation, ValidationRecord, PermissionMatrix, UserLog } from '../types';
+import { Account, CostCenter, Hotel, BudgetVersion, User, GMDConfiguration, UserRole, ImportedRow, KpiCalculation, ValidationRecord, PermissionMatrix, UserLog, Meeting } from '../types';
 
 // Supabase/PostgREST caps rows per request (default 1000) regardless of .limit(),
 // so tables that can exceed that must be paged with .range() to retrieve every row.
@@ -1121,6 +1121,9 @@ export const supabaseService = {
       month: r.month,
       year: r.year,
       projectionType: r.projection_type,
+      meetingKind: r.meeting_kind || undefined,
+      meetingLabel: r.meeting_label || undefined,
+      meetingDate: r.meeting_date || undefined,
       validatedAt: r.validated_at,
       status: r.status || 'Validado'
     }));
@@ -1141,8 +1144,47 @@ export const supabaseService = {
         month: record.month,
         year: record.year,
         projection_type: record.projectionType,
+        meeting_kind: record.meetingKind || null,
+        meeting_label: record.meetingLabel || null,
+        meeting_date: record.meetingDate || null,
         validated_at: record.validatedAt,
         status: record.status
+      }, { onConflict: 'id' });
+    if (error) throw error;
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MEETINGS (Reuniões dinâmicas da "Versão do Forecast")
+  // ═══════════════════════════════════════════════════════════════════════════
+  async getMeetings(): Promise<Meeting[]> {
+    const rows = await fetchAllRows('meetings');
+    return rows.map((r: any) => ({
+      id: r.id,
+      hotelId: r.hotel_id,
+      year: r.year,
+      month: r.month,
+      meetingDate: r.meeting_date,
+      kind: r.kind,
+      displayLabel: r.display_label,
+      createdByUserId: r.created_by_user_id || undefined,
+      createdByUserName: r.created_by_user_name || undefined,
+      createdAt: r.created_at,
+    }));
+  },
+
+  async saveMeeting(meeting: Meeting): Promise<void> {
+    const { error } = await supabase
+      .from('meetings')
+      .upsert({
+        id: meeting.id,
+        hotel_id: meeting.hotelId,
+        year: meeting.year,
+        month: meeting.month,
+        meeting_date: meeting.meetingDate,
+        kind: meeting.kind,
+        display_label: meeting.displayLabel,
+        created_by_user_id: meeting.createdByUserId || null,
+        created_by_user_name: meeting.createdByUserName || null,
       }, { onConflict: 'id' });
     if (error) throw error;
   },

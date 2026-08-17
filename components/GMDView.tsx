@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { Network, Filter, AlertTriangle, CheckCircle, FileText, ClipboardList, ShieldCheck, ShieldAlert, Calendar, DollarSign, CheckSquare, Search, X, FileEdit, ExternalLink, ChevronDown, ChevronRight } from 'lucide-react';
-import { GMDConfiguration, Account, CostPackage, Hotel, ImportedRow, User, Justification, CostCenter, UserRole, hasRole, ProjectionType, PermissionMatrix, hasPermission } from '../types';
+import { GMDConfiguration, Account, CostPackage, Hotel, ImportedRow, User, Justification, CostCenter, UserRole, hasRole, ProjectionType, PermissionMatrix, hasPermission, Meeting } from '../types';
 import { supabaseService } from '../services/supabaseService';
+import { buildProjectionOptions } from '../utils/meetings';
 
 // Segmentação informativa de Despesas Administrativas e Despesas com Vendas e Marketing —
 // alimentada pela importação de Despesas (Destino: Meta) ou editada direto aqui; nunca altera
@@ -23,14 +24,6 @@ const SEGMENTED_MASTERS: Record<string, { key: string; label: string }[]> = {
     'DESPESAS ADMINISTRATIVAS': ADMIN_SEGMENT_KEYS,
     'DESPESAS COM VENDAS E MARKETING': VENDAS_SEGMENT_KEYS,
 };
-
-const PROJECTION_TYPE_OPTIONS: { value: ProjectionType; label: string }[] = [
-    { value: 'Reunião de Ritmo', label: 'Reunião de Ritmo' },
-    { value: 'FCA N2', label: 'FCA N2' },
-    { value: 'FCA N1', label: 'FCA N1' },
-    { value: 'Fechamento oficial', label: 'Fechamento' },
-    { value: 'Realizado', label: 'Realizado' },
-];
 
 interface FilterCardProps {
     type: string;
@@ -80,6 +73,8 @@ interface GMDViewProps {
     activeRealVersionId?: string;
     activeProjectionType?: ProjectionType;
     setActiveProjectionType?: React.Dispatch<React.SetStateAction<ProjectionType>>;
+    // Reuniões dinâmicas da "Versão do Forecast" (substituem a lista fixa de 5 nomes).
+    meetings: Meeting[];
     currentUser?: User;
     permissionsMatrix: PermissionMatrix;
     onLogAction?: (action: string) => void;
@@ -92,7 +87,7 @@ const formatPercent = (val: number) => `${val.toFixed(1)}%`;
 const GMDView: React.FC<GMDViewProps> = ({
     gmdConfigs, accounts, packages, hotels, financialData, users, costCenters,
     selectedMonth, selectedYear, initialSelectedHotel, activeRealVersionName,
-    activeRealVersionId, activeProjectionType, setActiveProjectionType, currentUser, permissionsMatrix, onLogAction
+    activeRealVersionId, activeProjectionType, setActiveProjectionType, meetings, currentUser, permissionsMatrix, onLogAction
 }) => {
   const [activeTab, setActiveTab] = useState<'monitor' | 'justifications'>('monitor');
   const [currentHotel, setCurrentHotel] = useState(initialSelectedHotel);
@@ -691,20 +686,18 @@ const GMDView: React.FC<GMDViewProps> = ({
           <div className="flex items-center gap-4">
               {/* Version Filter */}
               {setActiveProjectionType && (
-                  <div className="flex items-center bg-gray-100 p-1 rounded-lg">
-                      {PROJECTION_TYPE_OPTIONS.map(opt => (
-                          <button
-                              key={opt.value}
-                              onClick={() => setActiveProjectionType(opt.value)}
-                              className={`px-3 py-1 text-xs font-bold rounded-md transition-all whitespace-nowrap ${activeProjectionType === opt.value
-                                  ? 'bg-white text-indigo-600 shadow-sm border border-gray-200'
-                                  : 'text-gray-500 hover:text-gray-700'
-                              }`}
-                          >
-                              {opt.label}
-                          </button>
+                  <select
+                      value={activeProjectionType || ''}
+                      onChange={(e) => setActiveProjectionType(e.target.value)}
+                      className="bg-gray-100 border border-gray-200 rounded-lg px-3 py-1.5 text-xs font-bold text-indigo-600"
+                  >
+                      {buildProjectionOptions(
+                          meetings, currentHotel, selectedYear, localMonth,
+                          hasPermission(permissionsMatrix, currentUser, 'DRE Forecast', 'Selecionar Versão "Realizado"')
+                      ).map(opt => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
                       ))}
-                  </div>
+                  </select>
               )}
 
               {/* Month Filter */}
