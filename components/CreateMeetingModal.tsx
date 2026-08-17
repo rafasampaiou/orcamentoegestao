@@ -20,8 +20,19 @@ const formatDateBR = (isoDate: string): string => {
     return `${d}/${m}/${y}`;
 };
 
+// Data de hoje em 'YYYY-MM-DD', em horário LOCAL (não UTC) — usada só pra pré-preencher o campo
+// de data já com o ano atual, poupando o usuário de digitar os 4 dígitos toda vez; ele ajusta só
+// o dia/mês se a reunião não for hoje.
+const todayIso = (): string => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+};
+
 const CreateMeetingModal: React.FC<CreateMeetingModalProps> = ({ onClose, onCreate }) => {
-    const [meetingDate, setMeetingDate] = useState('');
+    const [meetingDate, setMeetingDate] = useState(todayIso());
     const [kind, setKind] = useState<MeetingKind | ''>('');
 
     const previaLabel = meetingDate ? `Prévia de ${formatDateBR(meetingDate)}` : 'Prévia (escolha uma data primeiro)';

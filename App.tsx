@@ -810,6 +810,54 @@ const App: React.FC = () => {
     }
   };
 
+  // Excluir uma reunião em Validações (botão novo, pedido do usuário) — apaga a reunião de
+  // verdade e tudo que foi salvo sob ela (financial_data/overrides, validação, comentários,
+  // apresentações), decisão confirmada com o usuário. Não usa o autosave genérico de ocupação
+  // (esse só cobre o hotel/versão ATUALMENTE selecionado no menu principal) — repersiste
+  // explicitamente a versão do hotel da própria validação, que pode ser outro.
+  const handleDeleteMeeting = async (validation: ValidationRecord) => {
+    const hotel = hotels.find(h => h.id === validation.hotelId || h.name === validation.hotelId || h.code === validation.hotelId);
+    const hotelName = hotel?.name || validation.hotelId;
+    const matchedVersion = realVersions.find(v =>
+      v.year === validation.year && (v.hotelId === hotel?.id || v.hotelId === hotel?.code || v.hotel === hotel?.name)
+    );
+    const versionId = matchedVersion?.id || '';
+
+    try {
+      await supabaseService.deleteMeetingCascade({
+        meetingId: validation.projectionType,
+        hotelId: hotelName,
+        year: validation.year,
+        month: validation.month,
+        versionId,
+      });
+
+      const remainingMeetings = meetings.filter(m => m.id !== validation.projectionType);
+      setMeetings(remainingMeetings);
+      setValidations(prev => prev.filter(v => v.id !== validation.id));
+
+      const nextOccupancy = { ...realOccupancyData };
+      for (let i = 1; i <= 12; i++) {
+        delete nextOccupancy[`${hotelName}_${validation.year}_${i}_${versionId}__${validation.projectionType}`];
+        delete nextOccupancy[`${hotelName}_${validation.year}_${i}_${versionId}__${validation.projectionType}__OTB`];
+      }
+      setRealOccupancyData(nextOccupancy);
+
+      if (matchedVersion && versionId) {
+        const projections = buildProjectionsSnapshot(nextOccupancy, hotelName, validation.year, versionId, remainingMeetings);
+        const otbProjections = buildOtbProjectionsSnapshot(nextOccupancy, hotelName, validation.year, versionId, remainingMeetings);
+        const finalOccupancyData: any = { ...(matchedVersion.occupancyData || {}), __projections: projections, __otbProjections: otbProjections };
+        await supabaseService.upsertBudgetVersion({ ...matchedVersion, occupancyData: finalOccupancyData });
+      }
+
+      toast.success('Reunião excluída com sucesso.');
+      logUserAction(`Excluiu a reunião "${validation.meetingLabel || validation.projectionType}" de ${hotelName} — ${validation.month}/${validation.year}`);
+    } catch (err) {
+      console.error('Failed to delete meeting:', err);
+      toast.error('Erro ao excluir a reunião.');
+    }
+  };
+
   // Espera um elemento aparecer no DOM (usado depois de trocar de tela pra capturar outra seção)
   // — poll simples em vez de um delay fixo, já que telas mais pesadas (Análise de A&B) podem
   // demorar mais pra terminar de calcular/renderizar do que outras.
@@ -1563,6 +1611,8 @@ const App: React.FC = () => {
             validations={validations}
             hotels={hotels}
             currentUser={currentUser}
+            permissionsMatrix={permissionsMatrix}
+            onDeleteMeeting={handleDeleteMeeting}
             onNavigateToValidation={(validation) => {
               const hotel = hotels.find(h => h.id === validation.hotelId || h.name === validation.hotelId || h.code === validation.hotelId);
               const matchedVersion = realVersions.find(v =>

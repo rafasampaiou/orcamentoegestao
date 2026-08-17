@@ -1,19 +1,26 @@
 import React, { useState } from 'react';
-import { ValidationRecord, Hotel, User } from '../types';
-import { Calendar, Filter, Building2, CheckCircle2, ArrowRight, Clock } from 'lucide-react';
+import { ValidationRecord, Hotel, User, PermissionMatrix, hasPermission } from '../types';
+import { Calendar, Filter, Building2, CheckCircle2, ArrowRight, Clock, Trash2, AlertTriangle } from 'lucide-react';
 
 interface ValidationsViewProps {
   validations: ValidationRecord[];
   hotels: Hotel[];
   currentUser?: User;
+  permissionsMatrix: PermissionMatrix;
   onNavigateToValidation?: (validation: ValidationRecord) => void;
+  // Exclui a reunião de verdade (reunião + validação + dados salvos sob ela) — botão novo em
+  // Validações, não disponível pra "Realizado" (não é uma reunião criada, é o fechamento
+  // gerencial fixo).
+  onDeleteMeeting?: (validation: ValidationRecord) => void;
 }
 
-const ValidationsView: React.FC<ValidationsViewProps> = ({ validations, hotels, currentUser, onNavigateToValidation }) => {
+const ValidationsView: React.FC<ValidationsViewProps> = ({ validations, hotels, currentUser, permissionsMatrix, onNavigateToValidation, onDeleteMeeting }) => {
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedHotel, setSelectedHotel] = useState<string>('all');
   const [selectedProjection, setSelectedProjection] = useState<string>('all');
+  const [pendingDelete, setPendingDelete] = useState<ValidationRecord | null>(null);
+  const canDeleteMeeting = hasPermission(permissionsMatrix, currentUser, 'DRE Forecast', 'Excluir Reunião (Prévia)');
 
   const filteredValidations = validations.filter(v => {
     if (v.month !== selectedMonth) return false;
@@ -170,15 +177,26 @@ const ValidationsView: React.FC<ValidationsViewProps> = ({ validations, hotels, 
                                             )}
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            {onNavigateToValidation && (
-                                                <button
-                                                    onClick={() => onNavigateToValidation(validation)}
-                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg text-sm font-bold border border-indigo-100 transition-colors"
-                                                >
-                                                    Ir para Forecast
-                                                    <ArrowRight size={14} />
-                                                </button>
-                                            )}
+                                            <div className="flex items-center justify-end gap-2">
+                                                {onNavigateToValidation && (
+                                                    <button
+                                                        onClick={() => onNavigateToValidation(validation)}
+                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg text-sm font-bold border border-indigo-100 transition-colors"
+                                                    >
+                                                        Ir para Forecast
+                                                        <ArrowRight size={14} />
+                                                    </button>
+                                                )}
+                                                {onDeleteMeeting && canDeleteMeeting && validation.projectionType !== 'Realizado' && (
+                                                    <button
+                                                        onClick={() => setPendingDelete(validation)}
+                                                        title="Excluir esta reunião"
+                                                        className="inline-flex items-center justify-center p-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg border border-red-100 transition-colors"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 );
@@ -189,6 +207,37 @@ const ValidationsView: React.FC<ValidationsViewProps> = ({ validations, hotels, 
             </div>
         </div>
       </div>
+
+      {pendingDelete && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm overflow-hidden">
+            <div className="p-6 text-center space-y-4">
+              <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
+                <AlertTriangle size={24} />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900">Excluir Reunião</h3>
+              <p className="text-sm text-gray-500">
+                Tem certeza que deseja excluir a reunião "{pendingDelete.meetingLabel || pendingDelete.projectionType}"? Isso apaga TODOS os dados
+                salvos nela (ocupação, valores da prévia, comentários e apresentações geradas). Esta ação não pode ser desfeita.
+              </p>
+              <div className="flex justify-center gap-3 pt-4">
+                <button onClick={() => setPendingDelete(null)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => {
+                    onDeleteMeeting?.(pendingDelete);
+                    setPendingDelete(null);
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
+                >
+                  Excluir
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

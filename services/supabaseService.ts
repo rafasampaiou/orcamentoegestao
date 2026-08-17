@@ -1189,6 +1189,32 @@ export const supabaseService = {
     if (error) throw error;
   },
 
+  // Exclui uma reunião "de verdade" (Administração → Validações → excluir) — apaga a própria
+  // reunião e TUDO que foi salvo sob ela (decisão confirmada com o usuário): valores da prévia/
+  // overrides (financial_data), o registro de validação, comentários de célula, e o rastreio de
+  // apresentações já geradas. Não toca no snapshot de ocupação (realOccupancyData/__projections)
+  // — isso é limpo no client (App.tsx), que já tem o mapa em memória e sabe re-persistir o
+  // BudgetVersion sem a reunião excluída.
+  async deleteMeetingCascade(params: {
+    meetingId: string; hotelId: string; year: number; month: number; versionId: string;
+  }): Promise<void> {
+    const { meetingId, hotelId, year, month, versionId } = params;
+    const slug = (s: string) => (s || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    // Comentários de célula não têm coluna própria de projection_type — o id já embute o slug
+    // dela (ver ForecastTable.tsx, buildCommentId), então filtra por prefixo do id.
+    const commentIdPrefix = `com_${slug(hotelId)}_${year}_${month}_${slug(meetingId)}_`;
+
+    const results = await Promise.all([
+      supabase.from('meetings').delete().eq('id', meetingId),
+      supabase.from('validations').delete().eq('hotel_id', hotelId).eq('year', year).eq('month', month).eq('projection_type', meetingId),
+      supabase.from('financial_data').delete().eq('hotel', hotelId).eq('year', year).eq('month', month).eq('version_id', versionId).eq('projection_type', meetingId),
+      supabase.from('slide_presentations').delete().eq('hotel', hotelId).eq('year', year).eq('month', month).eq('projection_type', meetingId),
+      supabase.from('dre_row_comments').delete().like('id', `${commentIdPrefix}%`),
+    ]);
+    const firstError = results.find(r => r.error)?.error;
+    if (firstError) throw firstError;
+  },
+
   // Usado pelo "Resetar etapa" de Salvar projeção — desfaz a validação daquele contexto específico.
   async deleteValidationByContext(hotelId: string, year: number, month: number, projectionType: string): Promise<void> {
     const { error } = await supabase
