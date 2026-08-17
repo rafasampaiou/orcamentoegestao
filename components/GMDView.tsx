@@ -81,6 +81,7 @@ interface GMDViewProps {
     activeProjectionType?: ProjectionType;
     setActiveProjectionType?: React.Dispatch<React.SetStateAction<ProjectionType>>;
     currentUser?: User;
+    onLogAction?: (action: string) => void;
 }
 
 // Helper to format currency
@@ -90,7 +91,7 @@ const formatPercent = (val: number) => `${val.toFixed(1)}%`;
 const GMDView: React.FC<GMDViewProps> = ({
     gmdConfigs, accounts, packages, hotels, financialData, users, costCenters,
     selectedMonth, selectedYear, initialSelectedHotel, activeRealVersionName,
-    activeRealVersionId, activeProjectionType, setActiveProjectionType, currentUser
+    activeRealVersionId, activeProjectionType, setActiveProjectionType, currentUser, onLogAction
 }) => {
   const [activeTab, setActiveTab] = useState<'monitor' | 'justifications'>('monitor');
   const [currentHotel, setCurrentHotel] = useState(initialSelectedHotel);
@@ -586,6 +587,9 @@ const GMDView: React.FC<GMDViewProps> = ({
               assignedAreaManagerId: assignedAreaManagerId,
               status: newStatus
        }));
+      if (newStatus === 'Atrasado') {
+          onLogAction?.(`Marcou como atrasado o plano de ação de "${selectedJustification?.accountName}" (${currentHotel})`);
+      }
       closeJustificationModal();
   };
 
@@ -596,6 +600,7 @@ const GMDView: React.FC<GMDViewProps> = ({
             recoveredValue: parseFloat(recoveredValue.replace(',', '.') || '0'),
             completionObservation: completionObs
       }));
+      onLogAction?.(`Confirmou a conclusão do plano de ação de "${selectedJustification?.accountName}" (${currentHotel})`);
       closeJustificationModal();
   };
 
@@ -605,6 +610,7 @@ const GMDView: React.FC<GMDViewProps> = ({
             recoveredValue: parseFloat(recoveredValue.replace(',', '.') || '0'),
             completionObservation: completionObs
       }));
+      onLogAction?.(`Salvou o progresso da execução do plano de ação de "${selectedJustification?.accountName}" (${currentHotel})`);
       alert("Progresso salvo com sucesso!");
       closeJustificationModal();
   };

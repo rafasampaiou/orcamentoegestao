@@ -34,6 +34,7 @@ interface OccupancyMonthlyRealViewProps {
     // Passos da timeline que só existem na DRE Forecast (balancete, despesas da Prévia, Calcular
     // Forecast, Salvar Projeção) navegam pra lá quando clicados a partir daqui.
     onNavigateToForecast?: () => void;
+    onLogAction?: (action: string) => void;
 }
 
 // Rótulo curto de cada Versão do Forecast pra exibir nos botões/badge (mesmo padrão do
@@ -105,7 +106,8 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
     initialSelectedMonth,
     financialData,
     validations,
-    onNavigateToForecast
+    onNavigateToForecast,
+    onLogAction
 }) => {
     const canEditOccupancy = hasRole(currentUser, UserRole.ADMIN) ||
         hasRole(currentUser, UserRole.ENTITY_MANAGER) ||

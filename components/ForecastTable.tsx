@@ -78,6 +78,7 @@ interface ForecastTableProps {
     // API do Google) mora em App.tsx, que é quem controla a navegação entre telas.
     onGenerateSlides?: () => void;
     isGeneratingSlides?: boolean;
+    onLogAction?: (action: string) => void;
 }
 
 // --- UTILITÁRIOS MOVIDOS PARA FORA PARA EVITAR RE-RENDERIZAÇÕES DESNECESSÁRIAS ---
@@ -318,6 +319,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     onResetValidation,
     onGenerateSlides,
     isGeneratingSlides,
+    onLogAction,
 }) => {
     // Hotéis "Administradora" (ex.: ADM, JDL) não têm receita própria — a tela vira uma versão
     // simplificada nas prévias (só despesa do mês + Salvar Versão) e, no Realizado, o
@@ -1440,6 +1442,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         setForceUnlockValidated(true);
         handleOtbStepReset(6);
         handleOtbStepReset(7);
+        onLogAction?.(`Reabriu a versão validada de ${selectedHotel} — ${selectedMonth}/${selectedYear} (${activeProjectionType}) para edição`);
     };
 
     const handleSaveResultsDirectly = () => {
@@ -1502,6 +1505,10 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 setValidations(prev => [...prev.filter(v => v.id !== validationId), newValidation]);
             }
             setForceUnlockValidated(false);
+
+            onLogAction?.(isFullyComplete
+                ? `Validou a projeção de ${selectedHotel} — ${monthName}/${selectedYear} (${activeProjectionType})`
+                : `Salvou (em construção) a projeção de ${selectedHotel} — ${monthName}/${selectedYear} (${activeProjectionType})`);
 
             const notificationMsg = `A unidade ${selectedHotel} salvou os resultados de ${activeProjectionType} para ${monthName}/${selectedYear}. Dados salvos no banco.`;
             console.log('Notification sent to Admin:', notificationMsg);

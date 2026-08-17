@@ -1,5 +1,5 @@
 import { supabase, SITE_URL } from './supabaseClient';
-import { Account, CostCenter, Hotel, BudgetVersion, User, GMDConfiguration, UserRole, ImportedRow, KpiCalculation, ValidationRecord, PermissionMatrix } from '../types';
+import { Account, CostCenter, Hotel, BudgetVersion, User, GMDConfiguration, UserRole, ImportedRow, KpiCalculation, ValidationRecord, PermissionMatrix, UserLog } from '../types';
 
 // Supabase/PostgREST caps rows per request (default 1000) regardless of .limit(),
 // so tables that can exceed that must be paged with .range() to retrieve every row.
@@ -573,6 +573,40 @@ export const supabaseService = {
         roles,
         updated_at: new Date().toISOString()
       }, { onConflict: 'id' });
+    if (error) throw error;
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // USER LOGS (Logs de auditoria — Administração > Usuários > Logs)
+  // ═══════════════════════════════════════════════════════════════════════════
+  async getUserLogs(): Promise<UserLog[]> {
+    const { data, error } = await supabase
+      .from('user_logs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(500);
+    if (error) throw error;
+    return (data || []).map((row: any): UserLog => ({
+      id: row.id,
+      userId: row.user_id || '',
+      userName: row.user_name || '',
+      userUnit: row.user_unit || '',
+      action: row.action,
+      timestamp: row.created_at,
+    }));
+  },
+
+  // Fire-and-forget de propósito — quem chama não deve travar (nem falhar) a ação real do usuário
+  // por causa de um log que não gravou (ex. tabela `user_logs` ainda não criada no Supabase).
+  async saveUserLog(entry: Omit<UserLog, 'id' | 'timestamp'>): Promise<void> {
+    const { error } = await supabase
+      .from('user_logs')
+      .insert({
+        user_id: entry.userId,
+        user_name: entry.userName,
+        user_unit: entry.userUnit,
+        action: entry.action,
+      });
     if (error) throw error;
   },
 

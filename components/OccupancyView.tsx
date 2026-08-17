@@ -43,6 +43,7 @@ interface OccupancyViewProps {
     activeRealVersionId?: string;
     activeRealVersionName?: string;
     currentUser?: User;
+    onLogAction?: (action: string) => void;
 }
 
 export interface BudgetRow {
@@ -459,7 +460,8 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
     setActiveProjectionType,
     activeRealVersionId,
     activeRealVersionName,
-    currentUser
+    currentUser,
+    onLogAction
 }) => {
 
     const canEditOccupancy = hasRole(currentUser, UserRole.ADMIN) ||
@@ -1354,6 +1356,7 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
         if (onClearOccupancy) {
             onClearOccupancy();
         }
+        onLogAction?.(`Limpou os dados de Orçamento de Ocupação de ${selectedHotel} (${selectedYear})`);
         setShowClearConfirm(false);
     };
 

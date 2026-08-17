@@ -360,6 +360,20 @@ const App: React.FC = () => {
     };
   }, [session, loggedInProfile]);
 
+  // Log de auditoria (Administração > Usuários > Logs) — só o App.tsx tem `currentUser` e
+  // `selectedHotel` juntos ao mesmo tempo, então o helper mora aqui e é passado como prop pras
+  // telas que precisam registrar uma ação (ForecastTable, GMDView, OccupancyView,
+  // OccupancyMonthlyRealView, UnifiedAdministrationView). Fire-and-forget de propósito: uma falha
+  // ao gravar o log (ex. tabela `user_logs` ainda não criada) nunca deve travar a ação real.
+  const logUserAction = React.useCallback((action: string) => {
+    supabaseService.saveUserLog({
+      userId: currentUser.id,
+      userName: currentUser.name,
+      userUnit: selectedHotel || '',
+      action,
+    }).catch(err => console.error('Falha ao gravar log de auditoria', err));
+  }, [currentUser, selectedHotel]);
+
   const [hotels, setHotels] = useState<Hotel[]>([]);
 
   // The automatic useEffects that synced selectedHotel based on activeRealVersionId 
@@ -961,6 +975,7 @@ const App: React.FC = () => {
     try {
       await supabaseService.upsertBudgetVersion(updatedVersion);
       setRealVersions(prev => prev.map(v => v.id === version.id ? updatedVersion : v));
+      logUserAction(`Salvou a Ocupação de ${selectedHotel} — ${version.name} (${selectedDate.getFullYear()})`);
     } catch (error) {
       console.error('Erro ao salvar ocupação real:', error);
     }
@@ -1023,6 +1038,7 @@ const App: React.FC = () => {
       }
 
       toast.success(`Versões ${name} criadas com sucesso!`);
+      logUserAction(`Criou a versão "${name}" (${year})${hotelName ? ` — ${hotelName}` : ''}`);
     } catch (e) {
       console.error(e);
       toast.error('Erro ao criar novas versões.');
@@ -1196,7 +1212,8 @@ const App: React.FC = () => {
       setActiveBudgetVersionId(newBudgetVersionId);
 
       toast.success(`Versão ${options.name} replicada com sucesso!`);
-      
+      logUserAction(`Replicou a versão "${options.name}" (${replicateTarget.year})`);
+
       // Close modal
       setReplicateModalOpen(false);
       setReplicateTarget(null);
@@ -1241,7 +1258,10 @@ const App: React.FC = () => {
               if (!version) return;
               const updated = { ...version, isLocked: !version.isLocked };
               setRealVersions(prev => prev.map(bv => bv.id === id ? updated : bv));
-              try { await supabaseService.upsertBudgetVersion(updated); } catch(e) { console.error(e); }
+              try {
+                await supabaseService.upsertBudgetVersion(updated);
+                logUserAction(`${updated.isLocked ? 'Bloqueou' : 'Desbloqueou'} a versão "${version.name}" (${version.year})`);
+              } catch(e) { console.error(e); }
             }}
             onCreateVersion={onCreateVersion}
             onReplicateVersion={(year, month) => {
@@ -1259,6 +1279,8 @@ const App: React.FC = () => {
                 for (const v of newVersions) {
                     await supabaseService.upsertBudgetVersion(v);
                 }
+                const mainVersion = newVersions.find(v => v.id === id);
+                if (mainVersion) logUserAction(`Tornou "${mainVersion.name}" (${mainVersion.year}) a versão principal`);
               } catch(e) { console.error(e); }
             }}
             onDelete={async (id) => {
@@ -1267,6 +1289,7 @@ const App: React.FC = () => {
                 await supabaseService.deleteFinancialDataByVersion(id);
                 await supabaseService.deleteBudgetVersion(id);
                 setRealVersions(prev => prev.filter(v => v.id !== id));
+                if (deletedVersion) logUserAction(`Excluiu a versão "${deletedVersion.name}" (${deletedVersion.year})`);
                 if (activeRealVersionId === id) {
                   setActiveRealVersionId(realVersions.find(v => v.id !== id)?.id || '');
                 }
@@ -1342,6 +1365,7 @@ const App: React.FC = () => {
               validations={validations}
               setValidations={setValidations}
               currentUser={currentUser}
+              onLogAction={logUserAction}
               onNavigateToOccupancy={(otbMode) => { setOtbNavSignal(!!otbMode); setOccupancyNavMonth(selectedDate.getMonth() + 1); setCurrentView('occupancy_monthly'); }}
               onImportData={handleImportData}
               onDeleteOtbBalancete={handleDeleteOtbBalancete}
@@ -1405,6 +1429,7 @@ const App: React.FC = () => {
           activeRealVersionId={activeRealVersionId}
           activeRealVersionName={activeRealVersionName}
           currentUser={currentUser}
+          onLogAction={logUserAction}
         />
       );
       case 'occupancy_monthly': return (
@@ -1428,6 +1453,7 @@ const App: React.FC = () => {
           financialData={importedFinancialData}
           validations={validations}
           onNavigateToForecast={() => setCurrentView('dashboard')}
+          onLogAction={logUserAction}
         />
       );
       case 'comparatives': return (
@@ -1465,6 +1491,7 @@ const App: React.FC = () => {
           activeProjectionType={activeProjectionType}
           setActiveProjectionType={setActiveProjectionType}
           currentUser={currentUser}
+          onLogAction={logUserAction}
         />
       );
       case 'validations': return (
@@ -1546,6 +1573,7 @@ const App: React.FC = () => {
             setHotelCategories={setHotelCategories}
             hotelRegions={hotelRegions}
             setHotelRegions={setHotelRegions}
+            onLogAction={logUserAction}
           />
         );
       default: return (

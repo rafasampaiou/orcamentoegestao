@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { getForecastData, normalizeAccountName } from '../services/mockData';
 import { Plus, Trash2, X, Save, Briefcase, Pencil, Calendar, PieChart, Lock, Settings as SettingsIcon, Users, Search, Upload, Settings, Eye, FileText, Layout, Info, ChevronUp, GripVertical, Database, BedDouble, DollarSign, Target, LayoutList, ArrowUp, ArrowDown, Copy, Loader2 } from 'lucide-react';
-import { User, UserRole, CostCenter, ImportedRow, Hotel, Account, BudgetVersion, LaborParameters, ScheduleItem, ImportedCostCenter, CostPackage, GMDConfiguration, ViewState, DreSection, HotelCategory, HotelRegion, ImportedAccount, KpiCalculation, PermissionMatrix, userRoles, hasRole } from '../types';
+import { User, UserRole, CostCenter, ImportedRow, Hotel, Account, BudgetVersion, LaborParameters, ScheduleItem, ImportedCostCenter, CostPackage, GMDConfiguration, ViewState, DreSection, HotelCategory, HotelRegion, ImportedAccount, KpiCalculation, PermissionMatrix, UserLog, userRoles, hasRole } from '../types';
 import { getDreReferenceOptions } from '../utils/dreReferences';
 import KpiCalculationEditor from './KpiCalculationEditor';
 import TimelineView from './TimelineView';
@@ -356,6 +356,9 @@ interface UnifiedAdministrationViewProps {
 
   currentView: ViewState;
   setCurrentView: (view: ViewState) => void;
+
+  // Log de auditoria (aba Logs, mesma tela) — chamado a cada ação de escrita relevante daqui.
+  onLogAction?: (action: string) => void;
 }
 
 // Botão "Ver" (ícone de olho) na tabela de Usuários — ao clicar, abre um balão com os Pacotes/
@@ -457,7 +460,8 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   hotelCategories, setHotelCategories,
   hotelRegions, setHotelRegions,
   currentView,
-  setCurrentView
+  setCurrentView,
+  onLogAction
 }) => {
   // Main Module Tabs
   const [mainTab, setMainTab] = useState<'real' | 'geral'>('real');
@@ -679,6 +683,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         onDeleteImport(id);
       }
       toast.success('Importação excluída com sucesso.');
+      onLogAction?.(`Excluiu uma importação (id ${id})`);
     } catch (e: any) {
       console.error('[DEBUG] Catch em handleDeleteImportHistory. Erro completo:', e);
       toast.error('Erro ao excluir importação: ' + (e?.message || JSON.stringify(e)));
@@ -790,10 +795,29 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     );
   };
 
-  const [userLogs, setUserLogs] = useState([
-    { id: '1', userId: 'u1', userName: 'Carlos Silva', userUnit: 'Tauá Resort Caeté', action: 'Atualizou Forecast DRE', timestamp: new Date(Date.now() - 3600000).toISOString() },
-    { id: '2', userId: 'u2', userName: 'Ana Souza', userUnit: 'Tauá Resort Atibaia', action: 'Criou Nova Versão GMD', timestamp: new Date(Date.now() - 86400000).toISOString() }
-  ]);
+  // Logs de auditoria reais (Administração > Usuários > Logs) — carregados do Supabase (tabela
+  // `user_logs`) toda vez que a aba fica ativa, mesmo padrão de `fetchImportHistory`. Sem
+  // atualização em tempo real entre usuários diferentes (é preciso reabrir a aba ou clicar
+  // "Atualizar" pra ver logs gravados por outra pessoa nesse meio tempo).
+  const [userLogs, setUserLogs] = useState<UserLog[]>([]);
+  const [isLoadingUserLogs, setIsLoadingUserLogs] = useState(false);
+  const fetchUserLogs = async () => {
+    setIsLoadingUserLogs(true);
+    try {
+      const logs = await supabaseService.getUserLogs();
+      setUserLogs(logs);
+    } catch (e) {
+      console.error('Falha ao carregar logs de auditoria', e);
+    } finally {
+      setIsLoadingUserLogs(false);
+    }
+  };
+  React.useEffect(() => {
+    if (activeRegistryTab === 'logs') {
+      fetchUserLogs();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeRegistryTab]);
 
   // Catálogo de permissões: cada linha nova usa `rolesFor(...)` (lista só os perfis que já podem
   // fazer aquilo HOJE de verdade no código, via `hasRole`/gate de tela — não é uma restrição nova
@@ -946,6 +970,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         }
       }
       alert('Permissões salvas com sucesso!');
+      onLogAction?.('Editou a Matriz de Permissões');
     } catch (e: any) {
       console.error(e);
       alert(`Erro ao salvar permissões: ${e.message}`);
@@ -1584,6 +1609,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         [activeDreName]: dreStructure as unknown as DreSection[]
       }));
       alert(`Configuração de DRE do ${activeDreName} salva com sucesso!`);
+      onLogAction?.(`Editou a estrutura da DRE "${activeDreName}"`);
     } catch (err: any) {
       console.error("Erro ao salvar DRE:", err);
       alert(`Erro ao salvar DRE: ${err.message || JSON.stringify(err)}`);
@@ -1781,6 +1807,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       setActiveModal(null);
       setEditingId(null);
       alert('Hotel salvo com sucesso!');
+      onLogAction?.(`${editingId ? 'Editou' : 'Criou'} o hotel "${newHotel.name}"`);
     } catch (err: any) {
       console.error("Erro ao salvar hotel:", err);
       alert(`Erro ao salvar hotel: ${err.message || 'Verifique sua conexão.'}`);
@@ -1989,6 +2016,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         setGmdConfigs(prev => [...prev, newGMD]);
       }
       setActiveModal(null);
+      onLogAction?.(`${editingId ? 'Editou' : 'Criou'} uma configuração de GMD`);
     } catch (err: any) {
       console.error("Erro ao salvar GMD:", err);
       const msg = err?.message || err?.details || JSON.stringify(err);
@@ -2027,6 +2055,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         setUsers(prev => [...prev, newUserReq]);
       }
       setActiveModal(null);
+      onLogAction?.(`${editingId ? 'Editou' : 'Criou'} o usuário "${newUserReq.name}"`);
     } catch (err: any) {
       console.error("Erro ao salvar usuário:", err);
       const msg = err?.message || err?.details || JSON.stringify(err);
@@ -2078,6 +2107,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       }
       setActiveModal(null);
       alert('Setor(es) salvo(s) com sucesso!');
+      onLogAction?.(`${editingId ? 'Editou' : 'Criou'} o setor "${costCenterForm.name}"`);
     } catch (err: any) {
       console.error("Erro ao salvar setor:", err);
       alert(`Erro ao salvar setor: ${err.message || 'Erro desconhecido'}`);
@@ -2152,6 +2182,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     try {
       await supabaseService.upsertAccounts(finalAccounts);
       alert('Alterações salvas e sincronizadas com sucesso!');
+      onLogAction?.(`Editou o Plano de Contas/Pacotes ("${accountForm.name}")`);
     } catch (err: any) {
       console.error("Save failed:", err);
       alert(`Erro ao sincronizar: ${err.message || JSON.stringify(err)}`);
@@ -2282,6 +2313,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         await supabaseService.deleteAccount(tid);
       }
       toast.success('Excluído com sucesso do banco de dados!');
+      onLogAction?.(`Excluiu ${type === 'master' ? 'o master' : type === 'pkg' ? 'o pacote' : 'a conta'} "${name || id}" do Plano de Contas`);
     } catch (e: any) {
       console.error('[DEBUG] Erro ao excluir do Supabase:', e);
       toast.error('Erro ao excluir do banco: ' + e.message);
@@ -2453,6 +2485,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       setCcParsedData([]);
       setImportText('');
       alert(`${validData.length} setores importados e sincronizados com sucesso!`);
+      onLogAction?.(`Importou ${validData.length} setores (${ccHotelLabel})`);
     } catch (err: any) {
       console.error("Erro ao importar setores no Supabase:", err);
       alert(`Erro ao sincronizar: ${err.message || 'Erro desconhecido'}`);
@@ -2619,6 +2652,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       }
       await recordCadastralImportHistory('Conta', 'Todos os hotéis', uniqueNewAccounts.length);
       alert(`Sucesso! ${uniqueNewAccounts.length} contas foram processadas.`);
+      onLogAction?.(`Importou o Plano de Contas (${uniqueNewAccounts.length} contas)`);
     } catch (err: any) {
       console.error("Erro ao salvar no Supabase:", err);
       alert(`Erro ao sincronizar: ${err.message}`);
@@ -2675,6 +2709,11 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
           setGmdConfigs(prev => prev.filter(i => i.id !== id));
           break;
       }
+      const typeLabel: Record<typeof type, string> = {
+        users: 'usuário', hotels: 'hotel', costCenters: 'setor', costCentersGrouped: 'setor',
+        accounts: 'conta do Plano de Contas', gmd: 'configuração de GMD',
+      };
+      onLogAction?.(`Excluiu ${typeLabel[type]} "${id}"`);
     } catch (err) {
       console.error(`Erro ao excluir ${type}:`, err);
       toast.error(err instanceof Error ? err.message : 'Erro ao excluir no banco de dados.');
@@ -3231,12 +3270,14 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         setEditingImportId(null);
         fetchImportHistory();
         toast.success('Importação atualizada com sucesso!');
+        onLogAction?.(`Editou a importação de Despesas (Forecast) de ${hotelName}`);
       } else {
         const importId = await recordImportHistory(rowsToSave);
         await supabaseService.saveFinancialData(rowsToSave, importId);
         if (onImportData) {
           onImportData(rowsToSave, 'append');
         }
+        onLogAction?.(`Importou Despesas (${scenario === 'BUDGET' ? 'Budget' : 'Forecast'}) de ${hotelName}`);
         const wantToValidate = await confirmAction(`Dados de despesas (${scenario === 'BUDGET' ? 'Budget' : 'Forecast'}) salvos com sucesso!\n\nDados salvos, clique OK para validar a importação na DRE Forecast ou Cancelar para permanecer nesta tela.`);
         if (wantToValidate) {
           setCurrentView('dashboard');
@@ -3383,6 +3424,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         onImportData(rowsToSave, 'append');
       }
       alert(`Impostos (${scenario === 'BUDGET' ? 'Budget' : 'Real'}) salvos com sucesso!`);
+      onLogAction?.(`Importou Impostos (${scenario === 'BUDGET' ? 'Budget' : 'Real'})`);
     } catch (e: any) {
       alert('Erro ao salvar impostos: ' + e.message);
     } finally {
@@ -3456,6 +3498,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       }
 
       alert(`Dados de ocupação (${scenario === 'BUDGET' ? 'Budget' : 'Real'}) salvos com sucesso!`);
+      onLogAction?.(`Importou Ocupação (${scenario === 'BUDGET' ? 'Budget' : 'Real'}) — versão "${targetVersion.name}"`);
 
       const histRows: ImportedRow[] = [{
         ano: String(targetVersion.year),
@@ -3525,6 +3568,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       const importId = await recordImportHistory(rowsToSave);
       await supabaseService.saveFinancialData(rowsToSave, importId);
       alert(`${rowsToSave.length} registros de receita (${scenario === 'BUDGET' ? 'Budget' : 'Real'}) salvos com sucesso!`);
+      onLogAction?.(`Importou ${rowsToSave.length} registros de Receita (${scenario === 'BUDGET' ? 'Budget' : 'Real'})`);
       if (scenario === 'BUDGET') setBudgetFinancialImportText('');
       else setImportText('');
     } catch (e: any) {
@@ -3713,6 +3757,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       } else {
         setRealVersions(prev => prev.map(rv => rv.id === id ? updated : rv));
       }
+      onLogAction?.(`${updated.isLocked ? 'Bloqueou' : 'Desbloqueou'} a versão "${version.name}" (${version.year})`);
     } catch (err) {
       console.error('Failed to update version lock:', err);
     }
@@ -3769,6 +3814,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       setActiveBudgetVersionId(budgetId);
 
       toast.success(`Versões ${name} criadas com sucesso!`);
+      onLogAction?.(`Criou a versão "${name}" (${year})`);
     } catch (e) {
       console.error(e);
       toast.error('Erro ao criar novas versões.');
@@ -3919,6 +3965,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       setActiveBudgetVersionId(newBudgetVersionId);
 
       toast.success(`Versão ${options.name} replicada com sucesso!`);
+      onLogAction?.(`Replicou a versão "${options.name}"`);
 
       // Close modal
       setReplicateModalOpen(false);
@@ -3985,6 +4032,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
           }
         }
       }
+      if (deletedVersion) onLogAction?.(`Excluiu a versão "${deletedVersion.name}" (${deletedVersion.year})`);
     } catch (err) {
       console.error('Failed to delete version:', err);
       alert('Erro ao excluir versão.');
@@ -5493,6 +5541,13 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <h4 className="font-bold text-gray-700">Registros de Atividades (Logs)</h4>
+                    <button
+                      onClick={fetchUserLogs}
+                      disabled={isLoadingUserLogs}
+                      className="text-indigo-600 hover:text-indigo-800 flex items-center gap-1 text-sm font-bold bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors border border-indigo-100 disabled:opacity-50"
+                    >
+                      {isLoadingUserLogs ? 'Atualizando...' : 'Atualizar'}
+                    </button>
                   </div>
                   <div className="overflow-hidden border border-gray-200 rounded-lg">
                     <table className="min-w-full divide-y divide-gray-200 text-sm">
@@ -5505,6 +5560,13 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
+                        {userLogs.length === 0 && (
+                          <tr>
+                            <td colSpan={4} className="px-6 py-8 text-center text-gray-400 text-sm">
+                              {isLoadingUserLogs ? 'Carregando...' : 'Nenhum registro de atividade ainda.'}
+                            </td>
+                          </tr>
+                        )}
                         {userLogs.map(log => (
                           <tr key={log.id} className="hover:bg-slate-50 transition-colors">
                             <td className="px-6 py-4 whitespace-nowrap font-medium text-slate-800">{log.userName}</td>
