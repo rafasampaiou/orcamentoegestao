@@ -24,7 +24,8 @@ import ValidationsView from './components/ValidationsView';
 import { supabase } from './services/supabaseClient';
 import { supabaseService } from './services/supabaseService';
 import { Session } from '@supabase/supabase-js';
-import { ViewState, ImportedRow, User, Hotel, HotelCategory, HotelRegion, CostCenter, CostPackage, Account, GMDConfiguration, ModuleType, UserRole, BudgetVersion, LaborParameters, ScheduleItem, ProjectionType, ValidationRecord, DreSection, KpiCalculation, hasRole } from './types';
+import { ViewState, ImportedRow, User, Hotel, HotelCategory, HotelRegion, CostCenter, CostPackage, Account, GMDConfiguration, ModuleType, UserRole, BudgetVersion, LaborParameters, ScheduleItem, ProjectionType, ValidationRecord, DreSection, KpiCalculation, hasRole, hasPermission, PermissionMatrix } from './types';
+import { DEFAULT_PERMISSIONS_MATRIX, mergePermissionsMatrix } from './utils/permissionsCatalog';
 import { SLIDES_CAPTURE_TARGETS } from './utils/slidesCaptureTargets';
 import { captureSlideTarget, getPngBlobSize } from './utils/captureElement';
 import {
@@ -343,6 +344,12 @@ const App: React.FC = () => {
   // profile" gate below doesn't false-positive on a valid user while `users` is still loading.
   const [profilesLoaded, setProfilesLoaded] = useState(false);
 
+  // Matriz de Permissões — nasce já com o catálogo default (= comportamento atual do `hasRole`
+  // hardcoded que está sendo substituído), nunca fica vazia; o boot acima sobrescreve com o que
+  // estiver salvo no Supabase, se houver. Como toda tela só renderiza depois de `profilesLoaded`,
+  // nenhum componente vê essa matriz antes dela estar populada.
+  const [permissionsMatrix, setPermissionsMatrix] = useState<PermissionMatrix>(DEFAULT_PERMISSIONS_MATRIX);
+
   const loggedInProfile = React.useMemo(() => {
     if (!session) return null;
     return users.find(u => u.email.toLowerCase() === session.user.email?.toLowerCase()) || null;
@@ -501,7 +508,8 @@ const App: React.FC = () => {
           remoteCategories,
           remoteRegions,
           remoteVersions,
-          remoteFinancial
+          remoteFinancial,
+          remotePermissions
         ] = await Promise.all([
           supabaseService.getHotels(),
           supabaseService.getCostCenters(),
@@ -522,6 +530,13 @@ const App: React.FC = () => {
           fetchFinancialData().catch(finError => {
             console.warn('Could not fetch financial data from Supabase.', finError);
             return [] as any[];
+          }),
+          // Matriz de Permissões — mesmo padrão defensivo de validations/financial: uma falha
+          // aqui não pode travar o boot do app inteiro, só cai pro catálogo default (que já é
+          // uma foto do comportamento atual, então nada muda pra ninguém nesse caso).
+          supabaseService.getPermissions().catch(permError => {
+            console.warn('Could not fetch permissions from Supabase.', permError);
+            return {} as PermissionMatrix;
           })
         ]);
 
@@ -564,6 +579,7 @@ const App: React.FC = () => {
         if (remoteValidations) setValidations(remoteValidations);
         if (remoteCategories) setHotelCategories(remoteCategories);
         if (remoteRegions) setHotelRegions(remoteRegions);
+        setPermissionsMatrix(mergePermissionsMatrix(DEFAULT_PERMISSIONS_MATRIX, remotePermissions || {}));
 
         hasLoadedFromSupabase.current = true;
 
@@ -1365,6 +1381,7 @@ const App: React.FC = () => {
               validations={validations}
               setValidations={setValidations}
               currentUser={currentUser}
+              permissionsMatrix={permissionsMatrix}
               onLogAction={logUserAction}
               onNavigateToOccupancy={(otbMode) => { setOtbNavSignal(!!otbMode); setOccupancyNavMonth(selectedDate.getMonth() + 1); setCurrentView('occupancy_monthly'); }}
               onImportData={handleImportData}
@@ -1429,6 +1446,7 @@ const App: React.FC = () => {
           activeRealVersionId={activeRealVersionId}
           activeRealVersionName={activeRealVersionName}
           currentUser={currentUser}
+          permissionsMatrix={permissionsMatrix}
           onLogAction={logUserAction}
         />
       );
@@ -1446,6 +1464,7 @@ const App: React.FC = () => {
           activeRealVersionId={activeRealVersionId}
           activeRealVersionName={activeRealVersionName}
           currentUser={currentUser}
+          permissionsMatrix={permissionsMatrix}
           activeProjectionType={activeProjectionType}
           setActiveProjectionType={setActiveProjectionType}
           initialOtbMode={otbNavSignal}
@@ -1491,6 +1510,7 @@ const App: React.FC = () => {
           activeProjectionType={activeProjectionType}
           setActiveProjectionType={setActiveProjectionType}
           currentUser={currentUser}
+          permissionsMatrix={permissionsMatrix}
           onLogAction={logUserAction}
         />
       );
@@ -1533,7 +1553,7 @@ const App: React.FC = () => {
       case 'admin_hotels':
       case 'admin_gmd':
       case 'admin':
-        if (!hasRole(currentUser, UserRole.ADMIN)) {
+        if (!hasPermission(permissionsMatrix, currentUser, 'Administração — Acesso', 'Acessar Área de Administração')) {
           return (
             <div className="p-8 text-center text-red-500 font-bold bg-white rounded-2xl border border-red-200 max-w-xl mx-auto shadow-sm mt-12">
               Acesso negado. Apenas perfis Administradores possuem acesso à área administrativa.
@@ -1543,6 +1563,9 @@ const App: React.FC = () => {
         return (
           <UnifiedAdministrationView
             currentView={currentView}
+            currentUser={currentUser}
+            permissionsMatrix={permissionsMatrix}
+            onPermissionsChange={setPermissionsMatrix}
             users={users}
             setUsers={setUsers}
             hotels={hotels} setHotels={setHotels}
@@ -1659,6 +1682,7 @@ const App: React.FC = () => {
         onChangeView={setCurrentView}
         onModuleChange={handleModuleChange}
         user={currentUser}
+        permissionsMatrix={permissionsMatrix}
         collapsed={sidebarCollapsed}
       />
 

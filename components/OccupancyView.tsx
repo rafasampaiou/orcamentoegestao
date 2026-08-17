@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Settings2, ChevronUp, Save, Trash2, CheckCircle, ListFilter, LayoutList } from 'lucide-react';
-import { ColumnVisibility, ImportedRow, User, UserRole, Hotel, BudgetVersion, ProjectionType, hasRole } from '../types';
+import { ColumnVisibility, ImportedRow, User, Hotel, BudgetVersion, ProjectionType, PermissionMatrix, hasPermission } from '../types';
 
 // A "Versão do Forecast" as selectable in Ocupação — the 5 canonical ProjectionType values
 // (shared with DRE Forecast) plus 2 view-only labels with no DRE Forecast equivalent (Meta/Ano
@@ -43,6 +43,7 @@ interface OccupancyViewProps {
     activeRealVersionId?: string;
     activeRealVersionName?: string;
     currentUser?: User;
+    permissionsMatrix: PermissionMatrix;
     onLogAction?: (action: string) => void;
 }
 
@@ -461,12 +462,12 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
     activeRealVersionId,
     activeRealVersionName,
     currentUser,
+    permissionsMatrix,
     onLogAction
 }) => {
 
-    const canEditOccupancy = hasRole(currentUser, UserRole.ADMIN) ||
-                            hasRole(currentUser, UserRole.ENTITY_MANAGER) ||
-                            hasRole(currentUser, UserRole.COST_ANALYST);
+    const canEditOccupancyValues = hasPermission(permissionsMatrix, currentUser, 'Ocupação', 'Editar Ocupação (Real/Prévia)');
+    const canSaveClearOccupancy = hasPermission(permissionsMatrix, currentUser, 'Ocupação', 'Salvar / Limpar Dados de Ocupação');
 
     const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>({
         otb: false,
@@ -1127,7 +1128,7 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
                                         </td>
                                         {columnVisibility.previa && (
                                             <td className="px-1 py-2 text-right text-sm truncate bg-sky-50/30 border-r border-gray-100">
-                                                {row.isManualReal && canEditOccupancy && isSingleMonthView ? (
+                                                {row.isManualReal && canEditOccupancyValues && isSingleMonthView ? (
                                                     <TableInput
                                                         value={previa || 0}
                                                         format={row.format}
@@ -1147,7 +1148,7 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
                                         )}
                                         {columnVisibility.real && (
                                             <td className="px-1 py-2 text-right text-sm truncate bg-sky-50/30 border-r border-gray-100">
-                                                {row.isManualReal && canEditOccupancy && isSingleMonthView ? (
+                                                {row.isManualReal && canEditOccupancyValues && isSingleMonthView ? (
                                                     <TableInput
                                                         value={forecast || 0}
                                                         format={row.format}
@@ -1368,7 +1369,7 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
                     <h2 className="text-2xl font-bold text-gray-900">Orçamento de Ocupação</h2>
                     <p className="text-gray-500 mt-1">Projeção mensal de ocupação e receitas (Lazer e Eventos).</p>
                 </div>
-            {canEditOccupancy && (
+            {canSaveClearOccupancy && (
                 <div className="flex items-center gap-3">
                     <button
                         onClick={handleManualSave}
@@ -1450,9 +1451,9 @@ const OccupancyView: React.FC<OccupancyViewProps> = ({
             </div>
 
             <div className="space-y-6">
-                <BudgetOccupancyTable title="Geral" rows={geralRows} data={budgetData} onUpdate={handleUpdate} decimalOverrides={decimalOverrides} onToggleDecimals={toggleDecimals} canEdit={canEditOccupancy} visibleMonths={visibleMonthsFilter} />
-                <BudgetOccupancyTable title="Lazer" rows={lazerRows} data={budgetData} onUpdate={handleUpdate} decimalOverrides={decimalOverrides} onToggleDecimals={toggleDecimals} canEdit={canEditOccupancy} visibleMonths={visibleMonthsFilter} />
-                <BudgetOccupancyTable title="Eventos" rows={eventRows} data={budgetData} onUpdate={handleUpdate} decimalOverrides={decimalOverrides} onToggleDecimals={toggleDecimals} canEdit={canEditOccupancy} visibleMonths={visibleMonthsFilter} />
+                <BudgetOccupancyTable title="Geral" rows={geralRows} data={budgetData} onUpdate={handleUpdate} decimalOverrides={decimalOverrides} onToggleDecimals={toggleDecimals} canEdit={canEditOccupancyValues} visibleMonths={visibleMonthsFilter} />
+                <BudgetOccupancyTable title="Lazer" rows={lazerRows} data={budgetData} onUpdate={handleUpdate} decimalOverrides={decimalOverrides} onToggleDecimals={toggleDecimals} canEdit={canEditOccupancyValues} visibleMonths={visibleMonthsFilter} />
+                <BudgetOccupancyTable title="Eventos" rows={eventRows} data={budgetData} onUpdate={handleUpdate} decimalOverrides={decimalOverrides} onToggleDecimals={toggleDecimals} canEdit={canEditOccupancyValues} visibleMonths={visibleMonthsFilter} />
             </div>
         </div>
     );

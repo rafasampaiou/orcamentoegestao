@@ -54,6 +54,22 @@ export const userRoles = (user?: { role?: UserRole; roles?: UserRole[] } | null)
 export const hasRole = (user: { role?: UserRole; roles?: UserRole[] } | null | undefined, role: UserRole): boolean =>
   userRoles(user).includes(role);
 
+// Controle de acesso real da Matriz de Permissões (Administração → Permissões). ADMIN geral é
+// sempre um "super usuário" — passa em qualquer checagem independente do que estiver marcado na
+// matriz, pra nunca correr risco de se autobloquear. Pros demais perfis, a permissão é a UNIÃO de
+// todos os roles do usuário (basta um dos perfis dele estar marcado `true` pra ação).
+export const hasPermission = (
+  matrix: PermissionMatrix | null | undefined,
+  user: { role?: UserRole; roles?: UserRole[] } | null | undefined,
+  category: string,
+  action: string
+): boolean => {
+  if (hasRole(user, UserRole.ADMIN)) return true;
+  const cell = matrix?.[category]?.[action];
+  if (!cell) return false;
+  return userRoles(user).some(role => cell[role] === true);
+};
+
 // Profile represents a user account managed in the `profiles` table in Supabase.
 // It links to auth.users via the `id` field.
 export interface Profile {

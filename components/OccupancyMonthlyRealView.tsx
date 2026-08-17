@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Save, CheckCircle } from 'lucide-react';
-import { User, UserRole, ProjectionType, ImportedRow, ValidationRecord, Hotel, hasRole } from '../types';
+import { User, ProjectionType, ImportedRow, ValidationRecord, Hotel, PermissionMatrix, hasPermission } from '../types';
 import { BudgetRow, BudgetOccupancyTable, geralRows, lazerRows, eventRows, OccupancyVersionOption, MEETING_VERSIONS, OWN_SNAPSHOT_VERSIONS } from './OccupancyView';
 import OtbProgressTimeline from './OtbProgressTimeline';
 import { computeOtbProgress } from '../utils/otbProgress';
@@ -19,6 +19,7 @@ interface OccupancyMonthlyRealViewProps {
     activeRealVersionId?: string;
     activeRealVersionName?: string;
     currentUser?: User;
+    permissionsMatrix: PermissionMatrix;
     onSaveOccupancy?: () => void;
     activeProjectionType?: ProjectionType;
     setActiveProjectionType?: React.Dispatch<React.SetStateAction<ProjectionType>>;
@@ -99,6 +100,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
     activeRealVersionId,
     activeRealVersionName,
     currentUser,
+    permissionsMatrix,
     onSaveOccupancy,
     activeProjectionType,
     setActiveProjectionType,
@@ -109,9 +111,8 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
     onNavigateToForecast,
     onLogAction
 }) => {
-    const canEditOccupancy = hasRole(currentUser, UserRole.ADMIN) ||
-        hasRole(currentUser, UserRole.ENTITY_MANAGER) ||
-        hasRole(currentUser, UserRole.COST_ANALYST);
+    const canEditOccupancyValues = hasPermission(permissionsMatrix, currentUser, 'Ocupação', 'Editar Ocupação (Real/Prévia)');
+    const canSaveClearOccupancy = hasPermission(permissionsMatrix, currentUser, 'Ocupação', 'Salvar / Limpar Dados de Ocupação');
 
     // Hotel Administradora (ex.: ADM, JDL) não tem ocupação própria — a tabela não faz sentido
     // pra ele, mostra um aviso no lugar (mesmo critério usado em ForecastTable.tsx/
@@ -752,7 +753,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
                     </div>
                     <p className="text-gray-500 mt-1">Visão anual de ocupação. As alterações feitas aqui alimentam automaticamente as colunas correspondentes no DRE Forecast.</p>
                 </div>
-                {canEditOccupancy && (
+                {canSaveClearOccupancy && (
                     <div className="flex items-center gap-3">
                         <button
                             onClick={handleManualSave}
@@ -860,7 +861,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
                         onUpdate={handleUpdate}
                         decimalOverrides={decimalOverrides}
                         onToggleDecimals={toggleDecimals}
-                        canEdit={canEditOccupancy}
+                        canEdit={canEditOccupancyValues}
                         isRealMode={true}
                         visibleMonths={visibleMonthsFilter}
                     />
@@ -871,7 +872,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
                         onUpdate={handleUpdate}
                         decimalOverrides={decimalOverrides}
                         onToggleDecimals={toggleDecimals}
-                        canEdit={canEditOccupancy}
+                        canEdit={canEditOccupancyValues}
                         isRealMode={true}
                         visibleMonths={visibleMonthsFilter}
                     />
@@ -882,7 +883,7 @@ const OccupancyMonthlyRealView: React.FC<OccupancyMonthlyRealViewProps> = ({
                         onUpdate={handleUpdate}
                         decimalOverrides={decimalOverrides}
                         onToggleDecimals={toggleDecimals}
-                        canEdit={canEditOccupancy}
+                        canEdit={canEditOccupancyValues}
                         isRealMode={true}
                         visibleMonths={visibleMonthsFilter}
                     />

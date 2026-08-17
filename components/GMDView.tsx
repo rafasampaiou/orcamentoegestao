@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Network, Filter, AlertTriangle, CheckCircle, FileText, ClipboardList, ShieldCheck, ShieldAlert, Calendar, DollarSign, CheckSquare, Search, X, FileEdit, ExternalLink, ChevronDown, ChevronRight } from 'lucide-react';
-import { GMDConfiguration, Account, CostPackage, Hotel, ImportedRow, User, Justification, CostCenter, UserRole, hasRole, ProjectionType } from '../types';
+import { GMDConfiguration, Account, CostPackage, Hotel, ImportedRow, User, Justification, CostCenter, UserRole, hasRole, ProjectionType, PermissionMatrix, hasPermission } from '../types';
 import { supabaseService } from '../services/supabaseService';
 
 // Segmentação informativa de Despesas Administrativas e Despesas com Vendas e Marketing —
@@ -81,6 +81,7 @@ interface GMDViewProps {
     activeProjectionType?: ProjectionType;
     setActiveProjectionType?: React.Dispatch<React.SetStateAction<ProjectionType>>;
     currentUser?: User;
+    permissionsMatrix: PermissionMatrix;
     onLogAction?: (action: string) => void;
 }
 
@@ -91,7 +92,7 @@ const formatPercent = (val: number) => `${val.toFixed(1)}%`;
 const GMDView: React.FC<GMDViewProps> = ({
     gmdConfigs, accounts, packages, hotels, financialData, users, costCenters,
     selectedMonth, selectedYear, initialSelectedHotel, activeRealVersionName,
-    activeRealVersionId, activeProjectionType, setActiveProjectionType, currentUser, onLogAction
+    activeRealVersionId, activeProjectionType, setActiveProjectionType, currentUser, permissionsMatrix, onLogAction
 }) => {
   const [activeTab, setActiveTab] = useState<'monitor' | 'justifications'>('monitor');
   const [currentHotel, setCurrentHotel] = useState(initialSelectedHotel);
@@ -271,7 +272,7 @@ const GMDView: React.FC<GMDViewProps> = ({
       // tudo que algum dos perfis do usuário concede, não só o primeiro que bater.
 
       // Gerente de Entidade e Analista de Custos: can resolve/approve if in one of their hotels
-      if (hasRole(currentUser, UserRole.ENTITY_MANAGER) || hasRole(currentUser, UserRole.COST_ANALYST)) {
+      if ((hasRole(currentUser, UserRole.ENTITY_MANAGER) || hasRole(currentUser, UserRole.COST_ANALYST)) && (hasPermission(permissionsMatrix, currentUser, 'GMD', 'Confirmar Conclusão / Marcar Atrasado (Plano de Ação)') || hasPermission(permissionsMatrix, currentUser, 'GMD', 'Salvar Progresso da Execução (Plano de Ação)'))) {
           const userHotelIds = currentUser.hotelIds && currentUser.hotelIds.length > 0
               ? currentUser.hotelIds
               : (currentUser.hotelId ? [currentUser.hotelId] : []);
@@ -286,7 +287,7 @@ const GMDView: React.FC<GMDViewProps> = ({
 
       // Gerente de Pacotes: can resolve if this Pacote Master is under their responsibility —
       // responsiblePackages guarda nomes de Pacote Master (mesma lista que aparece em Metas GMD).
-      if (hasRole(currentUser, UserRole.PACKAGE_MANAGER)) {
+      if (hasRole(currentUser, UserRole.PACKAGE_MANAGER) && (hasPermission(permissionsMatrix, currentUser, 'GMD', 'Confirmar Conclusão / Marcar Atrasado (Plano de Ação)') || hasPermission(permissionsMatrix, currentUser, 'GMD', 'Salvar Progresso da Execução (Plano de Ação)'))) {
           const pkg = masterPackages.find(p => p.id === config.packageId || p.name === config.packageId);
           const isResponsibleForPkg = !!pkg && currentUser.responsiblePackages?.includes(pkg.name);
           const isResponsibleForRev = currentUser.responsibleRevenues?.some(rev =>
@@ -296,7 +297,7 @@ const GMDView: React.FC<GMDViewProps> = ({
       }
 
       // Gerente de Área / Analista de área: can resolve if CR matches responsibleCostCenters OR directed to them
-      if (hasRole(currentUser, UserRole.AREA_MANAGER) || hasRole(currentUser, UserRole.AREA_ANALYST)) {
+      if ((hasRole(currentUser, UserRole.AREA_MANAGER) || hasRole(currentUser, UserRole.AREA_ANALYST)) && (hasPermission(permissionsMatrix, currentUser, 'GMD', 'Confirmar Conclusão / Marcar Atrasado (Plano de Ação)') || hasPermission(permissionsMatrix, currentUser, 'GMD', 'Salvar Progresso da Execução (Plano de Ação)'))) {
           if (just.assignedAreaManagerId === currentUser.id) return true;
 
           const hasResponsibleCR = config.costCenterIds?.some(ccId =>
@@ -1174,7 +1175,7 @@ const GMDView: React.FC<GMDViewProps> = ({
                                 {canUserResolveJustification(selectedJustification) && (
                                     <div className="flex flex-col gap-2">
                                         {/* Entity Managers, Cost Analysts, and Admins can finalize */}
-                                        {(hasRole(currentUser, UserRole.ADMIN) || hasRole(currentUser, UserRole.ENTITY_MANAGER) || hasRole(currentUser, UserRole.COST_ANALYST)) ? (
+                                        {hasPermission(permissionsMatrix, currentUser, 'GMD', 'Confirmar Conclusão / Marcar Atrasado (Plano de Ação)') ? (
                                             <div className="flex gap-3">
                                                 <button onClick={() => handleCompletePlan(selectedJustification.id)} className="flex-1 bg-green-600 text-white py-2.5 rounded-lg text-sm font-bold hover:bg-green-700 flex justify-center items-center gap-2 shadow-sm transition-colors">
                                                     <CheckCircle size={16} /> Confirmar Conclusão

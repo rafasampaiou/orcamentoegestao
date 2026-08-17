@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { getForecastData, getDynamicForecastData } from '../services/mockData';
 import { Upload, ListFilter, LayoutList, Settings2, ChevronUp, Activity, TrendingUp, Lock, LockOpen, CheckCircle2, X, FileSpreadsheet, AlertCircle, CheckCircle, ChevronRight, ChevronDown, Presentation } from 'lucide-react';
-import { ExpenseDriver, ImportedRow, Account, CostPackage, Hotel, BudgetVersion, ForecastRow, ForecastConfig, ForecastOperator, ColumnVisibility, UserRole, KpiCalculation, hasRole } from '../types';
+import { ExpenseDriver, ImportedRow, Account, CostPackage, Hotel, BudgetVersion, ForecastRow, ForecastConfig, ForecastOperator, ColumnVisibility, UserRole, KpiCalculation, hasRole, PermissionMatrix, hasPermission } from '../types';
 import { evaluateFormula } from '../utils/formulaEngine';
 import { supabaseService } from '../services/supabaseService';
 import { MEETING_VERSIONS } from './OccupancyView';
@@ -69,6 +69,7 @@ interface ForecastTableProps {
     validations?: import('../types').ValidationRecord[];
     setValidations?: React.Dispatch<React.SetStateAction<import('../types').ValidationRecord[]>>;
     currentUser?: import('../types').User;
+    permissionsMatrix: PermissionMatrix;
     dreConfigs?: Record<string, import('../types').DreSection[]>;
     onNavigateToOccupancy?: (otbMode?: boolean) => void;
     onImportData?: (rows: ImportedRow[], mode: 'append' | 'replace') => void;
@@ -312,6 +313,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     validations,
     setValidations,
     currentUser,
+    permissionsMatrix,
     dreConfigs,
     onNavigateToOccupancy,
     onImportData,
@@ -328,14 +330,12 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     const currentHotelObj = hotels.find(h => h.name === selectedHotel);
     const isAdminEntity = currentHotelObj?.type === 'Administradora';
 
-    const canEditForecast = hasRole(currentUser, UserRole.ADMIN) ||
-        hasRole(currentUser, UserRole.ENTITY_MANAGER) ||
-        hasRole(currentUser, UserRole.COST_ANALYST) ||
-        hasRole(currentUser, UserRole.PACKAGE_MANAGER);
-
-    const canValidate = hasRole(currentUser, UserRole.ADMIN) ||
-        hasRole(currentUser, UserRole.ENTITY_MANAGER) ||
-        hasRole(currentUser, UserRole.COST_ANALYST);
+    const canEditForecastValues = hasPermission(permissionsMatrix, currentUser, 'DRE Forecast', 'Editar Valores da Prévia/Real (contas, pacotes, indicadores)');
+    const canCalcularForecast   = hasPermission(permissionsMatrix, currentUser, 'DRE Forecast', 'Calcular Forecast / Iniciar Projeção');
+    const canValidateForecast   = hasPermission(permissionsMatrix, currentUser, 'DRE Forecast', 'Salvar Projeção / Validar Fechamento');
+    const canReopenValidated    = hasPermission(permissionsMatrix, currentUser, 'DRE Forecast', 'Reabrir Versão Validada para Edição');
+    const canSelectRealizado    = hasPermission(permissionsMatrix, currentUser, 'DRE Forecast', 'Selecionar Versão "Realizado"');
+    const canGenerateSlides     = hasPermission(permissionsMatrix, currentUser, 'DRE Forecast', 'Gerar Apresentação (Google Slides)');
 
     // Selecting "Fechamento" as the Forecast version only swaps labels (Prévia → Real) — it
     // does NOT lock editing by itself. Editing only locks once THIS specific closing has
@@ -784,7 +784,10 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         if (!currentUser) return false;
 
         // ADMIN Geral, Gerente de Entidade, and Analista de Custos have full edit access
-        if (hasRole(currentUser, UserRole.ADMIN) || hasRole(currentUser, UserRole.ENTITY_MANAGER) || hasRole(currentUser, UserRole.COST_ANALYST)) {
+        if (
+            (hasRole(currentUser, UserRole.ADMIN) || hasRole(currentUser, UserRole.ENTITY_MANAGER) || hasRole(currentUser, UserRole.COST_ANALYST)) &&
+            canEditForecastValues
+        ) {
             return true;
         }
 
@@ -792,7 +795,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         // responsiblePackages holds Pacote names (see "Pacotes" no formulário de usuário, mesma
         // granularidade que aparece na DRE Forecast) — matched against each account's own
         // package, não o Pacote Master (mais amplo).
-        if (hasRole(currentUser, UserRole.PACKAGE_MANAGER)) {
+        if (hasRole(currentUser, UserRole.PACKAGE_MANAGER) && canEditForecastValues) {
             if (row.category === 'Costs' || row.category === 'Package' || row.category === 'Account') {
                 // If it's a package header
                 if (row.isHeader && row.indentLevel === 1) {
@@ -1713,7 +1716,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 <option value="FCA N2">FCA N2</option>
                                 <option value="FCA N1">FCA N1</option>
                                 <option value="Fechamento oficial">Fechamento</option>
-                                {hasRole(currentUser, UserRole.ADMIN) && <option value="Realizado">Realizado</option>}
+                                {canSelectRealizado && <option value="Realizado">Realizado</option>}
                             </select>
                         </div>
                     </div>
@@ -1756,7 +1759,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             // etapa — Iniciar Projeção (ainda não começou) → Salvar Projeção (já
                             // começou) → Versão concluída (Validado, clique pra reabrir a edição).
                             isMeetingVersionCompleted && !forceUnlockValidated ? (
-                                canValidate && (
+                                canReopenValidated && (
                                     <button
                                         onClick={handleReopenForEdit}
                                         className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors shadow-sm text-base font-bold"
@@ -1769,7 +1772,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             ) : !isAdminEntity && !otbDaySaved ? (
                                 // Hotéis Administradora não têm ocupação/OTB — pulam direto pra
                                 // "Salvar Projeção" (ver branch abaixo), sem o botão "Iniciar Projeção".
-                                canEditForecast && onNavigateToOccupancy && (
+                                canCalcularForecast && onNavigateToOccupancy && (
                                     <button
                                         onClick={handleIniciarProjecao}
                                         className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-base font-bold transition-colors border bg-white text-gray-600 border-gray-300 hover:bg-gray-50 shadow-sm"
@@ -1780,7 +1783,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     </button>
                                 )
                             ) : (
-                                canValidate && (
+                                canValidateForecast && (
                                     <button
                                         onClick={handleSaveResultsDirectly}
                                         className={`flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-md text-base font-bold ${pulseSaveButton ? 'animate-[pulse_1.33s_ease-in-out_3]' : ''}`}
@@ -1795,7 +1798,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             // Na versão Realizado não faz sentido "iniciar projeção" (é o fechamento
                             // gerencial oficial, não uma prévia em construção) — só "Calcular Forecast".
                             // Hotéis Administradora também não têm ocupação/OTB, então nunca mostram esse botão.
-                            activeProjectionType !== 'Realizado' && !isAdminEntity && canEditForecast && onNavigateToOccupancy && (
+                            activeProjectionType !== 'Realizado' && !isAdminEntity && canCalcularForecast && onNavigateToOccupancy && (
                                 <button
                                     onClick={handleIniciarProjecao}
                                     className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-base font-bold transition-colors border bg-white text-gray-600 border-gray-300 hover:bg-gray-50 shadow-sm"
@@ -1807,7 +1810,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             )
                         )}
 
-                        {canEditForecast && (
+                        {canCalcularForecast && (
                             <button
                                 onClick={() => {
                                     if (!isOnCalcularForecastStep) {
@@ -1826,28 +1829,32 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             </button>
                         )}
 
-                        {!isMeetingVersion && canValidate && (
+                        {!isMeetingVersion && (canReopenValidated || canValidateForecast) && (
                             isMonthClosed && isAlreadyValidated && !forceUnlockValidated ? (
-                                <button
-                                    onClick={() => setForceUnlockValidated(true)}
-                                    className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors shadow-sm text-base font-bold"
-                                    title="Clique para reabrir esta versão para edição"
-                                >
-                                    <Lock size={20} />
-                                    Resultados validados (clique aqui caso queira fazer alguma alteração)
-                                </button>
+                                canReopenValidated && (
+                                    <button
+                                        onClick={() => setForceUnlockValidated(true)}
+                                        className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors shadow-sm text-base font-bold"
+                                        title="Clique para reabrir esta versão para edição"
+                                    >
+                                        <Lock size={20} />
+                                        Resultados validados (clique aqui caso queira fazer alguma alteração)
+                                    </button>
+                                )
                             ) : (
-                                <button
-                                    onClick={handleSaveResultsDirectly}
-                                    className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-md text-base font-bold"
-                                >
-                                    <CheckCircle2 size={20} />
-                                    {isMonthClosed ? 'Validar fechamento' : 'Salvar Projeção'}
-                                </button>
+                                canValidateForecast && (
+                                    <button
+                                        onClick={handleSaveResultsDirectly}
+                                        className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-md text-base font-bold"
+                                    >
+                                        <CheckCircle2 size={20} />
+                                        {isMonthClosed ? 'Validar fechamento' : 'Salvar Projeção'}
+                                    </button>
+                                )
                             )
                         )}
 
-                        {isMeetingVersion && !isAdminEntity && canValidate && (
+                        {isMeetingVersion && !isAdminEntity && canGenerateSlides && (
                             <button
                                 onClick={() => onGenerateSlides?.()}
                                 disabled={!otbProgress.every(Boolean) || !!isGeneratingSlides}
@@ -2201,11 +2208,11 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     : packageKpiCalc
                                         ? parseSelfRatioDenominator(packageKpiCalc.formula, row.label)
                                         : (impostoKpiCalc ? parseSelfRatioDenominator(impostoKpiCalc.formula, row.label) : null);
-                                const isEditableKpi = !!kpiSelfDenominator && canEditForecast && !isLocked && isRowEditableForUser(row);
+                                const isEditableKpi = !!kpiSelfDenominator && canEditForecastValues && !isLocked && isRowEditableForUser(row);
                                 // Receitas Extras (Lazer/Eventos) KPI Prévia is also invertible (Receita ÷ PAX,
                                 // with PAX carried in precomputedKpi.denominator) — but only the Prévia column,
                                 // not Forecast, is meant to be editable here.
-                                const isEditableKpiPrevia = (isEditableKpi || (!!precomputedKpi?.denominator && canEditForecast && !isLocked && isRowEditableForUser(row)));
+                                const isEditableKpiPrevia = (isEditableKpi || (!!precomputedKpi?.denominator && canEditForecastValues && !isLocked && isRowEditableForUser(row)));
 
                                 const renderFinancialCells = (isHeaderOrTotal = false, customBg = "") => {
                                     const effectiveBg = row.bgColor || (isBlueHighlight ? 'bg-sky-100 border-sky-200' : (customBg || 'bg-blue-50/20 border-r border-blue-50'));
@@ -2227,7 +2234,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     const isRowEditable = isRowEditableForUser(row);
                                     const isVariableExpense = row.category === 'Costs' && row.rowConfig?.expenseType === 'Variável';
 
-                                    if (canEditForecast && isRowEditable && !isIndicator && row.category !== 'Labor' && (!isHeaderOrTotal || isEditableCost || isEditableSpecial)) {
+                                    if (canEditForecastValues && isRowEditable && !isIndicator && row.category !== 'Labor' && (!isHeaderOrTotal || isEditableCost || isEditableSpecial)) {
                                         realCellContent = (
                                             <FormattedInput
                                                 inputRef={(el: any) => { inputRefs.current[`input-real-${row.id}`] = el; }}
@@ -2300,7 +2307,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                                     onPaste={(e: any) => handlePaste(e, row.id, 'previa')}
                                                 />
                                             );
-                                        } else if ((isInputIndicator || isManualRow) && (isLocked || !canEditForecast)) {
+                                        } else if ((isInputIndicator || isManualRow) && (isLocked || !canEditForecastValues)) {
                                             realCellContent = <span className="font-medium">{formatValue(row.real, formatType)}</span>;
                                             previaCellContent = <span className="font-medium">{formatValue(row.previa, formatType)}</span>;
                                         }
@@ -2310,7 +2317,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     // pra digitar a Prévia direto no pacote — pra quem monta a prévia só por pacote,
                                     // sem detalhar conta a conta. O valor digitado prevalece sobre a soma (ver
                                     // isManualPreviaOverride em recalculateTotals) até a etapa ser resetada.
-                                    if (row.category === 'Package' && canEditForecast && !isLocked && isRowEditable) {
+                                    if (row.category === 'Package' && canEditForecastValues && !isLocked && isRowEditable) {
                                         previaCellContent = (
                                             <FormattedInput
                                                 inputRef={(el: any) => { inputRefs.current[`input-previa-${row.id}`] = el; }}

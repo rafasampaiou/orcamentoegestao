@@ -6,7 +6,7 @@ import {
   Calendar, GanttChartSquare, Layers, ShieldCheck, Package,
   UtensilsCrossed
 } from 'lucide-react';
-import { ViewState, ModuleType, User, UserRole, hasRole } from '../types';
+import { ViewState, ModuleType, User, hasPermission, PermissionMatrix } from '../types';
 
 interface SidebarProps {
   currentView: ViewState;
@@ -14,6 +14,7 @@ interface SidebarProps {
   onChangeView: (view: ViewState) => void;
   onModuleChange: (module: ModuleType) => void;
   user: User;
+  permissionsMatrix: PermissionMatrix;
   collapsed?: boolean;
 }
 
@@ -79,9 +80,11 @@ const Sidebar: React.FC<SidebarProps> = ({
   onChangeView,
   onModuleChange,
   user,
+  permissionsMatrix,
   collapsed,
 }) => {
-  const isAdmin = hasRole(user, UserRole.ADMIN);
+  const canAccessAdmin = hasPermission(permissionsMatrix, user, 'Administração — Acesso', 'Acessar Área de Administração');
+  const canAccessValidations = hasPermission(permissionsMatrix, user, 'Validações', 'Acessar Tela de Validações');
 
   const [exp, setExp] = useState<Record<string, boolean>>({
     real:  currentModule === 'REAL' && !isAdminView(currentView),
@@ -112,7 +115,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           <button onClick={() => go('dashboard', 'REAL')} title="Forecast & GMD">
             <TrendingUp size={22} className={currentModule === 'REAL' && !isAdminView(currentView) ? 'text-[#F8981C]' : 'text-slate-400'} />
           </button>
-          {isAdmin && (
+          {canAccessAdmin && (
             <button onClick={() => go('admin_real_versions')} title="Administração">
               <Settings size={22} className={isAdminView(currentView) ? 'text-[#F8981C]' : 'text-slate-400'} />
             </button>
@@ -164,12 +167,12 @@ const Sidebar: React.FC<SidebarProps> = ({
             <NavItem depth={1} label="Análise de A&B" icon={UtensilsCrossed} active={currentView === 'ab_analysis'}   onClick={() => go('ab_analysis', 'REAL')} />
             <NavItem depth={1} label="Tabela de GOP"  icon={PieChart}      active={currentView === 'comparatives'}    onClick={() => go('comparatives', 'REAL')} />
             <NavItem depth={1} label="GMD"            icon={Users}         active={currentView === 'gmd'}             onClick={() => go('gmd', 'REAL')} />
-            {isAdmin && <NavItem depth={1} label="Validações" icon={CheckCircle2} active={currentView === 'validations'} onClick={() => go('validations', 'REAL')} />}
+            {canAccessValidations && <NavItem depth={1} label="Validações" icon={CheckCircle2} active={currentView === 'validations'} onClick={() => go('validations', 'REAL')} />}
           </div>
         )}
 
         {/* ══ ADMINISTRAÇÃO ══ */}
-        {isAdmin && (
+        {canAccessAdmin && (
           <div className="pt-3 mt-1">
             <GroupHeader
               label="Administração"
@@ -181,20 +184,29 @@ const Sidebar: React.FC<SidebarProps> = ({
             {exp.admin && (
               <div className="space-y-0.5 pb-1 mt-0.5">
                 {/* Versões */}
-                <NavItem depth={1} label="Versões"          icon={Database}        active={currentView === 'admin_real_versions'} onClick={() => go('admin_real_versions')} />
+                {hasPermission(permissionsMatrix, user, 'Administração — Versões', 'Criar Nova Versão (Real ou Budget)') &&
+                  <NavItem depth={1} label="Versões"          icon={Database}        active={currentView === 'admin_real_versions'} onClick={() => go('admin_real_versions')} />}
 
                 {/* Divisor visual suave */}
                 <div className="my-1.5 mx-3 h-px bg-white/5" />
 
                 {/* Cadastros gerais */}
-                <NavItem depth={1} label="Plano de Contas"  icon={FileText}        active={currentView === 'admin_geral_accounts'}    onClick={() => go('admin_geral_accounts')} />
-                <NavItem depth={1} label="Pacotes"          icon={Package}         active={currentView === 'admin_geral_packages'}    onClick={() => go('admin_geral_packages')} />
-                <NavItem depth={1} label="Hotéis"           icon={Building2}       active={currentView === 'admin_geral_hotels'}      onClick={() => go('admin_geral_hotels')} />
-                <NavItem depth={1} label="Setores (CR)"     icon={Layers}          active={currentView === 'admin_geral_costcenters'} onClick={() => go('admin_geral_costcenters')} />
-                <NavItem depth={1} label="Usuários"         icon={Users}           active={currentView === 'admin_geral_users'}       onClick={() => go('admin_geral_users')} />
-                <NavItem depth={1} label="Logs"             icon={FileText}        active={currentView === 'admin_geral_logs'}        onClick={() => go('admin_geral_logs')} />
-                <NavItem depth={1} label="Permissões"       icon={ShieldCheck}     active={currentView === 'admin_geral_permissions'} onClick={() => go('admin_geral_permissions')} />
-                <NavItem depth={1} label="Importação"       icon={Upload}          active={currentView === 'admin_geral_import'}      onClick={() => go('admin_geral_import')} />
+                {hasPermission(permissionsMatrix, user, 'Administração — Plano de Contas e Pacotes', 'Gerenciar Plano de Contas e Pacotes') &&
+                  <NavItem depth={1} label="Plano de Contas"  icon={FileText}        active={currentView === 'admin_geral_accounts'}    onClick={() => go('admin_geral_accounts')} />}
+                {hasPermission(permissionsMatrix, user, 'Administração — Plano de Contas e Pacotes', 'Gerenciar Plano de Contas e Pacotes') &&
+                  <NavItem depth={1} label="Pacotes"          icon={Package}         active={currentView === 'admin_geral_packages'}    onClick={() => go('admin_geral_packages')} />}
+                {hasPermission(permissionsMatrix, user, 'Administração — Hotéis', 'Gerenciar Hotéis, Categorias e Regiões') &&
+                  <NavItem depth={1} label="Hotéis"           icon={Building2}       active={currentView === 'admin_geral_hotels'}      onClick={() => go('admin_geral_hotels')} />}
+                {hasPermission(permissionsMatrix, user, 'Administração — Setores', 'Gerenciar Setores (Centros de Custo)') &&
+                  <NavItem depth={1} label="Setores (CR)"     icon={Layers}          active={currentView === 'admin_geral_costcenters'} onClick={() => go('admin_geral_costcenters')} />}
+                {hasPermission(permissionsMatrix, user, 'Administração — Usuários', 'Gerenciar Usuários (criar/editar/excluir)') &&
+                  <NavItem depth={1} label="Usuários"         icon={Users}           active={currentView === 'admin_geral_users'}       onClick={() => go('admin_geral_users')} />}
+                {hasPermission(permissionsMatrix, user, 'Administração — Logs', 'Acessar Logs de Importação') &&
+                  <NavItem depth={1} label="Logs"             icon={FileText}        active={currentView === 'admin_geral_logs'}        onClick={() => go('admin_geral_logs')} />}
+                {hasPermission(permissionsMatrix, user, 'Administração — Permissões', 'Editar Matriz de Permissões') &&
+                  <NavItem depth={1} label="Permissões"       icon={ShieldCheck}     active={currentView === 'admin_geral_permissions'} onClick={() => go('admin_geral_permissions')} />}
+                {hasPermission(permissionsMatrix, user, 'Administração — Importação', 'Importar Despesas / Receitas / Impostos (Real e Budget)') &&
+                  <NavItem depth={1} label="Importação"       icon={Upload}          active={currentView === 'admin_geral_import'}      onClick={() => go('admin_geral_import')} />}
 
               </div>
             )}
