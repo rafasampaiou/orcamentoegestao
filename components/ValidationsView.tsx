@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { ValidationRecord, Hotel, User, PermissionMatrix, hasPermission } from '../types';
-import { Calendar, Filter, Building2, CheckCircle2, ArrowRight, Clock, Trash2, AlertTriangle } from 'lucide-react';
+import { Filter, Building2, CheckCircle2, ArrowRight, Clock, Trash2, AlertTriangle } from 'lucide-react';
+
+const MONTH_NAMES_PT = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
 interface ValidationsViewProps {
   validations: ValidationRecord[];
@@ -15,27 +17,25 @@ interface ValidationsViewProps {
 }
 
 const ValidationsView: React.FC<ValidationsViewProps> = ({ validations, hotels, currentUser, permissionsMatrix, onNavigateToValidation, onDeleteMeeting }) => {
-  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedHotel, setSelectedHotel] = useState<string>('all');
   const [selectedProjection, setSelectedProjection] = useState<string>('all');
   const [pendingDelete, setPendingDelete] = useState<ValidationRecord | null>(null);
   const canDeleteMeeting = hasPermission(permissionsMatrix, currentUser, 'DRE Forecast', 'Excluir Reunião (Prévia)');
 
-  const filteredValidations = validations.filter(v => {
-    if (v.month !== selectedMonth) return false;
-    if (v.year !== selectedYear) return false;
-    if (selectedHotel !== 'all' && v.hotelId !== selectedHotel) return false;
-    if (selectedProjection !== 'all') {
-        const matches = selectedProjection === 'Realizado'
-            ? v.projectionType === 'Realizado'
-            : v.meetingKind === selectedProjection;
-        if (!matches) return false;
-    }
-    return true;
-  });
-
-  const monthName = new Date(selectedYear, selectedMonth - 1).toLocaleString('pt-BR', { month: 'long' });
+  // Sem filtro de mês/ano — mostra o histórico inteiro, sempre ordenado por ano/mês (mais
+  // recente primeiro), a pedido do usuário.
+  const filteredValidations = validations
+    .filter(v => {
+        if (selectedHotel !== 'all' && v.hotelId !== selectedHotel) return false;
+        if (selectedProjection !== 'all') {
+            const matches = selectedProjection === 'Realizado'
+                ? v.projectionType === 'Realizado'
+                : v.meetingKind === selectedProjection;
+            if (!matches) return false;
+        }
+        return true;
+    })
+    .sort((a, b) => (b.year - a.year) || (b.month - a.month));
 
   return (
     <div className="flex flex-col h-full bg-gray-50/50 p-6">
@@ -48,42 +48,12 @@ const ValidationsView: React.FC<ValidationsViewProps> = ({ validations, hotels, 
               <p className="text-gray-500 mt-1">Acompanhe as validações de Previa e Forecast por unidade.</p>
             </div>
             <div className="text-right">
-                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Total no período</span>
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Total</span>
                 <span className="text-2xl font-bold text-indigo-700">{filteredValidations.length}</span>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1 flex items-center gap-1">
-                <Calendar size={12} />
-                Mês
-              </label>
-              <select 
-                className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 p-2.5 outline-none font-medium"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(Number(e.target.value))}
-              >
-                {Array.from({length: 12}, (_, i) => i + 1).map(m => (
-                  <option key={m} value={m}>{new Date(2000, m - 1).toLocaleString('pt-BR', { month: 'long' })}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1 flex items-center gap-1">
-                <Calendar size={12} />
-                Ano
-              </label>
-              <select 
-                className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 p-2.5 outline-none font-medium"
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(Number(e.target.value))}
-              >
-                {[2024, 2025, 2026, 2027].map(y => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-1 flex items-center gap-1">
                 <Building2 size={12} />
@@ -127,12 +97,13 @@ const ValidationsView: React.FC<ValidationsViewProps> = ({ validations, hotels, 
                     <div className="h-full flex flex-col items-center justify-center p-12 text-center text-gray-500">
                         <CheckCircle2 size={48} className="text-gray-300 mb-4" />
                         <h3 className="text-xl font-bold text-gray-700 mb-2">Nenhuma validação encontrada</h3>
-                        <p>Não há registros de validação para {monthName} de {selectedYear} com os filtros selecionados.</p>
+                        <p>Não há registros de validação com os filtros selecionados.</p>
                     </div>
                 ) : (
                     <table className="w-full text-left border-collapse">
                         <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm border-b border-gray-200">
                             <tr>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Período</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Data / Hora</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Unidade</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Usuário</th>
@@ -147,6 +118,9 @@ const ValidationsView: React.FC<ValidationsViewProps> = ({ validations, hotels, 
                                 const d = new Date(validation.validatedAt);
                                 return (
                                     <tr key={validation.id} className="hover:bg-gray-50 transition-colors">
+                                        <td className="px-6 py-4 font-bold text-gray-700">
+                                            {MONTH_NAMES_PT[validation.month - 1]}/{validation.year}
+                                        </td>
                                         <td className="px-6 py-4">
                                             <div className="font-medium text-gray-900">{d.toLocaleDateString('pt-BR')}</div>
                                             <div className="text-xs text-gray-500">{d.toLocaleTimeString('pt-BR')}</div>
