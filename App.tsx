@@ -175,6 +175,10 @@ const App: React.FC = () => {
   // o usuário escolher uma reunião existente ou criar uma nova (ForecastTable abre o popup de
   // criação sozinho quando não há nenhuma reunião pro hotel/mês/ano selecionado).
   const [activeProjectionType, setActiveProjectionType] = useState<ProjectionType>('');
+  // Incrementado sempre que uma navegação (ex.: "Ir para Forecast" em Validações) escolhe a
+  // Versão do Forecast de propósito ao mesmo tempo que troca hotel/mês — avisa o ForecastTable
+  // pra não sobrescrever essa escolha com o auto-select de "última versão do mês".
+  const [versionNavToken, setVersionNavToken] = useState(0);
   const [validations, setValidations] = useState<ValidationRecord[]>([]);
   // Reuniões dinâmicas da "Versão do Forecast" (substituem a lista fixa de 5 nomes) — carregadas
   // 1x no boot, junto de `validations`.
@@ -1502,6 +1506,7 @@ const App: React.FC = () => {
               budgetOccupancyDataMap={budgetOccupancyDataMap}
               activeProjectionType={activeProjectionType}
               setActiveProjectionType={setActiveProjectionType}
+              versionNavToken={versionNavToken}
               meetings={meetings}
               setMeetings={setMeetings}
               validations={validations}
@@ -1663,6 +1668,10 @@ const App: React.FC = () => {
               setSelectedDate(new Date(validation.year, validation.month - 1));
               if (matchedVersion) setActiveRealVersionId(matchedVersion.id);
               setActiveProjectionType(validation.projectionType);
+              // Sinaliza pro ForecastTable que a versão foi escolhida de propósito por essa
+              // navegação — sem isso, o auto-select de "última versão do mês" (que dispara ao
+              // trocar hotel/mês) sobrescreveria pra outra reunião/Realizado, perdendo o destino.
+              setVersionNavToken(t => t + 1);
               setCurrentView('dashboard');
             }}
         />

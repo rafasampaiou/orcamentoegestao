@@ -68,6 +68,10 @@ interface ForecastTableProps {
     // Projections & Validation
     activeProjectionType?: import('../types').ProjectionType;
     setActiveProjectionType?: React.Dispatch<React.SetStateAction<import('../types').ProjectionType>>;
+    // Incrementado por App.tsx quando uma navegação (ex.: "Ir para Forecast" em Validações) já
+    // escolheu a Versão do Forecast de propósito — avisa o auto-select de "última versão do mês"
+    // pra não sobrescrever essa escolha.
+    versionNavToken?: number;
     // Reuniões dinâmicas da "Versão do Forecast" (substituem a lista fixa de 5 nomes) — carregadas
     // uma vez no boot de App.tsx.
     meetings: Meeting[];
@@ -319,6 +323,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     budgetOccupancyDataMap = {},
     activeProjectionType,
     setActiveProjectionType,
+    versionNavToken = 0,
     meetings,
     setMeetings,
     validations,
@@ -407,8 +412,18 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     // em "Realizado" (mesmo que ele também esteja vazio ainda), em vez de abrir um popup forçado.
     // Só dispara quando o CONTEXTO muda (não quando `meetings` muda por outro motivo, ex.: acabou
     // de criar uma reunião nova — nesse caso `handleCreateMeeting` já seleciona ela diretamente).
+    // Se uma navegação externa (ex.: "Ir para Forecast" em Validações) já escolheu a versão de
+    // propósito ao mesmo tempo que troca hotel/mês, `versionNavToken` chega incrementado — nesse
+    // caso o auto-select abaixo não deve rodar dessa vez, senão sobrescreveria a escolha. Inicia
+    // "atrasado" de propósito (não em `versionNavToken`, e sim `-1` dele) pra também pegar o caso
+    // de o componente já montar direto por uma navegação (token > 0 desde o primeiro render).
+    const lastVersionNavTokenRef = useRef(versionNavToken > 0 ? versionNavToken - 1 : 0);
     useEffect(() => {
         if (!setActiveProjectionType) return;
+        if (versionNavToken !== lastVersionNavTokenRef.current) {
+            lastVersionNavTokenRef.current = versionNavToken;
+            return;
+        }
         const latestMeeting = meetingsForContext[meetingsForContext.length - 1];
         if (latestMeeting) {
             setActiveProjectionType(latestMeeting.id);
