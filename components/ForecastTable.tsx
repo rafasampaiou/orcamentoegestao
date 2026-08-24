@@ -394,19 +394,26 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     }, [selectedHotel, selectedYear, selectedMonth, activeRealVersionId, realOccupancyData, validations]);
 
     // Popup "Criar nova reunião" — substitui a antiga lista fixa de 5 nomes no seletor "Versão
-    // do Forecast". Abre sozinho quando o hotel/mês/ano não tem nenhuma reunião criada ainda
-    // (nem legada) e nenhuma seleção válida ativa, guiando o usuário direto pra ação.
+    // do Forecast".
     const [showCreateMeetingModal, setShowCreateMeetingModal] = useState(false);
-    const [dismissedAutoOpenKey, setDismissedAutoOpenKey] = useState<string | null>(null);
+
+    // Ao trocar de hotel/mês/ano, a Versão do Forecast já cai sozinha na ÚLTIMA reunião criada
+    // pra esse contexto (a de data mais recente) — ou, se não houver nenhuma (nem legada), fica
+    // em "Realizado" (mesmo que ele também esteja vazio ainda), em vez de abrir um popup forçado.
+    // Só dispara quando o CONTEXTO muda (não quando `meetings` muda por outro motivo, ex.: acabou
+    // de criar uma reunião nova — nesse caso `handleCreateMeeting` já seleciona ela diretamente).
     useEffect(() => {
-        if (!canCreateMeeting) return;
-        const autoOpenKey = `${selectedHotel}_${selectedYear}_${selectedMonth}`;
-        const allOptions = [...meetingsForContext, ...legacyOptionsForContext];
-        const hasValidSelection = activeProjectionType === 'Realizado' || allOptions.some(o => o.id === activeProjectionType);
-        if (allOptions.length === 0 && !hasValidSelection && dismissedAutoOpenKey !== autoOpenKey) {
-            setShowCreateMeetingModal(true);
+        if (!setActiveProjectionType) return;
+        const latestMeeting = meetingsForContext[meetingsForContext.length - 1];
+        if (latestMeeting) {
+            setActiveProjectionType(latestMeeting.id);
+        } else if (legacyOptionsForContext.length > 0) {
+            setActiveProjectionType(legacyOptionsForContext[0].id);
+        } else {
+            setActiveProjectionType('Realizado');
         }
-    }, [meetingsForContext, legacyOptionsForContext, activeProjectionType, canCreateMeeting, selectedHotel, selectedYear, selectedMonth, dismissedAutoOpenKey]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedHotel, selectedYear, selectedMonth]);
 
     const handleCreateMeeting = async (meetingDate: string, kind: MeetingKind) => {
         const displayLabel = kind === 'Prévia'
@@ -595,6 +602,33 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         driverForecast: true,
         driverBudget: true,
     });
+
+    // "Comparar com prévias anteriores" (botão Colunas) — mostra, como colunas extras
+    // read-only ao lado da Prévia/Real, o valor de "previa" de OUTRAS reuniões do MESMO mês
+    // (ex.: uma 2ª reunião comparando com a 1ª). Reseta ao trocar hotel/mês/ano, já que a lista
+    // de reuniões candidatas muda de contexto.
+    const [extraComparisonMeetingIds, setExtraComparisonMeetingIds] = useState<string[]>([]);
+    useEffect(() => {
+        setExtraComparisonMeetingIds([]);
+    }, [selectedHotel, selectedMonth, selectedYear]);
+
+    // Pra cada reunião extra selecionada, monta a DRE inteira dela (mesma função usada pra
+    // versão ativa) e guarda só a "previa" por linha — é só isso que aparece na coluna de
+    // comparação (read-only, sem edição).
+    const extraComparisonData = useMemo(() => {
+        const result: Record<string, Record<string, number>> = {};
+        extraComparisonMeetingIds.forEach(meetingId => {
+            const rows = buildForecastRows(
+                dreConfigs, selectedMonth, selectedYear, financialData, selectedHotel, hotels,
+                realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages,
+                budgetOccupancyData, meetingId, meetings
+            );
+            const map: Record<string, number> = {};
+            rows.forEach(r => { map[r.id] = r.previa; });
+            result[meetingId] = map;
+        });
+        return result;
+    }, [extraComparisonMeetingIds, dreConfigs, selectedMonth, selectedYear, financialData, selectedHotel, hotels, realOccupancyData, activeRealVersionId, activeBudgetVersionId, accounts, packages, budgetOccupancyData, meetings]);
 
     const [showColumnSettings, setShowColumnSettings] = useState(false);
     const [showAlertModal, setShowAlertModal] = useState(false);
@@ -2048,6 +2082,31 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                     </label>
                                 ))}
                             </div>
+
+                            {meetingsForContext.filter(m => m.id !== activeProjectionType).length > 0 && (
+                                <>
+                                    <div className="border-t border-gray-100 mt-3 pt-3">
+                                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider block mb-1.5">
+                                            Comparar com prévias anteriores
+                                        </span>
+                                    </div>
+                                    <div className="space-y-2">
+                                        {meetingsForContext.filter(m => m.id !== activeProjectionType).map(m => (
+                                            <label key={m.id} className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-1.5 rounded transition-colors">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={extraComparisonMeetingIds.includes(m.id)}
+                                                    onChange={() => setExtraComparisonMeetingIds(prev =>
+                                                        prev.includes(m.id) ? prev.filter(id => id !== m.id) : [...prev, m.id]
+                                                    )}
+                                                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                                />
+                                                <span className="text-xs font-medium text-gray-700">{m.displayLabel}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
                         </div>
                     )}
 
@@ -2090,6 +2149,15 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                         />
                                     </th>
                                 )}
+
+                                {extraComparisonMeetingIds.map(meetingId => {
+                                    const meeting = meetingsForContext.find(m => m.id === meetingId);
+                                    return (
+                                        <th key={meetingId} className="px-2 py-3 text-center bg-purple-50 text-purple-900 border-b border-purple-200 border-l border-purple-200 whitespace-nowrap">
+                                            {(meeting?.displayLabel || meetingId).toUpperCase()}
+                                        </th>
+                                    );
+                                })}
 
                                 {columnVisibility.real && (
                                     <th
@@ -2479,6 +2547,12 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                                     {previaCellContent}
                                                 </CommentableCell>
                                             )}
+
+                                            {extraComparisonMeetingIds.map(meetingId => (
+                                                <td key={meetingId} className="px-2 py-px text-right border-r border-l border-purple-100 tabular-nums truncate bg-purple-50/30 text-purple-900">
+                                                    {formatValue(extraComparisonData[meetingId]?.[row.id], formatType)}
+                                                </td>
+                                            ))}
 
                                             {columnVisibility.real && (
                                                 <CommentableCell rowId={row.id} columnId="real" style={textStyle} className={`px-2 py-px text-right border-l border-gray-200 tabular-nums ${effectiveText} ${effectiveBg} truncate`}>
@@ -3228,16 +3302,14 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 </div>
             )}
 
-            {/* Wizard OTB (On the books) — passo único: mensagem + dia de corte do mês */}
             {showCreateMeetingModal && (
                 <CreateMeetingModal
-                    onClose={() => {
-                        setDismissedAutoOpenKey(`${selectedHotel}_${selectedYear}_${selectedMonth}`);
-                        setShowCreateMeetingModal(false);
-                    }}
+                    onClose={() => setShowCreateMeetingModal(false)}
                     onCreate={handleCreateMeeting}
                 />
             )}
+
+            {/* Wizard OTB (On the books) — passo único: mensagem + dia de corte do mês */}
 
             {showOtbWizard && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">

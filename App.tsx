@@ -1660,6 +1660,7 @@ const App: React.FC = () => {
             currentUser={currentUser}
             permissionsMatrix={permissionsMatrix}
             initialImportTab={importNavSignal}
+            onValidationSaved={(record) => setValidations(prev => [...prev.filter(v => v.id !== record.id), record])}
             onPermissionsChange={setPermissionsMatrix}
             users={users}
             setUsers={setUsers}

@@ -372,6 +372,11 @@ interface UnifiedAdministrationViewProps {
   // direto na sub-aba de Importação de Despesas, em vez do default. Único valor usado por
   // enquanto (só Despesas tem esse deep-link), mas o tipo já é extensível se precisar de outros.
   initialImportTab?: 'expenses';
+
+  // Importar Despesas com destino "Realizado" (cenário REAL) passa a validar automaticamente
+  // aquele hotel/mês como "Realizado" — sem isso, Histórico de Validações só mostrava hotéis
+  // validados manualmente pela DRE Forecast, mesmo com dado real já importado pra todos.
+  onValidationSaved?: (record: import('../types').ValidationRecord) => void;
 }
 
 // Botão "Ver" (ícone de olho) na tabela de Usuários — ao clicar, abre um balão com os Pacotes/
@@ -479,6 +484,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
   permissionsMatrix: permissionsMatrixProp,
   onPermissionsChange,
   initialImportTab,
+  onValidationSaved,
 }) => {
   // Main Module Tabs
   const [mainTab, setMainTab] = useState<'real' | 'geral'>('real');
@@ -3146,6 +3152,34 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     }
   };
 
+  // Importar Despesas com destino "Realizado" (cenário REAL) equivale, na prática, a já ter
+  // validado aquele hotel/mês como "Realizado" — sem isso, Histórico de Validações só mostrava
+  // hotéis validados manualmente pela DRE Forecast, mesmo com dado real já importado pra todos
+  // (decisão do usuário: importação de Despesas Real conta como validação automática).
+  const autoValidateRealizado = async (hotelName: string, year: number, months: number[]) => {
+    const slug = (s: string) => (s || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    for (const month of months) {
+      const record: import('../types').ValidationRecord = {
+        id: `val_${slug(hotelName)}_${year}_${month}_realizado`,
+        hotelId: hotelName,
+        userId: currentUser?.id || '',
+        userName: currentUser?.name || 'Sistema (importação)',
+        month,
+        year,
+        projectionType: 'Realizado',
+        meetingLabel: 'Realizado',
+        validatedAt: new Date().toISOString(),
+        status: 'Validado',
+      };
+      try {
+        await supabaseService.saveValidation(record);
+        onValidationSaved?.(record);
+      } catch (e) {
+        console.error('Falha ao validar Realizado automaticamente', e);
+      }
+    }
+  };
+
   const handleSaveExpensesForecast = async (scenario: 'REAL' | 'BUDGET' = 'REAL') => {
     if (!hasPermission(permissionsMatrix, currentUser, 'Administração — Importação', 'Importar Despesas / Receitas / Impostos (Real e Budget)')) {
       toast.error('Você não tem permissão para isso.');
@@ -3240,6 +3274,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         if (onImportData) {
           onImportData(rowsToSave, 'replace');
         }
+        if (cenario === 'REAL') {
+          await autoValidateRealizado(hotelName, targetYear, monthsUsed);
+        }
         setEditingImportId(null);
         fetchImportHistory();
         toast.success('Importação atualizada com sucesso!');
@@ -3249,6 +3286,10 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
         await supabaseService.saveFinancialData(rowsToSave, importId);
         if (onImportData) {
           onImportData(rowsToSave, 'append');
+        }
+        if (cenario === 'REAL') {
+          const monthsUsed = Array.from(new Set(rowsToSave.map(r => parseInt(r.mes, 10)))).sort((a, b) => a - b);
+          await autoValidateRealizado(hotelName, targetYear, monthsUsed);
         }
         onLogAction?.(`Importou Despesas (${scenario === 'BUDGET' ? 'Budget' : 'Forecast'}) de ${hotelName}`);
         const wantToValidate = await confirmAction(`Dados de despesas (${scenario === 'BUDGET' ? 'Budget' : 'Forecast'}) salvos com sucesso!\n\nDados salvos, clique OK para validar a importação na DRE Forecast ou Cancelar para permanecer nesta tela.`);
