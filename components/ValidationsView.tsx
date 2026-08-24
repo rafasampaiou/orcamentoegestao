@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { ValidationRecord, Hotel, User, PermissionMatrix, hasPermission } from '../types';
-import { Filter, Building2, CheckCircle2, ArrowRight, Clock, Trash2, AlertTriangle } from 'lucide-react';
+import { ValidationRecord, Hotel, User, PermissionMatrix, hasPermission, hasRole, UserRole } from '../types';
+import { Filter, Building2, CheckCircle2, ArrowRight, Clock, Trash2, AlertTriangle, RefreshCw } from 'lucide-react';
 
 const MONTH_NAMES_PT = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
@@ -14,13 +14,19 @@ interface ValidationsViewProps {
   // Validações, não disponível pra "Realizado" (não é uma reunião criada, é o fechamento
   // gerencial fixo).
   onDeleteMeeting?: (validation: ValidationRecord) => void;
+  // "Sincronizar importações" (ADMIN) — cria a validação "Realizado" que ficou faltando pra
+  // importações de Despesas/Impostos/Receita (cenário Real) feitas ANTES do auto-validar na
+  // importação ter sido ligado. Idempotente, pode clicar mais de uma vez sem duplicar.
+  onBackfillRealizado?: () => void;
 }
 
-const ValidationsView: React.FC<ValidationsViewProps> = ({ validations, hotels, currentUser, permissionsMatrix, onNavigateToValidation, onDeleteMeeting }) => {
+const ValidationsView: React.FC<ValidationsViewProps> = ({ validations, hotels, currentUser, permissionsMatrix, onNavigateToValidation, onDeleteMeeting, onBackfillRealizado }) => {
   const [selectedHotel, setSelectedHotel] = useState<string>('all');
   const [selectedProjection, setSelectedProjection] = useState<string>('all');
   const [pendingDelete, setPendingDelete] = useState<ValidationRecord | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
   const canDeleteMeeting = hasPermission(permissionsMatrix, currentUser, 'DRE Forecast', 'Excluir Reunião (Prévia)');
+  const isAdmin = hasRole(currentUser, UserRole.ADMIN);
 
   // Sem filtro de mês/ano — mostra o histórico inteiro, sempre ordenado por ano/mês (mais
   // recente primeiro), a pedido do usuário.
@@ -47,9 +53,25 @@ const ValidationsView: React.FC<ValidationsViewProps> = ({ validations, hotels, 
               <h2 className="text-2xl font-bold text-gray-900">Histórico de Validações</h2>
               <p className="text-gray-500 mt-1">Acompanhe as validações de Previa e Forecast por unidade.</p>
             </div>
-            <div className="text-right">
-                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Total</span>
-                <span className="text-2xl font-bold text-indigo-700">{filteredValidations.length}</span>
+            <div className="flex items-center gap-4">
+                {isAdmin && onBackfillRealizado && (
+                    <button
+                        onClick={async () => {
+                            setIsSyncing(true);
+                            try { await onBackfillRealizado(); } finally { setIsSyncing(false); }
+                        }}
+                        disabled={isSyncing}
+                        title="Cria a validação 'Realizado' pra hotéis/meses já importados (Despesas/Impostos/Receita) que ainda não apareciam aqui"
+                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg text-sm font-bold border border-indigo-100 transition-colors disabled:opacity-50"
+                    >
+                        <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
+                        Sincronizar importações
+                    </button>
+                )}
+                <div className="text-right">
+                    <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Total</span>
+                    <span className="text-2xl font-bold text-indigo-700">{filteredValidations.length}</span>
+                </div>
             </div>
           </div>
 

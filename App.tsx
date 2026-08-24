@@ -858,6 +858,46 @@ const App: React.FC = () => {
     }
   };
 
+  // Botão "Sincronizar importações" em Validações (ADMIN) — cobre o histórico já existente
+  // de ANTES do auto-validar-Realizado-na-importação (ver handleSaveExpensesForecast em
+  // UnifiedAdministrationView.tsx) ter sido ligado: varre financial_data por combinações
+  // hotel+ano+mês com cenário 'REAL' (Despesas/Impostos/Receita importados como Realizado —
+  // nunca 'Real', que é o Ano Anterior, nem override_* salvo pela própria DRE Forecast) e cria
+  // a validação "Realizado" que estiver faltando. Idempotente — rodar de novo não duplica nada.
+  const handleBackfillRealizadoValidations = async () => {
+    const slug = (s: string) => (s || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const combos = new Map<string, { hotel: string; year: number; month: number }>();
+    importedFinancialData.forEach(r => {
+      if ((r.cenario || '') !== 'REAL') return;
+      const hotel = (r.hotel || '').trim();
+      const year = parseInt(r.ano, 10);
+      const month = parseInt(r.mes, 10);
+      if (!hotel || !year || !month) return;
+      combos.set(`${hotel}|${year}|${month}`, { hotel, year, month });
+    });
+
+    let created = 0;
+    try {
+      for (const { hotel, year, month } of combos.values()) {
+        const id = `val_${slug(hotel)}_${year}_${month}_realizado`;
+        if (validations.some(v => v.id === id)) continue;
+        const record: ValidationRecord = {
+          id, hotelId: hotel, userId: currentUser?.id || '', userName: currentUser?.name || 'Sistema (sincronização)',
+          month, year, projectionType: 'Realizado', meetingLabel: 'Realizado',
+          validatedAt: new Date().toISOString(), status: 'Validado',
+        };
+        await supabaseService.saveValidation(record);
+        setValidations(prev => [...prev.filter(v => v.id !== id), record]);
+        created++;
+      }
+      toast.success(created > 0 ? `${created} validação(ões) "Realizado" criada(s) a partir de importações já existentes.` : 'Nada pra sincronizar — todas as importações já têm validação.');
+      if (created > 0) logUserAction(`Sincronizou ${created} validação(ões) "Realizado" a partir de importações existentes`);
+    } catch (err) {
+      console.error('Failed to backfill Realizado validations:', err);
+      toast.error('Erro ao sincronizar validações.');
+    }
+  };
+
   // Espera um elemento aparecer no DOM (usado depois de trocar de tela pra capturar outra seção)
   // — poll simples em vez de um delay fixo, já que telas mais pesadas (Análise de A&B) podem
   // demorar mais pra terminar de calcular/renderizar do que outras.
@@ -1613,6 +1653,7 @@ const App: React.FC = () => {
             currentUser={currentUser}
             permissionsMatrix={permissionsMatrix}
             onDeleteMeeting={handleDeleteMeeting}
+            onBackfillRealizado={handleBackfillRealizadoValidations}
             onNavigateToValidation={(validation) => {
               const hotel = hotels.find(h => h.id === validation.hotelId || h.name === validation.hotelId || h.code === validation.hotelId);
               const matchedVersion = realVersions.find(v =>
