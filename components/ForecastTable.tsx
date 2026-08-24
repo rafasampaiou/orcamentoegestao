@@ -383,14 +383,19 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     // chave de armazenamento já funciona com ele, sem precisar de nenhum backfill no banco.
     const legacyOptionsForContext = useMemo(() => {
         const LEGACY_KINDS_TO_PROBE = ['Reunião de Ritmo', 'FCA N1', 'FCA N2', 'Fechamento oficial'];
+        // "Fechamento oficial" já é exibido como "Realizado" (mesmo papel) — se já existe um
+        // "Realizado" de verdade validado pra esse hotel/mês (ex.: via importação de Despesas),
+        // esse sinônimo antigo fica redundante e não precisa aparecer no seletor.
+        const hasRealRealizado = (validations || []).some(v => v.projectionType === 'Realizado' && v.hotelId === selectedHotel && v.month === selectedMonth && v.year === selectedYear);
         return LEGACY_KINDS_TO_PROBE
             .filter(legacy => {
+                if (legacy === 'Fechamento oficial' && hasRealRealizado) return false;
                 const key = `${selectedHotel}_${selectedYear}_${selectedMonth}_${activeRealVersionId || ''}__${legacy}`;
                 const hasOcc = Object.keys(realOccupancyData[key] || {}).length > 0;
                 const hasValidation = (validations || []).some(v => v.projectionType === legacy && v.hotelId === selectedHotel && v.month === selectedMonth && v.year === selectedYear);
                 return hasOcc || hasValidation;
             })
-            .map(legacy => ({ id: legacy, displayLabel: `${legacy === 'Fechamento oficial' ? 'Fechamento' : legacy} (dado antigo)` }));
+            .map(legacy => ({ id: legacy, displayLabel: `${legacy === 'Fechamento oficial' ? 'Realizado' : legacy} (dado antigo)` }));
     }, [selectedHotel, selectedYear, selectedMonth, activeRealVersionId, realOccupancyData, validations]);
 
     // Popup "Criar nova reunião" — substitui a antiga lista fixa de 5 nomes no seletor "Versão

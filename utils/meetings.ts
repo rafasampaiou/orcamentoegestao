@@ -41,9 +41,10 @@ export function getMeetingLabel(value: string | undefined, meetings: Meeting[]):
     if (value === 'Realizado') return 'Realizado';
     const found = meetings.find(m => m.id === value);
     if (found) return found.displayLabel;
-    // Dado legado: o próprio valor já é o nome de exibição (ex.: "FCA N1"), exceto o único caso
-    // em que o literal antigo e o novo rótulo divergem.
-    return value === 'Fechamento oficial' ? 'Fechamento' : value;
+    // Dado legado: o próprio valor já é o nome de exibição (ex.: "FCA N1"), exceto "Fechamento
+    // oficial" — na prática já era o fechamento gerencial oficial do mês, o mesmo papel que
+    // "Realizado" cumpre hoje, então é exibido como "Realizado" (decisão do usuário).
+    return value === 'Fechamento oficial' ? 'Realizado' : value;
 }
 
 // Monta a lista de opções {value, label} pros dropdowns de versão (DRE Forecast, Ocupação

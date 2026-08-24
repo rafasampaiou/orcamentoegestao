@@ -1,6 +1,16 @@
 import React, { useState } from 'react';
 import { ValidationRecord, Hotel, User, PermissionMatrix, hasPermission, hasRole, UserRole } from '../types';
-import { Filter, Building2, CheckCircle2, ArrowRight, Clock, Trash2, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Filter, Building2, CheckCircle2, ArrowRight, Clock, Trash2, AlertTriangle, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+
+// "Fechamento oficial" era, na prática, o fechamento gerencial oficial do mês (de antes desta
+// migração) — o mesmo papel que "Realizado" cumpre hoje. Mostrado como "Realizado" em todo
+// lugar (mesmo mantendo o valor interno "Fechamento oficial" como chave de armazenamento —
+// são dados antigos já salvos sob esse nome, não dá pra só troca o rótulo sem também migrar o
+// dado, e isso não foi pedido).
+const displayMeetingLabel = (v: ValidationRecord): string =>
+  v.meetingLabel || (v.projectionType === 'Fechamento oficial' ? 'Realizado' : v.projectionType);
+
+type SortKey = 'period' | 'date' | 'hotel' | 'user' | 'meeting' | 'status';
 
 const MONTH_NAMES_PT = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
@@ -25,23 +35,54 @@ const ValidationsView: React.FC<ValidationsViewProps> = ({ validations, hotels, 
   const [selectedProjection, setSelectedProjection] = useState<string>('all');
   const [pendingDelete, setPendingDelete] = useState<ValidationRecord | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [sortKey, setSortKey] = useState<SortKey>('period');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const canDeleteMeeting = hasPermission(permissionsMatrix, currentUser, 'DRE Forecast', 'Excluir Reunião (Prévia)');
   const isAdmin = hasRole(currentUser, UserRole.ADMIN);
 
-  // Sem filtro de mês/ano — mostra o histórico inteiro, sempre ordenado por ano/mês (mais
-  // recente primeiro), a pedido do usuário.
+  const hotelNameFor = (v: ValidationRecord) => hotels.find(h => h.id === v.hotelId || h.name === v.hotelId)?.name || v.hotelId;
+
+  const handleSort = (key: SortKey) => {
+    if (key === sortKey) {
+      setSortDir(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
+
+  const sortIcon = (key: SortKey) => {
+    if (key !== sortKey) return <ArrowUpDown size={12} className="text-gray-300" />;
+    return sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />;
+  };
+
+  // Sem filtro de mês/ano — mostra o histórico inteiro, ordenável clicando em cada coluna
+  // (padrão inicial: Período, mais recente primeiro).
   const filteredValidations = validations
     .filter(v => {
         if (selectedHotel !== 'all' && v.hotelId !== selectedHotel) return false;
         if (selectedProjection !== 'all') {
             const matches = selectedProjection === 'Realizado'
-                ? v.projectionType === 'Realizado'
+                // "Fechamento oficial" (dado antigo) conta como Realizado pro filtro também,
+                // já que é exibido como Realizado na tabela.
+                ? (v.projectionType === 'Realizado' || v.projectionType === 'Fechamento oficial')
                 : v.meetingKind === selectedProjection;
             if (!matches) return false;
         }
         return true;
     })
-    .sort((a, b) => (b.year - a.year) || (b.month - a.month));
+    .sort((a, b) => {
+        let cmp = 0;
+        switch (sortKey) {
+            case 'period': cmp = (a.year - b.year) || (a.month - b.month); break;
+            case 'date': cmp = new Date(a.validatedAt).getTime() - new Date(b.validatedAt).getTime(); break;
+            case 'hotel': cmp = hotelNameFor(a).localeCompare(hotelNameFor(b)); break;
+            case 'user': cmp = (a.userName || '').localeCompare(b.userName || ''); break;
+            case 'meeting': cmp = displayMeetingLabel(a).localeCompare(displayMeetingLabel(b)); break;
+            case 'status': cmp = (a.status || '').localeCompare(b.status || ''); break;
+        }
+        return sortDir === 'asc' ? cmp : -cmp;
+    });
 
   return (
     <div className="flex flex-col h-full bg-gray-50/50 p-6">
@@ -125,12 +166,24 @@ const ValidationsView: React.FC<ValidationsViewProps> = ({ validations, hotels, 
                     <table className="w-full text-left border-collapse">
                         <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm border-b border-gray-200">
                             <tr>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Período</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Data / Hora</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Unidade</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Usuário</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Reunião</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Status</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700 select-none" onClick={() => handleSort('period')}>
+                                    <span className="inline-flex items-center gap-1">Período {sortIcon('period')}</span>
+                                </th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700 select-none" onClick={() => handleSort('date')}>
+                                    <span className="inline-flex items-center gap-1">Data / Hora {sortIcon('date')}</span>
+                                </th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700 select-none" onClick={() => handleSort('hotel')}>
+                                    <span className="inline-flex items-center gap-1">Unidade {sortIcon('hotel')}</span>
+                                </th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700 select-none" onClick={() => handleSort('user')}>
+                                    <span className="inline-flex items-center gap-1">Usuário {sortIcon('user')}</span>
+                                </th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700 select-none" onClick={() => handleSort('meeting')}>
+                                    <span className="inline-flex items-center gap-1">Reunião {sortIcon('meeting')}</span>
+                                </th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right cursor-pointer hover:text-gray-700 select-none" onClick={() => handleSort('status')}>
+                                    <span className="inline-flex items-center gap-1 justify-end">Status {sortIcon('status')}</span>
+                                </th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Ações</th>
                             </tr>
                         </thead>
@@ -156,7 +209,7 @@ const ValidationsView: React.FC<ValidationsViewProps> = ({ validations, hotels, 
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-lg text-sm font-bold border border-blue-100">
-                                                {validation.meetingLabel || validation.projectionType}
+                                                {displayMeetingLabel(validation)}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-right">
@@ -174,15 +227,6 @@ const ValidationsView: React.FC<ValidationsViewProps> = ({ validations, hotels, 
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex items-center justify-end gap-2">
-                                                {onNavigateToValidation && (
-                                                    <button
-                                                        onClick={() => onNavigateToValidation(validation)}
-                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg text-sm font-bold border border-indigo-100 transition-colors"
-                                                    >
-                                                        Ir para Forecast
-                                                        <ArrowRight size={14} />
-                                                    </button>
-                                                )}
                                                 {onDeleteMeeting && canDeleteMeeting && validation.projectionType !== 'Realizado' && (
                                                     <button
                                                         onClick={() => setPendingDelete(validation)}
@@ -190,6 +234,15 @@ const ValidationsView: React.FC<ValidationsViewProps> = ({ validations, hotels, 
                                                         className="inline-flex items-center justify-center p-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg border border-red-100 transition-colors"
                                                     >
                                                         <Trash2 size={16} />
+                                                    </button>
+                                                )}
+                                                {onNavigateToValidation && (
+                                                    <button
+                                                        onClick={() => onNavigateToValidation(validation)}
+                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg text-sm font-bold border border-indigo-100 transition-colors"
+                                                    >
+                                                        Ir para Forecast
+                                                        <ArrowRight size={14} />
                                                     </button>
                                                 )}
                                             </div>
@@ -213,7 +266,7 @@ const ValidationsView: React.FC<ValidationsViewProps> = ({ validations, hotels, 
               </div>
               <h3 className="text-lg font-medium text-gray-900">Excluir Reunião</h3>
               <p className="text-sm text-gray-500">
-                Tem certeza que deseja excluir a reunião "{pendingDelete.meetingLabel || pendingDelete.projectionType}"? Isso apaga TODOS os dados
+                Tem certeza que deseja excluir a reunião "{displayMeetingLabel(pendingDelete)}"? Isso apaga TODOS os dados
                 salvos nela (ocupação, valores da prévia, comentários e apresentações geradas). Esta ação não pode ser desfeita.
               </p>
               <div className="flex justify-center gap-3 pt-4">
