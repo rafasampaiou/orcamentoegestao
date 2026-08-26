@@ -1072,7 +1072,11 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         if (budgetSourceId) {
             const row = data.find(r => r.id === rowId);
             const denomValue = row?.rowConfig?.precomputedKpi?.denominator?.budget;
-            if (!denomValue || !activeBudgetVersionId || !setBudgetOccupancyDataMap) return;
+            if (!denomValue) {
+                toast.error('Não deu pra calcular: o PAX de Meta desse segmento ainda está zerado/não preenchido pra esse mês (Ocupação → Meta).');
+                return;
+            }
+            if (!activeBudgetVersionId || !setBudgetOccupancyDataMap) return;
             const newValue = typedKpiValue * denomValue;
             const monthIdx = (selectedMonth || 1) - 1;
             setBudgetOccupancyDataMap(prev => {
@@ -1105,7 +1109,10 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                     denomValue = precomputedDenominator;
                 }
 
-                if (!denomValue) return row;
+                if (!denomValue) {
+                    toast.error(`Não deu pra calcular: "${selfDenominatorLabel || 'o driver dessa conta'}" está zerado/sem valor de ${field === 'budget' ? 'Meta' : field === 'real' ? 'Forecast' : 'Prévia'} pra esse mês.`);
+                    return row;
+                }
 
                 const newValue = rawKpi * denomValue;
 
