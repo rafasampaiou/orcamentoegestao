@@ -10,6 +10,7 @@ import CreateMeetingModal from './CreateMeetingModal';
 import BalanceteImportModal from './BalanceteImportModal';
 import { computeOtbProgress, hasOccupancyData } from '../utils/otbProgress';
 import { resolveMeetingKind, getMeetingLabel } from '../utils/meetings';
+import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 
 // Nomes amigáveis das colunas comentáveis (usado só no rótulo do modal de comentário).
@@ -64,6 +65,10 @@ interface ForecastTableProps {
     realVersions?: BudgetVersion[];
     budgetVersions?: BudgetVersion[];
     budgetOccupancyDataMap?: Record<string, Record<string, number[]>>;
+    // Só pra escrever a Meta de Receita Extra editada via "KPI (Meta)" de volta no MESMO lugar
+    // que a tela de Ocupação (período Meta) já usa — sem isso as duas telas ficariam
+    // dessincronizadas (Ocupação não veria o valor editado aqui).
+    setBudgetOccupancyDataMap?: React.Dispatch<React.SetStateAction<Record<string, Record<string, number[]>>>>;
 
     // Projections & Validation
     activeProjectionType?: import('../types').ProjectionType;
@@ -321,6 +326,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     realVersions = [],
     budgetVersions = [],
     budgetOccupancyDataMap = {},
+    setBudgetOccupancyDataMap,
     activeProjectionType,
     setActiveProjectionType,
     versionNavToken = 0,
@@ -1052,7 +1058,32 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
 
     // Typing a new KPI value (e.g. "R$ 12,00 / PAX") back-solves the account's underlying
     // Prévia/Forecast value from the formula's denominator, so adjusting the rate adjusts the result.
-    const handleKpiValueChange = (rowId: string, field: 'previa' | 'real', typedKpiValue: number) => {
+    // Receita Extra (Lazer/Eventos) não tem "Meta" própria em financial_data — o número vem
+    // direto de budgetOccupancyDataMap, o MESMO dado que a tela de Ocupação (período Meta) edita.
+    // Editar "KPI (Meta)" dessas 2 linhas tem que escrever ali, não em `data` local, senão a
+    // Ocupação nunca veria a mudança.
+    const REVENUE_EXTRA_BUDGET_SOURCE: Record<string, string> = {
+        'REV-EXTRA-LAZER': 'lazer_extra_rev',
+        'REV-EXTRA-EVENTOS': 'event_extra_rev',
+    };
+
+    const handleKpiValueChange = (rowId: string, field: 'previa' | 'real' | 'budget', typedKpiValue: number) => {
+        const budgetSourceId = field === 'budget' ? REVENUE_EXTRA_BUDGET_SOURCE[rowId] : undefined;
+        if (budgetSourceId) {
+            const row = data.find(r => r.id === rowId);
+            const denomValue = row?.rowConfig?.precomputedKpi?.denominator?.budget;
+            if (!denomValue || !activeBudgetVersionId || !setBudgetOccupancyDataMap) return;
+            const newValue = typedKpiValue * denomValue;
+            const monthIdx = (selectedMonth || 1) - 1;
+            setBudgetOccupancyDataMap(prev => {
+                const versionData = prev[activeBudgetVersionId] || {};
+                const newRowData = [...(versionData[budgetSourceId] || Array(12).fill(0))];
+                newRowData[monthIdx] = newValue;
+                return { ...prev, [activeBudgetVersionId]: { ...versionData, [budgetSourceId]: newRowData } };
+            });
+            return;
+        }
+
         setData(prevData => {
             const editedRow = prevData.find(r => r.id === rowId);
             let newData = prevData.map(row => {
@@ -1079,6 +1110,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 const newValue = rawKpi * denomValue;
 
                 if (field === 'real') return { ...row, real: newValue, isManualOverride: true };
+                if (field === 'budget') return { ...row, budget: newValue, isManualBudgetOverride: true };
                 return { ...row, previa: newValue, isManualPreviaOverride: true };
             });
             if (field === 'previa' && editedRow && editedRow.category !== 'Package') {
@@ -1086,6 +1118,132 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             }
             return recalculateTotals(newData, packages, accounts);
         });
+    };
+
+    // Mesma lógica de resolução do KPI/Driver usada no render de cada linha (accountKpiCalc/
+    // packageKpiCalc/gopKpiCalc/impostoKpiCalc/precomputedKpi) — extraída aqui só pra reusar na
+    // exportação Excel sem duplicar closures do JSX. Se um dia essa lógica mudar no render,
+    // replicar a mudança aqui também.
+    const getKpiInfoForRow = (row: ForecastRow, allRows: ForecastRow[]) => {
+        const isSectionHeader = row.isHeader && row.indentLevel === 0;
+        const isBlueHighlight = blueRowIds.includes(row.id);
+        const isTotal = row.isTotal;
+        const isGopRsRow = row.id === 'RES-OP-COM-IMP' || row.id === 'RES-OP-SEM-IMP';
+        const isImpostoKpiRow = row.id === 'REV-IMP';
+        const precomputedKpi = row.rowConfig?.precomputedKpi;
+        const hideKpi = (!isGopRsRow && !isImpostoKpiRow && (isSectionHeader || isBlueHighlight || isTotal)) || row.category === 'Indicators' || (row.category === 'Revenue' && !precomputedKpi && !isImpostoKpiRow);
+        const accountKpiCalc = (row.category === 'Costs' || row.category === 'Account') && row.rowConfig?.expenseType === 'Variável' ? row.rowConfig?.kpiCalculation : undefined;
+        const packageKpiCalc = !hideKpi && row.category === 'Package' ? packageKpiConfigs[row.label.trim()] : undefined;
+        const gopKpiCalc: KpiCalculation | undefined = isGopRsRow ? { formula: `@[${row.label}] / @[UH Disponível]`, format: 'number' } : undefined;
+        const impostoKpiCalc: KpiCalculation | undefined = isImpostoKpiRow ? row.rowConfig?.kpiCalculation : undefined;
+        const rowKpiCalc = accountKpiCalc || packageKpiCalc || gopKpiCalc || impostoKpiCalc;
+        const hasKpi = !!(rowKpiCalc || precomputedKpi);
+        const kpiFormatType = precomputedKpi ? precomputedKpi.format : (rowKpiCalc?.format === 'percent' ? 'percent' : 'decimal');
+        const kpiValue = (field: 'previa' | 'real' | 'budget' | 'otb') => {
+            if (precomputedKpi) return precomputedKpi[field] || 0;
+            const raw = evaluateKpiCalculation(rowKpiCalc, allRows, field);
+            return rowKpiCalc?.format === 'percent' ? raw * 100 : raw;
+        };
+        return { hideKpi, hasKpi, kpiFormatType, kpiValue };
+    };
+
+    // Exporta a DRE Forecast "no formato que está" — mesmas linhas (`visibleData`, já filtrada
+    // pelo Mostrar Contas/pacotes expandidos no momento do clique) e mesmas colunas visíveis
+    // (`columnVisibility`), na mesma ordem e com os mesmos números formatados da tela.
+    const handleExportExcel = () => {
+        const header: string[] = ['Descrição'];
+        if (columnVisibility.otb && isMeetingVersion && !isAdminEntity) header.push(otbColumnLabel.toUpperCase());
+        if (columnVisibility.previa) header.push(showPreviaAsReal ? 'Real' : 'Prévia');
+        extraComparisonMeetingIds.forEach(meetingId => {
+            const meeting = meetingsForContext.find(m => m.id === meetingId);
+            header.push(meeting?.displayLabel || meetingId);
+        });
+        if (columnVisibility.real) header.push('Forecast');
+        if (columnVisibility.budget) header.push('Meta');
+        if (columnVisibility.deltaPreviaBudget) header.push(`Δ ${showPreviaAsReal ? 'Real' : 'Prévia'} - Meta R$`);
+        if (columnVisibility.deltaPreviaBudgetPct) header.push(`Δ ${showPreviaAsReal ? 'Real' : 'Prévia'} - Meta %`);
+        if (columnVisibility.deltaPreviaForecast) header.push(`Δ ${showPreviaAsReal ? 'Real' : 'Prévia'} - Forecast R$`);
+        if (columnVisibility.deltaPreviaForecastPct) header.push(`Δ ${showPreviaAsReal ? 'Real' : 'Prévia'} - Forecast %`);
+        if (columnVisibility.lastYear) header.push('Ano anterior');
+        if (columnVisibility.deltaLY) header.push(`Δ ${showPreviaAsReal ? 'Real' : 'Prévia'} - Ano anterior R$`);
+        if (columnVisibility.deltaLYPct) header.push(`Δ ${showPreviaAsReal ? 'Real' : 'Prévia'} - Ano anterior %`);
+        if (columnVisibility.driverOtb && isMeetingVersion) header.push('KPI (OTB)');
+        if (columnVisibility.driverPrevia) header.push(`KPI (${showPreviaAsReal ? 'Real' : 'Prévia'})`);
+        if (columnVisibility.driverForecast) header.push('KPI (Forecast)');
+        if (columnVisibility.driverBudget) header.push('KPI (Meta)');
+
+        const aoa: (string | number)[][] = [header];
+
+        visibleData.forEach(row => {
+            if (row.category === 'Spacer') {
+                aoa.push(header.map(() => ''));
+                return;
+            }
+
+            const formatType = row.rowConfig?.format || 'currency';
+            const isPercentFormatRow = formatType === 'percent';
+            const isIndicator = row.category === 'Indicators';
+            const indent = '    '.repeat(row.indentLevel || 0);
+            const line: (string | number)[] = [`${indent}${row.label}`];
+
+            if (columnVisibility.otb && isMeetingVersion && !isAdminEntity) {
+                line.push(row.otb !== undefined ? formatValue(row.otb, formatType) : '-');
+            }
+            if (columnVisibility.previa) line.push(formatValue(row.previa, formatType));
+            extraComparisonMeetingIds.forEach(meetingId => {
+                line.push(formatValue(extraComparisonData[meetingId]?.[row.id], formatType));
+            });
+            if (columnVisibility.real) line.push(formatValue(row.real, formatType));
+            if (columnVisibility.budget) line.push(formatValue(row.budget, formatType));
+            if (columnVisibility.deltaPreviaBudget) {
+                line.push(formatValue(row.deltaPreviaBudgetVal || 0, (isIndicator || row.category === 'Labor') && formatType !== 'percent' ? formatType : 'currency'));
+            }
+            if (columnVisibility.deltaPreviaBudgetPct) {
+                line.push(isPercentFormatRow ? formatPointsDiff(row.deltaPreviaBudgetVal) : formatPercentDiff(row.deltaPreviaBudgetPct));
+            }
+            if (columnVisibility.deltaPreviaForecast) {
+                line.push(formatValue(row.deltaPreviaForecastVal || 0, (isIndicator || row.category === 'Labor') && formatType !== 'percent' ? formatType : 'currency'));
+            }
+            if (columnVisibility.deltaPreviaForecastPct) {
+                line.push(isPercentFormatRow ? formatPointsDiff(row.deltaPreviaForecastVal) : formatPercentDiff(row.deltaPreviaForecastPct));
+            }
+            if (columnVisibility.lastYear) line.push(formatValue(row.lastYear, formatType));
+
+            // Δ Ano anterior é recalculado na hora (igual o render faz), não usa
+            // row.deltaLYVal/deltaLYPct — esses campos existem no tipo mas não são a fonte real
+            // usada na tela pra essas 2 colunas.
+            if (columnVisibility.deltaLY || columnVisibility.deltaLYPct) {
+                const previaLYVal = (row.previa || 0) - (row.lastYear || 0);
+                const previaLYPct = row.lastYear ? (previaLYVal / row.lastYear) * 100 : 0;
+                if (columnVisibility.deltaLY) {
+                    line.push(formatValue(previaLYVal, (isIndicator || row.category === 'Labor') && formatType !== 'percent' ? formatType : 'currency'));
+                }
+                if (columnVisibility.deltaLYPct) {
+                    line.push(isPercentFormatRow ? formatPointsDiff(previaLYVal) : formatPercentDiff(previaLYPct));
+                }
+            }
+
+            if (columnVisibility.driverOtb || columnVisibility.driverPrevia || columnVisibility.driverForecast || columnVisibility.driverBudget) {
+                const kpiInfo = getKpiInfoForRow(row, data);
+                const kpiCell = (field: 'previa' | 'real' | 'budget' | 'otb') =>
+                    (!kpiInfo.hideKpi && kpiInfo.hasKpi) ? formatValue(kpiInfo.kpiValue(field), kpiInfo.kpiFormatType) : '';
+                if (columnVisibility.driverOtb && isMeetingVersion) line.push(kpiCell('otb'));
+                if (columnVisibility.driverPrevia) line.push(kpiCell('previa'));
+                if (columnVisibility.driverForecast) line.push(kpiCell('real'));
+                if (columnVisibility.driverBudget) line.push(kpiCell('budget'));
+            }
+
+            aoa.push(line);
+        });
+
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'DRE Forecast');
+        const slug = (s: string) => (s || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_');
+        const versionLabel = getMeetingLabel(activeProjectionType, meetings);
+        const fileName = `DRE_Forecast_${slug(selectedHotel || '')}_${String(selectedMonth || '').padStart(2, '0')}${selectedYear || ''}_${slug(versionLabel)}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+        onLogAction?.(`Exportou a DRE Forecast de ${selectedHotel} — ${selectedMonth}/${selectedYear} (${versionLabel}) em Excel`);
     };
 
     // "Distribuir nas contas contábeis" (clique direito na Prévia do pacote, só Custo de
@@ -1902,6 +2060,14 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                             Colunas
                         </button>
                         <button
+                            onClick={handleExportExcel}
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-base font-bold transition-colors border bg-white text-gray-600 border-gray-300 hover:bg-gray-50 shadow-sm"
+                            title="Exportar a DRE Forecast em Excel, no formato que está na tela"
+                        >
+                            <FileSpreadsheet size={20} />
+                            Exportar Excel
+                        </button>
+                        <button
                             onClick={() => {
                                 if (showDetails) {
                                     setShowDetails(false);
@@ -2430,6 +2596,10 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 // with PAX carried in precomputedKpi.denominator) — but only the Prévia column,
                                 // not Forecast, is meant to be editable here.
                                 const isEditableKpiPrevia = (isEditableKpi || (!!precomputedKpi?.denominator && canEditForecastValues && !isLocked && isRowEditableForUser(row)));
+                                // "KPI (Meta)" editável — mesma condição de isEditableKpiPrevia (contas com
+                                // fórmula de KPI self-denominator, ou as 2 linhas de Receita Extra
+                                // Lazer/Eventos via precomputedKpi.denominator).
+                                const isEditableKpiBudget = isEditableKpiPrevia;
 
                                 const renderFinancialCells = (isHeaderOrTotal = false, customBg = "") => {
                                     const effectiveBg = row.bgColor || (isBlueHighlight ? 'bg-sky-100 border-sky-200' : (customBg || 'bg-blue-50/20 border-r border-blue-50'));
@@ -2690,7 +2860,18 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                                     title={!hideKpi ? kpiFormulaTooltip : undefined}
                                                     style={kpiBorderStyle}
                                                     className={`px-2 py-px text-center tabular-nums text-xs truncate ${kpiBorderClass} ${hideKpi || !hasKpi ? 'bg-white text-transparent' : 'text-slate-500 bg-slate-50 cursor-help'}`}>
-                                                    {!hideKpi && hasKpi ? formatValue(kpiValue('budget'), kpiFormatType) : ''}
+                                                    {!hideKpi && hasKpi
+                                                        ? (isEditableKpiBudget ? (
+                                                            <FormattedInput
+                                                                inputRef={(el: any) => { inputRefs.current[`input-kpi-budget-${row.id}`] = el; }}
+                                                                className="w-full text-center bg-transparent border border-transparent hover:bg-white focus:bg-white focus:border-indigo-300 focus:ring-1 focus:ring-indigo-100 rounded outline-none py-1"
+                                                                value={kpiValue('budget')}
+                                                                formatType={kpiFormatType}
+                                                                onChange={(val: number) => handleKpiValueChange(row.id, 'budget', val)}
+                                                                onKeyDown={(e: any) => handleKeyDown(e, row.id, 'kpi-budget')}
+                                                            />
+                                                        ) : formatValue(kpiValue('budget'), kpiFormatType))
+                                                        : ''}
                                                 </CommentableCell>
                                             )}
                                         </>

@@ -1504,6 +1504,7 @@ const App: React.FC = () => {
               realVersions={realVersions}
               budgetVersions={budgetVersions}
               budgetOccupancyDataMap={budgetOccupancyDataMap}
+              setBudgetOccupancyDataMap={setBudgetOccupancyDataMap}
               activeProjectionType={activeProjectionType}
               setActiveProjectionType={setActiveProjectionType}
               versionNavToken={versionNavToken}

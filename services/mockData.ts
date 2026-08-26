@@ -1287,6 +1287,15 @@ export const getForecastData = (
                 r.isManualPreviaOverride = true;
                 if (r.previaConfig) r.previaConfig.manualValue = previaOverride;
             }
+
+            // KPI (Meta) editável — "Salvar Projeção" já grava esse override (scenario 'Meta')
+            // há tempos, mas nunca era lido de volta aqui (só REAL/PREVIA eram aplicados) — o
+            // valor editado "sumia" no próximo carregamento. Mesmo padrão dos dois de cima.
+            const budgetOverride = tryOverride('BUDGET');
+            if (budgetOverride !== undefined) {
+                r.budget = budgetOverride;
+                r.isManualBudgetOverride = true;
+            }
         });
     };
     applyOverrides();
@@ -1531,6 +1540,15 @@ export const getDynamicForecastData = (
                 r.previa = previaOverride;
                 r.isManualPreviaOverride = true;
                 if (r.previaConfig) r.previaConfig.manualValue = previaOverride;
+            }
+
+            // KPI (Meta) editável — "Salvar Projeção" já grava esse override (scenario 'Meta')
+            // há tempos, mas nunca era lido de volta aqui (só REAL/PREVIA eram aplicados) — o
+            // valor editado "sumia" no próximo carregamento. Mesmo padrão dos dois de cima.
+            const budgetOverride = tryOverride('BUDGET');
+            if (budgetOverride !== undefined) {
+                r.budget = budgetOverride;
+                r.isManualBudgetOverride = true;
             }
         });
     };
