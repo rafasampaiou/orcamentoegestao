@@ -1912,21 +1912,41 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     // e a Receita (`rev_fap`) é DERIVADA (dm_fap × sold, ver recalculateMeetingProjectionForMonth)
     // — por isso grava a DM direto, sem back-solve nenhum, senão a Receita fica recalculada por
     // cima igual a zero (dm_fap nunca escrito) mesmo com Aptos vendidos certo.
+    // Grava em `_previa` E `_forecast` (mesmo par que handleRealUpdate grava numa digitação manual
+    // nessa tela, OccupancyMonthlyRealView.tsx) — a Prévia é a entrada "de baixo pra cima", e é ela
+    // que alimenta a coluna Forecast na DRE Forecast; gravar só em `_forecast` não refletia na
+    // Prévia (só o contrário cascadeia).
+    // A Receita (`rev_fap` = dm_fap × sold) também precisa ser gravada aqui, não só dm_fap/sold:
+    // getRealOccValue (services/mockData.ts, usada pelas linhas REV-APT-LAZER/EVENTOS da DRE
+    // Forecast) faz leitura DIRETA de realOccupancyData, sem recalcular nada — a derivação de
+    // rev_fap a partir de dm_fap/sold só acontece dentro de OccupancyMonthlyRealView.tsx (reativa,
+    // ao renderizar a tela), então sem gravar rev_fap aqui a Receita na DRE ficaria zerada até
+    // alguém abrir a Ocupação e editar algo manualmente (o que reaciona o recálculo de lá).
     const syncForecastOccupancyFromSheet = () => {
         if (isAdminEntity || !selectedHotel || !selectedMonth || !setRealOccupancyData) return;
         // Dois buckets escrevem o mesmo dado: `contextKey` (sem projectionType) é o que a tela de
         // Ocupação de fato lê/exibe pro usuário; `normalKey` (com __projectionType, mesmo formato
         // de computeOtbProgress/otbProgress.ts) é o que marca a etapa 4 como concluída no Status
-        // da prévia.
+        // da prévia e o que a DRE Forecast (getRealOccValue) de fato lê.
         const contextKey = `${selectedHotel}_${selectedYear}_${selectedMonth}_${activeRealVersionId || ''}`;
         const normalKey = `${contextKey}__${activeProjectionType}`;
         toast.promise(
             fetchForecastOccupancyFromSheet(selectedHotel, selectedMonth).then(sheetData => {
+                const eventRevFap = sheetData.eventosDM * sheetData.eventosAptosVendidos;
+                const lazerRevFap = sheetData.lazerDM * sheetData.lazerAptosVendidos;
                 const fields = {
                     event_sold_forecast: sheetData.eventosAptosVendidos,
+                    event_sold_previa: sheetData.eventosAptosVendidos,
                     event_dm_fap_forecast: sheetData.eventosDM,
+                    event_dm_fap_previa: sheetData.eventosDM,
+                    event_rev_fap_forecast: eventRevFap,
+                    event_rev_fap_previa: eventRevFap,
                     lazer_sold_forecast: sheetData.lazerAptosVendidos,
+                    lazer_sold_previa: sheetData.lazerAptosVendidos,
                     lazer_dm_fap_forecast: sheetData.lazerDM,
+                    lazer_dm_fap_previa: sheetData.lazerDM,
+                    lazer_rev_fap_forecast: lazerRevFap,
+                    lazer_rev_fap_previa: lazerRevFap,
                 };
                 setRealOccupancyData(prev => ({
                     ...prev,
