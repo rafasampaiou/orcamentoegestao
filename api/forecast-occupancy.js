@@ -35,7 +35,7 @@ const stripDiacritics = (s) =>
     })
     .join('');
 
-const normalizeTabName = (s) =>
+const normalizeText = (s) =>
   stripDiacritics(s || '')
     .trim()
     .toLowerCase()
@@ -78,12 +78,59 @@ async function getServiceAccountAccessToken() {
 
 // Lê uma célula em texto/número já resolvido (não a fórmula) — mesma leitura "crua" que o resto
 // do app já faz ao importar planilhas com essa mesma lib (ver handleExportExcel/imports).
-const readCellNumber = (sheet, address) => {
-  const cell = sheet[address];
+const readCellNumber = (sheet, addr) => {
+  const cell = sheet[addr];
   if (!cell) return 0;
   const val = typeof cell.v === 'number' ? cell.v : Number(cell.v);
   return Number.isFinite(val) ? val : 0;
 };
+
+const cellText = (sheet, addr) => normalizeText(sheet[addr] ? String(sheet[addr].v ?? '') : '');
+
+// A tabela "Indicadores / Receita Evento / Receita Lazer / Receita Total" não fica sempre
+// ancorada em AK21:AN24 — cada aba (mês/hotel) é montada manualmente e desliza uma linha/coluna
+// pra lá ou pra cá. Em vez de um endereço fixo, procura pelos RÓTULOS de texto (o cabeçalho e as
+// linhas "Room Nights"/"Diária Média") em qualquer lugar da aba, e lê os valores relativos a onde
+// eles de fato estiverem — assim funciona mesmo com esse deslize entre abas.
+function findIndicatorsTable(sheet) {
+  const ref = sheet['!ref'];
+  if (!ref) throw new Error('Aba vazia (sem intervalo de células).');
+  const range = XLSX.utils.decode_range(ref);
+
+  for (let r = range.s.r; r <= range.e.r; r++) {
+    // Varre a linha inteira em busca da célula "Indicadores" (não só na 1ª coluna) — a tabela
+    // pode começar em qualquer coluna.
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const addr = XLSX.utils.encode_cell({ r, c });
+      if (cellText(sheet, addr) !== 'indicadores') continue;
+
+      const eventCol = c + 1;
+      const lazerCol = c + 2;
+      const eventHeader = cellText(sheet, XLSX.utils.encode_cell({ r, c: eventCol }));
+      const lazerHeader = cellText(sheet, XLSX.utils.encode_cell({ r, c: lazerCol }));
+      if (!eventHeader.includes('evento') || !lazerHeader.includes('lazer')) continue;
+
+      // Linhas de dado logo abaixo do cabeçalho (Receita / Room Nights / Diária Média) — procura
+      // numa janela pequena, não assume posição fixa também pras linhas.
+      let aptosRow = null;
+      let dmRow = null;
+      for (let dr = r + 1; dr <= Math.min(r + 8, range.e.r); dr++) {
+        const label = cellText(sheet, XLSX.utils.encode_cell({ r: dr, c }));
+        if (aptosRow === null && (label.includes('room night') || label.includes('aptos vendid'))) aptosRow = dr;
+        if (dmRow === null && (label.includes('diaria media') || label.includes('dm bruta'))) dmRow = dr;
+      }
+      if (aptosRow === null || dmRow === null) continue;
+
+      return {
+        eventosAptosVendidos: readCellNumber(sheet, XLSX.utils.encode_cell({ r: aptosRow, c: eventCol })),
+        lazerAptosVendidos: readCellNumber(sheet, XLSX.utils.encode_cell({ r: aptosRow, c: lazerCol })),
+        eventosDM: readCellNumber(sheet, XLSX.utils.encode_cell({ r: dmRow, c: eventCol })),
+        lazerDM: readCellNumber(sheet, XLSX.utils.encode_cell({ r: dmRow, c: lazerCol })),
+      };
+    }
+  }
+  return null;
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -123,13 +170,13 @@ export default async function handler(req, res) {
     const workbook = XLSX.read(Buffer.from(arrayBuffer), { type: 'buffer' });
 
     const monthName = MONTH_FULL_NAMES[month - 1];
-    const expected = normalizeTabName(`${monthName} - ${hotelName}`);
+    const expected = normalizeText(`${monthName} - ${hotelName}`);
     const titles = workbook.SheetNames || [];
     const matchedTitle =
-      titles.find((t) => normalizeTabName(t) === expected) ||
+      titles.find((t) => normalizeText(t) === expected) ||
       titles.find((t) => {
-        const nt = normalizeTabName(t);
-        return nt.includes(normalizeTabName(hotelName)) && nt.includes(normalizeTabName(monthName));
+        const nt = normalizeText(t);
+        return nt.includes(normalizeText(hotelName)) && nt.includes(normalizeText(monthName));
       });
 
     if (!matchedTitle) {
@@ -140,13 +187,15 @@ export default async function handler(req, res) {
     }
 
     const sheet = workbook.Sheets[matchedTitle];
-    // AL23/AM23 — Aptos vendidos; AL24/AM24 — DM bruta (sem ISS).
-    const eventosAptosVendidos = readCellNumber(sheet, 'AL23');
-    const lazerAptosVendidos = readCellNumber(sheet, 'AM23');
-    const eventosDM = readCellNumber(sheet, 'AL24');
-    const lazerDM = readCellNumber(sheet, 'AM24');
+    const table = findIndicatorsTable(sheet);
+    if (!table) {
+      res.status(404).json({
+        error: `Não encontrei a tabela "Indicadores / Receita Evento / Receita Lazer" na aba "${matchedTitle}" (procurei em toda a aba, não só perto de AK21:AN24).`,
+      });
+      return;
+    }
 
-    res.status(200).json({ tab: matchedTitle, eventosAptosVendidos, eventosDM, lazerAptosVendidos, lazerDM });
+    res.status(200).json({ tab: matchedTitle, ...table });
   } catch (err) {
     res.status(500).json({ error: err?.message || 'Erro desconhecido ao buscar dados da planilha.' });
   }
