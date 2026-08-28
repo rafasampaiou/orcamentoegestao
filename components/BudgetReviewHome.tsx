@@ -5,6 +5,7 @@ import { BudgetVersion, Hotel } from '../types';
 interface BudgetReviewHomeProps {
     hotels: Hotel[];
     selectedHotel: string;
+    setSelectedHotel: (name: string) => void;
     budgetVersions: BudgetVersion[];
     onCreateReplica: (sourceVersionId: string) => Promise<string | null>;
     onStartReview: (versionId: string, months: number[]) => void;
@@ -17,18 +18,20 @@ type Step = 'version' | 'mode' | 'period';
 // Fluxo de "Revisão de Metas" (Budget): escolher qual versão de Meta revisar → revisar a versão
 // original ou criar uma réplica pra revisar em paralelo → escolher o período (meses) → segue pra
 // BudgetReviewOccupancy (aba tipo Ocupação, só que gravando na versão escolhida aqui).
-const BudgetReviewHome: React.FC<BudgetReviewHomeProps> = ({ hotels, selectedHotel, budgetVersions, onCreateReplica, onStartReview }) => {
+const BudgetReviewHome: React.FC<BudgetReviewHomeProps> = ({ hotels, selectedHotel, setSelectedHotel, budgetVersions, onCreateReplica, onStartReview }) => {
     const [step, setStep] = useState<Step>('version');
     const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
     const [selectedMonths, setSelectedMonths] = useState<number[]>([]);
     const [creating, setCreating] = useState(false);
 
-    const hotel = hotels.find(h => h.name === selectedHotel);
-    const versionsForHotel = budgetVersions
-        .filter(v => v.hotelId === hotel?.code || v.hotelId === hotel?.id || v.hotel === selectedHotel)
-        .sort((a, b) => (b.year - a.year) || (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+    // Mesma lógica da tela "Versões" (TimelineView/Planejamentos): a lista mostra TODAS as versões
+    // de Budget já criadas, de qualquer hotel — não só do hotel selecionado no momento. Escolher
+    // uma versão troca o hotel ativo pra o dela (ver hotelNameForVersion/onClick abaixo), do mesmo
+    // jeito que a tela Versões já faz.
+    const allVersions = [...budgetVersions].sort((a, b) => (b.year - a.year) || (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+    const hotelNameForVersion = (v: BudgetVersion) => hotels.find(h => h.code === v.hotelId || h.id === v.hotelId)?.name || v.hotel || v.hotelId || '—';
 
-    const selectedVersion = versionsForHotel.find(v => v.id === selectedVersionId) || null;
+    const selectedVersion = allVersions.find(v => v.id === selectedVersionId) || null;
 
     const resetAll = () => {
         setStep('version');
@@ -78,26 +81,34 @@ const BudgetReviewHome: React.FC<BudgetReviewHomeProps> = ({ hotels, selectedHot
                     <h2 className="font-bold text-gray-700 mb-1">Qual versão de Meta você quer revisar?</h2>
                     <p className="text-xs text-gray-400 mb-4">Escolha a versão de origem — no próximo passo você decide se revisa ela direto ou cria uma réplica.</p>
 
-                    {versionsForHotel.length === 0 ? (
-                        <p className="text-sm text-gray-400 italic py-6 text-center">Nenhuma versão de Meta encontrada para {selectedHotel}.</p>
+                    {allVersions.length === 0 ? (
+                        <p className="text-sm text-gray-400 italic py-6 text-center">Nenhuma versão de Meta encontrada em Versões.</p>
                     ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-                            {versionsForHotel.map(v => (
-                                <button
-                                    key={v.id}
-                                    onClick={() => setSelectedVersionId(v.id)}
-                                    className={`text-left p-3 rounded-xl border transition-colors ${selectedVersionId === v.id ? 'border-[#F8981C] bg-[#F8981C]/5' : 'border-gray-200 hover:border-gray-300'}`}
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <span className="font-bold text-sm text-gray-800 truncate">{v.name}</span>
-                                        {v.isLocked && <Lock size={12} className="text-gray-400 shrink-0" />}
-                                    </div>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <span className="text-xs text-gray-500">{v.year}{v.month ? ` — ${MONTH_NAMES[v.month - 1]}` : ''}</span>
-                                        {v.isMain && <span className="text-[9px] font-bold uppercase text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">Principal</span>}
-                                    </div>
-                                </button>
-                            ))}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6 max-h-[420px] overflow-y-auto pr-1">
+                            {allVersions.map(v => {
+                                const hotelName = hotelNameForVersion(v);
+                                return (
+                                    <button
+                                        key={v.id}
+                                        onClick={() => {
+                                            setSelectedVersionId(v.id);
+                                            if (hotelName && hotelName !== selectedHotel) setSelectedHotel(hotelName);
+                                        }}
+                                        className={`text-left p-3 rounded-xl border transition-colors ${selectedVersionId === v.id ? 'border-[#F8981C] bg-[#F8981C]/5' : 'border-gray-200 hover:border-gray-300'}`}
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="font-bold text-sm text-gray-800 truncate">{v.name}</span>
+                                            {v.isLocked && <Lock size={12} className="text-gray-400 shrink-0" />}
+                                        </div>
+                                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                            <span className="text-xs font-semibold text-gray-600">{hotelName}</span>
+                                            <span className="text-xs text-gray-400">·</span>
+                                            <span className="text-xs text-gray-500">{v.year}{v.month ? ` — ${MONTH_NAMES[v.month - 1]}` : ''}</span>
+                                            {v.isMain && <span className="text-[9px] font-bold uppercase text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">Principal</span>}
+                                        </div>
+                                    </button>
+                                );
+                            })}
                         </div>
                     )}
 

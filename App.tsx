@@ -1603,6 +1603,7 @@ const App: React.FC = () => {
         <BudgetReviewHome
           hotels={hotels}
           selectedHotel={selectedHotel}
+          setSelectedHotel={setSelectedHotel}
           budgetVersions={budgetVersions}
           onCreateReplica={handleCreateBudgetReviewReplica}
           onStartReview={(versionId, months) => {
