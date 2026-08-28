@@ -1123,6 +1123,10 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                     denomValue = resolveKpiTerm(selfDenominatorLabel, prevData, field);
                 } else if (precomputedDenominator) {
                     denomValue = precomputedDenominator;
+                    // Mesma conversão do ramo acima: o valor digitado num KPI "percent" vem 0-100
+                    // (ex. digitou "5" pra 5%), mas o cálculo (rawKpi × denominador) precisa da
+                    // fração (0,05) — sem isso o valor gravado sairia 100x maior que o digitado.
+                    if (row.rowConfig?.precomputedKpi?.format === 'percent') rawKpi = typedKpiValue / 100;
                 }
 
                 if (!denomValue) {
@@ -1166,7 +1170,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         const hasKpi = !!(rowKpiCalc || precomputedKpi);
         const kpiFormatType = precomputedKpi ? precomputedKpi.format : (rowKpiCalc?.format === 'percent' ? 'percent' : 'decimal');
         const kpiValue = (field: 'previa' | 'real' | 'budget' | 'otb') => {
-            if (precomputedKpi) return precomputedKpi[field] || 0;
+            if (precomputedKpi) return precomputedKpi.format === 'percent' ? (precomputedKpi[field] || 0) * 100 : (precomputedKpi[field] || 0);
             const raw = evaluateKpiCalculation(rowKpiCalc, allRows, field);
             return rowKpiCalc?.format === 'percent' ? raw * 100 : raw;
         };
@@ -2662,12 +2666,12 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                                 const hasKpi = !!(rowKpiCalc || precomputedKpi);
                                 const kpiFormatType = precomputedKpi ? precomputedKpi.format : (rowKpiCalc?.format === 'percent' ? 'percent' : 'decimal');
                                 const kpiValue = (field: 'previa' | 'real' | 'budget' | 'otb') => {
-                                    if (precomputedKpi) return precomputedKpi[field] || 0;
+                                    if (precomputedKpi) return precomputedKpi.format === 'percent' ? (precomputedKpi[field] || 0) * 100 : (precomputedKpi[field] || 0);
                                     const raw = evaluateKpiCalculation(rowKpiCalc, data, field);
                                     return rowKpiCalc?.format === 'percent' ? raw * 100 : raw;
                                 };
                                 const kpiFormulaTooltip = precomputedKpi
-                                    ? 'Receita ÷ PAX do segmento'
+                                    ? (row.id === 'REV-ISS' ? 'Receita de ISS ÷ demais receitas (Apartamentos + Extras + Time Share)' : 'Receita ÷ PAX do segmento')
                                     : (rowKpiCalc ? formatKpiFormulaForDisplay(rowKpiCalc.formula) : undefined);
 
                                 // The KPI can be typed directly (to adjust the underlying result) only when
@@ -4121,6 +4125,16 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
             const revExtraRow = rowMap.get('REV-EXTRA');
             if (revExtraRow?.rowConfig?.precomputedKpi) {
                 revExtraRow.rowConfig = { ...revExtraRow.rowConfig, precomputedKpi: { ...revExtraRow.rowConfig.precomputedKpi, [field]: kpiSum } };
+            }
+
+            // Mesma ideia pro KPI de Receita de ISS ÷ demais receitas — o denominador foi fixado
+            // na montagem (mockData.ts), só o valor do KPI precisa acompanhar o valor atual da
+            // linha (editado direto ou via KPI).
+            const issRow = rowMap.get('REV-ISS');
+            const issDenom = issRow?.rowConfig?.precomputedKpi?.denominator?.[field];
+            if (issRow?.rowConfig?.precomputedKpi && issDenom) {
+                const issKpiVal = issDenom > 0 ? (issRow[field] || 0) / issDenom : 0;
+                issRow.rowConfig = { ...issRow.rowConfig, precomputedKpi: { ...issRow.rowConfig.precomputedKpi, [field]: issKpiVal } };
             }
         }
 

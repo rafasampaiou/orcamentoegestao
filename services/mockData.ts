@@ -995,6 +995,12 @@ export const getForecastData = (
         { id: 'REV-APT-OR', code: '1.01.03', label: 'OR de hospedagem', sourceId: 'geral_or_hosp' }
     ];
 
+    // Soma acumulada pro denominador do KPI de Receita de ISS (Receita de ISS ÷ demais receitas)
+    // montado mais abaixo — precisa ser as receitas "brutas" (Apartamentos + Extras + Time Share),
+    // por isso é somado aqui em vez de lido de REV-APT/REV-EXTRA (que só ganham o total de verdade
+    // dentro de recalculateTotals, chamado bem depois de getDynamicForecastData terminar).
+    const revAptSum = { previa: 0, real: 0, budget: 0, otb: 0 };
+
     revAptItems.forEach(item => {
         const valBudget = budgetOccupancyData[item.sourceId] ? budgetOccupancyData[item.sourceId][monthIdx] : 0;
         const valReal = getRealOccValue(`${item.sourceId}_forecast`) || 0;
@@ -1005,6 +1011,11 @@ export const getForecastData = (
         const rowAptItem = generateRow(item.id, item.code, 'Revenue', item.label, valBudget, valReal, valLY, valPrevia, false, false, 2);
         rowAptItem.otb = getOtbOccValue(`${item.sourceId}_previa`) || 0;
         rows.push(rowAptItem);
+
+        revAptSum.previa += valPrevia;
+        revAptSum.real += valReal;
+        revAptSum.budget += valBudget;
+        revAptSum.otb += rowAptItem.otb || 0;
     });
 
     // 1.02 Receitas Extras
@@ -1057,6 +1068,14 @@ export const getForecastData = (
     rows.push(generateRow('REV-EXTRA', '1.02', 'Revenue', 'Receitas Extras', 0, 0, 0, 0, true, false, 1, undefined, { precomputedKpi: { ...revExtraKpiSum, format: 'decimal' } }));
     rows.push(...revExtraItemRows);
 
+    // Soma das Receitas Extras pro mesmo denominador do KPI de Receita de ISS (ver revAptSum acima).
+    const revExtraSum = revExtraItemRows.reduce((acc, r) => ({
+        previa: acc.previa + (r.previa || 0),
+        real: acc.real + (r.real || 0),
+        budget: acc.budget + (r.budget || 0),
+        otb: acc.otb + (r.otb || 0)
+    }), { previa: 0, real: 0, budget: 0, otb: 0 });
+
     // 1.03 Cancelamento de Time Share
     const valBudgetTS = budgetOccupancyData['geral_cancel_ts'] ? budgetOccupancyData['geral_cancel_ts'][monthIdx] : 0;
     const valRealTS = getRealOccValue('geral_cancel_ts_forecast') || 0;
@@ -1073,10 +1092,27 @@ export const getForecastData = (
     const valRealISS = getRealOccValue('geral_iss_rev_forecast') || 0;
     const valPreviaISS = getRealOccValue('geral_iss_rev_previa') || 0;
     const valLYISS = getLYOccValue('geral_iss_rev_forecast') || 0;
-    const revIssRow = generateRow('REV-ISS', '1.04', 'Revenue', 'RECEITA DE ISS', valBudgetISS, valRealISS, valLYISS, valPreviaISS, true, false, 1);
-    // "Receitas de ISS" (3.01.01.02.008) do balancete importado alimenta esta linha direto na
-    // coluna OTB — mesmo padrão de Imposto/Time Share acima.
+    // "Receitas de ISS" (3.01.01.02.008) do balancete importado alimenta a coluna OTB — mesmo
+    // padrão de Imposto/Time Share acima. Precisa vir antes do KPI abaixo (o denominador do OTB
+    // usa o OTB de Apartamentos/Extras/Time Share, e o numerador usa esse valor de ISS no OTB).
     const balanceteIss = getOtbOccValue('__balancete_iss');
+    // KPI = Receita de ISS ÷ demais receitas (Apartamentos + Extras + Time Share) — mesmo padrão
+    // precomputado de Receita Extra Lazer/Eventos acima, editável tanto na Meta quanto na Prévia
+    // (handleKpiValueChange em ForecastTable.tsx já cobre isso genericamente via
+    // precomputedKpi.denominator, sem precisar de nada específico pra Receita de ISS).
+    const otherRevPrevia = revAptSum.previa + revExtraSum.previa + valPreviaTS;
+    const otherRevReal = revAptSum.real + revExtraSum.real + valRealTS;
+    const otherRevBudget = revAptSum.budget + revExtraSum.budget + valBudgetTS;
+    const otherRevOtb = revAptSum.otb + revExtraSum.otb + (revTimeRow.otb || 0);
+    const issPrecomputedKpi = {
+        previa: otherRevPrevia > 0 ? valPreviaISS / otherRevPrevia : 0,
+        real: otherRevReal > 0 ? valRealISS / otherRevReal : 0,
+        budget: otherRevBudget > 0 ? valBudgetISS / otherRevBudget : 0,
+        otb: otherRevOtb > 0 ? (balanceteIss || 0) / otherRevOtb : 0,
+        format: 'percent' as const,
+        denominator: { previa: otherRevPrevia, real: otherRevReal, budget: otherRevBudget, otb: otherRevOtb }
+    };
+    const revIssRow = generateRow('REV-ISS', '1.04', 'Revenue', 'RECEITA DE ISS', valBudgetISS, valRealISS, valLYISS, valPreviaISS, true, false, 1, undefined, { precomputedKpi: issPrecomputedKpi });
     if (balanceteIss !== undefined) revIssRow.otb = balanceteIss;
     rows.push(revIssRow);
 
