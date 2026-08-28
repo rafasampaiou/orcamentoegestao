@@ -186,7 +186,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           />
           {exp.budgetReview && (
             <div className="space-y-0.5 pb-1">
-              <NavItem depth={1} label="Revisão de Metas" icon={ClipboardEdit} active={currentView === 'budget_review_home' || currentView === 'budget_review_occupancy'} onClick={() => go('budget_review_home', 'BUDGET_REVIEW')} />
+              <NavItem depth={1} label="Revisão de Metas" icon={ClipboardEdit} active={currentView === 'budget_review_home' || currentView === 'budget_review_occupancy' || currentView === 'budget_review_dre' || currentView === 'budget_review_comparatives'} onClick={() => go('budget_review_home', 'BUDGET_REVIEW')} />
             </div>
           )}
         </div>

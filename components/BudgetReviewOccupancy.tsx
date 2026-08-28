@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, ClipboardEdit } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ClipboardEdit } from 'lucide-react';
 import { BudgetVersion, User, PermissionMatrix, hasPermission } from '../types';
 import { BudgetOccupancyTable, geralRows, lazerRows, eventRows } from './OccupancyView';
 import { recalculateBudgetOccupancy } from '../utils/occupancyProjection';
@@ -12,6 +12,7 @@ interface BudgetReviewOccupancyProps {
     currentUser?: User;
     permissionsMatrix: PermissionMatrix;
     onBack: () => void;
+    onGoToDRE: () => void;
 }
 
 // Etapa 3 da Revisão de Metas: tela igual à Ocupação (Geral/Lazer/Eventos), só que gravando na
@@ -19,7 +20,7 @@ interface BudgetReviewOccupancyProps {
 // hotel — reaproveita a mesma grade (BudgetOccupancyTable) e o mesmo motor de cálculo
 // (recalculateBudgetOccupancy) da tela de Ocupação, só aponta pra outro versionId.
 const BudgetReviewOccupancy: React.FC<BudgetReviewOccupancyProps> = ({
-    version, reviewMonths, budgetOccupancyDataMap, setBudgetOccupancyDataMap, currentUser, permissionsMatrix, onBack
+    version, reviewMonths, budgetOccupancyDataMap, setBudgetOccupancyDataMap, currentUser, permissionsMatrix, onBack, onGoToDRE
 }) => {
     const [decimalOverrides, setDecimalOverrides] = useState<Record<string, number>>({});
 
@@ -64,6 +65,12 @@ const BudgetReviewOccupancy: React.FC<BudgetReviewOccupancyProps> = ({
                         {version.isLocked && ' Esta versão está bloqueada (somente leitura).'}
                     </p>
                 </div>
+                <button
+                    onClick={onGoToDRE}
+                    className="ml-auto flex items-center gap-1.5 px-4 py-2.5 rounded-lg font-bold text-sm bg-[#F8981C] text-white hover:bg-[#e08a15] transition-colors"
+                >
+                    Ir para a DRE <ArrowRight size={16} />
+                </button>
             </div>
 
             <div className="space-y-6">

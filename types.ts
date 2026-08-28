@@ -304,6 +304,8 @@ export type ViewState =
   // Metas é um fluxo pontual de revisão sobre uma BudgetVersion existente, ver BudgetReviewHome).
   | 'budget_review_home'
   | 'budget_review_occupancy'
+  | 'budget_review_dre'
+  | 'budget_review_comparatives'
 
   // ADMIN > Tauá Real
   | 'admin_real_versions'

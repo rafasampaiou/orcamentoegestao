@@ -23,6 +23,8 @@ import LoadingScreen from './components/LoadingScreen';
 import ValidationsView from './components/ValidationsView';
 import BudgetReviewHome from './components/BudgetReviewHome';
 import BudgetReviewOccupancy from './components/BudgetReviewOccupancy';
+import BudgetReviewDRE from './components/BudgetReviewDRE';
+import BudgetReviewComparatives from './components/BudgetReviewComparatives';
 import { supabase } from './services/supabaseClient';
 import { supabaseService } from './services/supabaseService';
 import { Session } from '@supabase/supabase-js';
@@ -31,6 +33,7 @@ import { DEFAULT_PERMISSIONS_MATRIX, mergePermissionsMatrix } from './utils/perm
 import { resolveMeetingKind, getMeetingLabel, LEGACY_MEETING_VALUES } from './utils/meetings';
 import { SLIDES_CAPTURE_TARGETS } from './utils/slidesCaptureTargets';
 import { captureSlideTarget, getPngBlobSize } from './utils/captureElement';
+import { projectExpensesAcrossMonths } from './utils/budgetReviewDre';
 import {
     ensureGoogleAccessToken, ensureDriveFolder, copyTemplatePresentation, uploadImageAndGetPublicUrl,
     getPresentationStructure, addContentSlideFromMold, deleteSlide, fillCoverPlaceholders,
@@ -177,6 +180,12 @@ const App: React.FC = () => {
   // ligados ao activeRealVersionId de sempre, iguais nas duas, de propósito).
   const [budgetReviewVersionId, setBudgetReviewVersionId] = useState<string>('');
   const [budgetReviewMonths, setBudgetReviewMonths] = useState<number[]>([]);
+  // Snapshot de ocupação/despesa capturado no exato momento em que a revisão começa (antes de
+  // qualquer edição desta sessão) — é a "Meta" de referência que "Calcular Forecast" usa pra tirar
+  // a taxa (valor ÷ driver) e reaplicar em cima da ocupação já revisada de cada mês. Sem isso,
+  // recalcular depois de já ter editado a ocupação seria circular (taxa e driver mudariam juntos,
+  // nunca fazendo a despesa reagir à revisão).
+  const [budgetReviewBaseline, setBudgetReviewBaseline] = useState<{ occupancyData: Record<string, number[]>; financialData: ImportedRow[] } | null>(null);
 
   // --- PROJECTION TYPE STATE ---
   // Sem valor fixo de fábrica — as "reuniões" agora são criadas dinamicamente (ver `meetings`
@@ -1443,6 +1452,55 @@ const App: React.FC = () => {
     }
   };
 
+  // "Calcular Forecast" da Revisão de Metas (etapa 5) — projeta as despesas dos meses
+  // selecionados a partir da taxa (valor ÷ driver) da MESMA versão ANTES da revisão começar
+  // (budgetReviewBaseline), aplicada em cima da ocupação já revisada de cada mês. Reescreve o mês
+  // inteiro (todas as contas) em vez de só as que mudaram — evita duplicar linha no Supabase, já
+  // que saveFinancialData só faz insert puro (sem upsert), então tem que apagar antes de gravar.
+  const handleCalcularBudgetReviewForecast = async () => {
+    if (!budgetReviewVersionId || !budgetReviewBaseline || budgetReviewMonths.length === 0) return;
+    const version = budgetVersions.find(v => v.id === budgetReviewVersionId);
+    if (!version) return;
+    const hotel = hotels.find(h => h.code === version.hotelId || h.id === version.hotelId)?.name || version.hotel || selectedHotel;
+    const year = version.year;
+
+    try {
+      const newRows = projectExpensesAcrossMonths(
+        accounts,
+        budgetReviewBaseline.financialData,
+        budgetReviewBaseline.occupancyData,
+        budgetOccupancyDataMap[budgetReviewVersionId] || {},
+        hotel,
+        year,
+        budgetReviewVersionId,
+        budgetReviewMonths
+      );
+
+      for (const month of budgetReviewMonths) {
+        await supabaseService.deleteFinancialDataByContext(hotel, year, month, budgetReviewVersionId, 'Meta');
+      }
+      if (newRows.length > 0) {
+        await supabaseService.saveFinancialData(newRows);
+      }
+
+      setImportedFinancialData(prev => {
+        const monthsSet = new Set(budgetReviewMonths);
+        const kept = prev.filter(r => !(
+          r.versionId === budgetReviewVersionId &&
+          (r.cenario || '').trim().toLowerCase() === 'meta' &&
+          monthsSet.has(parseInt(r.mes))
+        ));
+        return [...kept, ...newRows];
+      });
+
+      toast.success('Despesas projetadas pra todos os meses selecionados.');
+      logUserAction(`Calculou o Forecast da Revisão de Metas "${version.name}" (${year})`);
+    } catch (err) {
+      console.error('Budget review Calcular Forecast error:', err);
+      toast.error('Erro ao projetar as despesas. Verifique a conexão.');
+    }
+  };
+
   const renderContent = () => {
     // Whether the month is "closed" is now controlled entirely by which Forecast version is
     // selected — selecting a reunião do tipo "Fechamento" é o que marca o mês como fechado.
@@ -1609,6 +1667,10 @@ const App: React.FC = () => {
           onStartReview={(versionId, months) => {
             setBudgetReviewVersionId(versionId);
             setBudgetReviewMonths(months);
+            setBudgetReviewBaseline({
+              occupancyData: { ...(budgetOccupancyDataMap[versionId] || {}) },
+              financialData: importedFinancialData.filter(r => r.versionId === versionId && (r.cenario || '').trim().toLowerCase() === 'meta'),
+            });
             setCurrentView('budget_review_occupancy');
           }}
         />
@@ -1636,6 +1698,63 @@ const App: React.FC = () => {
             currentUser={currentUser}
             permissionsMatrix={permissionsMatrix}
             onBack={() => setCurrentView('budget_review_home')}
+            onGoToDRE={() => setCurrentView('budget_review_dre')}
+          />
+        );
+      }
+      case 'budget_review_dre': {
+        const reviewVersion = budgetVersions.find(v => v.id === budgetReviewVersionId);
+        if (!reviewVersion) {
+          return (
+            <div className="p-8 text-center text-gray-500">
+              Nenhuma versão em revisão selecionada.
+              <button onClick={() => setCurrentView('budget_review_home')} className="block mx-auto mt-3 text-[#F8981C] font-bold hover:underline">
+                ← Voltar pra Revisão de Metas
+              </button>
+            </div>
+          );
+        }
+        return (
+          <BudgetReviewDRE
+            version={reviewVersion}
+            reviewMonths={budgetReviewMonths}
+            accounts={accounts}
+            packages={packages}
+            financialData={importedFinancialData}
+            budgetOccupancyDataMap={budgetOccupancyDataMap}
+            currentUser={currentUser}
+            permissionsMatrix={permissionsMatrix}
+            onBack={() => setCurrentView('budget_review_occupancy')}
+            onGoToOccupancy={() => setCurrentView('budget_review_occupancy')}
+            onGoToComparatives={() => setCurrentView('budget_review_comparatives')}
+            onCalcularForecast={handleCalcularBudgetReviewForecast}
+          />
+        );
+      }
+      case 'budget_review_comparatives': {
+        const reviewVersion = budgetVersions.find(v => v.id === budgetReviewVersionId);
+        if (!reviewVersion) {
+          return (
+            <div className="p-8 text-center text-gray-500">
+              Nenhuma versão em revisão selecionada.
+              <button onClick={() => setCurrentView('budget_review_home')} className="block mx-auto mt-3 text-[#F8981C] font-bold hover:underline">
+                ← Voltar pra Revisão de Metas
+              </button>
+            </div>
+          );
+        }
+        return (
+          <BudgetReviewComparatives
+            hotels={hotels}
+            budgetVersions={budgetVersions}
+            accounts={accounts}
+            financialData={importedFinancialData}
+            budgetOccupancyDataMap={budgetOccupancyDataMap}
+            realOccupancyData={realOccupancyData}
+            activeRealVersionId={activeRealVersionId}
+            initialNewVersionId={budgetReviewVersionId}
+            initialMonths={budgetReviewMonths}
+            onBack={() => setCurrentView('budget_review_dre')}
           />
         );
       }
