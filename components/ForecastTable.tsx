@@ -1027,6 +1027,20 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         );
     };
 
+    // Mesma lógica de clearParentPackagePreviaOverride, mas pro Budget: editar o KPI (Meta) de uma
+    // conta contábil também tira o pacote-pai do modo "valor manual" (travado via KPI ÷ PAX do
+    // próprio pacote), pra ele voltar a somar as contas normalmente.
+    const clearParentPackageBudgetOverride = (rows: ForecastRow[], accountRowId: string): ForecastRow[] => {
+        const acc = accounts.find(a => a.id === accountRowId) || accounts.find(a => a.id === accountRowId.split('-')[0]);
+        if (!acc) return rows;
+        return rows.map(row =>
+            row.category === 'Package' && row.indentLevel === 1 && row.isHeader &&
+            ((acc.package || '').toLowerCase() === (row.label || '').toLowerCase() || acc.packageId === row.id)
+                ? { ...row, isManualBudgetOverride: false }
+                : row
+        );
+    };
+
     const handleManualValueChange = (rowId: string, field: 'real' | 'previa', value: number) => {
         setData(prevData => {
             const editedRow = prevData.find(r => r.id === rowId);
@@ -1122,6 +1136,9 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
             });
             if (field === 'previa' && editedRow && editedRow.category !== 'Package') {
                 newData = clearParentPackagePreviaOverride(newData, rowId);
+            }
+            if (field === 'budget' && editedRow && editedRow.category !== 'Package') {
+                newData = clearParentPackageBudgetOverride(newData, rowId);
             }
             return recalculateTotals(newData, packages, accounts);
         });
@@ -4187,7 +4204,6 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
 
         if (children.length > 0) {
             pkgRow.real = children.reduce((sum, c) => sum + c.real, 0);
-            pkgRow.budget = children.reduce((sum, c) => sum + c.budget, 0);
             pkgRow.lastYear = children.reduce((sum, c) => sum + c.lastYear, 0);
             // Prévia digitada direto no pacote (isManualPreviaOverride) prevalece sobre a soma das
             // contas — sem essa trava, o valor digitado seria sobrescrito de volta na mesma hora,
@@ -4195,6 +4211,12 @@ function recalculateTotals(rows: ForecastRow[], packages: CostPackage[], account
             // próprio digitar o valor).
             if (!pkgRow.isManualPreviaOverride) {
                 pkgRow.previa = children.reduce((sum, c) => sum + (c.previa || 0), 0);
+            }
+            // Meta editada via "KPI (Meta)" direto no pacote (isManualBudgetOverride) prevalece
+            // sobre a soma das contas — mesma trava da Prévia acima, faltava pro Budget (era o que
+            // fazia o valor digitado voltar pro antigo na mesma hora, sem o usuário perceber).
+            if (!pkgRow.isManualBudgetOverride) {
+                pkgRow.budget = children.reduce((sum, c) => sum + c.budget, 0);
             }
             pkgRow.isManualOverride = false;
         }
