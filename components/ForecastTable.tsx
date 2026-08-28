@@ -10,6 +10,7 @@ import CreateMeetingModal from './CreateMeetingModal';
 import BalanceteImportModal from './BalanceteImportModal';
 import { computeOtbProgress, hasOccupancyData } from '../utils/otbProgress';
 import { resolveMeetingKind, getMeetingLabel } from '../utils/meetings';
+import { fetchForecastOccupancyFromSheet } from '../services/forecastOccupancySync';
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 
@@ -1899,7 +1900,40 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         return Object.keys(overrides).length > 0 ? overrides : null;
     };
 
+    // "Calcular Forecast" também tenta puxar Ocupação/Receita do Forecast (Aptos vendidos + DM
+    // bruta sem ISS, Eventos e Lazer) de uma planilha Google Sheets externa — uma aba por
+    // "Mês - Hotel" (api/forecast-occupancy.js, via conta de serviço do Google). Roda em paralelo
+    // ao cálculo financeiro normal, sem travar o resto do fluxo se falhar (aba não encontrada,
+    // planilha fora do ar etc. só viram um toast de erro). DM bruta é campo calculado na Ocupação
+    // (Receita ÷ Aptos vendidos) — por isso back-solve pra Receita (DM × Aptos vendidos) em vez de
+    // gravar a DM direto.
+    const syncForecastOccupancyFromSheet = () => {
+        if (isAdminEntity || !selectedHotel || !selectedMonth || !setRealOccupancyData) return;
+        const contextKey = `${selectedHotel}_${selectedYear}_${selectedMonth}_${activeRealVersionId || ''}`;
+        toast.promise(
+            fetchForecastOccupancyFromSheet(selectedHotel, selectedMonth).then(sheetData => {
+                setRealOccupancyData(prev => ({
+                    ...prev,
+                    [contextKey]: {
+                        ...(prev[contextKey] || {}),
+                        event_sold_forecast: sheetData.eventosAptosVendidos,
+                        event_rev_fap_forecast: sheetData.eventosDM * sheetData.eventosAptosVendidos,
+                        lazer_sold_forecast: sheetData.lazerAptosVendidos,
+                        lazer_rev_fap_forecast: sheetData.lazerDM * sheetData.lazerAptosVendidos,
+                    }
+                }));
+                return sheetData;
+            }),
+            {
+                loading: 'Buscando Ocupação/Receita do Forecast na planilha...',
+                success: (sheetData) => `Ocupação/Receita do Forecast atualizada a partir da aba "${sheetData.tab}".`,
+                error: (err) => `Não deu pra puxar da planilha: ${err.message}`,
+            }
+        );
+    };
+
     const handleCalcularForecast = () => {
+        syncForecastOccupancyFromSheet();
         if (activeProjectionType === 'Realizado') {
             const overrides = findFechamentoOverrides();
             if (overrides) {
