@@ -1,12 +1,17 @@
 import crypto from 'crypto';
+import * as XLSX from 'xlsx';
 
-// Puxa Ocupação/Receita do Forecast (Aptos vendidos + DM bruta sem ISS, Eventos e Lazer) de uma
-// planilha Google Sheets externa, uma aba por "NOME DO MÊS - NOME DO HOTEL". Roda só aqui
-// (Vercel function) porque usa uma conta de serviço do Google (credencial que nunca pode chegar
-// ao bundle do navegador) — assim funciona pra qualquer usuário que clicar em "Calcular
-// Forecast", sem depender de quem está logado ter acesso à planilha.
+// Puxa Ocupação/Receita do Forecast (Aptos vendidos + DM bruta sem ISS, Eventos e Lazer) de um
+// arquivo Excel que fica no Google Drive, uma aba por "NOME DO MÊS - NOME DO HOTEL". Baixa o
+// arquivo BRUTO via Google Drive API (em vez da API do Google Sheets) porque é um .xlsx de fato —
+// só aberto pelo Google Sheets em modo de compatibilidade, nunca convertido pra Planilhas Google
+// nativa — e é assim de propósito: sempre que alguém atualiza esse Excel no Drive, a próxima
+// busca já lê o conteúdo novo, sem precisar recriar/reconectar nada. Roda só aqui (Vercel
+// function) porque usa uma conta de serviço do Google (credencial que nunca pode chegar ao bundle
+// do navegador) — assim funciona pra qualquer usuário que clicar na etapa 4, sem depender de quem
+// está logado ter acesso ao arquivo.
 
-const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets.readonly';
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
 
 const MONTH_FULL_NAMES = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -48,7 +53,7 @@ async function getServiceAccountAccessToken() {
   const now = Math.floor(Date.now() / 1000);
   const unsigned = `${base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))}.${base64url(JSON.stringify({
     iss: clientEmail,
-    scope: SHEETS_SCOPE,
+    scope: DRIVE_SCOPE,
     aud: 'https://oauth2.googleapis.com/token',
     iat: now,
     exp: now + 3600,
@@ -71,6 +76,15 @@ async function getServiceAccountAccessToken() {
   return tokenJson.access_token;
 }
 
+// Lê uma célula em texto/número já resolvido (não a fórmula) — mesma leitura "crua" que o resto
+// do app já faz ao importar planilhas com essa mesma lib (ver handleExportExcel/imports).
+const readCellNumber = (sheet, address) => {
+  const cell = sheet[address];
+  if (!cell) return 0;
+  const val = typeof cell.v === 'number' ? cell.v : Number(cell.v);
+  return Number.isFinite(val) ? val : 0;
+};
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
@@ -85,29 +99,32 @@ export default async function handler(req, res) {
     return;
   }
 
-  const spreadsheetId = process.env.FORECAST_OCCUPANCY_SPREADSHEET_ID;
-  if (!spreadsheetId) {
-    res.status(500).json({ error: 'Configuração do servidor incompleta (planilha de Forecast não configurada).' });
+  const fileId = process.env.FORECAST_OCCUPANCY_SPREADSHEET_ID;
+  if (!fileId) {
+    res.status(500).json({ error: 'Configuração do servidor incompleta (arquivo de Forecast não configurado).' });
     return;
   }
 
   try {
     const accessToken = await getServiceAccountAccessToken();
-    const authHeader = { Authorization: `Bearer ${accessToken}` };
 
-    const metaRes = await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=sheets.properties.title`,
-      { headers: authHeader }
+    const fileRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
     );
-    const metaJson = await metaRes.json();
-    if (!metaRes.ok) {
-      res.status(502).json({ error: `Erro ao ler a planilha: ${metaJson.error?.message || metaRes.status}` });
+    if (!fileRes.ok) {
+      const errText = await fileRes.text().catch(() => '');
+      let message = errText;
+      try { message = JSON.parse(errText)?.error?.message || errText; } catch { /* keep raw text */ }
+      res.status(502).json({ error: `Erro ao baixar o arquivo do Drive: ${message || fileRes.status}` });
       return;
     }
+    const arrayBuffer = await fileRes.arrayBuffer();
+    const workbook = XLSX.read(Buffer.from(arrayBuffer), { type: 'buffer' });
 
     const monthName = MONTH_FULL_NAMES[month - 1];
     const expected = normalizeTabName(`${monthName} - ${hotelName}`);
-    const titles = (metaJson.sheets || []).map((s) => s.properties?.title || '');
+    const titles = workbook.SheetNames || [];
     const matchedTitle =
       titles.find((t) => normalizeTabName(t) === expected) ||
       titles.find((t) => {
@@ -117,28 +134,17 @@ export default async function handler(req, res) {
 
     if (!matchedTitle) {
       res.status(404).json({
-        error: `Não encontrei a aba "${monthName} - ${hotelName}" nessa planilha. Abas disponíveis: ${titles.join(', ') || '(nenhuma)'}`,
+        error: `Não encontrei a aba "${monthName} - ${hotelName}" nesse arquivo. Abas disponíveis: ${titles.join(', ') || '(nenhuma)'}`,
       });
       return;
     }
 
-    const range = `'${matchedTitle.replace(/'/g, "''")}'!AL23:AM24`;
-    const valuesRes = await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}?valueRenderOption=UNFORMATTED_VALUE`,
-      { headers: authHeader }
-    );
-    const valuesJson = await valuesRes.json();
-    if (!valuesRes.ok) {
-      res.status(502).json({ error: `Erro ao ler os valores da aba "${matchedTitle}": ${valuesJson.error?.message || valuesRes.status}` });
-      return;
-    }
-
-    // grid[0] = linha 23 (AL23, AM23) — Aptos vendidos; grid[1] = linha 24 (AL24, AM24) — DM bruta.
-    const grid = valuesJson.values || [];
-    const eventosAptosVendidos = Number(grid[0]?.[0]) || 0;
-    const lazerAptosVendidos = Number(grid[0]?.[1]) || 0;
-    const eventosDM = Number(grid[1]?.[0]) || 0;
-    const lazerDM = Number(grid[1]?.[1]) || 0;
+    const sheet = workbook.Sheets[matchedTitle];
+    // AL23/AM23 — Aptos vendidos; AL24/AM24 — DM bruta (sem ISS).
+    const eventosAptosVendidos = readCellNumber(sheet, 'AL23');
+    const lazerAptosVendidos = readCellNumber(sheet, 'AM23');
+    const eventosDM = readCellNumber(sheet, 'AL24');
+    const lazerDM = readCellNumber(sheet, 'AM24');
 
     res.status(200).json({ tab: matchedTitle, eventosAptosVendidos, eventosDM, lazerAptosVendidos, lazerDM });
   } catch (err) {
