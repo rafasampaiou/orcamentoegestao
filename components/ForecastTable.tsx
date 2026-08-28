@@ -11,6 +11,7 @@ import BalanceteImportModal from './BalanceteImportModal';
 import { computeOtbProgress, hasOccupancyData } from '../utils/otbProgress';
 import { resolveMeetingKind, getMeetingLabel } from '../utils/meetings';
 import { fetchForecastOccupancyFromSheet } from '../services/forecastOccupancySync';
+import { recalculateMeetingProjectionForMonth } from '../utils/occupancyProjection';
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 
@@ -1619,7 +1620,10 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 setShowBalanceteModal(true);
             }
         } else if (index === 3) {
-            syncForecastOccupancyFromSheet();
+            // Só busca de novo na planilha se a etapa ainda não tiver dado (nunca feita, ou
+            // "Resetar etapa" limpou o bucket) — revisitar uma etapa já concluída é só navegação,
+            // sem sobrescrever o que já foi buscado/ajustado.
+            if (!otbProgress[3]) syncForecastOccupancyFromSheet();
             onNavigateToOccupancy?.(false);
         } else if (index === 4) {
             handleCalcularForecast();
@@ -1908,20 +1912,20 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     // Ocupação pra preencher à mão. Não trava a navegação se falhar (aba não encontrada, planilha
     // fora do ar etc. só viram um toast de erro, e a etapa continua podendo ser preenchida manual).
     // Quem edita essa etapa é OccupancyMonthlyRealView (Reunião de Ritmo/FCA N1/FCA N2) — nesse
-    // modo (ao contrário da tela geral de Ocupação/Realizado) DM bruta É o campo de entrada bruto
-    // e a Receita (`rev_fap`) é DERIVADA (dm_fap × sold, ver recalculateMeetingProjectionForMonth)
-    // — por isso grava a DM direto, sem back-solve nenhum, senão a Receita fica recalculada por
-    // cima igual a zero (dm_fap nunca escrito) mesmo com Aptos vendidos certo.
-    // Grava em `_previa` E `_forecast` (mesmo par que handleRealUpdate grava numa digitação manual
-    // nessa tela, OccupancyMonthlyRealView.tsx) — a Prévia é a entrada "de baixo pra cima", e é ela
-    // que alimenta a coluna Forecast na DRE Forecast; gravar só em `_forecast` não refletia na
-    // Prévia (só o contrário cascadeia).
-    // A Receita (`rev_fap` = dm_fap × sold) também precisa ser gravada aqui, não só dm_fap/sold:
-    // getRealOccValue (services/mockData.ts, usada pelas linhas REV-APT-LAZER/EVENTOS da DRE
-    // Forecast) faz leitura DIRETA de realOccupancyData, sem recalcular nada — a derivação de
-    // rev_fap a partir de dm_fap/sold só acontece dentro de OccupancyMonthlyRealView.tsx (reativa,
-    // ao renderizar a tela), então sem gravar rev_fap aqui a Receita na DRE ficaria zerada até
-    // alguém abrir a Ocupação e editar algo manualmente (o que reaciona o recálculo de lá).
+    // modo (ao contrário da tela geral de Ocupação/Realizado) DM bruta É o campo de entrada bruto,
+    // e tudo mais (Receita, Geral = Lazer+Eventos, Adultos/CHD, Coef. Occ, Mão de obra) é DERIVADO
+    // por recalculateMeetingProjectionForMonth (utils/occupancyProjection.ts — extraída de
+    // OccupancyMonthlyRealView pra ser reaproveitada aqui, mesma fórmula que uma digitação manual
+    // roda). Reusar essa função em vez de derivar campo por campo na mão evita ficar descobrindo
+    // um por um quais campos a DRE Forecast/Ocupação precisam (já rolou 2x: Receita e depois os
+    // campos de Geral).
+    // Grava em `_previa` E `_forecast` (mesmo par que handleRealUpdate grava numa digitação manual)
+    // — a Prévia é a entrada "de baixo pra cima", e é ela que alimenta a coluna Forecast na DRE
+    // Forecast; gravar só em `_forecast` não refletia na Prévia (só o contrário cascadeia).
+    // getRealOccValue (services/mockData.ts, usada pela DRE Forecast) faz leitura DIRETA de
+    // realOccupancyData, sem recalcular nada — por isso os campos derivados (Receita, Geral etc.)
+    // precisam estar de fato PERSISTIDOS no bucket, não só calculados na hora de renderizar a tela
+    // de Ocupação.
     const syncForecastOccupancyFromSheet = () => {
         if (isAdminEntity || !selectedHotel || !selectedMonth || !setRealOccupancyData) return;
         // Dois buckets escrevem o mesmo dado: `contextKey` (sem projectionType) é o que a tela de
@@ -1930,28 +1934,23 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         // da prévia e o que a DRE Forecast (getRealOccValue) de fato lê.
         const contextKey = `${selectedHotel}_${selectedYear}_${selectedMonth}_${activeRealVersionId || ''}`;
         const normalKey = `${contextKey}__${activeProjectionType}`;
+        const monthIdx = (selectedMonth || 1) - 1;
         toast.promise(
             fetchForecastOccupancyFromSheet(selectedHotel, selectedMonth).then(sheetData => {
-                const eventRevFap = sheetData.eventosDM * sheetData.eventosAptosVendidos;
-                const lazerRevFap = sheetData.lazerDM * sheetData.lazerAptosVendidos;
-                const fields = {
+                const rawFields = {
                     event_sold_forecast: sheetData.eventosAptosVendidos,
                     event_sold_previa: sheetData.eventosAptosVendidos,
                     event_dm_fap_forecast: sheetData.eventosDM,
                     event_dm_fap_previa: sheetData.eventosDM,
-                    event_rev_fap_forecast: eventRevFap,
-                    event_rev_fap_previa: eventRevFap,
                     lazer_sold_forecast: sheetData.lazerAptosVendidos,
                     lazer_sold_previa: sheetData.lazerAptosVendidos,
                     lazer_dm_fap_forecast: sheetData.lazerDM,
                     lazer_dm_fap_previa: sheetData.lazerDM,
-                    lazer_rev_fap_forecast: lazerRevFap,
-                    lazer_rev_fap_previa: lazerRevFap,
                 };
                 setRealOccupancyData(prev => ({
                     ...prev,
-                    [contextKey]: { ...(prev[contextKey] || {}), ...fields },
-                    [normalKey]: { ...(prev[normalKey] || {}), ...fields },
+                    [contextKey]: recalculateMeetingProjectionForMonth({ ...(prev[contextKey] || {}), ...rawFields }, monthIdx, budgetOccupancyData, selectedYear || new Date().getFullYear()),
+                    [normalKey]: recalculateMeetingProjectionForMonth({ ...(prev[normalKey] || {}), ...rawFields }, monthIdx, budgetOccupancyData, selectedYear || new Date().getFullYear()),
                 }));
                 return sheetData;
             }),
