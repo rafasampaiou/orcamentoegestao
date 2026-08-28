@@ -4,7 +4,7 @@ import {
   BedDouble, CheckCircle2, ChevronDown, ChevronRight,
   TrendingUp, Database, PieChart, FileText, Upload,
   Calendar, GanttChartSquare, Layers, ShieldCheck, Package,
-  UtensilsCrossed
+  UtensilsCrossed, ClipboardEdit
 } from 'lucide-react';
 import { ViewState, ModuleType, User, hasPermission, PermissionMatrix } from '../types';
 
@@ -88,6 +88,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const [exp, setExp] = useState<Record<string, boolean>>({
     real:  currentModule === 'REAL' && !isAdminView(currentView),
+    budgetReview: currentModule === 'BUDGET_REVIEW',
     admin: isAdminView(currentView),
   });
 
@@ -114,6 +115,9 @@ const Sidebar: React.FC<SidebarProps> = ({
         <nav className="flex-1 flex flex-col items-center gap-4 py-4">
           <button onClick={() => go('dashboard', 'REAL')} title="Forecast & GMD">
             <TrendingUp size={22} className={currentModule === 'REAL' && !isAdminView(currentView) ? 'text-[#F8981C]' : 'text-slate-400'} />
+          </button>
+          <button onClick={() => go('budget_review_home', 'BUDGET_REVIEW')} title="Budget">
+            <ClipboardEdit size={22} className={currentModule === 'BUDGET_REVIEW' ? 'text-[#F8981C]' : 'text-slate-400'} />
           </button>
           {canAccessAdmin && (
             <button onClick={() => go('admin_real_versions')} title="Administração">
@@ -170,6 +174,22 @@ const Sidebar: React.FC<SidebarProps> = ({
             {canAccessValidations && <NavItem depth={1} label="Validações" icon={CheckCircle2} active={currentView === 'validations'} onClick={() => go('validations', 'REAL')} />}
           </div>
         )}
+
+        {/* ══ BUDGET (Revisão de Metas) ══ */}
+        <div className="pt-3 mt-1">
+          <GroupHeader
+            label="Budget"
+            icon={ClipboardEdit}
+            active={currentModule === 'BUDGET_REVIEW'}
+            expanded={!!exp.budgetReview}
+            onToggle={() => toggle('budgetReview')}
+          />
+          {exp.budgetReview && (
+            <div className="space-y-0.5 pb-1">
+              <NavItem depth={1} label="Revisão de Metas" icon={ClipboardEdit} active={currentView === 'budget_review_home' || currentView === 'budget_review_occupancy'} onClick={() => go('budget_review_home', 'BUDGET_REVIEW')} />
+            </div>
+          )}
+        </div>
 
         {/* ══ ADMINISTRAÇÃO ══ */}
         {canAccessAdmin && (

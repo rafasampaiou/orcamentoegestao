@@ -41,6 +41,10 @@ export const DEFAULT_PERMISSIONS_MATRIX: PermissionMatrix = {
     'Editar Ocupação (Real/Prévia)': rolesFor(UserRole.ADMIN, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST),
     'Salvar / Limpar Dados de Ocupação': rolesFor(UserRole.ADMIN, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST),
   },
+  'Revisão de Metas': {
+    'Acessar Revisão de Metas': rolesFor(UserRole.ADMIN, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST),
+    'Criar Réplica / Editar Meta em Revisão': rolesFor(UserRole.ADMIN, UserRole.ENTITY_MANAGER, UserRole.COST_ANALYST),
+  },
   'Tabela de GOP': {
     'Gerar PDF da Tabela de GOP': rolesFor(...ALL_ROLES),
     'Usar Modo Projeção (Simulação WHAT IF)': rolesFor(...ALL_ROLES),

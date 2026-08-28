@@ -3,6 +3,150 @@
 // ForecastTable.tsx, ao puxar da planilha externa na etapa 4) sem duplicar as fórmulas na mão —
 // isso já causou bug 2x (fórmula esquecida/duplicada errado) antes dessa extração.
 //
+// Recalcula o Orçamento de Ocupação (grade de 12 meses da Meta/Budget — Geral/Lazer/Eventos).
+// Extraída de OccupancyView.tsx (era `recalculateBudget`, closure local) pelo mesmo motivo acima —
+// reaproveitada por BudgetReviewOccupancy.tsx (Revisão de Metas), que edita uma BudgetVersion que
+// não é necessariamente a "principal" ativa do hotel.
+export function recalculateBudgetOccupancy(data: Record<string, number[]>, selectedYear: number): Record<string, number[]> {
+    const newData = { ...data };
+    const months = Array.from({ length: 12 }, (_, i) => i);
+
+    const get = (key: string, idx: number) => newData[key]?.[idx] || 0;
+    const set = (key: string, idx: number, val: number) => {
+        if (!newData[key]) {
+            newData[key] = Array(12).fill(0);
+        } else if (newData[key] === data[key]) {
+            newData[key] = [...newData[key]];
+        }
+        newData[key][idx] = val;
+    };
+
+    const getDaysInMonth = (year: number, month: number) => new Date(year, month, 0).getDate();
+
+    months.forEach(i => {
+        const currentDays = get('days_month', i);
+        const days = currentDays > 0 ? currentDays : getDaysInMonth(selectedYear, i + 1);
+        if (currentDays === 0) {
+            set('days_month', i, days);
+        }
+        const gCap = get('geral_capacity', i);
+
+        const lzCap = gCap;
+        const lzAvail = lzCap * days;
+        set('lazer_capacity', i, lzCap);
+        set('lazer_avail', i, lzAvail);
+
+        const lzSold = get('lazer_sold', i);
+        const lzAd = get('lazer_adults', i);
+        const lzChd = get('lazer_chd', i);
+        const lzRevFap = get('lazer_rev_fap', i);
+        const lzPax = lzAd + lzChd;
+        let lzRevHosp = get('lazer_rev_hosp', i);
+        if (!lzRevHosp && lzRevHosp !== 0) {
+            lzRevHosp = 0;
+        }
+
+        const lzRateAd = lzAd > 0 ? (lzRevFap - lzRevHosp) / lzAd : 0;
+        const lzRateChd = lzChd > 0 ? (lzRevFap - lzRevHosp) / lzChd : 0;
+
+        set('lazer_occ_pct', i, lzAvail > 0 ? (lzSold / lzAvail) * 100 : 0);
+        set('lazer_pax', i, lzPax);
+        set('lazer_coef_total', i, lzSold > 0 ? lzPax / lzSold : 0);
+        set('lazer_coef_ad', i, lzSold > 0 ? lzAd / lzSold : 0);
+        set('lazer_coef_chd', i, lzSold > 0 ? lzChd / lzSold : 0);
+        set('lazer_rev_fap', i, lzRevFap);
+        set('lazer_rev_hosp', i, lzRevHosp);
+        set('lazer_dm_fap', i, lzSold > 0 ? lzRevFap / lzSold : 0);
+        set('lazer_dm_hosp', i, lzSold > 0 ? lzRevHosp / lzSold : 0);
+        set('lazer_revpar', i, lzAvail > 0 ? lzRevFap / lzAvail : 0);
+        set('lazer_rate_ad', i, lzRateAd);
+        set('lazer_rate_chd', i, lzRateChd);
+
+        const evCap = gCap;
+        const evAvail = evCap * days;
+        set('event_capacity', i, evCap);
+        set('event_avail', i, evAvail);
+
+        const evSold = get('event_sold', i);
+        const evAd = get('event_adults', i);
+        const evChd = get('event_chd', i);
+        const evRevFap = get('event_rev_fap', i);
+        const evPax = evAd + evChd;
+        let evRevHosp = get('event_rev_hosp', i);
+        if (!evRevHosp && evRevHosp !== 0) {
+            evRevHosp = 0;
+        }
+
+        const evRateAd = evAd > 0 ? (evRevFap - evRevHosp) / evAd : 0;
+        const evRateChd = evChd > 0 ? (evRevFap - evRevHosp) / evChd : 0;
+
+        set('event_occ_pct', i, evAvail > 0 ? (evSold / evAvail) * 100 : 0);
+        set('event_pax', i, evPax);
+        set('event_coef_total', i, evSold > 0 ? evPax / evSold : 0);
+        set('event_pax', i, evPax);
+        set('event_coef_ad', i, evSold > 0 ? evAd / evSold : 0);
+        set('event_coef_chd', i, evSold > 0 ? evChd / evSold : 0);
+        set('event_rev_fap', i, evRevFap);
+        set('event_rev_hosp', i, evRevHosp);
+        set('event_dm_fap', i, evSold > 0 ? evRevFap / evSold : 0);
+        set('event_dm_hosp', i, evSold > 0 ? evRevHosp / evSold : 0);
+        set('event_revpar', i, evAvail > 0 ? evRevFap / evAvail : 0);
+        set('event_rate_ad', i, evRateAd);
+        set('event_rate_chd', i, evRateChd);
+
+        const gAvail = gCap * days;
+        set('geral_avail', i, gAvail);
+
+        const gSold = lzSold + evSold;
+        const gAd = lzAd + evAd;
+        const gChd = lzChd + evChd;
+        const gPax = gAd + gChd;
+        const gRevFap = lzRevFap + evRevFap;
+        const gRevHosp = lzRevHosp + evRevHosp;
+
+        set('geral_sold', i, gSold);
+        set('geral_occ_pct', i, gAvail > 0 ? (gSold / gAvail) * 100 : 0);
+        set('geral_pax', i, gPax);
+        set('geral_coef_total', i, gSold > 0 ? gPax / gSold : 0);
+        set('geral_adults', i, gAd);
+        set('geral_coef_ad', i, gSold > 0 ? gAd / gSold : 0);
+        set('geral_chd', i, gChd);
+        set('geral_coef_chd', i, gSold > 0 ? gChd / gSold : 0);
+
+        set('geral_rate_ad', i, gAd > 0 ? (gRevFap - gRevHosp) / gAd : 0);
+        set('geral_rate_chd', i, gChd > 0 ? (gRevFap - gRevHosp) / gChd : 0);
+
+        set('geral_rev_fap', i, gRevFap);
+        set('geral_rev_hosp', i, gRevHosp);
+
+        const lzExtra = get('lazer_extra_rev', i);
+        const evExtra = get('event_extra_rev', i);
+        const gExtra = lzExtra + evExtra;
+        set('geral_extra_rev', i, gExtra);
+
+        const gOrExtras = get('geral_or_extras', i);
+        const gOrHosp = get('geral_or_hosp', i);
+
+        set('geral_dm_fap', i, gSold > 0 ? gRevFap / gSold : 0);
+        set('geral_dm_hosp', i, gSold > 0 ? gRevHosp / gSold : 0);
+        set('geral_revpar', i, gAvail > 0 ? gRevFap / gAvail : 0);
+        set('geral_trevpor', i, gSold > 0 ? (gRevFap + gExtra + gOrExtras + gOrHosp) / gSold : 0);
+        set('geral_trevpar', i, gAvail > 0 ? (gRevFap + gExtra + gOrExtras + gOrHosp) / gAvail : 0);
+
+        set('lazer_trevpor', i, lzSold > 0 ? (lzRevFap + lzExtra) / lzSold : 0);
+        set('lazer_trevpar', i, lzAvail > 0 ? (lzRevFap + lzExtra) / lzAvail : 0);
+
+        set('event_trevpor', i, evSold > 0 ? (evRevFap + evExtra) / evSold : 0);
+        set('event_trevpar', i, evAvail > 0 ? (evRevFap + evExtra) / evAvail : 0);
+
+        const gMoClt = get('geral_mo_clt', i);
+        const gMoExtra = get('geral_mo_extra', i);
+        set('geral_mo_total', i, gMoClt + gMoExtra);
+    });
+
+    return newData;
+}
+
 // Reunião de Ritmo / FCA N1 / FCA N2 — inverte a direção da fórmula em relação ao modo Realizado:
 // aqui DM bruta e os Coef. Occ são as entradas manuais (Coef. Occ vem sugerido da Meta do mesmo
 // mês, mas o usuário pode mudar), e Receita/Adultos/CHD/Geral são derivados.

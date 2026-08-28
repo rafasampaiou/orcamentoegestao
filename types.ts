@@ -299,6 +299,12 @@ export type ViewState =
   // | 'extra_revenue_budget'
   // | 'dre_budget'
 
+  // BUDGET Module (Revisão de Metas) — nova área, separada do módulo REAL acima; não reaproveita
+  // nada do módulo Budget antigo removido (esse era por tela dedicada por hotel; a Revisão de
+  // Metas é um fluxo pontual de revisão sobre uma BudgetVersion existente, ver BudgetReviewHome).
+  | 'budget_review_home'
+  | 'budget_review_occupancy'
+
   // ADMIN > Tauá Real
   | 'admin_real_versions'
   | 'admin_real_import'
@@ -331,7 +337,7 @@ export type ViewState =
   | 'admin_gmd'
   | 'admin';
 
-export type ModuleType = 'REAL';
+export type ModuleType = 'REAL' | 'BUDGET_REVIEW';
 
 export interface ColumnVisibility {
   otb: boolean;

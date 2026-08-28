@@ -21,6 +21,8 @@ import Auth from './components/Auth';
 import DefinePasswordView from './components/DefinePasswordView';
 import LoadingScreen from './components/LoadingScreen';
 import ValidationsView from './components/ValidationsView';
+import BudgetReviewHome from './components/BudgetReviewHome';
+import BudgetReviewOccupancy from './components/BudgetReviewOccupancy';
 import { supabase } from './services/supabaseClient';
 import { supabaseService } from './services/supabaseService';
 import { Session } from '@supabase/supabase-js';
@@ -168,7 +170,14 @@ const App: React.FC = () => {
   const [replicateTarget, setReplicateTarget] = useState<{ year: number, month: number } | null>(null);
   const [replicateMode, setReplicateMode] = useState<'BUDGET' | 'REAL'>('BUDGET');
   const [projectedBudgetVersionId] = useState<string>('v2');
-  
+
+  // --- REVISÃO DE METAS (Budget) STATE ---
+  // Qual BudgetVersion está sendo revisada agora (a original escolhida, ou a réplica criada pra
+  // revisão) — só Budget, nunca cria/afeta uma Versão Real em paralelo (Real/Prévia continuam
+  // ligados ao activeRealVersionId de sempre, iguais nas duas, de propósito).
+  const [budgetReviewVersionId, setBudgetReviewVersionId] = useState<string>('');
+  const [budgetReviewMonths, setBudgetReviewMonths] = useState<number[]>([]);
+
   // --- PROJECTION TYPE STATE ---
   // Sem valor fixo de fábrica — as "reuniões" agora são criadas dinamicamente (ver `meetings`
   // abaixo), então não existe mais um "Reunião de Ritmo" que já exista de saída. Fica vazio até
@@ -303,6 +312,24 @@ const App: React.FC = () => {
     }, 2000); // 2 seconds debounce
     return () => clearTimeout(timeout);
   }, [budgetOccupancyDataMap, globalLaborDataMap, extraRevenueDataMap, activeBudgetVersionId, budgetVersions]);
+
+  // Auto-Save da versão em Revisão de Metas — mesmo padrão do efeito acima, só que pra
+  // `budgetReviewVersionId` em vez de `activeBudgetVersionId` (podem ser versões diferentes: a
+  // Revisão de Metas edita uma versão que não precisa ser a "principal" ativa do hotel).
+  React.useEffect(() => {
+    if (isInitialMount.current || !budgetReviewVersionId) return;
+    const timeout = setTimeout(() => {
+      const version = budgetVersions.find(v => v.id === budgetReviewVersionId);
+      if (version) {
+        const versionToSave = {
+          ...version,
+          occupancyData: budgetOccupancyDataMapRef.current[budgetReviewVersionId] || {},
+        };
+        supabaseService.upsertBudgetVersion(versionToSave).catch(console.error);
+      }
+    }, 2000);
+    return () => clearTimeout(timeout);
+  }, [budgetOccupancyDataMap, budgetReviewVersionId, budgetVersions]);
 
   // Central Auto-Save Effect for Real Occupancy
   React.useEffect(() => {
@@ -1370,6 +1397,52 @@ const App: React.FC = () => {
     }
   };
 
+  // Revisão de Metas — réplica SÓ do lado Budget (ocupação + financial_data cenário Meta), sem
+  // criar/mexer em nenhuma versão Real em paralelo (diferente de handleReplicateBudget acima, que
+  // sempre cria o par Real+Budget). Mesmo ano/mês da origem — não desloca período nenhum, é uma
+  // cópia pra revisar em paralelo à mesma versão original.
+  const handleCreateBudgetReviewReplica = async (sourceVersionId: string): Promise<string | null> => {
+    const source = budgetVersions.find(v => v.id === sourceVersionId);
+    if (!source) return null;
+
+    const timestamp = Date.now();
+    const newId = `v-review-${timestamp}`;
+    const newVersion: BudgetVersion = {
+      id: newId,
+      name: `${source.name} (Revisão)`,
+      year: source.year,
+      month: source.month,
+      isMain: false,
+      isLocked: false,
+      hotelId: source.hotelId,
+      occupancyData: source.occupancyData || {},
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    try {
+      await supabaseService.upsertBudgetVersion(newVersion);
+
+      const sourceFinancialData = await supabaseService.getFinancialDataByVersion(sourceVersionId);
+      const sourceMetaRows = sourceFinancialData.filter(r => (r.cenario || '').trim().toLowerCase() === 'meta');
+      const newRows: ImportedRow[] = sourceMetaRows.map(row => ({ ...row, versionId: newId }));
+      if (newRows.length > 0) {
+        await supabaseService.saveFinancialData(newRows);
+      }
+
+      setBudgetVersions(prev => [...prev, newVersion]);
+      setBudgetOccupancyDataMap(prev => ({ ...prev, [newId]: newVersion.occupancyData! }));
+      if (newRows.length > 0) setImportedFinancialData(prev => [...prev, ...newRows]);
+
+      logUserAction(`Criou réplica "${newVersion.name}" pra Revisão de Metas, a partir de "${source.name}" (${source.year})`);
+      return newId;
+    } catch (err) {
+      console.error('Budget review replication error:', err);
+      toast.error('Erro ao criar a réplica pra revisão. Verifique a conexão.');
+      return null;
+    }
+  };
+
   const renderContent = () => {
     // Whether the month is "closed" is now controlled entirely by which Forecast version is
     // selected — selecting a reunião do tipo "Fechamento" é o que marca o mês como fechado.
@@ -1526,6 +1599,45 @@ const App: React.FC = () => {
           </div>
         </div>
       );
+      case 'budget_review_home': return (
+        <BudgetReviewHome
+          hotels={hotels}
+          selectedHotel={selectedHotel}
+          budgetVersions={budgetVersions}
+          onCreateReplica={handleCreateBudgetReviewReplica}
+          onStartReview={(versionId, months) => {
+            setBudgetReviewVersionId(versionId);
+            setBudgetReviewMonths(months);
+            setCurrentView('budget_review_occupancy');
+          }}
+        />
+      );
+      case 'budget_review_occupancy': {
+        const reviewVersion = budgetVersions.find(v => v.id === budgetReviewVersionId);
+        if (!reviewVersion) {
+          // Não chama setCurrentView aqui dentro (é durante o render) — só avisa e deixa o
+          // botão "Voltar" levar de volta ao wizard, pra escolher a versão de novo.
+          return (
+            <div className="p-8 text-center text-gray-500">
+              Nenhuma versão em revisão selecionada.
+              <button onClick={() => setCurrentView('budget_review_home')} className="block mx-auto mt-3 text-[#F8981C] font-bold hover:underline">
+                ← Voltar pra Revisão de Metas
+              </button>
+            </div>
+          );
+        }
+        return (
+          <BudgetReviewOccupancy
+            version={reviewVersion}
+            reviewMonths={budgetReviewMonths}
+            budgetOccupancyDataMap={budgetOccupancyDataMap}
+            setBudgetOccupancyDataMap={setBudgetOccupancyDataMap}
+            currentUser={currentUser}
+            permissionsMatrix={permissionsMatrix}
+            onBack={() => setCurrentView('budget_review_home')}
+          />
+        );
+      }
       case 'dre_segmentada': return (
         <DreSegmentadaView
           selectedMonth={selectedDate.getMonth() + 1}
