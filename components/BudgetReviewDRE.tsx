@@ -195,19 +195,19 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
-                <table className="min-w-full text-xs">
+                <table className="min-w-full text-[11px] border-collapse">
                     <thead>
                         <tr className="border-b border-gray-200">
-                            <th rowSpan={2} className="px-3 py-2 text-left font-bold text-gray-500 uppercase sticky left-0 bg-white z-10 align-bottom">Indicador</th>
+                            <th rowSpan={2} className="px-2 py-px text-left font-bold text-gray-500 uppercase sticky left-0 bg-white z-10 align-bottom whitespace-nowrap">Indicador</th>
                             {months.map(m => (
-                                <th key={m} colSpan={2} className="px-2 py-1.5 text-center font-bold text-gray-500 uppercase border-l border-gray-100">{MONTH_NAMES[m - 1]}</th>
+                                <th key={m} colSpan={2} className="px-1 py-px text-center font-bold text-gray-500 uppercase border-l border-gray-100 truncate">{MONTH_NAMES[m - 1]}</th>
                             ))}
                         </tr>
                         <tr className="border-b border-gray-200">
                             {months.map(m => (
                                 <React.Fragment key={m}>
-                                    <th className="px-2 py-1 text-right font-semibold text-gray-400 border-l border-gray-100">Valor</th>
-                                    <th className="px-2 py-1 text-center font-semibold text-amber-600">KPI</th>
+                                    <th className="w-20 px-1 py-px text-right font-semibold text-gray-400 border-l border-gray-100 truncate">Valor</th>
+                                    <th className="w-14 px-1 py-px text-center font-semibold text-amber-600 truncate">KPI</th>
                                 </React.Fragment>
                             ))}
                         </tr>
@@ -215,20 +215,21 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
                     <tbody className="divide-y divide-gray-50">
                         {structureRows.map((row, idx) => {
                             if (!isRowVisible(row, idx)) return null;
-                            if (row.category === 'Spacer') return <tr key={row.id}><td colSpan={1 + months.length * 2}>&nbsp;</td></tr>;
+                            if (row.category === 'Spacer') return <tr key={row.id}><td colSpan={1 + months.length * 2} className="py-1">&nbsp;</td></tr>;
 
                             const isSectionHeader = row.isHeader && row.indentLevel === 0;
                             const isPackageHeader = row.category === 'Package' && row.isHeader && row.indentLevel === 1;
                             const editable = canEdit && isEditableRow(row);
                             const indent = (row.indentLevel || 0) * 16;
-                            const rowStyle = (row.isTotal || isSectionHeader) ? 'font-bold bg-gray-50' : isPackageHeader ? 'font-semibold bg-gray-50/60' : '';
+                            const rowBg = (row.isTotal || isSectionHeader) ? '#f9fafb' : isPackageHeader ? '#fafafa' : 'white';
+                            const rowStyle = (row.isTotal || isSectionHeader) ? 'font-bold' : isPackageHeader ? 'font-semibold' : '';
 
                             return (
-                                <tr key={row.id} className={rowStyle}>
-                                    <td className="px-3 py-1.5 sticky left-0 bg-inherit whitespace-nowrap" style={{ paddingLeft: 12 + indent, backgroundColor: (row.isTotal || isSectionHeader) ? '#f9fafb' : isPackageHeader ? '#fafafa' : 'white' }}>
+                                <tr key={row.id} className={rowStyle} style={{ backgroundColor: rowBg }}>
+                                    <td className="px-2 py-px sticky left-0 bg-inherit truncate max-w-[220px]" style={{ paddingLeft: 8 + indent, backgroundColor: rowBg }}>
                                         {isPackageHeader && (
                                             <button onClick={() => togglePackage(row.id)} className="inline-flex mr-1 align-middle text-gray-400 hover:text-gray-600">
-                                                {collapsedPackages.has(row.id) ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                                                {collapsedPackages.has(row.id) ? <ChevronRight size={11} /> : <ChevronDown size={11} />}
                                             </button>
                                         )}
                                         {row.label}
@@ -240,7 +241,7 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
                                         const kpiEditable = editable && isEditableKpiForRow(monthRow, kpiInfo, packageKpiConfigs);
                                         return (
                                             <React.Fragment key={month}>
-                                                <td className="px-2 py-1 text-right tabular-nums border-l border-gray-100">
+                                                <td className="px-1 py-px text-right tabular-nums border-l border-gray-100 truncate">
                                                     {editable ? (
                                                         <input
                                                             type="text"
@@ -249,11 +250,11 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
                                                                 const parsed = parseFloat(e.target.value.replace(/\./g, '').replace(',', '.'));
                                                                 if (!isNaN(parsed) && parsed !== monthRow.budget) handleValueChange(row, month, parsed);
                                                             }}
-                                                            className="w-24 text-right bg-transparent border border-transparent hover:border-gray-200 focus:border-indigo-300 rounded px-1 outline-none"
+                                                            className="w-full text-right bg-transparent border border-transparent hover:bg-gray-50 focus:bg-white focus:border-indigo-300 rounded px-0.5 outline-none"
                                                         />
                                                     ) : fmt(monthRow.budget)}
                                                 </td>
-                                                <td className="px-2 py-1 text-center text-amber-700">
+                                                <td className="px-1 py-px text-center text-amber-700 truncate">
                                                     {!kpiInfo.hasKpi ? '' : kpiEditable ? (
                                                         <input
                                                             type="text"
@@ -262,7 +263,7 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
                                                                 const parsed = parseFloat(e.target.value.replace(/\./g, '').replace(',', '.'));
                                                                 if (!isNaN(parsed)) handleKpiChange(row, monthIdx, month, parsed);
                                                             }}
-                                                            className="w-16 text-center bg-amber-50/40 border border-transparent hover:border-gray-200 focus:border-indigo-300 rounded px-1 outline-none"
+                                                            className="w-full text-center bg-amber-50/40 border border-transparent hover:bg-white focus:bg-white focus:border-indigo-300 rounded px-0.5 outline-none"
                                                         />
                                                     ) : fmtKpi(kpiInfo.kpiValue('budget'), kpiInfo.kpiFormatType)}
                                                 </td>

@@ -180,12 +180,10 @@ const App: React.FC = () => {
   // ligados ao activeRealVersionId de sempre, iguais nas duas, de propósito).
   const [budgetReviewVersionId, setBudgetReviewVersionId] = useState<string>('');
   const [budgetReviewMonths, setBudgetReviewMonths] = useState<number[]>([]);
-  // Snapshot de ocupação/despesa capturado no exato momento em que a revisão começa (antes de
-  // qualquer edição desta sessão) — é a "Meta" de referência que "Calcular Forecast" usa pra tirar
-  // a taxa (valor ÷ driver) e reaplicar em cima da ocupação já revisada de cada mês. Sem isso,
-  // recalcular depois de já ter editado a ocupação seria circular (taxa e driver mudariam juntos,
-  // nunca fazendo a despesa reagir à revisão).
-  const [budgetReviewBaseline, setBudgetReviewBaseline] = useState<{ occupancyData: Record<string, number[]>; financialData: ImportedRow[] } | null>(null);
+  // Versão de onde "Calcular Forecast" lê os KPIs — a "última meta importada no sistema que foi
+  // pra DRE Forecast", sempre ao vivo (nunca um snapshot congelado): se usar a versão original
+  // diretamente, é ela mesma; se criar réplica, é a ORIGINAL que foi replicada.
+  const [budgetReviewSourceVersionId, setBudgetReviewSourceVersionId] = useState<string>('');
 
   // --- PROJECTION TYPE STATE ---
   // Sem valor fixo de fábrica — as "reuniões" agora são criadas dinamicamente (ver `meetings`
@@ -1495,24 +1493,27 @@ const App: React.FC = () => {
   // "Calcular Forecast" da Revisão de Metas (etapa 5) — mesmo motor de linhas/KPI da DRE Forecast
   // (buildForecastRows + resolveKpiTerm/parseSelfRatioDenominator), não uma versão simplificada:
   // pra cada linha com KPI (conta Variável, pacote, Impostos, GOP, ou Receita Extra/ISS
-  // precomputado), pega a taxa (valor ÷ denominador) da MESMA versão ANTES da revisão começar
-  // (budgetReviewBaseline) e aplica em cima do denominador de cada mês JÁ REVISADO — "considera os
-  // KPIs feitos na meta antiga", como pedido.
+  // precomputado), pega a taxa (valor ÷ denominador) da versão-ORIGEM (budgetReviewSourceVersionId
+  // — a "última meta importada no sistema que foi pra DRE Forecast", lida AO VIVO, nunca um
+  // snapshot congelado) e aplica em cima do denominador de cada mês JÁ REVISADO.
   const handleCalcularBudgetReviewForecast = async () => {
-    if (!budgetReviewVersionId || !budgetReviewBaseline || budgetReviewMonths.length === 0) return;
+    if (!budgetReviewVersionId || !budgetReviewSourceVersionId || budgetReviewMonths.length === 0) return;
     const version = budgetVersions.find(v => v.id === budgetReviewVersionId);
-    if (!version) return;
+    const sourceVersion = budgetVersions.find(v => v.id === budgetReviewSourceVersionId);
+    if (!version || !sourceVersion) return;
     const hotel = hotels.find(h => h.code === version.hotelId || h.id === version.hotelId)?.name || version.hotel || selectedHotel;
+    const sourceHotel = hotels.find(h => h.code === sourceVersion.hotelId || h.id === sourceVersion.hotelId)?.name || sourceVersion.hotel || hotel;
     const year = version.year;
     const scopedFinancialData = importedFinancialData.filter(r => r.versionId === budgetReviewVersionId);
-    const scopedBaselineData = budgetReviewBaseline.financialData.filter(r => r.versionId === budgetReviewVersionId);
+    const scopedSourceData = importedFinancialData.filter(r => r.versionId === budgetReviewSourceVersionId);
+    const sourceOccupancyData = budgetOccupancyDataMap[budgetReviewSourceVersionId] || {};
 
     try {
       const changesByMonth: Record<number, ImportedRow[]> = {};
       const occupancyUpdates: Record<string, number> = {}; // `${sourceId}_${monthIdx}` -> valor
 
       budgetReviewMonths.forEach(month => {
-        const baselineRows = buildForecastRows(dreConfigs, month, year, scopedBaselineData, hotel, hotels, {}, undefined, budgetReviewVersionId, accounts, packages, budgetReviewBaseline.occupancyData, undefined, []);
+        const baselineRows = buildForecastRows(dreConfigs, month, sourceVersion.year, scopedSourceData, sourceHotel, hotels, {}, undefined, budgetReviewSourceVersionId, accounts, packages, sourceOccupancyData, undefined, []);
         const currentRows = buildForecastRows(dreConfigs, month, year, scopedFinancialData, hotel, hotels, {}, undefined, budgetReviewVersionId, accounts, packages, budgetOccupancyDataMap[budgetReviewVersionId] || {}, undefined, []);
         const monthChanges: ImportedRow[] = [];
 
@@ -1765,13 +1766,10 @@ const App: React.FC = () => {
           setSelectedHotel={setSelectedHotel}
           budgetVersions={budgetVersions}
           onCreateReplica={handleCreateBudgetReviewReplica}
-          onStartReview={(versionId, months) => {
+          onStartReview={(versionId, months, sourceVersionId) => {
             setBudgetReviewVersionId(versionId);
             setBudgetReviewMonths(months);
-            setBudgetReviewBaseline({
-              occupancyData: { ...(budgetOccupancyDataMap[versionId] || {}) },
-              financialData: importedFinancialData.filter(r => r.versionId === versionId && (r.cenario || '').trim().toLowerCase() === 'meta'),
-            });
+            setBudgetReviewSourceVersionId(sourceVersionId);
             setCurrentView('budget_review_occupancy');
           }}
         />

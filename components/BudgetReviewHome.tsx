@@ -8,7 +8,10 @@ interface BudgetReviewHomeProps {
     setSelectedHotel: (name: string) => void;
     budgetVersions: BudgetVersion[];
     onCreateReplica: (sourceVersionId: string) => Promise<string | null>;
-    onStartReview: (versionId: string, months: number[]) => void;
+    // sourceVersionId = a versão ORIGINAL escolhida no passo 1 (mesmo quando "usar original
+    // diretamente", onde sourceVersionId === versionId) — é dela que "Calcular Forecast" vai ler
+    // os KPIs ao vivo (a "última meta importada no sistema", nunca um snapshot congelado).
+    onStartReview: (versionId: string, months: number[], sourceVersionId: string) => void;
 }
 
 const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -21,6 +24,9 @@ type Step = 'version' | 'mode' | 'period';
 const BudgetReviewHome: React.FC<BudgetReviewHomeProps> = ({ hotels, selectedHotel, setSelectedHotel, budgetVersions, onCreateReplica, onStartReview }) => {
     const [step, setStep] = useState<Step>('version');
     const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+    // Guarda a versão ORIGINALMENTE escolhida no passo 1, mesmo depois de `selectedVersionId`
+    // trocar pra réplica — é dela que "Calcular Forecast" vai ler os KPIs ao vivo depois.
+    const [sourceVersionId, setSourceVersionId] = useState<string | null>(null);
     const [selectedMonths, setSelectedMonths] = useState<number[]>([]);
     const [creating, setCreating] = useState(false);
 
@@ -36,6 +42,7 @@ const BudgetReviewHome: React.FC<BudgetReviewHomeProps> = ({ hotels, selectedHot
     const resetAll = () => {
         setStep('version');
         setSelectedVersionId(null);
+        setSourceVersionId(null);
         setSelectedMonths([]);
     };
 
@@ -59,8 +66,8 @@ const BudgetReviewHome: React.FC<BudgetReviewHomeProps> = ({ hotels, selectedHot
     };
 
     const handleConfirmPeriod = () => {
-        if (!selectedVersionId || selectedMonths.length === 0) return;
-        onStartReview(selectedVersionId, selectedMonths);
+        if (!selectedVersionId || !sourceVersionId || selectedMonths.length === 0) return;
+        onStartReview(selectedVersionId, selectedMonths, sourceVersionId);
     };
 
     return (
@@ -92,6 +99,7 @@ const BudgetReviewHome: React.FC<BudgetReviewHomeProps> = ({ hotels, selectedHot
                                         key={v.id}
                                         onClick={() => {
                                             setSelectedVersionId(v.id);
+                                            setSourceVersionId(v.id);
                                             if (hotelName && hotelName !== selectedHotel) setSelectedHotel(hotelName);
                                         }}
                                         className={`text-left p-3 rounded-xl border transition-colors ${selectedVersionId === v.id ? 'border-[#F8981C] bg-[#F8981C]/5' : 'border-gray-200 hover:border-gray-300'}`}
