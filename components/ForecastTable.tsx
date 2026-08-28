@@ -1907,23 +1907,26 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     // (api/forecast-occupancy.js, via conta de serviço do Google) — em vez de só navegar pra
     // Ocupação pra preencher à mão. Não trava a navegação se falhar (aba não encontrada, planilha
     // fora do ar etc. só viram um toast de erro, e a etapa continua podendo ser preenchida manual).
-    // DM bruta é campo calculado na Ocupação (Receita ÷ Aptos vendidos) — por isso back-solve pra
-    // Receita (DM × Aptos vendidos) em vez de gravar a DM direto.
+    // Quem edita essa etapa é OccupancyMonthlyRealView (Reunião de Ritmo/FCA N1/FCA N2) — nesse
+    // modo (ao contrário da tela geral de Ocupação/Realizado) DM bruta É o campo de entrada bruto
+    // e a Receita (`rev_fap`) é DERIVADA (dm_fap × sold, ver recalculateMeetingProjectionForMonth)
+    // — por isso grava a DM direto, sem back-solve nenhum, senão a Receita fica recalculada por
+    // cima igual a zero (dm_fap nunca escrito) mesmo com Aptos vendidos certo.
     const syncForecastOccupancyFromSheet = () => {
         if (isAdminEntity || !selectedHotel || !selectedMonth || !setRealOccupancyData) return;
         // Dois buckets escrevem o mesmo dado: `contextKey` (sem projectionType) é o que a tela de
-        // Ocupação (OccupancyView) de fato lê/exibe pro usuário; `normalKey` (com
-        // __projectionType, mesmo formato de computeOtbProgress/otbProgress.ts) é o que marca a
-        // etapa 4 ("Inserir a ocupação e receita do Forecast") como concluída no Status da prévia.
+        // Ocupação de fato lê/exibe pro usuário; `normalKey` (com __projectionType, mesmo formato
+        // de computeOtbProgress/otbProgress.ts) é o que marca a etapa 4 como concluída no Status
+        // da prévia.
         const contextKey = `${selectedHotel}_${selectedYear}_${selectedMonth}_${activeRealVersionId || ''}`;
         const normalKey = `${contextKey}__${activeProjectionType}`;
         toast.promise(
             fetchForecastOccupancyFromSheet(selectedHotel, selectedMonth).then(sheetData => {
                 const fields = {
                     event_sold_forecast: sheetData.eventosAptosVendidos,
-                    event_rev_fap_forecast: sheetData.eventosDM * sheetData.eventosAptosVendidos,
+                    event_dm_fap_forecast: sheetData.eventosDM,
                     lazer_sold_forecast: sheetData.lazerAptosVendidos,
-                    lazer_rev_fap_forecast: sheetData.lazerDM * sheetData.lazerAptosVendidos,
+                    lazer_dm_fap_forecast: sheetData.lazerDM,
                 };
                 setRealOccupancyData(prev => ({
                     ...prev,
