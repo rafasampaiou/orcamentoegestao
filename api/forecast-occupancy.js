@@ -76,16 +76,43 @@ async function getServiceAccountAccessToken() {
   return tokenJson.access_token;
 }
 
-// Lê uma célula em texto/número já resolvido (não a fórmula) — mesma leitura "crua" que o resto
-// do app já faz ao importar planilhas com essa mesma lib (ver handleExportExcel/imports).
-const readCellNumber = (sheet, addr) => {
-  const cell = sheet[addr];
+// Uma célula "visualmente" numa linha/coluna pode estar dentro de um intervalo mesclado — nesse
+// caso a lib só guarda o valor na célula-âncora (canto superior esquerdo da mesclagem), as demais
+// vêm vazias. Resolve pra âncora antes de ler, senão uma célula de DM mesclada lê como 0/vazio.
+const resolveMergedAnchor = (sheet, r, c) => {
+  const merges = sheet['!merges'] || [];
+  for (const m of merges) {
+    if (r >= m.s.r && r <= m.e.r && c >= m.s.c && c <= m.e.c) return { r: m.s.r, c: m.s.c };
+  }
+  return { r, c };
+};
+
+const getCell = (sheet, r, c) => {
+  const anchor = resolveMergedAnchor(sheet, r, c);
+  return sheet[XLSX.utils.encode_cell(anchor)];
+};
+
+// Número pode vir como valor numérico de fato (então cell.v já tem toda a precisão, mesmo que a
+// formatação de exibição do Excel arredonde/oculte casas decimais — isso é só cosmético) OU como
+// texto digitado no formato BR ("1.304,37" ou só "1.304", ponto de milhar/vírgula decimal) — nesse
+// segundo caso, Number("1.304") direto dá 1.304 (errado, JS lê ponto como decimal). Só remove os
+// pontos como separador de milhar quando há vírgula decimal por perto, pra não estragar um número
+// que já esteja em formato US (ponto decimal) sem vírgula nenhuma.
+const parseCellNumber = (cell) => {
   if (!cell) return 0;
-  const val = typeof cell.v === 'number' ? cell.v : Number(cell.v);
+  if (typeof cell.v === 'number') return cell.v;
+  const raw = String(cell.v ?? cell.w ?? '').trim();
+  if (!raw) return 0;
+  const normalized = raw.includes(',') ? raw.replace(/\./g, '').replace(',', '.') : raw;
+  const val = Number(normalized);
   return Number.isFinite(val) ? val : 0;
 };
 
-const cellText = (sheet, addr) => normalizeText(sheet[addr] ? String(sheet[addr].v ?? '') : '');
+const readNum = (sheet, r, c) => parseCellNumber(getCell(sheet, r, c));
+const readText = (sheet, r, c) => {
+  const cell = getCell(sheet, r, c);
+  return normalizeText(cell ? String(cell.v ?? cell.w ?? '') : '');
+};
 
 // A tabela "Indicadores / Receita Evento / Receita Lazer / Receita Total" não fica sempre
 // ancorada em AK21:AN24 — cada aba (mês/hotel) é montada manualmente e desliza uma linha/coluna
@@ -101,13 +128,12 @@ function findIndicatorsTable(sheet) {
     // Varre a linha inteira em busca da célula "Indicadores" (não só na 1ª coluna) — a tabela
     // pode começar em qualquer coluna.
     for (let c = range.s.c; c <= range.e.c; c++) {
-      const addr = XLSX.utils.encode_cell({ r, c });
-      if (cellText(sheet, addr) !== 'indicadores') continue;
+      if (readText(sheet, r, c) !== 'indicadores') continue;
 
       const eventCol = c + 1;
       const lazerCol = c + 2;
-      const eventHeader = cellText(sheet, XLSX.utils.encode_cell({ r, c: eventCol }));
-      const lazerHeader = cellText(sheet, XLSX.utils.encode_cell({ r, c: lazerCol }));
+      const eventHeader = readText(sheet, r, eventCol);
+      const lazerHeader = readText(sheet, r, lazerCol);
       if (!eventHeader.includes('evento') || !lazerHeader.includes('lazer')) continue;
 
       // Linhas de dado logo abaixo do cabeçalho (Receita / Room Nights / Diária Média) — procura
@@ -115,17 +141,17 @@ function findIndicatorsTable(sheet) {
       let aptosRow = null;
       let dmRow = null;
       for (let dr = r + 1; dr <= Math.min(r + 8, range.e.r); dr++) {
-        const label = cellText(sheet, XLSX.utils.encode_cell({ r: dr, c }));
+        const label = readText(sheet, dr, c);
         if (aptosRow === null && (label.includes('room night') || label.includes('aptos vendid'))) aptosRow = dr;
         if (dmRow === null && (label.includes('diaria media') || label.includes('dm bruta'))) dmRow = dr;
       }
       if (aptosRow === null || dmRow === null) continue;
 
       return {
-        eventosAptosVendidos: readCellNumber(sheet, XLSX.utils.encode_cell({ r: aptosRow, c: eventCol })),
-        lazerAptosVendidos: readCellNumber(sheet, XLSX.utils.encode_cell({ r: aptosRow, c: lazerCol })),
-        eventosDM: readCellNumber(sheet, XLSX.utils.encode_cell({ r: dmRow, c: eventCol })),
-        lazerDM: readCellNumber(sheet, XLSX.utils.encode_cell({ r: dmRow, c: lazerCol })),
+        eventosAptosVendidos: readNum(sheet, aptosRow, eventCol),
+        lazerAptosVendidos: readNum(sheet, aptosRow, lazerCol),
+        eventosDM: readNum(sheet, dmRow, eventCol),
+        lazerDM: readNum(sheet, dmRow, lazerCol),
       };
     }
   }
