@@ -12,6 +12,7 @@ import { computeOtbProgress, hasOccupancyData } from '../utils/otbProgress';
 import { resolveMeetingKind, getMeetingLabel } from '../utils/meetings';
 import { fetchForecastOccupancyFromSheet } from '../services/forecastOccupancySync';
 import { recalculateMeetingProjectionForMonth } from '../utils/occupancyProjection';
+import { blueRowIds, QUALIFIED_KPI_TERM_ROW_IDS, resolveKpiTerm, evaluateKpiCalculation, parseSelfRatioDenominator } from '../utils/kpiEngine';
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 
@@ -135,8 +136,6 @@ const formatPointsDiff = (val: number | undefined) => {
     if (val === undefined || isNaN(val as number)) return '-';
     return `${val > 0 ? '+' : ''}${val.toFixed(1).replace('.', ',')} p.p.`;
 };
-
-const blueRowIds = ['REV-TOTAL', 'REV-NET', 'CST-HEAD', 'RES-OP', 'RES-PCT', 'REV-IMP', 'RES-OP-SEM-IMP', 'RES-OP-COM-IMP', 'RES-OP-SEM-IMP-PCT', 'RES-OP-COM-IMP-PCT', 'LABOR-TOTAL'];
 
 // Resolve a "Versão Real"/"Versão Budget" de UM hotel específico — mesma lógica de resolução que
 // App.tsx usa pra decidir a versão ativa do hotel selecionado no menu principal (App.tsx, bloco
@@ -3976,61 +3975,6 @@ function getDriverValue(driver: string | undefined, allRows: ForecastRow[], base
     if (base === 'previa') return row.previa;
     if (base === 'budget') return row.budget;
     return 0;
-}
-
-// "Lazer" e "Eventos" existem em dobro na DRE (dentro de Receita de Apartamentos e de Receitas
-// Extras, com o mesmo nome de linha) — o seletor de fórmula oferece essas 4 combinações já
-// qualificadas (mesmo padrão do IMPORT_LABEL_MAP acima), e aqui é onde isso resolve pro id certo.
-const QUALIFIED_KPI_TERM_ROW_IDS: Record<string, string> = {
-    'receita de apartamentos (lazer)': 'REV-APT-LAZER',
-    'receita de apartamentos (eventos)': 'REV-APT-EVENTOS',
-    'receitas extras (lazer)': 'REV-EXTRA-LAZER',
-    'receitas extras (eventos)': 'REV-EXTRA-EVENTOS',
-};
-
-// A package's KPI only makes sense when every Variável account inside it shares the
-// same Plano de Contas driver — otherwise there is no single unit to divide the total by.
-// Resolves the value of any freely-picked KPI calculation term (an account, package, indicator
-// or revenue/result line, matched by its DRE row label) for a given scenario field.
-function resolveKpiTerm(termLabel: string | undefined, allRows: ForecastRow[], field: 'previa' | 'real' | 'budget' | 'otb'): number {
-    if (!termLabel) return 0;
-    const target = termLabel.trim().toLowerCase();
-    const qualifiedId = QUALIFIED_KPI_TERM_ROW_IDS[target];
-    const row = qualifiedId
-        ? allRows.find(r => r.id === qualifiedId)
-        : allRows.find(r => r.label.trim().toLowerCase() === target);
-    if (!row) return 0;
-    // OTB reads the row's own OTB snapshot directly — no Meta substitution, since the whole point
-    // is to reflect what was actually entered as of the cutoff day (or nothing, if not yet filled).
-    if (field === 'otb') return row.otb || 0;
-    // Forecast always projects off the Meta (budget) quantity for indicator/Receita Bruta lines,
-    // since there's no separately-tracked "forecast occupancy" distinct from the plan.
-    const usesMetaOnForecast = row.category === 'Indicators' || row.id === 'REV-TOTAL';
-    if (field === 'real' && usesMetaOnForecast) return row.budget;
-    if (field === 'real') return row.real;
-    if (field === 'previa') return row.previa;
-    return row.budget;
-}
-
-// The KPI formula is a free spreadsheet-style expression ("@[Line A] + @[Line B] / @[Line C]"),
-// evaluated with the same engine already used for Intelligent DRE calculated rows.
-function evaluateKpiCalculation(calc: KpiCalculation | undefined, allRows: ForecastRow[], field: 'previa' | 'real' | 'budget' | 'otb'): number {
-    if (!calc || !calc.formula || !calc.formula.trim()) return 0;
-    const context = { getValue: (name: string) => resolveKpiTerm(name, allRows, field) };
-    return evaluateFormula(calc.formula, context);
-}
-
-const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-// "Calcular Forecast" can only auto-project a value when the formula is the simple ratio
-// "@[This account] / @[Denominator]" — anything else (extra terms, +, -, multiply, or a
-// numerator that isn't the account itself) has no single "rate" to reapply to the Meta.
-function parseSelfRatioDenominator(formula: string | undefined, selfName: string): string | null {
-    if (!formula) return null;
-    const self = escapeRegExp(selfName.trim());
-    const pattern = new RegExp(`^\\s*@\\[?${self}\\]?\\s*/\\s*@\\[?([^/*+\\-]+?)\\]?\\s*$`, 'i');
-    const match = formula.trim().match(pattern);
-    return match ? match[1].trim() : null;
 }
 
 function calculateRowValue(row: ForecastRow | null, config: ForecastConfig, allRows: ForecastRow[], base: 'forecast' | 'previa'): number {

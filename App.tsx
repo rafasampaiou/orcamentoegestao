@@ -3,7 +3,7 @@ import React, { useState, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import TimelineView from './components/TimelineView';
 
-import ForecastTable from './components/ForecastTable';
+import ForecastTable, { buildForecastRows } from './components/ForecastTable';
 import GMDView from './components/GMDView';
 import OccupancyView from './components/OccupancyView';
 import OccupancyMonthlyRealView from './components/OccupancyMonthlyRealView';
@@ -33,7 +33,7 @@ import { DEFAULT_PERMISSIONS_MATRIX, mergePermissionsMatrix } from './utils/perm
 import { resolveMeetingKind, getMeetingLabel, LEGACY_MEETING_VALUES } from './utils/meetings';
 import { SLIDES_CAPTURE_TARGETS } from './utils/slidesCaptureTargets';
 import { captureSlideTarget, getPngBlobSize } from './utils/captureElement';
-import { projectExpensesAcrossMonths } from './utils/budgetReviewDre';
+import { resolveKpiTerm, parseSelfRatioDenominator } from './utils/kpiEngine';
 import {
     ensureGoogleAccessToken, ensureDriveFolder, copyTemplatePresentation, uploadImageAndGetPublicUrl,
     getPresentationStructure, addContentSlideFromMold, deleteSlide, fillCoverPlaceholders,
@@ -1452,52 +1452,153 @@ const App: React.FC = () => {
     }
   };
 
-  // "Calcular Forecast" da Revisão de Metas (etapa 5) — projeta as despesas dos meses
-  // selecionados a partir da taxa (valor ÷ driver) da MESMA versão ANTES da revisão começar
-  // (budgetReviewBaseline), aplicada em cima da ocupação já revisada de cada mês. Reescreve o mês
-  // inteiro (todas as contas) em vez de só as que mudaram — evita duplicar linha no Supabase, já
-  // que saveFinancialData só faz insert puro (sem upsert), então tem que apagar antes de gravar.
+  // Único caso, em toda a Revisão de Metas, de uma conta com KPI escrever fora de financial_data —
+  // mesmo mapa usado em ForecastTable.tsx (handleKpiValueChange) pras 2 linhas de Receita Extra,
+  // que não têm Meta própria em financial_data (vem de budgetOccupancyDataMap).
+  const BUDGET_REVIEW_REVENUE_EXTRA_SOURCE: Record<string, string> = {
+    'REV-EXTRA-LAZER': 'lazer_extra_rev',
+    'REV-EXTRA-EVENTOS': 'event_extra_rev',
+  };
+
+  // Reescreve, no Supabase e no state local, só as contas de um mês que MUDARAM (`changesByMonth`),
+  // preservando as demais contas daquele mês/versão — precisa ser feito como
+  // "apaga o mês inteiro + reinsere tudo" porque saveFinancialData só faz insert puro (sem
+  // upsert), mas o "tudo" inclui as contas NÃO tocadas (lidas do state atual), não só as novas.
+  const persistBudgetReviewMonthChanges = async (hotel: string, year: number, versionId: string, changesByMonth: Record<number, ImportedRow[]>) => {
+    const months = Object.keys(changesByMonth).map(Number);
+    if (months.length === 0) return;
+
+    for (const month of months) {
+      const newRowsForMonth = changesByMonth[month];
+      const touchedContas = new Set(newRowsForMonth.map(r => r.conta));
+      const keptRowsForMonth = importedFinancialData.filter(r =>
+        r.hotel === hotel && r.versionId === versionId && (r.cenario || '').trim().toLowerCase() === 'meta' &&
+        parseInt(r.ano) === year && parseInt(r.mes) === month && !touchedContas.has(r.conta)
+      );
+      const finalSet = [...keptRowsForMonth, ...newRowsForMonth];
+      await supabaseService.deleteFinancialDataByContext(hotel, year, month, versionId, 'Meta');
+      if (finalSet.length > 0) await supabaseService.saveFinancialData(finalSet);
+    }
+
+    setImportedFinancialData(prev => {
+      const touched = new Set<string>();
+      months.forEach(m => changesByMonth[m].forEach(r => touched.add(`${m}|${r.conta}`)));
+      const kept = prev.filter(r => {
+        if (!(r.hotel === hotel && r.versionId === versionId && (r.cenario || '').trim().toLowerCase() === 'meta' && parseInt(r.ano) === year && months.includes(parseInt(r.mes)))) return true;
+        return !touched.has(`${parseInt(r.mes)}|${r.conta}`);
+      });
+      const allNew = months.flatMap(m => changesByMonth[m]);
+      return [...kept, ...allNew];
+    });
+  };
+
+  // "Calcular Forecast" da Revisão de Metas (etapa 5) — mesmo motor de linhas/KPI da DRE Forecast
+  // (buildForecastRows + resolveKpiTerm/parseSelfRatioDenominator), não uma versão simplificada:
+  // pra cada linha com KPI (conta Variável, pacote, Impostos, GOP, ou Receita Extra/ISS
+  // precomputado), pega a taxa (valor ÷ denominador) da MESMA versão ANTES da revisão começar
+  // (budgetReviewBaseline) e aplica em cima do denominador de cada mês JÁ REVISADO — "considera os
+  // KPIs feitos na meta antiga", como pedido.
   const handleCalcularBudgetReviewForecast = async () => {
     if (!budgetReviewVersionId || !budgetReviewBaseline || budgetReviewMonths.length === 0) return;
     const version = budgetVersions.find(v => v.id === budgetReviewVersionId);
     if (!version) return;
     const hotel = hotels.find(h => h.code === version.hotelId || h.id === version.hotelId)?.name || version.hotel || selectedHotel;
     const year = version.year;
+    const scopedFinancialData = importedFinancialData.filter(r => r.versionId === budgetReviewVersionId);
+    const scopedBaselineData = budgetReviewBaseline.financialData.filter(r => r.versionId === budgetReviewVersionId);
 
     try {
-      const newRows = projectExpensesAcrossMonths(
-        accounts,
-        budgetReviewBaseline.financialData,
-        budgetReviewBaseline.occupancyData,
-        budgetOccupancyDataMap[budgetReviewVersionId] || {},
-        hotel,
-        year,
-        budgetReviewVersionId,
-        budgetReviewMonths
-      );
+      const changesByMonth: Record<number, ImportedRow[]> = {};
+      const occupancyUpdates: Record<string, number> = {}; // `${sourceId}_${monthIdx}` -> valor
 
-      for (const month of budgetReviewMonths) {
-        await supabaseService.deleteFinancialDataByContext(hotel, year, month, budgetReviewVersionId, 'Meta');
-      }
-      if (newRows.length > 0) {
-        await supabaseService.saveFinancialData(newRows);
-      }
+      budgetReviewMonths.forEach(month => {
+        const baselineRows = buildForecastRows(dreConfigs, month, year, scopedBaselineData, hotel, hotels, {}, undefined, budgetReviewVersionId, accounts, packages, budgetReviewBaseline.occupancyData, undefined, []);
+        const currentRows = buildForecastRows(dreConfigs, month, year, scopedFinancialData, hotel, hotels, {}, undefined, budgetReviewVersionId, accounts, packages, budgetOccupancyDataMap[budgetReviewVersionId] || {}, undefined, []);
+        const monthChanges: ImportedRow[] = [];
 
-      setImportedFinancialData(prev => {
-        const monthsSet = new Set(budgetReviewMonths);
-        const kept = prev.filter(r => !(
-          r.versionId === budgetReviewVersionId &&
-          (r.cenario || '').trim().toLowerCase() === 'meta' &&
-          monthsSet.has(parseInt(r.mes))
-        ));
-        return [...kept, ...newRows];
+        baselineRows.forEach(baseRow => {
+          if (baseRow.isHeader && baseRow.indentLevel === 0) return; // cabeçalho de seção, nunca tem KPI
+          const calc = baseRow.category === 'Package' ? packageKpiConfigs[baseRow.label.trim()] : baseRow.rowConfig?.kpiCalculation;
+          const precomputedKpi = baseRow.rowConfig?.precomputedKpi;
+          const currentRow = currentRows.find(r => r.id === baseRow.id);
+          if (!currentRow) return;
+
+          if (calc) {
+            const selfDenom = parseSelfRatioDenominator(calc.formula, baseRow.label);
+            if (!selfDenom) return;
+            const baseDenom = resolveKpiTerm(selfDenom, baselineRows, 'budget');
+            if (!baseDenom) return;
+            const rate = baseRow.budget / baseDenom;
+            const currentDenom = resolveKpiTerm(selfDenom, currentRows, 'budget');
+            const newValue = rate * currentDenom;
+            monthChanges.push({
+              ano: String(year), cenario: 'Meta', tipo: 'Despesa', hotel, conta: `override_${baseRow.id}`,
+              cr: '', mes: String(month), valor: newValue.toFixed(2), status: 'valid', versionId: budgetReviewVersionId,
+            });
+          } else if (precomputedKpi?.denominator) {
+            const sourceId = BUDGET_REVIEW_REVENUE_EXTRA_SOURCE[baseRow.id];
+            const baseDenom = precomputedKpi.denominator.budget;
+            if (!sourceId || !baseDenom) return;
+            const rate = baseRow.budget / baseDenom;
+            const currentDenom = currentRow.rowConfig?.precomputedKpi?.denominator?.budget || 0;
+            occupancyUpdates[`${sourceId}_${month - 1}`] = rate * currentDenom;
+          }
+        });
+
+        if (monthChanges.length > 0) changesByMonth[month] = monthChanges;
       });
 
-      toast.success('Despesas projetadas pra todos os meses selecionados.');
+      await persistBudgetReviewMonthChanges(hotel, year, budgetReviewVersionId, changesByMonth);
+
+      if (Object.keys(occupancyUpdates).length > 0) {
+        setBudgetOccupancyDataMap(prev => {
+          const current = { ...(prev[budgetReviewVersionId] || {}) };
+          Object.entries(occupancyUpdates).forEach(([key, value]) => {
+            const lastSep = key.lastIndexOf('_');
+            const sourceId = key.slice(0, lastSep);
+            const monthIdx = parseInt(key.slice(lastSep + 1));
+            const arr = [...(current[sourceId] || Array(12).fill(0))];
+            arr[monthIdx] = value;
+            current[sourceId] = arr;
+          });
+          return { ...prev, [budgetReviewVersionId]: current };
+        });
+      }
+
+      toast.success('Despesas projetadas pra todos os meses selecionados, a partir dos KPIs da meta antiga.');
       logUserAction(`Calculou o Forecast da Revisão de Metas "${version.name}" (${year})`);
     } catch (err) {
       console.error('Budget review Calcular Forecast error:', err);
       toast.error('Erro ao projetar as despesas. Verifique a conexão.');
+    }
+  };
+
+  // Edição manual de valor/KPI na DRE da Revisão de Metas — BudgetReviewDRE resolve o back-solve
+  // do KPI (usa a mesma resolveKpiTerm/parseSelfRatioDenominator) e só manda pra cá o valor final
+  // já calculado por (linha, mês); aqui só falta persistir como override_<rowId>, igual
+  // "Salvar Projeção" já faz na DRE Forecast normal.
+  const handleSaveBudgetReviewEdits = async (edits: { rowId: string; month: number; value: number }[]) => {
+    if (!budgetReviewVersionId || edits.length === 0) return;
+    const version = budgetVersions.find(v => v.id === budgetReviewVersionId);
+    if (!version) return;
+    const hotel = hotels.find(h => h.code === version.hotelId || h.id === version.hotelId)?.name || version.hotel || selectedHotel;
+
+    const changesByMonth: Record<number, ImportedRow[]> = {};
+    edits.forEach(({ rowId, month, value }) => {
+      if (!changesByMonth[month]) changesByMonth[month] = [];
+      changesByMonth[month].push({
+        ano: String(version.year), cenario: 'Meta', tipo: 'Despesa', hotel, conta: `override_${rowId}`,
+        cr: '', mes: String(month), valor: value.toFixed(2), status: 'valid', versionId: budgetReviewVersionId,
+      });
+    });
+
+    try {
+      await persistBudgetReviewMonthChanges(hotel, version.year, budgetReviewVersionId, changesByMonth);
+      toast.success('Alterações da Revisão de Metas salvas.');
+      logUserAction(`Editou valores/KPI da Revisão de Metas "${version.name}" (${version.year})`);
+    } catch (err) {
+      console.error('Budget review save edits error:', err);
+      toast.error('Erro ao salvar as alterações. Verifique a conexão.');
     }
   };
 
@@ -1720,14 +1821,19 @@ const App: React.FC = () => {
             reviewMonths={budgetReviewMonths}
             accounts={accounts}
             packages={packages}
+            packageKpiConfigs={packageKpiConfigs}
+            hotels={hotels}
+            dreConfigs={dreConfigs}
             financialData={importedFinancialData}
             budgetOccupancyDataMap={budgetOccupancyDataMap}
+            setBudgetOccupancyDataMap={setBudgetOccupancyDataMap}
             currentUser={currentUser}
             permissionsMatrix={permissionsMatrix}
             onBack={() => setCurrentView('budget_review_occupancy')}
             onGoToOccupancy={() => setCurrentView('budget_review_occupancy')}
             onGoToComparatives={() => setCurrentView('budget_review_comparatives')}
             onCalcularForecast={handleCalcularBudgetReviewForecast}
+            onSaveEdits={handleSaveBudgetReviewEdits}
           />
         );
       }
