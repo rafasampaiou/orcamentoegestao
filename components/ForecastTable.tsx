@@ -1619,6 +1619,7 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
                 setShowBalanceteModal(true);
             }
         } else if (index === 3) {
+            syncForecastOccupancyFromSheet();
             onNavigateToOccupancy?.(false);
         } else if (index === 4) {
             handleCalcularForecast();
@@ -1900,27 +1901,34 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
         return Object.keys(overrides).length > 0 ? overrides : null;
     };
 
-    // "Calcular Forecast" também tenta puxar Ocupação/Receita do Forecast (Aptos vendidos + DM
-    // bruta sem ISS, Eventos e Lazer) de uma planilha Google Sheets externa — uma aba por
-    // "Mês - Hotel" (api/forecast-occupancy.js, via conta de serviço do Google). Roda em paralelo
-    // ao cálculo financeiro normal, sem travar o resto do fluxo se falhar (aba não encontrada,
-    // planilha fora do ar etc. só viram um toast de erro). DM bruta é campo calculado na Ocupação
-    // (Receita ÷ Aptos vendidos) — por isso back-solve pra Receita (DM × Aptos vendidos) em vez de
-    // gravar a DM direto.
+    // Etapa "Inserir a ocupação e receita do Forecast" (índice 3 do Status da prévia, ver
+    // handleOtbStepClick) também tenta puxar esses dados (Aptos vendidos + DM bruta sem ISS,
+    // Eventos e Lazer) de uma planilha Google Sheets externa — uma aba por "Mês - Hotel"
+    // (api/forecast-occupancy.js, via conta de serviço do Google) — em vez de só navegar pra
+    // Ocupação pra preencher à mão. Não trava a navegação se falhar (aba não encontrada, planilha
+    // fora do ar etc. só viram um toast de erro, e a etapa continua podendo ser preenchida manual).
+    // DM bruta é campo calculado na Ocupação (Receita ÷ Aptos vendidos) — por isso back-solve pra
+    // Receita (DM × Aptos vendidos) em vez de gravar a DM direto.
     const syncForecastOccupancyFromSheet = () => {
         if (isAdminEntity || !selectedHotel || !selectedMonth || !setRealOccupancyData) return;
+        // Dois buckets escrevem o mesmo dado: `contextKey` (sem projectionType) é o que a tela de
+        // Ocupação (OccupancyView) de fato lê/exibe pro usuário; `normalKey` (com
+        // __projectionType, mesmo formato de computeOtbProgress/otbProgress.ts) é o que marca a
+        // etapa 4 ("Inserir a ocupação e receita do Forecast") como concluída no Status da prévia.
         const contextKey = `${selectedHotel}_${selectedYear}_${selectedMonth}_${activeRealVersionId || ''}`;
+        const normalKey = `${contextKey}__${activeProjectionType}`;
         toast.promise(
             fetchForecastOccupancyFromSheet(selectedHotel, selectedMonth).then(sheetData => {
+                const fields = {
+                    event_sold_forecast: sheetData.eventosAptosVendidos,
+                    event_rev_fap_forecast: sheetData.eventosDM * sheetData.eventosAptosVendidos,
+                    lazer_sold_forecast: sheetData.lazerAptosVendidos,
+                    lazer_rev_fap_forecast: sheetData.lazerDM * sheetData.lazerAptosVendidos,
+                };
                 setRealOccupancyData(prev => ({
                     ...prev,
-                    [contextKey]: {
-                        ...(prev[contextKey] || {}),
-                        event_sold_forecast: sheetData.eventosAptosVendidos,
-                        event_rev_fap_forecast: sheetData.eventosDM * sheetData.eventosAptosVendidos,
-                        lazer_sold_forecast: sheetData.lazerAptosVendidos,
-                        lazer_rev_fap_forecast: sheetData.lazerDM * sheetData.lazerAptosVendidos,
-                    }
+                    [contextKey]: { ...(prev[contextKey] || {}), ...fields },
+                    [normalKey]: { ...(prev[normalKey] || {}), ...fields },
                 }));
                 return sheetData;
             }),
@@ -1933,7 +1941,6 @@ const ForecastTable: React.FC<ForecastTableProps> = ({
     };
 
     const handleCalcularForecast = () => {
-        syncForecastOccupancyFromSheet();
         if (activeProjectionType === 'Realizado') {
             const overrides = findFechamentoOverrides();
             if (overrides) {
