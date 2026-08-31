@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { ArrowLeft, Calculator, ClipboardEdit, ArrowLeftRight, ChevronDown, ChevronRight, Save } from 'lucide-react';
 import { Account, BudgetVersion, CostPackage, DreSection, Hotel, ImportedRow, KpiCalculation, PermissionMatrix, User, hasPermission } from '../types';
 import { buildForecastRows } from './ForecastTable';
-import { getKpiInfoForRow, isEditableKpiForRow, resolveKpiTerm, parseSelfRatioDenominator } from '../utils/kpiEngine';
+import { getKpiInfoForRow, isEditableKpiForRow, resolveKpiTerm, parseSelfRatioDenominator, blueRowIds } from '../utils/kpiEngine';
 
 interface BudgetReviewDREProps {
     version: BudgetVersion;
@@ -220,18 +220,39 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
                             if (!isRowVisible(row, idx)) return null;
                             if (row.category === 'Spacer') return <tr key={row.id}><td colSpan={1 + months.length * 2} className="py-1">&nbsp;</td></tr>;
 
+                            // Mesma classificação/paleta de cores da DRE Forecast (ForecastTable.tsx:
+                            // isSectionHeader → azul sky-100 se "blueRowIds" (REV-TOTAL, REV-NET,
+                            // CST-HEAD, LABOR-TOTAL etc.) ou cinza slate-100 senão; pacote → cinza
+                            // gray-50 com chevron; isTotal → indigo-50; REV-IMP → azul sky sempre.
                             const isSectionHeader = row.isHeader && row.indentLevel === 0;
+                            const isBlueHighlight = blueRowIds.includes(row.id);
                             const isPackageHeader = row.category === 'Package' && row.isHeader && row.indentLevel === 1;
+                            const isRevImp = row.id === 'REV-IMP';
                             const editable = canEdit && isEditableRow(row);
                             const indent = (row.indentLevel || 0) * 16;
-                            const rowBg = (row.isTotal || isSectionHeader) ? '#f9fafb' : isPackageHeader ? '#fafafa' : 'white';
-                            const rowStyle = (row.isTotal || isSectionHeader) ? 'font-bold' : isPackageHeader ? 'font-semibold' : '';
+
+                            let rowBg = 'white';
+                            let trClass = 'border-b border-gray-100 text-slate-700 hover:bg-indigo-50/30';
+                            let labelClass = 'text-xs';
+                            if (isSectionHeader) {
+                                rowBg = isBlueHighlight ? '#e0f2fe' : '#f1f5f9';
+                                trClass = isBlueHighlight ? 'border-y border-sky-200' : 'border-y border-slate-200';
+                                labelClass = `text-xs font-bold uppercase tracking-wide ${isBlueHighlight ? 'text-sky-900' : 'text-slate-800'}`;
+                            } else if (isPackageHeader) {
+                                rowBg = '#f9fafb';
+                                trClass = 'border-b border-gray-200';
+                                labelClass = 'text-xs font-bold text-gray-800 uppercase';
+                            } else if (row.isTotal || isRevImp) {
+                                rowBg = isRevImp ? '#e0f2fe' : '#eef2ff';
+                                trClass = isRevImp ? 'border-y-2 border-sky-300 font-bold text-sky-950' : 'border-y-2 border-gray-300 font-bold text-indigo-900';
+                                labelClass = 'text-xs uppercase tracking-wide';
+                            }
 
                             return (
-                                <tr key={row.id} className={rowStyle} style={{ backgroundColor: rowBg }}>
-                                    <td className="px-2 py-px sticky left-0 bg-inherit truncate max-w-[220px]" style={{ paddingLeft: 8 + indent, backgroundColor: rowBg }}>
+                                <tr key={row.id} className={trClass} style={{ backgroundColor: rowBg }}>
+                                    <td className={`px-2 py-px sticky left-0 truncate max-w-[220px] ${labelClass}`} style={{ paddingLeft: 8 + indent, backgroundColor: rowBg }}>
                                         {isPackageHeader && (
-                                            <button onClick={() => togglePackage(row.id)} className="inline-flex mr-1 align-middle text-gray-400 hover:text-gray-600">
+                                            <button onClick={() => togglePackage(row.id)} className="inline-flex mr-1 align-middle text-gray-400 hover:text-indigo-600">
                                                 {collapsedPackages.has(row.id) ? <ChevronRight size={11} /> : <ChevronDown size={11} />}
                                             </button>
                                         )}
