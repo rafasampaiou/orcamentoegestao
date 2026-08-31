@@ -247,6 +247,7 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
                                                 <td className="px-1 py-px text-right tabular-nums border-l border-gray-100 truncate">
                                                     {editable ? (
                                                         <input
+                                                            key={`v-${monthRow.budget}`}
                                                             type="text"
                                                             defaultValue={fmt(monthRow.budget)}
                                                             onBlur={e => {
@@ -260,6 +261,7 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
                                                 <td className="px-1 py-px text-center text-amber-700 truncate">
                                                     {!kpiInfo.hasKpi ? '' : kpiEditable ? (
                                                         <input
+                                                            key={`k-${kpiInfo.kpiValue('budget')}`}
                                                             type="text"
                                                             defaultValue={fmtKpi(kpiInfo.kpiValue('budget'), kpiInfo.kpiFormatType)}
                                                             onBlur={e => {

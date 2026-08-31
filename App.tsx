@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import TimelineView from './components/TimelineView';
 
 import ForecastTable, { buildForecastRows } from './components/ForecastTable';
+import { normalizeHotelName } from './services/mockData';
 import GMDView from './components/GMDView';
 import OccupancyView from './components/OccupancyView';
 import OccupancyMonthlyRealView from './components/OccupancyMonthlyRealView';
@@ -1493,27 +1494,37 @@ const App: React.FC = () => {
   // "Calcular Forecast" da Revisão de Metas (etapa 5) — mesmo motor de linhas/KPI da DRE Forecast
   // (buildForecastRows + resolveKpiTerm/parseSelfRatioDenominator), não uma versão simplificada:
   // pra cada linha com KPI (conta Variável, pacote, Impostos, GOP, ou Receita Extra/ISS
-  // precomputado), pega a taxa (valor ÷ denominador) da versão-ORIGEM (budgetReviewSourceVersionId
-  // — a "última meta importada no sistema que foi pra DRE Forecast", lida AO VIVO, nunca um
-  // snapshot congelado) e aplica em cima do denominador de cada mês JÁ REVISADO.
+  // precomputado), pega a taxa (valor ÷ denominador) da versão PRINCIPAL (isMain) do hotel — a
+  // mesma que alimenta a coluna "KPI (Meta)" na DRE Forecast normal, "a última meta importada no
+  // sistema" — lida AO VIVO, nunca um snapshot congelado. Não usa budgetReviewSourceVersionId (a
+  // versão que você escolheu no assistente) direto como fonte: só cai nela como fallback se, por
+  // algum motivo, nenhuma versão do hotel estiver marcada como principal.
   const handleCalcularBudgetReviewForecast = async () => {
-    if (!budgetReviewVersionId || !budgetReviewSourceVersionId || budgetReviewMonths.length === 0) return;
+    if (!budgetReviewVersionId || budgetReviewMonths.length === 0) return;
     const version = budgetVersions.find(v => v.id === budgetReviewVersionId);
-    const sourceVersion = budgetVersions.find(v => v.id === budgetReviewSourceVersionId);
-    if (!version || !sourceVersion) return;
+    if (!version) return;
     const hotel = hotels.find(h => h.code === version.hotelId || h.id === version.hotelId)?.name || version.hotel || selectedHotel;
-    const sourceHotel = hotels.find(h => h.code === sourceVersion.hotelId || h.id === sourceVersion.hotelId)?.name || sourceVersion.hotel || hotel;
     const year = version.year;
+
+    const mainSourceVersion = budgetVersions.find(v =>
+      v.isMain && v.year === year &&
+      (v.hotelId === version.hotelId || normalizeHotelName(v.hotel || '') === normalizeHotelName(hotel))
+    ) || budgetVersions.find(v => v.id === budgetReviewSourceVersionId);
+    if (!mainSourceVersion) {
+      toast.error('Não encontrei a versão principal de Meta desse hotel pra pegar os KPIs. Verifique em Versões.');
+      return;
+    }
+    const sourceHotel = hotels.find(h => h.code === mainSourceVersion.hotelId || h.id === mainSourceVersion.hotelId)?.name || mainSourceVersion.hotel || hotel;
     const scopedFinancialData = importedFinancialData.filter(r => r.versionId === budgetReviewVersionId);
-    const scopedSourceData = importedFinancialData.filter(r => r.versionId === budgetReviewSourceVersionId);
-    const sourceOccupancyData = budgetOccupancyDataMap[budgetReviewSourceVersionId] || {};
+    const scopedSourceData = importedFinancialData.filter(r => r.versionId === mainSourceVersion.id);
+    const sourceOccupancyData = budgetOccupancyDataMap[mainSourceVersion.id] || {};
 
     try {
       const changesByMonth: Record<number, ImportedRow[]> = {};
       const occupancyUpdates: Record<string, number> = {}; // `${sourceId}_${monthIdx}` -> valor
 
       budgetReviewMonths.forEach(month => {
-        const baselineRows = buildForecastRows(dreConfigs, month, sourceVersion.year, scopedSourceData, sourceHotel, hotels, {}, undefined, budgetReviewSourceVersionId, accounts, packages, sourceOccupancyData, undefined, []);
+        const baselineRows = buildForecastRows(dreConfigs, month, mainSourceVersion.year, scopedSourceData, sourceHotel, hotels, {}, undefined, mainSourceVersion.id, accounts, packages, sourceOccupancyData, undefined, []);
         const currentRows = buildForecastRows(dreConfigs, month, year, scopedFinancialData, hotel, hotels, {}, undefined, budgetReviewVersionId, accounts, packages, budgetOccupancyDataMap[budgetReviewVersionId] || {}, undefined, []);
         const monthChanges: ImportedRow[] = [];
 
