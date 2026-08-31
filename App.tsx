@@ -1506,18 +1506,28 @@ const App: React.FC = () => {
     const hotel = hotels.find(h => h.code === version.hotelId || h.id === version.hotelId)?.name || version.hotel || selectedHotel;
     const year = version.year;
 
-    const mainSourceVersion = budgetVersions.find(v =>
-      v.isMain && v.year === year &&
-      (v.hotelId === version.hotelId || normalizeHotelName(v.hotel || '') === normalizeHotelName(hotel))
-    ) || budgetVersions.find(v => v.id === budgetReviewSourceVersionId);
+    // 1ª opção: activeBudgetVersionId — é literalmente o id que já alimenta a coluna "KPI (Meta)"
+    // na DRE Forecast normal pra esse hotel agora (a mesma fonte do print que você mandou), então
+    // é a mais confiável quando o hotel bate. Só cai pra busca por isMain (ou pro fallback do
+    // assistente) se o hotel ativo agora for outro.
+    const activeVersionMatchesHotel = (() => {
+      const v = budgetVersions.find(bv => bv.id === activeBudgetVersionId);
+      return v && (v.hotelId === version.hotelId || normalizeHotelName(v.hotel || '') === normalizeHotelName(hotel)) ? v : null;
+    })();
+    const mainSourceVersion = activeVersionMatchesHotel
+      || budgetVersions.find(v => v.isMain && (v.hotelId === version.hotelId || normalizeHotelName(v.hotel || '') === normalizeHotelName(hotel)))
+      || budgetVersions.find(v => v.id === budgetReviewSourceVersionId);
     if (!mainSourceVersion) {
-      toast.error('Não encontrei a versão principal de Meta desse hotel pra pegar os KPIs. Verifique em Versões.');
+      toast.error('Não encontrei a versão de Meta desse hotel pra pegar os KPIs. Verifique em Versões.');
       return;
     }
     const sourceHotel = hotels.find(h => h.code === mainSourceVersion.hotelId || h.id === mainSourceVersion.hotelId)?.name || mainSourceVersion.hotel || hotel;
     const scopedFinancialData = importedFinancialData.filter(r => r.versionId === budgetReviewVersionId);
     const scopedSourceData = importedFinancialData.filter(r => r.versionId === mainSourceVersion.id);
     const sourceOccupancyData = budgetOccupancyDataMap[mainSourceVersion.id] || {};
+    if (scopedSourceData.length === 0) {
+      console.warn('[Revisão de Metas] Nenhum financial_data encontrado pra versão-fonte', mainSourceVersion.id, mainSourceVersion.name);
+    }
 
     try {
       const changesByMonth: Record<number, ImportedRow[]> = {};
@@ -1577,7 +1587,12 @@ const App: React.FC = () => {
         });
       }
 
-      toast.success('Despesas projetadas pra todos os meses selecionados, a partir dos KPIs da meta antiga.');
+      const totalChanges = Object.values(changesByMonth).reduce((s, arr) => s + arr.length, 0);
+      if (totalChanges === 0 && Object.keys(occupancyUpdates).length === 0) {
+        toast.error(`Nenhuma conta com KPI encontrada em "${mainSourceVersion.name}" pra projetar. Confira se essa versão tem despesas de Meta importadas.`);
+      } else {
+        toast.success(`Despesas projetadas (${totalChanges} conta(s)/mês) a partir dos KPIs de "${mainSourceVersion.name}".`);
+      }
       logUserAction(`Calculou o Forecast da Revisão de Metas "${version.name}" (${year})`);
     } catch (err) {
       console.error('Budget review Calcular Forecast error:', err);
