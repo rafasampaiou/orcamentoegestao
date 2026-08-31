@@ -1493,20 +1493,22 @@ const App: React.FC = () => {
 
   // Resolve de qual BudgetVersion a Revisão de Metas deve puxar os KPIs de despesa "importados
   // anteriormente" — usado tanto por "Calcular Forecast" quanto pela própria tela (que já mostra
-  // esse KPI de cara, antes de qualquer clique, ver BudgetReviewDRE). 1ª opção: activeBudgetVersionId
-  // — é literalmente o id que já alimenta a coluna "KPI (Meta)" na DRE Forecast normal pra esse
-  // hotel agora — só cai pra busca por isMain (ou pro fallback do assistente) se o hotel ativo
-  // agora for outro. Independe de ser "versão original" ou "réplica" — o KPI vem sempre daqui.
+  // esse KPI de cara, antes de qualquer clique, ver BudgetReviewDRE). "A última meta que foi
+  // construída do respectivo ano/unidade" = a OUTRA BudgetVersion mais recentemente atualizada
+  // pra esse mesmo hotel+ano (excluindo a própria versão em revisão) — não depende de isMain nem
+  // de activeBudgetVersionId (nenhum dos dois se mostrou confiável pra isso). Independe de ser
+  // "versão original" ou "réplica": a réplica sempre é mais nova que a original, então já fica
+  // automaticamente excluída como candidata, sobrando a original de verdade.
   const resolveBudgetReviewMainVersion = (reviewVersion: BudgetVersion): BudgetVersion | null => {
     const hotel = hotels.find(h => h.code === reviewVersion.hotelId || h.id === reviewVersion.hotelId)?.name || reviewVersion.hotel || selectedHotel;
-    const activeVersionMatchesHotel = (() => {
-      const v = budgetVersions.find(bv => bv.id === activeBudgetVersionId);
-      return v && (v.hotelId === reviewVersion.hotelId || normalizeHotelName(v.hotel || '') === normalizeHotelName(hotel)) ? v : null;
-    })();
-    return activeVersionMatchesHotel
-      || budgetVersions.find(v => v.isMain && (v.hotelId === reviewVersion.hotelId || normalizeHotelName(v.hotel || '') === normalizeHotelName(hotel)))
-      || budgetVersions.find(v => v.id === budgetReviewSourceVersionId)
-      || null;
+    const candidates = budgetVersions.filter(v =>
+      v.id !== reviewVersion.id &&
+      v.year === reviewVersion.year &&
+      (v.hotelId === reviewVersion.hotelId || normalizeHotelName(v.hotel || '') === normalizeHotelName(hotel))
+    );
+    if (candidates.length === 0) return reviewVersion; // não achou nenhuma outra — só existe ela mesma
+    candidates.sort((a, b) => (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt));
+    return candidates[0];
   };
 
   // "Calcular Forecast" da Revisão de Metas (etapa 5) — mesmo motor de linhas/KPI da DRE Forecast

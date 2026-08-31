@@ -264,7 +264,7 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
                 <table className="w-auto text-[11px] border-collapse">
                     <thead>
                         <tr className="border-b border-gray-200">
-                            <th rowSpan={2} className="px-2 py-px text-left font-bold text-gray-500 uppercase sticky left-0 bg-white z-10 align-bottom whitespace-nowrap">Indicador</th>
+                            <th rowSpan={2} className="w-[300px] px-2 py-px text-left font-bold text-gray-500 uppercase sticky left-0 bg-white z-10 align-bottom whitespace-nowrap">Indicador</th>
                             {months.map(m => (
                                 <th key={m} colSpan={2} className="px-1 py-px text-center font-bold text-gray-500 uppercase border-l border-gray-100 truncate">{MONTH_NAMES[m - 1]}</th>
                             ))}
@@ -313,7 +313,7 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
 
                             return (
                                 <tr key={row.id} className={trClass} style={{ backgroundColor: rowBg }}>
-                                    <td className={`px-2 py-px sticky left-0 truncate max-w-[220px] ${labelClass}`} style={{ paddingLeft: 8 + indent, backgroundColor: rowBg }}>
+                                    <td className={`w-[300px] px-2 py-px sticky left-0 truncate ${labelClass}`} style={{ paddingLeft: 8 + indent, backgroundColor: rowBg }}>
                                         {isPackageHeader && (
                                             <button onClick={() => togglePackage(row.id)} className="inline-flex mr-1 align-middle text-gray-400 hover:text-indigo-600">
                                                 {collapsedPackages.has(row.id) ? <ChevronRight size={11} /> : <ChevronDown size={11} />}
