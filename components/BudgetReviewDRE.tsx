@@ -195,7 +195,10 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
-                <table className="min-w-full text-[11px] border-collapse">
+                {/* Sem min-w-full de propósito: com poucos meses selecionados, a tabela deve ficar
+                    do tamanho do conteúdo (encostada à esquerda), não esticada pra preencher o
+                    container inteiro — só cresce/ganha scroll horizontal quando o conteúdo pede. */}
+                <table className="w-auto text-[11px] border-collapse">
                     <thead>
                         <tr className="border-b border-gray-200">
                             <th rowSpan={2} className="px-2 py-px text-left font-bold text-gray-500 uppercase sticky left-0 bg-white z-10 align-bottom whitespace-nowrap">Indicador</th>
