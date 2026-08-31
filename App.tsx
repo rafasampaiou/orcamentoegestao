@@ -1491,14 +1491,30 @@ const App: React.FC = () => {
     });
   };
 
+  // Resolve de qual BudgetVersion a Revisão de Metas deve puxar os KPIs de despesa "importados
+  // anteriormente" — usado tanto por "Calcular Forecast" quanto pela própria tela (que já mostra
+  // esse KPI de cara, antes de qualquer clique, ver BudgetReviewDRE). 1ª opção: activeBudgetVersionId
+  // — é literalmente o id que já alimenta a coluna "KPI (Meta)" na DRE Forecast normal pra esse
+  // hotel agora — só cai pra busca por isMain (ou pro fallback do assistente) se o hotel ativo
+  // agora for outro. Independe de ser "versão original" ou "réplica" — o KPI vem sempre daqui.
+  const resolveBudgetReviewMainVersion = (reviewVersion: BudgetVersion): BudgetVersion | null => {
+    const hotel = hotels.find(h => h.code === reviewVersion.hotelId || h.id === reviewVersion.hotelId)?.name || reviewVersion.hotel || selectedHotel;
+    const activeVersionMatchesHotel = (() => {
+      const v = budgetVersions.find(bv => bv.id === activeBudgetVersionId);
+      return v && (v.hotelId === reviewVersion.hotelId || normalizeHotelName(v.hotel || '') === normalizeHotelName(hotel)) ? v : null;
+    })();
+    return activeVersionMatchesHotel
+      || budgetVersions.find(v => v.isMain && (v.hotelId === reviewVersion.hotelId || normalizeHotelName(v.hotel || '') === normalizeHotelName(hotel)))
+      || budgetVersions.find(v => v.id === budgetReviewSourceVersionId)
+      || null;
+  };
+
   // "Calcular Forecast" da Revisão de Metas (etapa 5) — mesmo motor de linhas/KPI da DRE Forecast
   // (buildForecastRows + resolveKpiTerm/parseSelfRatioDenominator), não uma versão simplificada:
   // pra cada linha com KPI (conta Variável, pacote, Impostos, GOP, ou Receita Extra/ISS
-  // precomputado), pega a taxa (valor ÷ denominador) da versão PRINCIPAL (isMain) do hotel — a
-  // mesma que alimenta a coluna "KPI (Meta)" na DRE Forecast normal, "a última meta importada no
-  // sistema" — lida AO VIVO, nunca um snapshot congelado. Não usa budgetReviewSourceVersionId (a
-  // versão que você escolheu no assistente) direto como fonte: só cai nela como fallback se, por
-  // algum motivo, nenhuma versão do hotel estiver marcada como principal.
+  // precomputado), pega a taxa (valor ÷ denominador) da versão resolvida acima (lida AO VIVO,
+  // nunca um snapshot congelado) e persiste como override — a tela já mostrava esse mesmo valor
+  // projetado antes de clicar; isso só torna oficial (grava no Supabase).
   const handleCalcularBudgetReviewForecast = async () => {
     if (!budgetReviewVersionId || budgetReviewMonths.length === 0) return;
     const version = budgetVersions.find(v => v.id === budgetReviewVersionId);
@@ -1506,17 +1522,7 @@ const App: React.FC = () => {
     const hotel = hotels.find(h => h.code === version.hotelId || h.id === version.hotelId)?.name || version.hotel || selectedHotel;
     const year = version.year;
 
-    // 1ª opção: activeBudgetVersionId — é literalmente o id que já alimenta a coluna "KPI (Meta)"
-    // na DRE Forecast normal pra esse hotel agora (a mesma fonte do print que você mandou), então
-    // é a mais confiável quando o hotel bate. Só cai pra busca por isMain (ou pro fallback do
-    // assistente) se o hotel ativo agora for outro.
-    const activeVersionMatchesHotel = (() => {
-      const v = budgetVersions.find(bv => bv.id === activeBudgetVersionId);
-      return v && (v.hotelId === version.hotelId || normalizeHotelName(v.hotel || '') === normalizeHotelName(hotel)) ? v : null;
-    })();
-    const mainSourceVersion = activeVersionMatchesHotel
-      || budgetVersions.find(v => v.isMain && (v.hotelId === version.hotelId || normalizeHotelName(v.hotel || '') === normalizeHotelName(hotel)))
-      || budgetVersions.find(v => v.id === budgetReviewSourceVersionId);
+    const mainSourceVersion = resolveBudgetReviewMainVersion(version);
     if (!mainSourceVersion) {
       toast.error('Não encontrei a versão de Meta desse hotel pra pegar os KPIs. Verifique em Versões.');
       return;
@@ -1839,9 +1845,12 @@ const App: React.FC = () => {
             </div>
           );
         }
+        const mainSourceVersionForDisplay = resolveBudgetReviewMainVersion(reviewVersion);
         return (
           <BudgetReviewDRE
             version={reviewVersion}
+            mainSourceVersionId={mainSourceVersionForDisplay?.id || ''}
+            budgetVersions={budgetVersions}
             reviewMonths={budgetReviewMonths}
             accounts={accounts}
             packages={packages}

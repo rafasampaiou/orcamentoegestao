@@ -6,6 +6,11 @@ import { getKpiInfoForRow, isEditableKpiForRow, resolveKpiTerm, parseSelfRatioDe
 
 interface BudgetReviewDREProps {
     version: BudgetVersion;
+    // De qual versão puxar os KPIs de despesa "importados anteriormente" (resolvido em App.tsx,
+    // resolveBudgetReviewMainVersion) — usado pra já preencher a tela por padrão, independente de
+    // "usar original" ou "criar réplica" ter sido escolhido no assistente.
+    mainSourceVersionId: string;
+    budgetVersions: BudgetVersion[];
     reviewMonths: number[]; // 1-indexed
     accounts: Account[];
     packages: CostPackage[];
@@ -40,7 +45,7 @@ const fmtKpi = (v: number, format: string) => format === 'percent' ? `${(v || 0)
 // seu par Valor/KPI) em vez de Prévia/Real/Meta. Reaproveita buildForecastRows (ForecastTable.tsx)
 // chamado uma vez por mês selecionado, e o motor de KPI extraído em utils/kpiEngine.ts.
 const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
-    version, reviewMonths, accounts, packages, packageKpiConfigs, hotels, dreConfigs, financialData,
+    version, mainSourceVersionId, budgetVersions, reviewMonths, accounts, packages, packageKpiConfigs, hotels, dreConfigs, financialData,
     budgetOccupancyDataMap, setBudgetOccupancyDataMap, currentUser, permissionsMatrix,
     onBack, onGoToOccupancy, onGoToComparatives, onCalcularForecast, onSaveEdits
 }) => {
@@ -73,9 +78,67 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
 
     const effectiveOccupancyData = budgetOccupancyDataMap[version.id] || {};
 
-    const monthRowSets = useMemo(() => months.map(month =>
+    // Passo 1: linhas com os dados reais/editados desta versão (sem preenchimento automático
+    // ainda) — usadas só pra ler os denominadores (Receita/UH Disponível etc.) de cada mês, que
+    // não dependem de despesa nenhuma.
+    const rawCurrentRowSets = useMemo(() => months.map(month =>
         buildForecastRows(dreConfigs, month, version.year, effectiveFinancialData, hotelName, hotels, {}, undefined, version.id, accounts, packages, effectiveOccupancyData, undefined, [])
     ), [months, dreConfigs, version.year, effectiveFinancialData, hotelName, hotels, version.id, accounts, packages, effectiveOccupancyData]);
+
+    const mainSourceVersion = budgetVersions.find(v => v.id === mainSourceVersionId) || null;
+    const sourceHotelName = mainSourceVersion ? (hotels.find(h => h.code === mainSourceVersion.hotelId || h.id === mainSourceVersion.hotelId)?.name || mainSourceVersion.hotel || hotelName) : hotelName;
+    const sourceScopedFinancialData = useMemo(() => mainSourceVersion ? financialData.filter(r => r.versionId === mainSourceVersion.id) : [], [financialData, mainSourceVersion]);
+    const sourceOccupancyData = mainSourceVersion ? (budgetOccupancyDataMap[mainSourceVersion.id] || {}) : {};
+
+    // Linhas da versão-fonte (a "última meta importada") — é dela que sai a taxa (valor ÷
+    // denominador) de cada conta de despesa, pro mesmo mês.
+    const baselineRowSets = useMemo(() => {
+        if (!mainSourceVersion) return months.map(() => [] as ReturnType<typeof buildForecastRows>);
+        return months.map(month =>
+            buildForecastRows(dreConfigs, month, mainSourceVersion.year, sourceScopedFinancialData, sourceHotelName, hotels, {}, undefined, mainSourceVersion.id, accounts, packages, sourceOccupancyData, undefined, [])
+        );
+    }, [months, mainSourceVersion, sourceScopedFinancialData, sourceHotelName, hotels, dreConfigs, accounts, packages, sourceOccupancyData]);
+
+    // Passo 2: pra cada conta de despesa (Costs/Account) com KPI de razão simples que ainda não foi
+    // editada nesta sessão, calcula o valor projetado (taxa da versão-fonte × denominador do mês já
+    // revisado) e injeta como override_<linha> — reaproveita o próprio buildForecastRows (e o
+    // recalculateTotals de dentro dele) pra já vir com pacotes/totais/GOP corretamente
+    // re-somados, em vez de eu reimplementar a agregação na mão.
+    const displayFinancialData = useMemo(() => {
+        if (!mainSourceVersion) return effectiveFinancialData;
+        const autoRows: ImportedRow[] = [];
+        months.forEach((month, monthIdx) => {
+            const currentRows = rawCurrentRowSets[monthIdx];
+            const baselineRows = baselineRowSets[monthIdx];
+            currentRows.forEach(row => {
+                if (row.category !== 'Costs' && row.category !== 'Account') return;
+                if (pendingEdits[row.id]?.[month] !== undefined) return; // editado nesta sessão, não mexe
+                const baseRow = baselineRows.find(r => r.id === row.id);
+                if (!baseRow?.rowConfig?.kpiCalculation) return;
+                const calc = baseRow.rowConfig.kpiCalculation;
+                const selfDenom = parseSelfRatioDenominator(calc.formula, baseRow.label);
+                if (!selfDenom) return;
+                const baseDenom = resolveKpiTerm(selfDenom, baselineRows, 'budget');
+                if (!baseDenom) return;
+                const rate = baseRow.budget / baseDenom;
+                const currentDenom = resolveKpiTerm(selfDenom, currentRows, 'budget');
+                const projected = rate * currentDenom;
+                autoRows.push({
+                    ano: String(version.year), cenario: 'Meta', tipo: 'Despesa', hotel: hotelName, conta: `override_${row.id}`,
+                    cr: '', mes: String(month), valor: projected.toFixed(2), status: 'valid', versionId: version.id,
+                });
+            });
+        });
+        if (autoRows.length === 0) return effectiveFinancialData;
+        const autoKeys = new Set(autoRows.map(r => `${r.conta}|${r.mes}`));
+        return [...effectiveFinancialData.filter(r => !autoKeys.has(`${r.conta}|${r.mes}`)), ...autoRows];
+    }, [mainSourceVersion, months, rawCurrentRowSets, baselineRowSets, pendingEdits, effectiveFinancialData, version.year, version.id, hotelName]);
+
+    const monthRowSets = useMemo(() => months.map((month, monthIdx) =>
+        mainSourceVersion
+            ? buildForecastRows(dreConfigs, month, version.year, displayFinancialData, hotelName, hotels, {}, undefined, version.id, accounts, packages, effectiveOccupancyData, undefined, [])
+            : rawCurrentRowSets[monthIdx]
+    ), [months, mainSourceVersion, dreConfigs, version.year, displayFinancialData, hotelName, hotels, version.id, accounts, packages, effectiveOccupancyData, rawCurrentRowSets]);
 
     const structureRows = monthRowSets[0] || [];
 
