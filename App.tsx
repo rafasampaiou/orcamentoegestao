@@ -1521,10 +1521,21 @@ const App: React.FC = () => {
     // pro mesmo hotel/ano (ex.: uma criada vazia antes da importação de verdade acontecer), e a
     // vazia pode ter updatedAt mais novo. Prioriza quem realmente TEM despesa de Meta importada
     // — só cai pra "mais recente sem checar dado" se nenhuma candidata tiver despesa nenhuma.
-    const hasDespesaImportada = (v: BudgetVersion) => importedFinancialData.some(r =>
-      r.versionId === v.id && (r.cenario || '').trim().toLowerCase() === 'meta' &&
-      (r.tipo || '').trim().toLowerCase() === 'despesa' && !(r.conta || '').toLowerCase().startsWith('override_')
-    );
+    // Conta linha SEM versionId como pertencente a qualquer candidata do hotel/ano certo — boa
+    // parte da despesa de Meta foi importada ANTES do recurso de múltiplas versões existir (ou
+    // sem escolher uma versão-alvo no import), então fica sem versionId no financial_data e só
+    // aparece na DRE Forecast pelo mecanismo "sem versionId = vale pra qualquer versão ativa"
+    // (getDynamicForecastData/getForecastData); exigir `r.versionId === v.id` aqui simplesmente
+    // nunca achava esse tipo de linha.
+    const hasDespesaImportada = (v: BudgetVersion) => {
+      const vHotelName = hotels.find(h => h.code === v.hotelId || h.id === v.hotelId)?.name || v.hotel || '';
+      const normVHotel = normalizeHotelName(vHotelName);
+      return importedFinancialData.some(r =>
+        (r.versionId === v.id || !r.versionId) && (r.cenario || '').trim().toLowerCase() === 'meta' &&
+        (r.tipo || '').trim().toLowerCase() === 'despesa' && !(r.conta || '').toLowerCase().startsWith('override_') &&
+        parseInt(r.ano) === v.year && normalizeHotelName(r.hotel) === normVHotel
+      );
+    };
     const withData = candidates.filter(hasDespesaImportada);
     const pool = withData.length > 0 ? withData : candidates;
 
@@ -1556,8 +1567,19 @@ const App: React.FC = () => {
       return;
     }
     const sourceHotel = hotels.find(h => h.code === mainSourceVersion.hotelId || h.id === mainSourceVersion.hotelId)?.name || mainSourceVersion.hotel || hotel;
-    const scopedFinancialData = importedFinancialData.filter(r => r.versionId === budgetReviewVersionId);
-    const scopedSourceData = importedFinancialData.filter(r => r.versionId === mainSourceVersion.id);
+    const normHotel = normalizeHotelName(hotel);
+    const normSourceHotel = normalizeHotelName(sourceHotel);
+    // Inclui linhas SEM versionId (despesa de Meta importada antes do recurso de versões existir,
+    // ou sem escolher versão-alvo no import) — mesma regra de "sem versionId vale pra qualquer
+    // versão ativa" que getDynamicForecastData/getForecastData já aplicam pra montar a DRE
+    // Forecast normal. Exigir versionId igual deixava essas despesas (a maioria, na prática)
+    // completamente invisíveis aqui. A sem-versionId só entra se for do mesmo hotel/ano.
+    const scopedFinancialData = importedFinancialData.filter(r =>
+      r.versionId === budgetReviewVersionId || (!r.versionId && parseInt(r.ano) === year && normalizeHotelName(r.hotel) === normHotel)
+    );
+    const scopedSourceData = importedFinancialData.filter(r =>
+      r.versionId === mainSourceVersion.id || (!r.versionId && parseInt(r.ano) === mainSourceVersion.year && normalizeHotelName(r.hotel) === normSourceHotel)
+    );
     const sourceOccupancyData = budgetOccupancyDataMap[mainSourceVersion.id] || {};
     if (scopedSourceData.length === 0) {
       console.warn('[Revisão de Metas] Nenhum financial_data encontrado pra versão-fonte', mainSourceVersion.id, mainSourceVersion.name);

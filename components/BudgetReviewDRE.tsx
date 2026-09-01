@@ -3,6 +3,7 @@ import { ArrowLeft, Calculator, ClipboardEdit, ArrowLeftRight, ChevronDown, Chev
 import { Account, BudgetVersion, CostPackage, DreSection, Hotel, ImportedRow, KpiCalculation, PermissionMatrix, User, hasPermission } from '../types';
 import { buildForecastRows } from './ForecastTable';
 import { getKpiInfoForRow, isEditableKpiForRow, resolveKpiTerm, parseSelfRatioDenominator, blueRowIds } from '../utils/kpiEngine';
+import { normalizeHotelName } from '../services/mockData';
 
 interface BudgetReviewDREProps {
     version: BudgetVersion;
@@ -59,7 +60,15 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
     const canEdit = hasPermission(permissionsMatrix, currentUser, 'Revisão de Metas', 'Criar Réplica / Editar Meta em Revisão') && !version.isLocked;
     const hotelName = hotels.find(h => h.code === version.hotelId || h.id === version.hotelId)?.name || version.hotel || '';
     const months = useMemo(() => [...reviewMonths].sort((a, b) => a - b), [reviewMonths]);
-    const scopedFinancialData = useMemo(() => financialData.filter(r => r.versionId === version.id), [financialData, version.id]);
+    // Inclui linhas SEM versionId (despesa de Meta importada antes do recurso de versões existir,
+    // ou sem escolher versão-alvo no import) — mesma regra de "sem versionId vale pra qualquer
+    // versão ativa" que getDynamicForecastData/getForecastData aplicam na DRE Forecast normal.
+    // A sem-versionId só entra se for do mesmo hotel/ano (senão o filtro vira "toda despesa sem
+    // versão de qualquer hotel", inútil pro diagnóstico e pesado à toa).
+    const normHotelName = useMemo(() => normalizeHotelName(hotelName), [hotelName]);
+    const scopedFinancialData = useMemo(() => financialData.filter(r =>
+        r.versionId === version.id || (!r.versionId && parseInt(r.ano) === version.year && normalizeHotelName(r.hotel) === normHotelName)
+    ), [financialData, version.id, version.year, normHotelName]);
 
     const effectiveFinancialData = useMemo(() => {
         const pendingRows: ImportedRow[] = [];
@@ -87,7 +96,10 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
 
     const mainSourceVersion = budgetVersions.find(v => v.id === mainSourceVersionId) || null;
     const sourceHotelName = mainSourceVersion ? (hotels.find(h => h.code === mainSourceVersion.hotelId || h.id === mainSourceVersion.hotelId)?.name || mainSourceVersion.hotel || hotelName) : hotelName;
-    const sourceScopedFinancialData = useMemo(() => mainSourceVersion ? financialData.filter(r => r.versionId === mainSourceVersion.id) : [], [financialData, mainSourceVersion]);
+    const normSourceHotelName = useMemo(() => normalizeHotelName(sourceHotelName), [sourceHotelName]);
+    const sourceScopedFinancialData = useMemo(() => mainSourceVersion ? financialData.filter(r =>
+        r.versionId === mainSourceVersion.id || (!r.versionId && parseInt(r.ano) === mainSourceVersion.year && normalizeHotelName(r.hotel) === normSourceHotelName)
+    ) : [], [financialData, mainSourceVersion, normSourceHotelName]);
     const sourceOccupancyData = mainSourceVersion ? (budgetOccupancyDataMap[mainSourceVersion.id] || {}) : {};
 
     // Linhas da versão-fonte (a "última meta importada") — é dela que sai a taxa (valor ÷
