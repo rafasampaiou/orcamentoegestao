@@ -1516,13 +1516,25 @@ const App: React.FC = () => {
       return v.hotelId === reviewVersion.hotelId || normalizeHotelName(v.hotel || '') === normReviewHotel || normalizeHotelName(vHotelName) === normReviewHotel;
     });
     if (candidates.length === 0) return reviewVersion; // não achou nenhuma outra — só existe ela mesma
-    candidates.sort((a, b) => {
+
+    // "Mais recentemente atualizada" sozinho não basta: pode existir mais de uma BudgetVersion
+    // pro mesmo hotel/ano (ex.: uma criada vazia antes da importação de verdade acontecer), e a
+    // vazia pode ter updatedAt mais novo. Prioriza quem realmente TEM despesa de Meta importada
+    // — só cai pra "mais recente sem checar dado" se nenhuma candidata tiver despesa nenhuma.
+    const hasDespesaImportada = (v: BudgetVersion) => importedFinancialData.some(r =>
+      r.versionId === v.id && (r.cenario || '').trim().toLowerCase() === 'meta' &&
+      (r.tipo || '').trim().toLowerCase() === 'despesa' && !(r.conta || '').toLowerCase().startsWith('override_')
+    );
+    const withData = candidates.filter(hasDespesaImportada);
+    const pool = withData.length > 0 ? withData : candidates;
+
+    pool.sort((a, b) => {
       const aYear = a.year === reviewVersion.year ? 1 : 0;
       const bYear = b.year === reviewVersion.year ? 1 : 0;
       if (aYear !== bYear) return bYear - aYear;
       return (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt);
     });
-    return candidates[0];
+    return pool[0];
   };
 
   // "Calcular Forecast" da Revisão de Metas (etapa 5) — mesmo motor de linhas/KPI da DRE Forecast
