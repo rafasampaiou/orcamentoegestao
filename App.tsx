@@ -1463,13 +1463,19 @@ const App: React.FC = () => {
   // preservando as demais contas daquele mês/versão — precisa ser feito como
   // "apaga o mês inteiro + reinsere tudo" porque saveFinancialData só faz insert puro (sem
   // upsert), mas o "tudo" inclui as contas NÃO tocadas (lidas do state atual), não só as novas.
-  const persistBudgetReviewMonthChanges = async (hotel: string, year: number, versionId: string, changesByMonth: Record<number, ImportedRow[]>) => {
-    const months = Object.keys(changesByMonth).map(Number);
+  const persistBudgetReviewMonthChanges = async (
+    hotel: string, year: number, versionId: string, changesByMonth: Record<number, ImportedRow[]>,
+    // contas pra remover SEM gravar substituto nenhum (ex.: override_<pacoteId> obsoleto de uma
+    // versão antiga do cálculo, que fazia a Revisão de Metas gravar um valor fixo por pacote em
+    // vez de deixar o pacote somar as contas — precisa sumir, não só parar de ser recriado).
+    extraContasToDelete: Record<number, string[]> = {}
+  ) => {
+    const months = Array.from(new Set([...Object.keys(changesByMonth).map(Number), ...Object.keys(extraContasToDelete).map(Number)]));
     if (months.length === 0) return;
 
     for (const month of months) {
-      const newRowsForMonth = changesByMonth[month];
-      const touchedContas = new Set(newRowsForMonth.map(r => r.conta));
+      const newRowsForMonth = changesByMonth[month] || [];
+      const touchedContas = new Set([...newRowsForMonth.map(r => r.conta), ...(extraContasToDelete[month] || [])]);
       const keptRowsForMonth = importedFinancialData.filter(r =>
         r.hotel === hotel && r.versionId === versionId && (r.cenario || '').trim().toLowerCase() === 'meta' &&
         parseInt(r.ano) === year && parseInt(r.mes) === month && !touchedContas.has(r.conta)
@@ -1481,12 +1487,15 @@ const App: React.FC = () => {
 
     setImportedFinancialData(prev => {
       const touched = new Set<string>();
-      months.forEach(m => changesByMonth[m].forEach(r => touched.add(`${m}|${r.conta}`)));
+      months.forEach(m => {
+        (changesByMonth[m] || []).forEach(r => touched.add(`${m}|${r.conta}`));
+        (extraContasToDelete[m] || []).forEach(conta => touched.add(`${m}|${conta}`));
+      });
       const kept = prev.filter(r => {
         if (!(r.hotel === hotel && r.versionId === versionId && (r.cenario || '').trim().toLowerCase() === 'meta' && parseInt(r.ano) === year && months.includes(parseInt(r.mes)))) return true;
         return !touched.has(`${parseInt(r.mes)}|${r.conta}`);
       });
-      const allNew = months.flatMap(m => changesByMonth[m]);
+      const allNew = months.flatMap(m => changesByMonth[m] || []);
       return [...kept, ...allNew];
     });
   };
@@ -1622,6 +1631,13 @@ const App: React.FC = () => {
     try {
       const changesByMonth: Record<number, ImportedRow[]> = {};
       const occupancyUpdates: Record<string, number> = {}; // `${sourceId}_${monthIdx}` -> valor
+      // Pacote é sempre a SOMA das contas dele nesta tela (nunca um valor próprio calculado por
+      // KPI de pacote) — "o valor total de Custos e Despesas Operacionais é a soma de cada
+      // pacote". Um clique anterior (de antes dos fixes de versão-fonte) pode ter deixado
+      // override_<pacoteId> gravado com um valor errado (geralmente 0, calculado com a
+      // versão-fonte vazia de antes) — isso trava o pacote nesse valor fixo pra sempre (o guard
+      // isManualBudgetOverride impede a soma normal de sobrescrever), então limpamos aqui.
+      const staleOverridesToDelete: Record<number, string[]> = {};
 
       // Passa o id "par" (Real/Budget nascem juntos com o mesmo sufixo, ver pairedVersionId acima)
       // como activeRealVersionId — buildForecastRows aceita QUALQUER um dos dois (matchesBudget OU
@@ -1632,10 +1648,18 @@ const App: React.FC = () => {
         const baselineRows = buildForecastRows(dreConfigs, month, mainSourceVersion.year, scopedSourceData, sourceHotel, hotels, {}, mainSourcePairedId || undefined, mainSourceVersion.id, accounts, packages, sourceOccupancyData, undefined, []);
         const currentRows = buildForecastRows(dreConfigs, month, year, scopedFinancialData, hotel, hotels, {}, reviewVersionPairedId || undefined, budgetReviewVersionId, accounts, packages, budgetOccupancyDataMap[budgetReviewVersionId] || {}, undefined, []);
         const monthChanges: ImportedRow[] = [];
+        const monthDeletions: string[] = [];
 
         baselineRows.forEach(baseRow => {
           if (baseRow.isHeader && baseRow.indentLevel === 0) return; // cabeçalho de seção, nunca tem KPI
-          const calc = baseRow.category === 'Package' ? packageKpiConfigs[baseRow.label.trim()] : baseRow.rowConfig?.kpiCalculation;
+          if (baseRow.category === 'Package') {
+            // Nunca escreve override de pacote aqui — o pacote precisa continuar somando as
+            // contas normalmente. Se um clique antigo deixou um override_<pacoteId> preso, marca
+            // pra deletar (sem substituto).
+            monthDeletions.push(`override_${baseRow.id}`);
+            return;
+          }
+          const calc = baseRow.rowConfig?.kpiCalculation;
           const precomputedKpi = baseRow.rowConfig?.precomputedKpi;
           const currentRow = currentRows.find(r => r.id === baseRow.id);
           if (!currentRow) return;
@@ -1663,9 +1687,10 @@ const App: React.FC = () => {
         });
 
         if (monthChanges.length > 0) changesByMonth[month] = monthChanges;
+        if (monthDeletions.length > 0) staleOverridesToDelete[month] = monthDeletions;
       });
 
-      await persistBudgetReviewMonthChanges(hotel, year, budgetReviewVersionId, changesByMonth);
+      await persistBudgetReviewMonthChanges(hotel, year, budgetReviewVersionId, changesByMonth, staleOverridesToDelete);
 
       if (Object.keys(occupancyUpdates).length > 0) {
         setBudgetOccupancyDataMap(prev => {
