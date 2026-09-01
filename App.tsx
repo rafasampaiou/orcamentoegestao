@@ -1538,6 +1538,14 @@ const App: React.FC = () => {
     };
     const withData = candidates.filter(hasDespesaImportada);
     const pool = withData.length > 0 ? withData : candidates;
+    if (withData.length === 0) {
+      // Log como STRING (JSON.stringify) de propósito — um console.warn com objeto/array cru
+      // aparece "colapsado" (só "Object"/"Array") no console do navegador até clicar pra abrir;
+      // como string já vem legível pra copiar e colar direto.
+      console.warn('[Revisão de Metas] Nenhuma candidata tem despesa — candidatas encontradas: ' + JSON.stringify(candidates.map(v => ({
+        id: v.id, name: v.name, year: v.year, hotelId: v.hotelId, hotel: v.hotel, updatedAt: v.updatedAt || v.createdAt
+      }))));
+    }
 
     pool.sort((a, b) => {
       const aYear = a.year === reviewVersion.year ? 1 : 0;
@@ -1582,7 +1590,7 @@ const App: React.FC = () => {
     );
     const sourceOccupancyData = budgetOccupancyDataMap[mainSourceVersion.id] || {};
     if (scopedSourceData.length === 0) {
-      console.warn('[Revisão de Metas] Nenhum financial_data encontrado pra versão-fonte', mainSourceVersion.id, mainSourceVersion.name);
+      console.warn(`[Revisão de Metas] Nenhum financial_data encontrado pra versão-fonte id="${mainSourceVersion.id}" name="${mainSourceVersion.name}" year=${mainSourceVersion.year} sourceHotel="${sourceHotel}" normSourceHotel="${normSourceHotel}"`);
       // Diagnóstico: lista toda combinação (hotel/ano/cenario/tipo/versionId) de despesa que bate
       // pelo nome do hotel (ignorando maiúscula/acento), pra achar sob qual versionId/grafia a
       // despesa de verdade está, já que nem por versionId nem por "sem versionId" achamos nada.
@@ -1592,7 +1600,7 @@ const App: React.FC = () => {
         const key = `hotel="${r.hotel}" ano=${r.ano} cenario="${r.cenario}" versionId="${r.versionId || '(vazio)'}"`;
         combos.set(key, (combos.get(key) || 0) + 1);
       });
-      console.warn('[Revisão de Metas] Diagnóstico — despesas encontradas pra esse hotel (qualquer ano/cenário/versão):', Object.fromEntries(combos));
+      console.warn('[Revisão de Metas] Diagnóstico — despesas encontradas pra esse hotel (qualquer ano/cenário/versão): ' + JSON.stringify(Object.fromEntries(combos)));
     }
 
     try {
