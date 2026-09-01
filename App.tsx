@@ -1583,6 +1583,16 @@ const App: React.FC = () => {
     const sourceOccupancyData = budgetOccupancyDataMap[mainSourceVersion.id] || {};
     if (scopedSourceData.length === 0) {
       console.warn('[Revisão de Metas] Nenhum financial_data encontrado pra versão-fonte', mainSourceVersion.id, mainSourceVersion.name);
+      // Diagnóstico: lista toda combinação (hotel/ano/cenario/tipo/versionId) de despesa que bate
+      // pelo nome do hotel (ignorando maiúscula/acento), pra achar sob qual versionId/grafia a
+      // despesa de verdade está, já que nem por versionId nem por "sem versionId" achamos nada.
+      const sameHotelDespesaRows = importedFinancialData.filter(r => normalizeHotelName(r.hotel) === normSourceHotel && (r.tipo || '').trim().toLowerCase() === 'despesa');
+      const combos = new Map<string, number>();
+      sameHotelDespesaRows.forEach(r => {
+        const key = `hotel="${r.hotel}" ano=${r.ano} cenario="${r.cenario}" versionId="${r.versionId || '(vazio)'}"`;
+        combos.set(key, (combos.get(key) || 0) + 1);
+      });
+      console.warn('[Revisão de Metas] Diagnóstico — despesas encontradas pra esse hotel (qualquer ano/cenário/versão):', Object.fromEntries(combos));
     }
 
     try {
