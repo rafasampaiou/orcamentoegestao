@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowLeft, Calculator, ClipboardEdit, ArrowLeftRight, ChevronDown, ChevronRight, Save } from 'lucide-react';
+import { ArrowLeft, Calculator, ClipboardEdit, ArrowLeftRight, ChevronDown, ChevronRight, Save, ListFilter, LayoutList } from 'lucide-react';
 import { Account, BudgetVersion, CostPackage, DreSection, Hotel, ImportedRow, KpiCalculation, PermissionMatrix, User, hasPermission } from '../types';
 import { buildForecastRows } from './ForecastTable';
 import { getKpiInfoForRow, isEditableKpiForRow, resolveKpiTerm, parseSelfRatioDenominator, blueRowIds } from '../utils/kpiEngine';
@@ -37,9 +37,17 @@ const REVENUE_EXTRA_BUDGET_SOURCE: Record<string, string> = { 'REV-EXTRA-LAZER':
 // Agregados sempre recalculados por soma dos filhos (sem trava de override) — editar aqui não
 // teria efeito nenhum, a soma sobrescreveria na mesma hora.
 const NON_EDITABLE_AGGREGATE_IDS = new Set(['REV-APT', 'REV-EXTRA', 'REV-TOTAL', 'REV-NET', 'CST-HEAD']);
+// Nesta tela só interessa o GOP com dedução de impostos — "GOP sem dedução" e as linhas de
+// Transformação/Reatividade (que comparam Real x Meta x Ano Anterior, sem sentido numa revisão
+// que não tem "Real" nenhum) só poluem a tabela.
+const HIDDEN_ROW_IDS = new Set(['RES-OP-SEM-IMP', 'RES-OP-SEM-IMP-PCT', 'KPI-TRANS-BUDGET', 'KPI-TRANS-LY', 'KPI-TRANS-M-LY', 'KPI-TRANS-BUDGET-SEM', 'KPI-TRANS-LY-SEM', 'KPI-TRANS-M-LY-SEM']);
 
 const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'decimal', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v || 0);
 const fmtKpi = (v: number, format: string) => format === 'percent' ? `${(v || 0).toFixed(2)}%` : new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v || 0);
+// Linhas como "GOP com dedução de impostos (%)" já vêm com o valor em pontos percentuais (ex.:
+// 31 = 31%), configuradas com rowConfig.format === 'percent' — precisa formatar como % com 2
+// casas, igual a DRE Forecast, em vez de cair no `fmt` genérico (0 casas, sem símbolo).
+const fmtValue = (v: number, row: { rowConfig?: { format?: string } }) => row.rowConfig?.format === 'percent' ? `${(v || 0).toFixed(2)}%` : fmt(v);
 
 // Etapa 4/5 da Revisão de Metas — DRE idêntica à DRE Forecast (mesma hierarquia de
 // contas/pacotes/indicadores, mesmo motor de KPI), só que com um mês em cada coluna (cada um com
@@ -53,6 +61,10 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
     const [calculating, setCalculating] = useState(false);
     const [saving, setSaving] = useState(false);
     const [collapsedPackages, setCollapsedPackages] = useState<Set<string>>(new Set());
+    // "Mostrar/Ocultar Contas" — igual ao botão da DRE Forecast: expande/colapsa todos os
+    // pacotes de uma vez (o chevron de cada pacote continua funcionando individualmente,
+    // independente deste estado, igual lá).
+    const [showDetails, setShowDetails] = useState(true);
     // rowId -> mês -> novo valor (ainda não salvo) — some com financialData/budgetOccupancyDataMap
     // pra recalcular ao vivo, e só vira persistência de verdade ao clicar "Salvar".
     const [pendingEdits, setPendingEdits] = useState<Record<string, Record<number, number>>>({});
@@ -169,6 +181,17 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
     ), [months, mainSourceVersion, dreConfigs, version.year, displayFinancialData, hotelName, hotels, version.id, accounts, packages, effectiveOccupancyData, rawCurrentRowSets, versionPairedId]);
 
     const structureRows = monthRowSets[0] || [];
+    const allPackageIds = useMemo(() => structureRows.filter(r => r.category === 'Package' && r.isHeader && r.indentLevel === 1).map(r => r.id), [structureRows]);
+
+    const toggleShowDetails = () => {
+        if (showDetails) {
+            setShowDetails(false);
+            setCollapsedPackages(new Set(allPackageIds));
+        } else {
+            setShowDetails(true);
+            setCollapsedPackages(new Set());
+        }
+    };
 
     const togglePackage = (id: string) => setCollapsedPackages(prev => {
         const next = new Set(prev);
@@ -177,6 +200,7 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
     });
 
     const isRowVisible = (row: any, idx: number) => {
+        if (HIDDEN_ROW_IDS.has(row.id)) return false;
         if (row.category !== 'Costs' && row.category !== 'Account') return true;
         if (row.indentLevel !== 2) return true;
         // Conta dentro de um pacote colapsado — acha o pacote-pai olhando pra trás até o header mais próximo.
@@ -280,6 +304,14 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
+                    <button
+                        onClick={toggleShowDetails}
+                        className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold border transition-colors ${!showDetails ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                        title={showDetails ? 'Ocultar contas contábeis' : 'Mostrar contas contábeis'}
+                    >
+                        {showDetails ? <ListFilter size={13} /> : <LayoutList size={13} />}
+                        {showDetails ? 'Ocultar Contas' : 'Mostrar Contas'}
+                    </button>
                     <button onClick={onGoToOccupancy} className="px-3 py-2 rounded-lg text-xs font-bold border border-gray-200 text-gray-600 hover:bg-gray-50">← Editar Ocupação</button>
                     <button onClick={onGoToComparatives} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold border border-gray-200 text-gray-600 hover:bg-gray-50">
                         <ArrowLeftRight size={13} /> Comparativos
@@ -373,14 +405,14 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
                                                         <input
                                                             key={`v-${monthRow.budget}`}
                                                             type="text"
-                                                            defaultValue={fmt(monthRow.budget)}
+                                                            defaultValue={fmtValue(monthRow.budget, monthRow)}
                                                             onBlur={e => {
-                                                                const parsed = parseFloat(e.target.value.replace(/\./g, '').replace(',', '.'));
+                                                                const parsed = parseFloat(e.target.value.replace(/\./g, '').replace(',', '.').replace('%', ''));
                                                                 if (!isNaN(parsed) && parsed !== monthRow.budget) handleValueChange(row, month, parsed);
                                                             }}
                                                             className="w-full text-right bg-transparent border border-transparent hover:bg-gray-50 focus:bg-white focus:border-indigo-300 rounded px-0.5 outline-none"
                                                         />
-                                                    ) : fmt(monthRow.budget)}
+                                                    ) : fmtValue(monthRow.budget, monthRow)}
                                                 </td>
                                                 <td className="px-1 py-px text-center text-amber-700 truncate">
                                                     {!kpiInfo.hasKpi ? '' : kpiEditable ? (
