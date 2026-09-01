@@ -1501,13 +1501,22 @@ const App: React.FC = () => {
   // automaticamente excluída como candidata, sobrando a original de verdade.
   const resolveBudgetReviewMainVersion = (reviewVersion: BudgetVersion): BudgetVersion | null => {
     const hotel = hotels.find(h => h.code === reviewVersion.hotelId || h.id === reviewVersion.hotelId)?.name || reviewVersion.hotel || selectedHotel;
-    const candidates = budgetVersions.filter(v =>
-      v.id !== reviewVersion.id &&
-      v.year === reviewVersion.year &&
-      (v.hotelId === reviewVersion.hotelId || normalizeHotelName(v.hotel || '') === normalizeHotelName(hotel))
-    );
+    const normReviewHotel = normalizeHotelName(hotel);
+    // Casa o hotel de qualquer um dos 3 jeitos possíveis (hotelId direto, campo legado `.hotel`,
+    // ou resolvendo o nome de cada candidata pela lista de hotéis) — ano é preferência, não
+    // obrigatório, pra não ficar de mãos vazias por uma inconsistência de dado num dos dois lados.
+    const candidates = budgetVersions.filter(v => {
+      if (v.id === reviewVersion.id) return false;
+      const vHotelName = hotels.find(h => h.code === v.hotelId || h.id === v.hotelId)?.name || v.hotel || '';
+      return v.hotelId === reviewVersion.hotelId || normalizeHotelName(v.hotel || '') === normReviewHotel || normalizeHotelName(vHotelName) === normReviewHotel;
+    });
     if (candidates.length === 0) return reviewVersion; // não achou nenhuma outra — só existe ela mesma
-    candidates.sort((a, b) => (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt));
+    candidates.sort((a, b) => {
+      const aYear = a.year === reviewVersion.year ? 1 : 0;
+      const bYear = b.year === reviewVersion.year ? 1 : 0;
+      if (aYear !== bYear) return bYear - aYear;
+      return (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt);
+    });
     return candidates[0];
   };
 

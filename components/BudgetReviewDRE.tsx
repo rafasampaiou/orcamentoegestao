@@ -237,6 +237,18 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
                     <div>
                         <h2 className="text-lg font-bold text-gray-900">Revisão de Metas — {version.name}</h2>
                         <p className="text-gray-500 text-xs mt-0.5">DRE completa de {version.year}, um mês por coluna.</p>
+                        <p className="text-[10px] mt-0.5 font-semibold">
+                            KPIs de despesa vindos de: {mainSourceVersion
+                                ? (mainSourceVersion.id === version.id
+                                    ? <span className="text-amber-600">nenhuma outra versão encontrada — usando esta mesma ({mainSourceVersion.name})</span>
+                                    : <span className="text-emerald-600">{mainSourceVersion.name} ({mainSourceVersion.year})</span>)
+                                : <span className="text-red-500">nenhuma versão encontrada</span>}
+                            {mainSourceVersion && (
+                                <span className="text-gray-400 font-normal">
+                                    {' '}— {sourceScopedFinancialData.length} linha(s) de financial_data, ocupação {Object.keys(sourceOccupancyData).length > 0 ? 'preenchida' : 'VAZIA'}
+                                </span>
+                            )}
+                        </p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
