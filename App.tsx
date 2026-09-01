@@ -1499,6 +1499,19 @@ const App: React.FC = () => {
   // de activeBudgetVersionId (nenhum dos dois se mostrou confiável pra isso). Independe de ser
   // "versão original" ou "réplica": a réplica sempre é mais nova que a original, então já fica
   // automaticamente excluída como candidata, sobrando a original de verdade.
+  // Ao criar uma versão pela tela "Versões", o Real e o Budget nascem em par, com o MESMO sufixo
+  // de timestamp ("r-<ts>" e "v-<ts>") — ver UnifiedAdministrationView.tsx. Achamos despesa de
+  // Meta de João Pessoa/2026 gravada sob "r-<ts>" (o par Real) em vez de "v-<ts>" (o Budget de
+  // verdade), provavelmente por causa de um `activeBudgetVersionId` variando entre a tela de
+  // Importação e a de Versões nesse período. Sem essa checagem, "Revisão de Metas" nunca acha
+  // essa despesa (mesmo já incluindo linha sem versionId), porque ela TEM versionId — só que é
+  // o do par errado.
+  const pairedVersionId = (id: string): string | null => {
+    if (id.startsWith('v-')) return 'r-' + id.slice(2);
+    if (id.startsWith('r-')) return 'v-' + id.slice(2);
+    return null;
+  };
+
   const resolveBudgetReviewMainVersion = (reviewVersion: BudgetVersion): BudgetVersion | null => {
     const hotel = hotels.find(h => h.code === reviewVersion.hotelId || h.id === reviewVersion.hotelId)?.name || reviewVersion.hotel || selectedHotel;
     const normReviewHotel = normalizeHotelName(hotel);
@@ -1530,8 +1543,9 @@ const App: React.FC = () => {
     const hasDespesaImportada = (v: BudgetVersion) => {
       const vHotelName = hotels.find(h => h.code === v.hotelId || h.id === v.hotelId)?.name || v.hotel || '';
       const normVHotel = normalizeHotelName(vHotelName);
+      const vPairedId = pairedVersionId(v.id);
       return importedFinancialData.some(r =>
-        (r.versionId === v.id || !r.versionId) && (r.cenario || '').trim().toLowerCase() === 'meta' &&
+        (r.versionId === v.id || (vPairedId && r.versionId === vPairedId) || !r.versionId) && (r.cenario || '').trim().toLowerCase() === 'meta' &&
         (r.tipo || '').trim().toLowerCase() === 'despesa' && !(r.conta || '').toLowerCase().startsWith('override_') &&
         parseInt(r.ano) === v.year && normalizeHotelName(r.hotel) === normVHotel
       );
@@ -1585,8 +1599,10 @@ const App: React.FC = () => {
     const scopedFinancialData = importedFinancialData.filter(r =>
       r.versionId === budgetReviewVersionId || (!r.versionId && parseInt(r.ano) === year && normalizeHotelName(r.hotel) === normHotel)
     );
+    const mainSourcePairedId = pairedVersionId(mainSourceVersion.id);
     const scopedSourceData = importedFinancialData.filter(r =>
-      r.versionId === mainSourceVersion.id || (!r.versionId && parseInt(r.ano) === mainSourceVersion.year && normalizeHotelName(r.hotel) === normSourceHotel)
+      r.versionId === mainSourceVersion.id || (mainSourcePairedId && r.versionId === mainSourcePairedId) ||
+      (!r.versionId && parseInt(r.ano) === mainSourceVersion.year && normalizeHotelName(r.hotel) === normSourceHotel)
     );
     const sourceOccupancyData = budgetOccupancyDataMap[mainSourceVersion.id] || {};
     if (scopedSourceData.length === 0) {
@@ -1607,9 +1623,14 @@ const App: React.FC = () => {
       const changesByMonth: Record<number, ImportedRow[]> = {};
       const occupancyUpdates: Record<string, number> = {}; // `${sourceId}_${monthIdx}` -> valor
 
+      // Passa o id "par" (Real/Budget nascem juntos com o mesmo sufixo, ver pairedVersionId acima)
+      // como activeRealVersionId — buildForecastRows aceita QUALQUER um dos dois (matchesBudget OU
+      // matchesReal) pra deixar a linha passar no filtro por versão, então isso cobre a despesa que
+      // foi gravada sob o id errado do par sem precisar remapear nada linha por linha.
+      const reviewVersionPairedId = pairedVersionId(budgetReviewVersionId);
       budgetReviewMonths.forEach(month => {
-        const baselineRows = buildForecastRows(dreConfigs, month, mainSourceVersion.year, scopedSourceData, sourceHotel, hotels, {}, undefined, mainSourceVersion.id, accounts, packages, sourceOccupancyData, undefined, []);
-        const currentRows = buildForecastRows(dreConfigs, month, year, scopedFinancialData, hotel, hotels, {}, undefined, budgetReviewVersionId, accounts, packages, budgetOccupancyDataMap[budgetReviewVersionId] || {}, undefined, []);
+        const baselineRows = buildForecastRows(dreConfigs, month, mainSourceVersion.year, scopedSourceData, sourceHotel, hotels, {}, mainSourcePairedId || undefined, mainSourceVersion.id, accounts, packages, sourceOccupancyData, undefined, []);
+        const currentRows = buildForecastRows(dreConfigs, month, year, scopedFinancialData, hotel, hotels, {}, reviewVersionPairedId || undefined, budgetReviewVersionId, accounts, packages, budgetOccupancyDataMap[budgetReviewVersionId] || {}, undefined, []);
         const monthChanges: ImportedRow[] = [];
 
         baselineRows.forEach(baseRow => {

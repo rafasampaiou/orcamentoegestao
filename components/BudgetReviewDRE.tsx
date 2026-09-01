@@ -57,6 +57,19 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
     // pra recalcular ao vivo, e só vira persistência de verdade ao clicar "Salvar".
     const [pendingEdits, setPendingEdits] = useState<Record<string, Record<number, number>>>({});
 
+    // Real e Budget nascem em par, com o MESMO sufixo de timestamp ("r-<ts>"/"v-<ts>" — ver
+    // UnifiedAdministrationView.tsx). Despesa de Meta às vezes acaba gravada sob o id do par
+    // errado (activeBudgetVersionId variando entre telas); buildForecastRows aceita QUALQUER um
+    // dos dois (matchesBudget OU matchesReal) pra deixar a linha passar no filtro por versão, daí
+    // passamos o par como activeRealVersionId em vez de undefined — cobre o caso sem remapear
+    // nada linha por linha.
+    const pairedVersionId = (id: string): string | null => {
+        if (id.startsWith('v-')) return 'r-' + id.slice(2);
+        if (id.startsWith('r-')) return 'v-' + id.slice(2);
+        return null;
+    };
+    const versionPairedId = pairedVersionId(version.id) || undefined;
+
     const canEdit = hasPermission(permissionsMatrix, currentUser, 'Revisão de Metas', 'Criar Réplica / Editar Meta em Revisão') && !version.isLocked;
     const hotelName = hotels.find(h => h.code === version.hotelId || h.id === version.hotelId)?.name || version.hotel || '';
     const months = useMemo(() => [...reviewMonths].sort((a, b) => a - b), [reviewMonths]);
@@ -67,8 +80,9 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
     // versão de qualquer hotel", inútil pro diagnóstico e pesado à toa).
     const normHotelName = useMemo(() => normalizeHotelName(hotelName), [hotelName]);
     const scopedFinancialData = useMemo(() => financialData.filter(r =>
-        r.versionId === version.id || (!r.versionId && parseInt(r.ano) === version.year && normalizeHotelName(r.hotel) === normHotelName)
-    ), [financialData, version.id, version.year, normHotelName]);
+        r.versionId === version.id || (versionPairedId && r.versionId === versionPairedId) ||
+        (!r.versionId && parseInt(r.ano) === version.year && normalizeHotelName(r.hotel) === normHotelName)
+    ), [financialData, version.id, version.year, normHotelName, versionPairedId]);
 
     const effectiveFinancialData = useMemo(() => {
         const pendingRows: ImportedRow[] = [];
@@ -91,15 +105,17 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
     // ainda) — usadas só pra ler os denominadores (Receita/UH Disponível etc.) de cada mês, que
     // não dependem de despesa nenhuma.
     const rawCurrentRowSets = useMemo(() => months.map(month =>
-        buildForecastRows(dreConfigs, month, version.year, effectiveFinancialData, hotelName, hotels, {}, undefined, version.id, accounts, packages, effectiveOccupancyData, undefined, [])
-    ), [months, dreConfigs, version.year, effectiveFinancialData, hotelName, hotels, version.id, accounts, packages, effectiveOccupancyData]);
+        buildForecastRows(dreConfigs, month, version.year, effectiveFinancialData, hotelName, hotels, {}, versionPairedId, version.id, accounts, packages, effectiveOccupancyData, undefined, [])
+    ), [months, dreConfigs, version.year, effectiveFinancialData, hotelName, hotels, version.id, accounts, packages, effectiveOccupancyData, versionPairedId]);
 
     const mainSourceVersion = budgetVersions.find(v => v.id === mainSourceVersionId) || null;
     const sourceHotelName = mainSourceVersion ? (hotels.find(h => h.code === mainSourceVersion.hotelId || h.id === mainSourceVersion.hotelId)?.name || mainSourceVersion.hotel || hotelName) : hotelName;
     const normSourceHotelName = useMemo(() => normalizeHotelName(sourceHotelName), [sourceHotelName]);
+    const sourcePairedId = mainSourceVersion ? pairedVersionId(mainSourceVersion.id) || undefined : undefined;
     const sourceScopedFinancialData = useMemo(() => mainSourceVersion ? financialData.filter(r =>
-        r.versionId === mainSourceVersion.id || (!r.versionId && parseInt(r.ano) === mainSourceVersion.year && normalizeHotelName(r.hotel) === normSourceHotelName)
-    ) : [], [financialData, mainSourceVersion, normSourceHotelName]);
+        r.versionId === mainSourceVersion.id || (sourcePairedId && r.versionId === sourcePairedId) ||
+        (!r.versionId && parseInt(r.ano) === mainSourceVersion.year && normalizeHotelName(r.hotel) === normSourceHotelName)
+    ) : [], [financialData, mainSourceVersion, normSourceHotelName, sourcePairedId]);
     const sourceOccupancyData = mainSourceVersion ? (budgetOccupancyDataMap[mainSourceVersion.id] || {}) : {};
 
     // Linhas da versão-fonte (a "última meta importada") — é dela que sai a taxa (valor ÷
@@ -107,9 +123,9 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
     const baselineRowSets = useMemo(() => {
         if (!mainSourceVersion) return months.map(() => [] as ReturnType<typeof buildForecastRows>);
         return months.map(month =>
-            buildForecastRows(dreConfigs, month, mainSourceVersion.year, sourceScopedFinancialData, sourceHotelName, hotels, {}, undefined, mainSourceVersion.id, accounts, packages, sourceOccupancyData, undefined, [])
+            buildForecastRows(dreConfigs, month, mainSourceVersion.year, sourceScopedFinancialData, sourceHotelName, hotels, {}, sourcePairedId, mainSourceVersion.id, accounts, packages, sourceOccupancyData, undefined, [])
         );
-    }, [months, mainSourceVersion, sourceScopedFinancialData, sourceHotelName, hotels, dreConfigs, accounts, packages, sourceOccupancyData]);
+    }, [months, mainSourceVersion, sourceScopedFinancialData, sourceHotelName, hotels, dreConfigs, accounts, packages, sourceOccupancyData, sourcePairedId]);
 
     // Passo 2: pra cada conta de despesa (Costs/Account) com KPI de razão simples que ainda não foi
     // editada nesta sessão, calcula o valor projetado (taxa da versão-fonte × denominador do mês já
@@ -148,9 +164,9 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
 
     const monthRowSets = useMemo(() => months.map((month, monthIdx) =>
         mainSourceVersion
-            ? buildForecastRows(dreConfigs, month, version.year, displayFinancialData, hotelName, hotels, {}, undefined, version.id, accounts, packages, effectiveOccupancyData, undefined, [])
+            ? buildForecastRows(dreConfigs, month, version.year, displayFinancialData, hotelName, hotels, {}, versionPairedId, version.id, accounts, packages, effectiveOccupancyData, undefined, [])
             : rawCurrentRowSets[monthIdx]
-    ), [months, mainSourceVersion, dreConfigs, version.year, displayFinancialData, hotelName, hotels, version.id, accounts, packages, effectiveOccupancyData, rawCurrentRowSets]);
+    ), [months, mainSourceVersion, dreConfigs, version.year, displayFinancialData, hotelName, hotels, version.id, accounts, packages, effectiveOccupancyData, rawCurrentRowSets, versionPairedId]);
 
     const structureRows = monthRowSets[0] || [];
 
