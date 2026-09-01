@@ -1516,7 +1516,8 @@ export const getDynamicForecastData = (
                     {
                         method: acc.expenseType === 'Variável' ? 'Variable' : 'Fixed',
                         driver: acc.expenseDriver,
-                        type: acc.expenseType
+                        type: acc.expenseType,
+                        kpiCalculation: acc.kpiCalculation
                     }
                 ));
             });
@@ -1552,7 +1553,13 @@ export const getDynamicForecastData = (
         const selHotelNameUpper = normalizeHotelName(selectedHotelName || '');
 
         rows.forEach(r => {
-            const targetName = `override_${r.id}`.toLowerCase();
+            // Precisa passar pelo MESMO normalizeAccountName usado pra indexar `dataIndex` acima
+            // (que também indexa as linhas "override_<rowId>", já que elas entram no mesmo loop
+            // genérico) — um `.toLowerCase()` cru aqui nunca bate com a chave normalizada (que
+            // remove hífen/underscore), então nenhum override_<rowId> (KPI editado, "Salvar
+            // Projeção", ou os overrides gerados pela Revisão de Metas) nunca era encontrado
+            // nesta função, mesmo gravado certinho no banco.
+            const targetName = normalizeAccountName(`override_${r.id}`);
 
             const tryOverride = (scenarioKey: string) => {
                 for (const h of [selHotelNameUpper, activeHotelCodeUpper].filter(Boolean)) {
