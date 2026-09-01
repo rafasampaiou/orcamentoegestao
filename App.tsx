@@ -1505,8 +1505,13 @@ const App: React.FC = () => {
     // Casa o hotel de qualquer um dos 3 jeitos possíveis (hotelId direto, campo legado `.hotel`,
     // ou resolvendo o nome de cada candidata pela lista de hotéis) — ano é preferência, não
     // obrigatório, pra não ficar de mãos vazias por uma inconsistência de dado num dos dois lados.
+    // Exclui QUALQUER réplica de Revisão de Metas (nome termina em "(Revisão)") — não só a desta
+    // sessão. Sessões de teste anteriores deixam réplicas "órfãs" pra trás (nunca são apagadas
+    // sozinhas), e uma dessas podia ser mais recente que a versão de verdade importada via
+    // Administração, ganhando errado na ordenação por "mais recente".
     const candidates = budgetVersions.filter(v => {
       if (v.id === reviewVersion.id) return false;
+      if (v.name.trim().endsWith('(Revisão)')) return false;
       const vHotelName = hotels.find(h => h.code === v.hotelId || h.id === v.hotelId)?.name || v.hotel || '';
       return v.hotelId === reviewVersion.hotelId || normalizeHotelName(v.hotel || '') === normReviewHotel || normalizeHotelName(vHotelName) === normReviewHotel;
     });
