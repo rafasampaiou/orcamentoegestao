@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowLeft, ArrowLeftRight, ChevronDown, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ArrowLeftRight, ChevronDown, ChevronRight, ListFilter, LayoutList } from 'lucide-react';
 import { Account, BudgetVersion, CostPackage, DreSection, Hotel, ImportedRow } from '../types';
 import { buildForecastRows } from './ForecastTable';
 import { blueRowIds } from '../utils/kpiEngine';
@@ -65,6 +65,9 @@ const BudgetReviewComparatives: React.FC<BudgetReviewComparativesProps> = ({
         return init;
     });
     const [collapsedPackages, setCollapsedPackages] = useState<Set<string>>(new Set());
+    // "Mostrar/Ocultar Contas" — igual ao botão da DRE Forecast/Revisão de Metas: expande/colapsa
+    // todos os pacotes de uma vez e mostra/esconde o detalhamento de Indicadores e Lazer/Eventos.
+    const [showDetails, setShowDetails] = useState(true);
 
     const oldVersion = versionsForHotel.find(v => v.id === oldVersionId);
     const newVersion = versionsForHotel.find(v => v.id === newVersionId);
@@ -122,6 +125,17 @@ const BudgetReviewComparatives: React.FC<BudgetReviewComparativesProps> = ({
     const structureRows = colRowSets[0] || [];
     const oldCount = columns.filter(c => c.group === 'old').length;
     const newCount = columns.filter(c => c.group === 'new').length;
+    const allPackageIds = useMemo(() => structureRows.filter(r => r.category === 'Package' && r.isHeader && r.indentLevel === 1).map(r => r.id), [structureRows]);
+
+    const toggleShowDetails = () => {
+        if (showDetails) {
+            setShowDetails(false);
+            setCollapsedPackages(new Set(allPackageIds));
+        } else {
+            setShowDetails(true);
+            setCollapsedPackages(new Set());
+        }
+    };
 
     // Diagnóstico visível embaixo de cada mês: quantas linhas de DESPESA (tipo='Despesa', não
     // qualquer linha de Meta — receita/imposto/ocupação-detalhada também gravam com cenario=Meta
@@ -193,8 +207,16 @@ const BudgetReviewComparatives: React.FC<BudgetReviewComparativesProps> = ({
         return next;
     });
 
+    const ALLOWED_INDICATORS_HIDDEN = ['IND-1', 'IND-2', 'IND-3', 'IND-4', 'IND-5', 'IND-6', 'IND-TREVPOR'];
+
     const isRowVisible = (row: any, idx: number) => {
         if (HIDDEN_ROW_IDS.has(row.id)) return false;
+        if (row.category === 'Indicators') {
+            return showDetails || ALLOWED_INDICATORS_HIDDEN.includes(row.id);
+        }
+        if (row.category === 'Revenue' && !row.isHeader) {
+            return showDetails;
+        }
         if (row.category !== 'Costs' && row.category !== 'Account') return true;
         if (row.indentLevel !== 2) return true;
         for (let i = idx - 1; i >= 0; i--) {
@@ -234,15 +256,25 @@ const BudgetReviewComparatives: React.FC<BudgetReviewComparativesProps> = ({
 
     return (
         <div className="p-6 max-w-full mx-auto">
-            <div className="mb-4 flex items-center gap-3">
-                <button onClick={onBack} className="p-2 rounded-lg hover:bg-gray-100 text-gray-500"><ArrowLeft size={18} /></button>
-                <div className="w-9 h-9 rounded-xl bg-[#F8981C]/10 flex items-center justify-center shrink-0">
-                    <ArrowLeftRight className="text-[#F8981C]" size={16} />
+            <div className="mb-4 flex items-center justify-between flex-wrap gap-3">
+                <div className="flex items-center gap-3">
+                    <button onClick={onBack} className="p-2 rounded-lg hover:bg-gray-100 text-gray-500"><ArrowLeft size={18} /></button>
+                    <div className="w-9 h-9 rounded-xl bg-[#F8981C]/10 flex items-center justify-center shrink-0">
+                        <ArrowLeftRight className="text-[#F8981C]" size={16} />
+                    </div>
+                    <div>
+                        <h2 className="text-lg font-bold text-gray-900">Comparativos — {hotelName}</h2>
+                        <p className="text-gray-500 text-xs mt-0.5">Escolha os meses e a fonte (Meta ou Realizado) de cada versão — mesma DRE completa da Revisão de Metas, uma coluna por combinação.</p>
+                    </div>
                 </div>
-                <div>
-                    <h2 className="text-lg font-bold text-gray-900">Comparativos — {hotelName}</h2>
-                    <p className="text-gray-500 text-xs mt-0.5">Escolha os meses e a fonte (Meta ou Realizado) de cada versão — mesma DRE completa da Revisão de Metas, uma coluna por combinação.</p>
-                </div>
+                <button
+                    onClick={toggleShowDetails}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold border transition-colors ${!showDetails ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                    title={showDetails ? 'Ocultar contas contábeis' : 'Mostrar contas contábeis'}
+                >
+                    {showDetails ? <ListFilter size={13} /> : <LayoutList size={13} />}
+                    {showDetails ? 'Ocultar Contas' : 'Mostrar Contas'}
+                </button>
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-4">
