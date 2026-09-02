@@ -199,8 +199,21 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
         return next;
     });
 
+    // Mesmo comportamento do botão "Mostrar/Ocultar Contas" da DRE Forecast (ForecastTable.tsx):
+    // com "Ocultar Contas" ativo, os Indicadores mostram só esse subconjunto (o resto —
+    // Dias do mês, Adultos, CHD, Coef. Adultos/CHD, TREVPAR — só aparece com "Mostrar Contas").
+    const ALLOWED_INDICATORS_HIDDEN = ['IND-1', 'IND-2', 'IND-3', 'IND-4', 'IND-5', 'IND-6', 'IND-TREVPOR'];
+
     const isRowVisible = (row: any, idx: number) => {
         if (HIDDEN_ROW_IDS.has(row.id)) return false;
+        if (row.category === 'Indicators') {
+            return showDetails || ALLOWED_INDICATORS_HIDDEN.includes(row.id);
+        }
+        // Lazer/Eventos dentro de Receita de Apartamentos/Receitas Extras — os totais (headers)
+        // continuam sempre visíveis, só o detalhamento some com "Ocultar Contas".
+        if (row.category === 'Revenue' && !row.isHeader) {
+            return showDetails;
+        }
         if (row.category !== 'Costs' && row.category !== 'Account') return true;
         if (row.indentLevel !== 2) return true;
         // Conta dentro de um pacote colapsado — acha o pacote-pai olhando pra trás até o header mais próximo.
@@ -333,8 +346,8 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
                 {/* Sem min-w-full de propósito: com poucos meses selecionados, a tabela deve ficar
                     do tamanho do conteúdo (encostada à esquerda), não esticada pra preencher o
                     container inteiro — só cresce/ganha scroll horizontal quando o conteúdo pede. */}
-                <table className="w-auto text-[11px] border-collapse">
-                    <thead>
+                <table className="w-auto text-base font-sans border-collapse">
+                    <thead className="text-sm">
                         <tr className="border-b border-gray-200">
                             <th rowSpan={2} className="w-[300px] px-2 py-px text-left font-bold text-gray-500 uppercase sticky left-0 bg-white z-10 align-bottom whitespace-nowrap">Indicador</th>
                             {months.map(m => (
@@ -344,8 +357,8 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
                         <tr className="border-b border-gray-200">
                             {months.map(m => (
                                 <React.Fragment key={m}>
-                                    <th className="w-20 px-1 py-px text-right font-semibold text-gray-400 border-l border-gray-100 truncate">Valor</th>
-                                    <th className="w-14 px-1 py-px text-center font-semibold text-amber-600 truncate">KPI</th>
+                                    <th className="w-20 px-1 py-px text-right text-xs font-semibold text-gray-400 border-l border-gray-100 truncate">Valor</th>
+                                    <th className="w-14 px-1 py-px text-center text-xs font-semibold text-amber-600 truncate">KPI</th>
                                 </React.Fragment>
                             ))}
                         </tr>
@@ -414,7 +427,7 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
                                                         />
                                                     ) : fmtValue(monthRow.budget, monthRow)}
                                                 </td>
-                                                <td className="px-1 py-px text-center text-amber-700 truncate">
+                                                <td className="px-1 py-px text-center text-xs text-amber-700 truncate">
                                                     {!kpiInfo.hasKpi ? '' : kpiEditable ? (
                                                         <input
                                                             key={`k-${kpiInfo.kpiValue('budget')}`}
