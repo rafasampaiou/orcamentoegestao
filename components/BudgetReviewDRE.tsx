@@ -47,7 +47,12 @@ const fmtKpi = (v: number, format: string) => format === 'percent' ? `${(v || 0)
 // Linhas como "GOP com dedução de impostos (%)" já vêm com o valor em pontos percentuais (ex.:
 // 31 = 31%), configuradas com rowConfig.format === 'percent' — precisa formatar como % com 2
 // casas, igual a DRE Forecast, em vez de cair no `fmt` genérico (0 casas, sem símbolo).
-const fmtValue = (v: number, row: { rowConfig?: { format?: string } }) => row.rowConfig?.format === 'percent' ? `${(v || 0).toFixed(2)}%` : fmt(v);
+const fmtDecimal2 = (v: number) => new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v || 0);
+const fmtValue = (v: number, row: { rowConfig?: { format?: string } }) => {
+    if (row.rowConfig?.format === 'percent') return `${(v || 0).toFixed(2)}%`;
+    if (row.rowConfig?.format === 'decimal') return fmtDecimal2(v); // ex.: Coef. Adultos/CHD
+    return fmt(v);
+};
 
 // Etapa 4/5 da Revisão de Metas — DRE idêntica à DRE Forecast (mesma hierarquia de
 // contas/pacotes/indicadores, mesmo motor de KPI), só que com um mês em cada coluna (cada um com

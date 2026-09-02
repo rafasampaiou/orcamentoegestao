@@ -31,7 +31,12 @@ interface ColumnDef { key: string; group: 'old' | 'new'; versionId: string; year
 // com dedução de impostos, e Transformação/Reatividade não faz sentido aqui (compara Real x Meta
 // x Ano Anterior, que já não é o que este comparativo mostra).
 const HIDDEN_ROW_IDS = new Set(['RES-OP-SEM-IMP', 'RES-OP-SEM-IMP-PCT', 'KPI-TRANS-BUDGET', 'KPI-TRANS-LY', 'KPI-TRANS-M-LY', 'KPI-TRANS-BUDGET-SEM', 'KPI-TRANS-LY-SEM', 'KPI-TRANS-M-LY-SEM']);
-const fmtValue = (v: number, row: { rowConfig?: { format?: string } }) => row.rowConfig?.format === 'percent' ? `${(v || 0).toFixed(2)}%` : fmt(v);
+const fmtDecimal2 = (v: number) => new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v || 0);
+const fmtValue = (v: number, row: { rowConfig?: { format?: string } }) => {
+    if (row.rowConfig?.format === 'percent') return `${(v || 0).toFixed(2)}%`;
+    if (row.rowConfig?.format === 'decimal') return fmtDecimal2(v); // ex.: Coef. Adultos/CHD
+    return fmt(v);
+};
 
 // Etapa 5 (bis) da Revisão de Metas — "Comparativos": pra cada versão (Meta antiga / Meta atual),
 // escolhe independentemente quais meses entram e, mês a mês, se a coluna usa a Meta daquela
@@ -109,6 +114,29 @@ const BudgetReviewComparatives: React.FC<BudgetReviewComparativesProps> = ({
     const structureRows = colRowSets[0] || [];
     const oldCount = columns.filter(c => c.group === 'old').length;
     const newCount = columns.filter(c => c.group === 'new').length;
+
+    // Diagnóstico visível embaixo de cada mês: quantas linhas de financial_data (despesa/receita)
+    // essa coluna realmente achou pra esse mês específico, e se tem ocupação. Se vier 0 aqui é
+    // porque não existe dado gravado pra esse mês/versão/hotel — não é a tabela "escondendo" nada.
+    const normCompareHotel = normalizeHotelName(hotelName);
+    const colDiagnostics = useMemo(() => columns.map(col => {
+        if (col.source === 'Meta') {
+            const paired = pairedVersionId(col.versionId);
+            const count = financialData.filter(r =>
+                (r.versionId === col.versionId || (paired && r.versionId === paired)) &&
+                (r.cenario || '').trim().toLowerCase() === 'meta' && parseInt(r.ano) === col.year &&
+                parseInt(r.mes) === col.month && normalizeHotelName(r.hotel) === normCompareHotel
+            ).length;
+            const hasOcc = (Object.keys(budgetOccupancyDataMap[col.versionId] || {}).length > 0) ||
+                (!!paired && Object.keys(budgetOccupancyDataMap[paired] || {}).length > 0);
+            return { count, hasOcc };
+        }
+        const count = financialData.filter(r =>
+            r.versionId === activeRealVersionId && (r.cenario || '').trim().toLowerCase() === 'real' &&
+            parseInt(r.ano) === col.year && parseInt(r.mes) === col.month && normalizeHotelName(r.hotel) === normCompareHotel
+        ).length;
+        return { count, hasOcc: true };
+    }), [columns, financialData, budgetOccupancyDataMap, normCompareHotel, activeRealVersionId]);
 
     const valueOf = (rows: ReturnType<typeof buildForecastRows>, rowId: string, source: SourceType) => {
         const r = rows.find(x => x.id === rowId);
@@ -253,11 +281,17 @@ const BudgetReviewComparatives: React.FC<BudgetReviewComparativesProps> = ({
                                 <th rowSpan={2} className="w-20 px-1 py-px text-center text-xs font-bold text-indigo-700 uppercase border-l-2 border-indigo-200 bg-indigo-50 align-bottom">Total</th>
                             </tr>
                             <tr className="border-b border-gray-200">
-                                {columns.map(col => (
-                                    <th key={col.key} className={`w-20 px-1 py-px text-center text-xs font-semibold border-l border-gray-100 truncate ${col.source === 'Real' ? 'text-emerald-600' : 'text-gray-400'}`}>
-                                        {MONTH_NAMES[col.month - 1]} <span className="block text-[9px] font-black uppercase">{col.source === 'Real' ? 'Real' : 'Meta'}</span>
-                                    </th>
-                                ))}
+                                {columns.map((col, colIdx) => {
+                                    const diag = colDiagnostics[colIdx];
+                                    return (
+                                        <th key={col.key} className={`w-20 px-1 py-px text-center text-xs font-semibold border-l border-gray-100 truncate ${col.source === 'Real' ? 'text-emerald-600' : 'text-gray-400'}`}>
+                                            {MONTH_NAMES[col.month - 1]} <span className="block text-[9px] font-black uppercase">{col.source === 'Real' ? 'Real' : 'Meta'}</span>
+                                            <span className={`block text-[8px] font-normal normal-case ${diag.count === 0 ? 'text-red-400' : 'text-gray-300'}`} title="Linhas de financial_data encontradas pra esse mês/versão — 0 quer dizer que não existe dado gravado aqui, não é a tabela escondendo nada">
+                                                {diag.count} linha(s){!diag.hasOcc && col.source === 'Meta' ? ' · sem ocup.' : ''}
+                                            </span>
+                                        </th>
+                                    );
+                                })}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
