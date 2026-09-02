@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowLeftRight, ChevronDown, ChevronRight } from 'lucide-rea
 import { Account, BudgetVersion, CostPackage, DreSection, Hotel, ImportedRow } from '../types';
 import { buildForecastRows } from './ForecastTable';
 import { blueRowIds } from '../utils/kpiEngine';
-import { normalizeHotelName, pairedVersionId } from '../services/mockData';
+import { normalizeHotelName, pairedVersionId, resolveVersionWithImportedData } from '../services/mockData';
 
 interface BudgetReviewComparativesProps {
     hotels: Hotel[];
@@ -69,6 +69,14 @@ const BudgetReviewComparatives: React.FC<BudgetReviewComparativesProps> = ({
     const oldVersion = versionsForHotel.find(v => v.id === oldVersionId);
     const newVersion = versionsForHotel.find(v => v.id === newVersionId);
 
+    // Pode existir mais de uma BudgetVersion com o MESMO nome/ano pro mesmo hotel (ex.: uma criada
+    // vazia antes da importação de verdade acontecer) — o <select> mostra as duas com texto
+    // idêntico, sem dar pra diferenciar. Resolve pra quem realmente TEM despesa/ocupação
+    // importada — mesma ideia usada pra achar o KPI "da última meta importada" na Revisão de
+    // Metas — em vez de confiar cegamente em qual delas o <select> ativou por padrão.
+    const oldResolved = useMemo(() => oldVersion ? resolveVersionWithImportedData(oldVersion, versionsForHotel, hotels, financialData, budgetOccupancyDataMap) : null, [oldVersion, versionsForHotel, hotels, financialData, budgetOccupancyDataMap]);
+    const newResolved = useMemo(() => newVersion ? resolveVersionWithImportedData(newVersion, versionsForHotel, hotels, financialData, budgetOccupancyDataMap) : null, [newVersion, versionsForHotel, hotels, financialData, budgetOccupancyDataMap]);
+
     const toggleMonth = (which: 'old' | 'new', m: number) => {
         const setter = which === 'old' ? setOldMonthSources : setNewMonthSources;
         setter(prev => {
@@ -85,18 +93,18 @@ const BudgetReviewComparatives: React.FC<BudgetReviewComparativesProps> = ({
 
     const columns: ColumnDef[] = useMemo(() => {
         const cols: ColumnDef[] = [];
-        if (oldVersion) {
+        if (oldResolved) {
             Object.entries(oldMonthSources).sort((a, b) => +a[0] - +b[0]).forEach(([m, source]) => {
-                cols.push({ key: `old-${m}`, group: 'old', versionId: oldVersion.id, year: oldVersion.year, month: +m, source });
+                cols.push({ key: `old-${m}`, group: 'old', versionId: oldResolved.id, year: oldResolved.year, month: +m, source });
             });
         }
-        if (newVersion) {
+        if (newResolved) {
             Object.entries(newMonthSources).sort((a, b) => +a[0] - +b[0]).forEach(([m, source]) => {
-                cols.push({ key: `new-${m}`, group: 'new', versionId: newVersion.id, year: newVersion.year, month: +m, source });
+                cols.push({ key: `new-${m}`, group: 'new', versionId: newResolved.id, year: newResolved.year, month: +m, source });
             });
         }
         return cols;
-    }, [oldVersion, newVersion, oldMonthSources, newMonthSources]);
+    }, [oldResolved, newResolved, oldMonthSources, newMonthSources]);
 
     const colRowSets = useMemo(() => columns.map(col => {
         if (col.source === 'Meta') {
@@ -245,6 +253,11 @@ const BudgetReviewComparatives: React.FC<BudgetReviewComparativesProps> = ({
                             <option value="">Selecione...</option>
                             {versionsForHotel.map(v => <option key={v.id} value={v.id}>{v.name} ({v.year})</option>)}
                         </select>
+                        {oldVersion && oldResolved && oldResolved.id !== oldVersion.id && (
+                            <p className="text-[10px] text-amber-600 font-semibold mb-1.5">
+                                Essa versão não tem despesa/ocupação importada — usando os dados de "{oldResolved.name}" ({oldResolved.year}) em vez disso.
+                            </p>
+                        )}
                         {oldVersion && renderMonthPicker('old', oldMonthSources)}
                     </div>
                     <div>
@@ -253,6 +266,11 @@ const BudgetReviewComparatives: React.FC<BudgetReviewComparativesProps> = ({
                             <option value="">Selecione...</option>
                             {versionsForHotel.map(v => <option key={v.id} value={v.id}>{v.name} ({v.year})</option>)}
                         </select>
+                        {newVersion && newResolved && newResolved.id !== newVersion.id && (
+                            <p className="text-[10px] text-amber-600 font-semibold mb-1.5">
+                                Essa versão não tem despesa/ocupação importada — usando os dados de "{newResolved.name}" ({newResolved.year}) em vez disso.
+                            </p>
+                        )}
                         {newVersion && renderMonthPicker('new', newMonthSources)}
                     </div>
                 </div>

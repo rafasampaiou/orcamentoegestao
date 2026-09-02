@@ -46,6 +46,55 @@ export const pairedVersionId = (id: string): string | null => {
     return null;
 };
 
+// Acha, entre TODAS as versões do mesmo hotel/ano de `selectedVersion`, qual delas realmente TEM
+// despesa/ocupação de Meta importada — a mesma ideia de "a última meta importada no sistema" que
+// resolveBudgetReviewMainVersion (App.tsx) usa pra puxar KPI na Revisão de Metas, só que aqui NÃO
+// exclui a própria `selectedVersion` (ela pode perfeitamente já ser a certa). Existe pra cobrir o
+// caso de duas BudgetVersion com o MESMO nome/ano pro mesmo hotel (ex.: uma criada vazia antes da
+// importação de verdade acontecer) — o <select> mostra os dois com o texto idêntico, sem dar pra
+// diferenciar visualmente, e a pessoa pode acabar com a vazia selecionada sem perceber. Usado
+// pelos Comparativos da Revisão de Metas (App.tsx só precisa da versão explicitamente escolhida
+// pelo usuário — a diferenciação por prefixo "(Revisão)" já resolve o caso dela).
+export const resolveVersionWithImportedData = (
+    selectedVersion: BudgetVersion,
+    candidateVersions: BudgetVersion[],
+    hotels: Hotel[],
+    financialData: ImportedRow[],
+    budgetOccupancyDataMap: Record<string, Record<string, number[]>>
+): BudgetVersion => {
+    const hotelNameOf = (v: BudgetVersion) => hotels.find(h => h.code === v.hotelId || h.id === v.hotelId)?.name || v.hotel || '';
+    const normSelectedHotel = normalizeHotelName(hotelNameOf(selectedVersion));
+    const candidates = candidateVersions.filter(v => {
+        if (v.year !== selectedVersion.year) return false;
+        if (v.id !== selectedVersion.id && v.name.trim().endsWith('(Revisão)')) return false;
+        return v.hotelId === selectedVersion.hotelId || normalizeHotelName(hotelNameOf(v)) === normSelectedHotel;
+    });
+    if (candidates.length <= 1) return selectedVersion;
+
+    const hasData = (v: BudgetVersion) => {
+        const normVHotel = normalizeHotelName(hotelNameOf(v));
+        const paired = pairedVersionId(v.id);
+        const hasDespesa = financialData.some(r =>
+            (r.versionId === v.id || (paired && r.versionId === paired)) &&
+            (r.cenario || '').trim().toLowerCase() === 'meta' && (r.tipo || '').trim().toLowerCase() === 'despesa' &&
+            !(r.conta || '').toLowerCase().startsWith('override_') && parseInt(r.ano) === v.year && normalizeHotelName(r.hotel) === normVHotel
+        );
+        if (hasDespesa) return true;
+        const occ = budgetOccupancyDataMap[v.id] || (paired ? budgetOccupancyDataMap[paired] : undefined) || {};
+        return (occ['geral_avail'] || []).some(n => (n || 0) > 0);
+    };
+
+    const sorted = [...candidates].sort((a, b) => {
+        const aData = hasData(a) ? 1 : 0;
+        const bData = hasData(b) ? 1 : 0;
+        if (aData !== bData) return bData - aData;
+        if (a.id === selectedVersion.id) return -1;
+        if (b.id === selectedVersion.id) return 1;
+        return (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt);
+    });
+    return sorted[0];
+};
+
 export const mockHotels: Hotel[] = [
     { id: '1', code: 'ATB', name: 'Atibaia', type: 'Hotéis próprios', category: 'Resort', region: 'Sudeste' },
     { id: '2', code: 'ALX', name: 'Alexania', type: 'Hotéis próprios', category: 'Resort', region: 'Centro-Oeste' },
