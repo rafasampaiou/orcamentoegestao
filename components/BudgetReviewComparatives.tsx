@@ -115,24 +115,29 @@ const BudgetReviewComparatives: React.FC<BudgetReviewComparativesProps> = ({
     const oldCount = columns.filter(c => c.group === 'old').length;
     const newCount = columns.filter(c => c.group === 'new').length;
 
-    // Diagnóstico visível embaixo de cada mês: quantas linhas de financial_data (despesa/receita)
-    // essa coluna realmente achou pra esse mês específico, e se tem ocupação. Se vier 0 aqui é
-    // porque não existe dado gravado pra esse mês/versão/hotel — não é a tabela "escondendo" nada.
+    // Diagnóstico visível embaixo de cada mês: quantas linhas de DESPESA (tipo='Despesa', não
+    // qualquer linha de Meta — receita/imposto/ocupação-detalhada também gravam com cenario=Meta
+    // e inflavam essa contagem antes) essa coluna achou pra esse mês específico, e se a OCUPAÇÃO
+    // tem valor não-zero exatamente nesse mês (não só "o objeto existe" — a Ocupação é um array de
+    // 12 posições por versão, então um array preenchido só de Set a Dez ainda "existe" mas fica
+    // zerado em Jan-Ago). Se vier 0/sem ocup. aqui é porque não existe dado gravado pra esse
+    // mês/versão/hotel — não é a tabela "escondendo" nada.
     const normCompareHotel = normalizeHotelName(hotelName);
     const colDiagnostics = useMemo(() => columns.map(col => {
         if (col.source === 'Meta') {
             const paired = pairedVersionId(col.versionId);
             const count = financialData.filter(r =>
                 (r.versionId === col.versionId || (paired && r.versionId === paired)) &&
-                (r.cenario || '').trim().toLowerCase() === 'meta' && parseInt(r.ano) === col.year &&
-                parseInt(r.mes) === col.month && normalizeHotelName(r.hotel) === normCompareHotel
+                (r.cenario || '').trim().toLowerCase() === 'meta' && (r.tipo || '').trim().toLowerCase() === 'despesa' &&
+                parseInt(r.ano) === col.year && parseInt(r.mes) === col.month && normalizeHotelName(r.hotel) === normCompareHotel
             ).length;
-            const hasOcc = (Object.keys(budgetOccupancyDataMap[col.versionId] || {}).length > 0) ||
-                (!!paired && Object.keys(budgetOccupancyDataMap[paired] || {}).length > 0);
+            const occForVersion = budgetOccupancyDataMap[col.versionId] || {};
+            const occForPaired = paired ? (budgetOccupancyDataMap[paired] || {}) : {};
+            const hasOcc = (occForVersion['geral_avail']?.[col.month - 1] || 0) > 0 || (occForPaired['geral_avail']?.[col.month - 1] || 0) > 0;
             return { count, hasOcc };
         }
         const count = financialData.filter(r =>
-            r.versionId === activeRealVersionId && (r.cenario || '').trim().toLowerCase() === 'real' &&
+            r.versionId === activeRealVersionId && (r.cenario || '').trim().toLowerCase() === 'real' && (r.tipo || '').trim().toLowerCase() === 'despesa' &&
             parseInt(r.ano) === col.year && parseInt(r.mes) === col.month && normalizeHotelName(r.hotel) === normCompareHotel
         ).length;
         return { count, hasOcc: true };
