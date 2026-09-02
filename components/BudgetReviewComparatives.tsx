@@ -96,7 +96,12 @@ const BudgetReviewComparatives: React.FC<BudgetReviewComparativesProps> = ({
     const colRowSets = useMemo(() => columns.map(col => {
         if (col.source === 'Meta') {
             const paired = pairedVersionId(col.versionId) || undefined;
-            return buildForecastRows(dreConfigs, col.month, col.year, financialData, hotelName, hotels, {}, paired, col.versionId, accounts, packages, budgetOccupancyDataMap[col.versionId] || {}, undefined, []);
+            // Mesmo problema do par Real/Budget pode acontecer com a ocupação (import gravando sob
+            // o id errado do par) — cai pro id par se a versão em si não tiver nada.
+            const occData = budgetOccupancyDataMap[col.versionId] && Object.keys(budgetOccupancyDataMap[col.versionId]).length > 0
+                ? budgetOccupancyDataMap[col.versionId]
+                : (paired ? budgetOccupancyDataMap[paired] : undefined) || {};
+            return buildForecastRows(dreConfigs, col.month, col.year, financialData, hotelName, hotels, {}, paired, col.versionId, accounts, packages, occData, undefined, []);
         }
         return buildForecastRows(dreConfigs, col.month, col.year, financialData, hotelName, hotels, realOccupancyData, activeRealVersionId, undefined, accounts, packages, {}, undefined, []);
     }), [columns, dreConfigs, financialData, hotelName, hotels, accounts, packages, budgetOccupancyDataMap, realOccupancyData, activeRealVersionId]);
@@ -109,6 +114,21 @@ const BudgetReviewComparatives: React.FC<BudgetReviewComparativesProps> = ({
         const r = rows.find(x => x.id === rowId);
         if (!r) return 0;
         return source === 'Meta' ? r.budget : r.real;
+    };
+
+    // Coluna "Total" (soma de todas as colunas selecionadas) — pra linhas em % não faz sentido
+    // somar ponto percentual, precisa recalcular a razão a partir dos totais em R$/unidade.
+    const sumRaw = (rowId: string) => columns.reduce((s, col, idx) => s + valueOf(colRowSets[idx], rowId, col.source), 0);
+    const computeTotalForRow = (row: any): number => {
+        if (row.id === 'RES-OP-COM-IMP-PCT') {
+            const totalReceita = sumRaw('REV-NET');
+            return totalReceita !== 0 ? (sumRaw('RES-OP-COM-IMP') / totalReceita) * 100 : 0;
+        }
+        if (row.id === 'IND-3') { // % de Ocupação
+            const totalDisponivel = sumRaw('IND-1');
+            return totalDisponivel !== 0 ? (sumRaw('IND-2') / totalDisponivel) * 100 : 0;
+        }
+        return sumRaw(row.id);
     };
 
     // Resposta direta a "quanto meu resultado vai ficar no ano": soma Receita Líquida/Despesa/GOP
@@ -230,6 +250,7 @@ const BudgetReviewComparatives: React.FC<BudgetReviewComparativesProps> = ({
                                 <th rowSpan={2} className="w-[300px] px-2 py-px text-left font-bold text-gray-500 uppercase sticky left-0 bg-white z-10 align-bottom whitespace-nowrap">Indicador</th>
                                 {oldCount > 0 && <th colSpan={oldCount} className="px-1 py-px text-center text-xs font-bold text-gray-500 uppercase border-l border-gray-100 truncate">Meta antiga — {oldVersion?.name}</th>}
                                 {newCount > 0 && <th colSpan={newCount} className="px-1 py-px text-center text-xs font-bold text-gray-500 uppercase border-l border-gray-100 truncate">Meta atual — {newVersion?.name}</th>}
+                                <th rowSpan={2} className="w-20 px-1 py-px text-center text-xs font-bold text-indigo-700 uppercase border-l-2 border-indigo-200 bg-indigo-50 align-bottom">Total</th>
                             </tr>
                             <tr className="border-b border-gray-200">
                                 {columns.map(col => (
@@ -242,7 +263,7 @@ const BudgetReviewComparatives: React.FC<BudgetReviewComparativesProps> = ({
                         <tbody className="divide-y divide-gray-50">
                             {structureRows.map((row, idx) => {
                                 if (!isRowVisible(row, idx)) return null;
-                                if (row.category === 'Spacer') return <tr key={row.id}><td colSpan={1 + columns.length} className="py-1">&nbsp;</td></tr>;
+                                if (row.category === 'Spacer') return <tr key={row.id}><td colSpan={2 + columns.length} className="py-1">&nbsp;</td></tr>;
 
                                 const isSectionHeader = row.isHeader && row.indentLevel === 0;
                                 const isBlueHighlight = blueRowIds.includes(row.id);
@@ -286,6 +307,9 @@ const BudgetReviewComparatives: React.FC<BudgetReviewComparativesProps> = ({
                                                 </td>
                                             );
                                         })}
+                                        <td className="px-1 py-px text-right tabular-nums border-l-2 border-indigo-200 bg-indigo-50/60 font-bold text-indigo-900 truncate">
+                                            {fmtValue(computeTotalForRow(row), row)}
+                                        </td>
                                     </tr>
                                 );
                             })}
