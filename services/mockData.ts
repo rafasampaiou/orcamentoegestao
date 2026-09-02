@@ -34,6 +34,18 @@ export const normalizeHotelName = (str: string) => {
     return out;
 };
 
+// Real e Budget nascem em par, com o MESMO sufixo de timestamp ("r-<ts>"/"v-<ts>" — ver
+// UnifiedAdministrationView.tsx). Despesa de Meta às vezes acaba gravada sob o id do par errado
+// (activeBudgetVersionId variando entre telas) — buildForecastRows aceita QUALQUER um dos dois
+// (matchesBudget OU matchesReal) pra deixar a linha passar no filtro por versão, então passar o
+// par como activeRealVersionId/activeBudgetVersionId (conforme o caso) cobre isso sem remapear
+// nada linha por linha. Usado pela Revisão de Metas e pelos Comparativos.
+export const pairedVersionId = (id: string): string | null => {
+    if (id.startsWith('v-')) return 'r-' + id.slice(2);
+    if (id.startsWith('r-')) return 'v-' + id.slice(2);
+    return null;
+};
+
 export const mockHotels: Hotel[] = [
     { id: '1', code: 'ATB', name: 'Atibaia', type: 'Hotéis próprios', category: 'Resort', region: 'Sudeste' },
     { id: '2', code: 'ALX', name: 'Alexania', type: 'Hotéis próprios', category: 'Resort', region: 'Centro-Oeste' },

@@ -4,7 +4,7 @@ import Sidebar from './components/Sidebar';
 import TimelineView from './components/TimelineView';
 
 import ForecastTable, { buildForecastRows } from './components/ForecastTable';
-import { normalizeHotelName } from './services/mockData';
+import { normalizeHotelName, pairedVersionId } from './services/mockData';
 import GMDView from './components/GMDView';
 import OccupancyView from './components/OccupancyView';
 import OccupancyMonthlyRealView from './components/OccupancyMonthlyRealView';
@@ -1508,19 +1508,8 @@ const App: React.FC = () => {
   // de activeBudgetVersionId (nenhum dos dois se mostrou confiável pra isso). Independe de ser
   // "versão original" ou "réplica": a réplica sempre é mais nova que a original, então já fica
   // automaticamente excluída como candidata, sobrando a original de verdade.
-  // Ao criar uma versão pela tela "Versões", o Real e o Budget nascem em par, com o MESMO sufixo
-  // de timestamp ("r-<ts>" e "v-<ts>") — ver UnifiedAdministrationView.tsx. Achamos despesa de
-  // Meta de João Pessoa/2026 gravada sob "r-<ts>" (o par Real) em vez de "v-<ts>" (o Budget de
-  // verdade), provavelmente por causa de um `activeBudgetVersionId` variando entre a tela de
-  // Importação e a de Versões nesse período. Sem essa checagem, "Revisão de Metas" nunca acha
-  // essa despesa (mesmo já incluindo linha sem versionId), porque ela TEM versionId — só que é
-  // o do par errado.
-  const pairedVersionId = (id: string): string | null => {
-    if (id.startsWith('v-')) return 'r-' + id.slice(2);
-    if (id.startsWith('r-')) return 'v-' + id.slice(2);
-    return null;
-  };
-
+  // pairedVersionId (services/mockData.ts) cobre o caso de despesa de Meta gravada sob o id do
+  // par Real errado (ver comentário lá) — usado logo abaixo.
   const resolveBudgetReviewMainVersion = (reviewVersion: BudgetVersion): BudgetVersion | null => {
     const hotel = hotels.find(h => h.code === reviewVersion.hotelId || h.id === reviewVersion.hotelId)?.name || reviewVersion.hotel || selectedHotel;
     const normReviewHotel = normalizeHotelName(hotel);
@@ -2001,6 +1990,8 @@ const App: React.FC = () => {
             hotels={hotels}
             budgetVersions={budgetVersions}
             accounts={accounts}
+            packages={packages}
+            dreConfigs={dreConfigs}
             financialData={importedFinancialData}
             budgetOccupancyDataMap={budgetOccupancyDataMap}
             realOccupancyData={realOccupancyData}

@@ -3,7 +3,7 @@ import { ArrowLeft, Calculator, ClipboardEdit, ArrowLeftRight, ChevronDown, Chev
 import { Account, BudgetVersion, CostPackage, DreSection, Hotel, ImportedRow, KpiCalculation, PermissionMatrix, User, hasPermission } from '../types';
 import { buildForecastRows } from './ForecastTable';
 import { getKpiInfoForRow, isEditableKpiForRow, resolveKpiTerm, parseSelfRatioDenominator, blueRowIds } from '../utils/kpiEngine';
-import { normalizeHotelName } from '../services/mockData';
+import { normalizeHotelName, pairedVersionId } from '../services/mockData';
 
 interface BudgetReviewDREProps {
     version: BudgetVersion;
@@ -70,17 +70,8 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
     // pra recalcular ao vivo, e só vira persistência de verdade ao clicar "Salvar".
     const [pendingEdits, setPendingEdits] = useState<Record<string, Record<number, number>>>({});
 
-    // Real e Budget nascem em par, com o MESMO sufixo de timestamp ("r-<ts>"/"v-<ts>" — ver
-    // UnifiedAdministrationView.tsx). Despesa de Meta às vezes acaba gravada sob o id do par
-    // errado (activeBudgetVersionId variando entre telas); buildForecastRows aceita QUALQUER um
-    // dos dois (matchesBudget OU matchesReal) pra deixar a linha passar no filtro por versão, daí
-    // passamos o par como activeRealVersionId em vez de undefined — cobre o caso sem remapear
-    // nada linha por linha.
-    const pairedVersionId = (id: string): string | null => {
-        if (id.startsWith('v-')) return 'r-' + id.slice(2);
-        if (id.startsWith('r-')) return 'v-' + id.slice(2);
-        return null;
-    };
+    // pairedVersionId (services/mockData.ts) cobre o caso de despesa gravada sob o id do par
+    // Real/Budget errado — ver comentário lá.
     const versionPairedId = pairedVersionId(version.id) || undefined;
 
     const canEdit = hasPermission(permissionsMatrix, currentUser, 'Revisão de Metas', 'Criar Réplica / Editar Meta em Revisão') && !version.isLocked;
