@@ -201,6 +201,48 @@ const BudgetReviewComparatives: React.FC<BudgetReviewComparativesProps> = ({
         return { receita, despesa, gop, gopPct: receita !== 0 ? (gop / receita) * 100 : 0 };
     }, [columns, colRowSets]);
 
+    // Transformação/Reatividade — mesma fórmula da DRE Forecast (ForecastTable.tsx,
+    // computeTransReat): Transformação = ΔGOP / ΔReceita quando a Receita Líquida do período
+    // "atual" (Meta atual, respeitando a fonte Meta/Real escolhida em cada mês) é MAIOR que a do
+    // MESMO período (mesmos meses) na Meta antiga — sempre a Meta antiga, não o Realizado, porque
+    // é "em relação à meta anterior" — indicando crescimento por transformação real do negócio.
+    // Reatividade = ΔCusto / ΔReceita quando encolheu, indicando reação via corte/aumento de
+    // custo. Ignora qual mês está manualmente marcado no seletor de "Meta antiga" — usa sempre os
+    // MESMOS meses selecionados em "Meta atual", buscados na versão antiga resolvida.
+    const transReatCard = useMemo(() => {
+        if (!oldResolved || !newResolved) return null;
+        const newMonthList = Object.keys(newMonthSources).map(Number);
+        if (newMonthList.length === 0) return null;
+
+        let curReceita = 0, curGop = 0, curCusto = 0;
+        newMonthList.forEach(m => {
+            const colIdx = columns.findIndex(c => c.group === 'new' && c.month === m);
+            if (colIdx === -1) return;
+            const rows = colRowSets[colIdx];
+            const source = columns[colIdx].source;
+            curReceita += valueOf(rows, 'REV-NET', source);
+            curGop += valueOf(rows, 'RES-OP-COM-IMP', source);
+            curCusto += valueOf(rows, 'CST-HEAD', source);
+        });
+
+        const pairedOld = pairedVersionId(oldResolved.id) || undefined;
+        const oldOccData = budgetOccupancyDataMap[oldResolved.id] && Object.keys(budgetOccupancyDataMap[oldResolved.id]).length > 0
+            ? budgetOccupancyDataMap[oldResolved.id]
+            : (pairedOld ? budgetOccupancyDataMap[pairedOld] : undefined) || {};
+        let baseReceita = 0, baseGop = 0, baseCusto = 0;
+        newMonthList.forEach(m => {
+            const rows = buildForecastRows(dreConfigs, m, oldResolved.year, financialData, hotelName, hotels, {}, pairedOld, oldResolved.id, accounts, packages, oldOccData, undefined, []);
+            const val = (id: string) => rows.find(r => r.id === id)?.budget || 0;
+            baseReceita += val('REV-NET'); baseGop += val('RES-OP-COM-IMP'); baseCusto += val('CST-HEAD');
+        });
+
+        const deltaRev = curReceita - baseReceita;
+        let value = 0;
+        if (deltaRev > 0) value = ((curGop - baseGop) / deltaRev) * 100;
+        else if (deltaRev < 0) value = ((curCusto - baseCusto) / deltaRev) * 100;
+        return { kind: deltaRev >= 0 ? 'Transformação' : 'Reatividade', value, deltaRev };
+    }, [oldResolved, newResolved, newMonthSources, columns, colRowSets, dreConfigs, financialData, hotelName, hotels, accounts, packages, budgetOccupancyDataMap]);
+
     const togglePackage = (id: string) => setCollapsedPackages(prev => {
         const next = new Set(prev);
         next.has(id) ? next.delete(id) : next.add(id);
@@ -309,7 +351,7 @@ const BudgetReviewComparatives: React.FC<BudgetReviewComparativesProps> = ({
                 <p className="text-[11px] text-gray-400 mt-3">Clique num mês pra incluir/tirar da tabela. Com o mês incluído, clique na etiqueta "Meta"/"Real" pra trocar a fonte daquela coluna.</p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 mb-4">
                 {[
                     { label: 'Receita Líquida (colunas selecionadas)', value: fmt(annualSummary.receita) },
                     { label: 'Despesa (colunas selecionadas)', value: fmt(annualSummary.despesa) },
@@ -321,6 +363,17 @@ const BudgetReviewComparatives: React.FC<BudgetReviewComparativesProps> = ({
                         <p className="text-xl font-bold text-gray-900 mt-1">{card.value}</p>
                     </div>
                 ))}
+                {transReatCard && (
+                    <div className={`rounded-xl border shadow-sm p-4 ${transReatCard.kind === 'Transformação' ? 'bg-emerald-50 border-emerald-100' : 'bg-amber-50 border-amber-100'}`}>
+                        <p className={`text-[10px] font-bold uppercase tracking-wide ${transReatCard.kind === 'Transformação' ? 'text-emerald-600' : 'text-amber-600'}`}>
+                            {transReatCard.kind} vs. mesmo período da Meta antiga
+                        </p>
+                        <p className={`text-xl font-bold mt-1 ${transReatCard.kind === 'Transformação' ? 'text-emerald-800' : 'text-amber-800'}`}>{fmtPct(transReatCard.value)}</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">
+                            Receita {transReatCard.deltaRev >= 0 ? 'maior' : 'menor'} que a da Meta antiga nos mesmos meses
+                        </p>
+                    </div>
+                )}
             </div>
 
             {columns.length === 0 ? (
