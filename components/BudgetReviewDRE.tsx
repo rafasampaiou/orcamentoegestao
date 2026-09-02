@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowLeft, Calculator, ClipboardEdit, ArrowLeftRight, ChevronDown, ChevronRight, Save, ListFilter, LayoutList } from 'lucide-react';
+import { ArrowLeft, Calculator, ClipboardEdit, ArrowLeftRight, ChevronDown, ChevronRight, Save, ListFilter, LayoutList, Eye, EyeOff } from 'lucide-react';
 import { Account, BudgetVersion, CostPackage, DreSection, Hotel, ImportedRow, KpiCalculation, PermissionMatrix, User, hasPermission } from '../types';
 import { buildForecastRows } from './ForecastTable';
 import { getKpiInfoForRow, isEditableKpiForRow, resolveKpiTerm, parseSelfRatioDenominator, blueRowIds } from '../utils/kpiEngine';
@@ -61,6 +61,7 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
     const [calculating, setCalculating] = useState(false);
     const [saving, setSaving] = useState(false);
     const [collapsedPackages, setCollapsedPackages] = useState<Set<string>>(new Set());
+    const [showKpi, setShowKpi] = useState(true);
     // "Mostrar/Ocultar Contas" — igual ao botão da DRE Forecast: expande/colapsa todos os
     // pacotes de uma vez (o chevron de cada pacote continua funcionando individualmente,
     // independente deste estado, igual lá).
@@ -325,6 +326,14 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
                         {showDetails ? <ListFilter size={13} /> : <LayoutList size={13} />}
                         {showDetails ? 'Ocultar Contas' : 'Mostrar Contas'}
                     </button>
+                    <button
+                        onClick={() => setShowKpi(v => !v)}
+                        className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold border transition-colors ${!showKpi ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                        title={showKpi ? 'Ocultar colunas de KPI' : 'Mostrar colunas de KPI'}
+                    >
+                        {showKpi ? <EyeOff size={13} /> : <Eye size={13} />}
+                        {showKpi ? "Ocultar KPI's" : "Mostrar KPI's"}
+                    </button>
                     <button onClick={onGoToOccupancy} className="px-3 py-2 rounded-lg text-xs font-bold border border-gray-200 text-gray-600 hover:bg-gray-50">← Editar Ocupação</button>
                     <button onClick={onGoToComparatives} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold border border-gray-200 text-gray-600 hover:bg-gray-50">
                         <ArrowLeftRight size={13} /> Comparativos
@@ -351,14 +360,14 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
                         <tr className="border-b border-gray-200">
                             <th rowSpan={2} className="w-[300px] px-2 py-px text-left font-bold text-gray-500 uppercase sticky left-0 bg-white z-10 align-bottom whitespace-nowrap">Indicador</th>
                             {months.map(m => (
-                                <th key={m} colSpan={2} className="px-1 py-px text-center font-bold text-gray-500 uppercase border-l border-gray-100 truncate">{MONTH_NAMES[m - 1]}</th>
+                                <th key={m} colSpan={showKpi ? 2 : 1} className="px-1 py-px text-center font-bold text-gray-500 uppercase border-l border-gray-100 truncate">{MONTH_NAMES[m - 1]}</th>
                             ))}
                         </tr>
                         <tr className="border-b border-gray-200">
                             {months.map(m => (
                                 <React.Fragment key={m}>
                                     <th className="w-20 px-1 py-px text-right text-xs font-semibold text-gray-400 border-l border-gray-100 truncate">Valor</th>
-                                    <th className="w-14 px-1 py-px text-center text-xs font-semibold text-amber-600 truncate">KPI</th>
+                                    {showKpi && <th className="w-14 px-1 py-px text-center text-xs font-semibold text-amber-600 truncate">KPI</th>}
                                 </React.Fragment>
                             ))}
                         </tr>
@@ -366,7 +375,7 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
                     <tbody className="divide-y divide-gray-50">
                         {structureRows.map((row, idx) => {
                             if (!isRowVisible(row, idx)) return null;
-                            if (row.category === 'Spacer') return <tr key={row.id}><td colSpan={1 + months.length * 2} className="py-1">&nbsp;</td></tr>;
+                            if (row.category === 'Spacer') return <tr key={row.id}><td colSpan={1 + months.length * (showKpi ? 2 : 1)} className="py-1">&nbsp;</td></tr>;
 
                             // Mesma classificação/paleta de cores da DRE Forecast (ForecastTable.tsx:
                             // isSectionHeader → azul sky-100 se "blueRowIds" (REV-TOTAL, REV-NET,
@@ -408,7 +417,7 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
                                     </td>
                                     {months.map((month, monthIdx) => {
                                         const monthRow = monthRowSets[monthIdx].find(r => r.id === row.id);
-                                        if (!monthRow) return <td key={month} colSpan={2} className="border-l border-gray-100">-</td>;
+                                        if (!monthRow) return <td key={month} colSpan={showKpi ? 2 : 1} className="border-l border-gray-100">-</td>;
                                         const kpiInfo = getKpiInfoForRow(monthRow, monthRowSets[monthIdx], packageKpiConfigs);
                                         const kpiEditable = editable && isEditableKpiForRow(monthRow, kpiInfo, packageKpiConfigs);
                                         return (
@@ -427,20 +436,22 @@ const BudgetReviewDRE: React.FC<BudgetReviewDREProps> = ({
                                                         />
                                                     ) : fmtValue(monthRow.budget, monthRow)}
                                                 </td>
-                                                <td className="px-1 py-px text-center text-xs text-amber-700 truncate">
-                                                    {!kpiInfo.hasKpi ? '' : kpiEditable ? (
-                                                        <input
-                                                            key={`k-${kpiInfo.kpiValue('budget')}`}
-                                                            type="text"
-                                                            defaultValue={fmtKpi(kpiInfo.kpiValue('budget'), kpiInfo.kpiFormatType)}
-                                                            onBlur={e => {
-                                                                const parsed = parseFloat(e.target.value.replace(/\./g, '').replace(',', '.'));
-                                                                if (!isNaN(parsed)) handleKpiChange(row, monthIdx, month, parsed);
-                                                            }}
-                                                            className="w-full text-center bg-amber-50/40 border border-transparent hover:bg-white focus:bg-white focus:border-indigo-300 rounded px-0.5 outline-none"
-                                                        />
-                                                    ) : fmtKpi(kpiInfo.kpiValue('budget'), kpiInfo.kpiFormatType)}
-                                                </td>
+                                                {showKpi && (
+                                                    <td className="px-1 py-px text-center text-xs text-amber-700 truncate">
+                                                        {!kpiInfo.hasKpi ? '' : kpiEditable ? (
+                                                            <input
+                                                                key={`k-${kpiInfo.kpiValue('budget')}`}
+                                                                type="text"
+                                                                defaultValue={fmtKpi(kpiInfo.kpiValue('budget'), kpiInfo.kpiFormatType)}
+                                                                onBlur={e => {
+                                                                    const parsed = parseFloat(e.target.value.replace(/\./g, '').replace(',', '.'));
+                                                                    if (!isNaN(parsed)) handleKpiChange(row, monthIdx, month, parsed);
+                                                                }}
+                                                                className="w-full text-center bg-amber-50/40 border border-transparent hover:bg-white focus:bg-white focus:border-indigo-300 rounded px-0.5 outline-none"
+                                                            />
+                                                        ) : fmtKpi(kpiInfo.kpiValue('budget'), kpiInfo.kpiFormatType)}
+                                                    </td>
+                                                )}
                                             </React.Fragment>
                                         );
                                     })}
