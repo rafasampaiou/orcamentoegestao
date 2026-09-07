@@ -174,6 +174,13 @@ const App: React.FC = () => {
   const [replicateTarget, setReplicateTarget] = useState<{ year: number, month: number } | null>(null);
   const [replicateMode, setReplicateMode] = useState<'BUDGET' | 'REAL'>('BUDGET');
   const [projectedBudgetVersionId] = useState<string>('v2');
+  // "Qual Meta você quer considerar?" — pergunta uma vez por hotel/sessão só quando existe MAIS
+  // de uma versão de Budget pra esse hotel (ex.: a original + uma réplica de Revisão de Metas).
+  // Enquanto o usuário não escolher, fica na "principal" (isMain) por padrão — não trava a tela
+  // esperando resposta. A escolha feita fica lembrada aqui pra não perguntar de novo ao trocar de
+  // tela e voltar pro mesmo hotel na mesma sessão (fecha ao recarregar a página).
+  const [budgetVersionChoiceByHotel, setBudgetVersionChoiceByHotel] = useState<Record<string, string>>({});
+  const [metaChoiceModal, setMetaChoiceModal] = useState<{ hotelCode: string; candidates: BudgetVersion[] } | null>(null);
 
   // --- REVISÃO DE METAS (Budget) STATE ---
   // Qual BudgetVersion está sendo revisada agora (a original escolhida, ou a réplica criada pra
@@ -492,9 +499,16 @@ const App: React.FC = () => {
     const isCurrentBudgetValid = currentActiveBudget && (currentActiveBudget.hotelId === hotelCode || currentActiveBudget.hotelId === selectedHotel || !currentActiveBudget.hotelId);
 
     if (!isCurrentBudgetValid || activeBudgetVersionId === '') {
+      // Se o usuário já escolheu uma Meta pra esse hotel nesta sessão (via o modal "Qual Meta você
+      // quer considerar?"), respeita — não some por trás toda vez que o hotel muda e volta.
+      const rememberedChoice = budgetVersionChoiceByHotel[hotelCode];
+      const rememberedVersion = rememberedChoice ? budgetVersions.find(v => v.id === rememberedChoice) : undefined;
+
+      const hotelCandidates = budgetVersions.filter(v => v.hotelId === hotelCode || v.hotelId === selectedHotel);
       const matchingBudget =
-        budgetVersions.find(v => (v.hotelId === hotelCode || v.hotelId === selectedHotel) && v.isMain) ||
-        budgetVersions.find(v => v.hotelId === hotelCode || v.hotelId === selectedHotel) ||
+        rememberedVersion ||
+        hotelCandidates.find(v => v.isMain) ||
+        hotelCandidates[0] ||
         budgetVersions.find(v => !v.hotelId && v.isMain) ||
         budgetVersions.find(v => !v.hotelId);
 
@@ -502,6 +516,15 @@ const App: React.FC = () => {
         setActiveBudgetVersionId(matchingBudget.id);
       } else if (!matchingBudget && activeBudgetVersionId) {
         setActiveBudgetVersionId('');
+      }
+
+      // Mais de uma versão de Budget pra esse hotel (ex.: a original + uma réplica de Revisão de
+      // Metas) e o usuário ainda não escolheu qual considerar nesta sessão — pergunta, sem travar
+      // a tela (já entrou usando a "principal" acima como padrão enquanto isso). Não pergunta
+      // dentro da própria Revisão de Metas — lá o usuário já escolhe a versão explicitamente pelo
+      // próprio assistente (BudgetReviewHome), perguntar de novo aqui só atrapalharia o fluxo.
+      if (hotelCandidates.length > 1 && !rememberedVersion && (currentModule as string) !== 'BUDGET_REVIEW') {
+        setMetaChoiceModal({ hotelCode, candidates: hotelCandidates });
       }
     }
 
@@ -525,7 +548,7 @@ const App: React.FC = () => {
       }
     }
 
-  }, [selectedHotel, budgetVersions, realVersions, hotels, activeBudgetVersionId, activeRealVersionId, currentModule]);
+  }, [selectedHotel, budgetVersions, realVersions, hotels, activeBudgetVersionId, activeRealVersionId, currentModule, budgetVersionChoiceByHotel]);
   // -- SUPABASE INTEGRATION: Fetch Real Data on Auth --
   React.useEffect(() => {
     if (!session) return;
@@ -2296,6 +2319,45 @@ const App: React.FC = () => {
               />
             </div>
             <div className="text-right text-xs font-bold text-gray-400 mt-1">{slideGenProgress?.percent ?? 0}%</div>
+          </div>
+        </div>
+      )}
+      {metaChoiceModal && (
+        <div className="fixed inset-0 bg-black/40 z-[200] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Qual Meta você quer considerar?</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              Esse hotel tem mais de uma versão de Meta (Budget) — inclusive alguma criada como réplica pra Revisão de Metas.
+              Escolha qual usar na DRE Forecast, Ocupação e GMD. Fica valendo só nesta sessão; dá pra trocar de novo depois.
+            </p>
+            <div className="space-y-2 max-h-72 overflow-y-auto mb-4">
+              {metaChoiceModal.candidates.map(v => (
+                <button
+                  key={v.id}
+                  onClick={() => {
+                    setActiveBudgetVersionId(v.id);
+                    setBudgetVersionChoiceByHotel(prev => ({ ...prev, [metaChoiceModal.hotelCode]: v.id }));
+                    setMetaChoiceModal(null);
+                  }}
+                  className={`w-full text-left p-3 rounded-xl border transition-colors ${v.id === activeBudgetVersionId ? 'border-[#F8981C] bg-[#F8981C]/5' : 'border-gray-200 hover:border-gray-300'}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-sm text-gray-800 truncate">{v.name}</span>
+                    {v.isMain && <span className="text-[9px] font-bold uppercase text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded shrink-0">Principal</span>}
+                  </div>
+                  <span className="text-xs text-gray-500">{v.year}</span>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => {
+                setBudgetVersionChoiceByHotel(prev => ({ ...prev, [metaChoiceModal.hotelCode]: activeBudgetVersionId }));
+                setMetaChoiceModal(null);
+              }}
+              className="text-xs text-gray-400 hover:text-gray-600 font-semibold"
+            >
+              Manter a principal por enquanto
+            </button>
           </div>
         </div>
       )}
