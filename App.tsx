@@ -174,13 +174,13 @@ const App: React.FC = () => {
   const [replicateTarget, setReplicateTarget] = useState<{ year: number, month: number } | null>(null);
   const [replicateMode, setReplicateMode] = useState<'BUDGET' | 'REAL'>('BUDGET');
   const [projectedBudgetVersionId] = useState<string>('v2');
-  // "Qual Meta você quer considerar?" — pergunta uma vez por hotel/sessão só quando existe MAIS
-  // de uma versão de Budget pra esse hotel (ex.: a original + uma réplica de Revisão de Metas).
-  // Enquanto o usuário não escolher, fica na "principal" (isMain) por padrão — não trava a tela
-  // esperando resposta. A escolha feita fica lembrada aqui pra não perguntar de novo ao trocar de
-  // tela e voltar pro mesmo hotel na mesma sessão (fecha ao recarregar a página).
-  const [budgetVersionChoiceByHotel, setBudgetVersionChoiceByHotel] = useState<Record<string, string>>({});
-  const [metaChoiceModal, setMetaChoiceModal] = useState<{ hotelCode: string; candidates: BudgetVersion[] } | null>(null);
+  // "Qual Meta você quer considerar?" — pergunta TODA VEZ que o usuário escolhe uma versão em
+  // Versões (real_home) pro hotel dela ter mais de uma Meta (Budget) cadastrada (ex.: a original +
+  // uma réplica de Revisão de Metas). Só avança pra DRE Forecast depois que a pessoa clica numa
+  // opção e confirma em "OK" — `onConfirm` carrega o que fazer (setar Real/Budget ativos, trocar
+  // hotel, navegar) uma vez resolvido. Ver onSelectVersion (case 'real_home').
+  const [metaChoiceModal, setMetaChoiceModal] = useState<{ candidates: BudgetVersion[]; defaultId: string; onConfirm: (chosenBudgetVersionId: string) => void } | null>(null);
+  const [metaChoiceSelectedId, setMetaChoiceSelectedId] = useState<string>('');
 
   // --- REVISÃO DE METAS (Budget) STATE ---
   // Qual BudgetVersion está sendo revisada agora (a original escolhida, ou a réplica criada pra
@@ -499,14 +499,12 @@ const App: React.FC = () => {
     const isCurrentBudgetValid = currentActiveBudget && (currentActiveBudget.hotelId === hotelCode || currentActiveBudget.hotelId === selectedHotel || !currentActiveBudget.hotelId);
 
     if (!isCurrentBudgetValid || activeBudgetVersionId === '') {
-      // Se o usuário já escolheu uma Meta pra esse hotel nesta sessão (via o modal "Qual Meta você
-      // quer considerar?"), respeita — não some por trás toda vez que o hotel muda e volta.
-      const rememberedChoice = budgetVersionChoiceByHotel[hotelCode];
-      const rememberedVersion = rememberedChoice ? budgetVersions.find(v => v.id === rememberedChoice) : undefined;
-
+      // Auto-seleção silenciosa (principal do hotel) — só serve de "enquanto isso"/fallback.
+      // A pergunta "Qual Meta você quer considerar?" (quando o hotel tem mais de uma) acontece
+      // de propósito só no fluxo explícito de escolher uma versão em Versões (real_home), não
+      // aqui — ver metaChoiceModal/onSelectVersion.
       const hotelCandidates = budgetVersions.filter(v => v.hotelId === hotelCode || v.hotelId === selectedHotel);
       const matchingBudget =
-        rememberedVersion ||
         hotelCandidates.find(v => v.isMain) ||
         hotelCandidates[0] ||
         budgetVersions.find(v => !v.hotelId && v.isMain) ||
@@ -516,15 +514,6 @@ const App: React.FC = () => {
         setActiveBudgetVersionId(matchingBudget.id);
       } else if (!matchingBudget && activeBudgetVersionId) {
         setActiveBudgetVersionId('');
-      }
-
-      // Mais de uma versão de Budget pra esse hotel (ex.: a original + uma réplica de Revisão de
-      // Metas) e o usuário ainda não escolheu qual considerar nesta sessão — pergunta, sem travar
-      // a tela (já entrou usando a "principal" acima como padrão enquanto isso). Não pergunta
-      // dentro da própria Revisão de Metas — lá o usuário já escolhe a versão explicitamente pelo
-      // próprio assistente (BudgetReviewHome), perguntar de novo aqui só atrapalharia o fluxo.
-      if (hotelCandidates.length > 1 && !rememberedVersion && (currentModule as string) !== 'BUDGET_REVIEW') {
-        setMetaChoiceModal({ hotelCode, candidates: hotelCandidates });
       }
     }
 
@@ -548,7 +537,7 @@ const App: React.FC = () => {
       }
     }
 
-  }, [selectedHotel, budgetVersions, realVersions, hotels, activeBudgetVersionId, activeRealVersionId, currentModule, budgetVersionChoiceByHotel]);
+  }, [selectedHotel, budgetVersions, realVersions, hotels, activeBudgetVersionId, activeRealVersionId, currentModule]);
   // -- SUPABASE INTEGRATION: Fetch Real Data on Auth --
   React.useEffect(() => {
     if (!session) return;
@@ -1780,12 +1769,27 @@ const App: React.FC = () => {
             versions={realVersions}
             activeVersionId={activeRealVersionId}
             onSelectVersion={(id) => {
-              setActiveRealVersionId(id);
-              setCurrentView('dashboard');
               const version = realVersions.find(v => v.id === id);
-              if (version) {
-                const hotelName = hotels.find(h => h.code === version.hotelId || h.id === version.hotelId)?.name;
+              const hotelName = version ? hotels.find(h => h.code === version.hotelId || h.id === version.hotelId)?.name : undefined;
+
+              const proceed = (chosenBudgetVersionId?: string) => {
+                setActiveRealVersionId(id);
+                if (chosenBudgetVersionId) setActiveBudgetVersionId(chosenBudgetVersionId);
                 if (hotelName) setSelectedHotel(hotelName);
+                setCurrentView('dashboard');
+              };
+
+              // Mesmo hotel pode ter mais de uma Meta (Budget) cadastrada — a original e, se
+              // existir, uma réplica de Revisão de Metas. Pergunta TODA VEZ que uma versão é
+              // escolhida aqui (não só na primeira vez) — só avança pra DRE Forecast depois que a
+              // pessoa confirma qual Meta considerar.
+              const hotelCandidates = version ? budgetVersions.filter(v => v.hotelId === version.hotelId) : [];
+              if (hotelCandidates.length > 1) {
+                const defaultId = hotelCandidates.find(v => v.isMain)?.id || hotelCandidates[0].id;
+                setMetaChoiceSelectedId(defaultId);
+                setMetaChoiceModal({ candidates: hotelCandidates, defaultId, onConfirm: proceed });
+              } else {
+                proceed(hotelCandidates[0]?.id);
               }
             }}
             onToggleLock={async (id) => {
@@ -2328,18 +2332,14 @@ const App: React.FC = () => {
             <h3 className="text-lg font-bold text-gray-900 mb-1">Qual Meta você quer considerar?</h3>
             <p className="text-sm text-gray-500 mb-4">
               Esse hotel tem mais de uma versão de Meta (Budget) — inclusive alguma criada como réplica pra Revisão de Metas.
-              Escolha qual usar na DRE Forecast, Ocupação e GMD. Fica valendo só nesta sessão; dá pra trocar de novo depois.
+              Escolha qual usar na DRE Forecast, Ocupação e GMD, e clique em OK pra avançar.
             </p>
             <div className="space-y-2 max-h-72 overflow-y-auto mb-4">
               {metaChoiceModal.candidates.map(v => (
                 <button
                   key={v.id}
-                  onClick={() => {
-                    setActiveBudgetVersionId(v.id);
-                    setBudgetVersionChoiceByHotel(prev => ({ ...prev, [metaChoiceModal.hotelCode]: v.id }));
-                    setMetaChoiceModal(null);
-                  }}
-                  className={`w-full text-left p-3 rounded-xl border transition-colors ${v.id === activeBudgetVersionId ? 'border-[#F8981C] bg-[#F8981C]/5' : 'border-gray-200 hover:border-gray-300'}`}
+                  onClick={() => setMetaChoiceSelectedId(v.id)}
+                  className={`w-full text-left p-3 rounded-xl border transition-colors ${v.id === metaChoiceSelectedId ? 'border-[#F8981C] bg-[#F8981C]/5' : 'border-gray-200 hover:border-gray-300'}`}
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-sm text-gray-800 truncate">{v.name}</span>
@@ -2349,15 +2349,18 @@ const App: React.FC = () => {
                 </button>
               ))}
             </div>
-            <button
-              onClick={() => {
-                setBudgetVersionChoiceByHotel(prev => ({ ...prev, [metaChoiceModal.hotelCode]: activeBudgetVersionId }));
-                setMetaChoiceModal(null);
-              }}
-              className="text-xs text-gray-400 hover:text-gray-600 font-semibold"
-            >
-              Manter a principal por enquanto
-            </button>
+            <div className="flex justify-end">
+              <button
+                onClick={() => {
+                  const { onConfirm } = metaChoiceModal;
+                  setMetaChoiceModal(null);
+                  onConfirm(metaChoiceSelectedId);
+                }}
+                className="px-5 py-2 rounded-lg font-bold text-sm bg-[#F8981C] text-white hover:bg-[#e08a15] transition-colors"
+              >
+                OK
+              </button>
+            </div>
           </div>
         </div>
       )}
