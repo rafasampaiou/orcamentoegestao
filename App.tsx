@@ -1463,6 +1463,44 @@ const App: React.FC = () => {
     }
   };
 
+  // Exclui uma réplica de Revisão de Metas (só ADMIN, checado de novo aqui além do botão só
+  // aparecer pra ADMIN na tela — nunca confia só na UI). Só aceita apagar versão cujo nome termina
+  // em "(Revisão)" — não deixa apagar a versão original por engano por essa tela. A ocupação vive
+  // dentro da própria linha de budget_versions (occupancy_data), então apagar a versão já cobre
+  // ela; só precisa também limpar o financial_data (despesa/receita) gravado com esse versionId.
+  const handleDeleteBudgetReviewReplica = async (versionId: string) => {
+    if (!hasRole(currentUser, UserRole.ADMIN)) {
+      toast.error('Só ADMIN pode excluir uma versão de Revisão de Metas.');
+      return;
+    }
+    const version = budgetVersions.find(v => v.id === versionId);
+    if (!version) return;
+    if (!version.name.trim().endsWith('(Revisão)')) {
+      toast.error('Essa tela só exclui réplicas de Revisão de Metas (nome termina em "(Revisão)").');
+      return;
+    }
+    try {
+      await supabaseService.deleteFinancialDataByVersion(versionId);
+      await supabaseService.deleteBudgetVersion(versionId);
+      setBudgetVersions(prev => prev.filter(v => v.id !== versionId));
+      setImportedFinancialData(prev => prev.filter(r => r.versionId !== versionId));
+      setBudgetOccupancyDataMap(prev => {
+        const next = { ...prev };
+        delete next[versionId];
+        return next;
+      });
+      if (budgetReviewVersionId === versionId) {
+        setBudgetReviewVersionId('');
+        setCurrentView('budget_review_home');
+      }
+      toast.success(`Versão "${version.name}" excluída.`);
+      logUserAction(`Excluiu a versão de Revisão de Metas "${version.name}" (${version.year})`);
+    } catch (err) {
+      console.error('Budget review delete error:', err);
+      toast.error('Erro ao excluir a versão. Verifique a conexão.');
+    }
+  };
+
   // Único caso, em toda a Revisão de Metas, de uma conta com KPI escrever fora de financial_data —
   // mesmo mapa usado em ForecastTable.tsx (handleKpiValueChange) pras 2 linhas de Receita Extra,
   // que não têm Meta própria em financial_data (vem de budgetOccupancyDataMap).
@@ -1934,6 +1972,8 @@ const App: React.FC = () => {
             setBudgetReviewSourceVersionId(sourceVersionId);
             setCurrentView('budget_review_occupancy');
           }}
+          canDeleteReplica={hasRole(currentUser, UserRole.ADMIN)}
+          onDeleteReplica={handleDeleteBudgetReviewReplica}
         />
       );
       case 'budget_review_occupancy': {

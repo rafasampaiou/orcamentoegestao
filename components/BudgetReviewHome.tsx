@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ClipboardEdit, Copy, FileEdit, Lock, ChevronRight, Check } from 'lucide-react';
+import { ClipboardEdit, Copy, FileEdit, Lock, ChevronRight, Check, Trash2, X } from 'lucide-react';
 import { BudgetVersion, Hotel } from '../types';
 
 interface BudgetReviewHomeProps {
@@ -12,6 +12,10 @@ interface BudgetReviewHomeProps {
     // diretamente", onde sourceVersionId === versionId) — é dela que "Calcular Forecast" vai ler
     // os KPIs ao vivo (a "última meta importada no sistema", nunca um snapshot congelado).
     onStartReview: (versionId: string, months: number[], sourceVersionId: string) => void;
+    // Só ADMIN pode excluir uma réplica de Revisão de Metas — App.tsx já confere a role de novo
+    // antes de excluir de verdade, isso aqui só decide se o botão aparece.
+    canDeleteReplica?: boolean;
+    onDeleteReplica?: (versionId: string) => Promise<void> | void;
 }
 
 const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -21,7 +25,7 @@ type Step = 'version' | 'mode' | 'period';
 // Fluxo de "Revisão de Metas" (Budget): escolher qual versão de Meta revisar → revisar a versão
 // original ou criar uma réplica pra revisar em paralelo → escolher o período (meses) → segue pra
 // BudgetReviewOccupancy (aba tipo Ocupação, só que gravando na versão escolhida aqui).
-const BudgetReviewHome: React.FC<BudgetReviewHomeProps> = ({ hotels, selectedHotel, setSelectedHotel, budgetVersions, onCreateReplica, onStartReview }) => {
+const BudgetReviewHome: React.FC<BudgetReviewHomeProps> = ({ hotels, selectedHotel, setSelectedHotel, budgetVersions, onCreateReplica, onStartReview, canDeleteReplica, onDeleteReplica }) => {
     const [step, setStep] = useState<Step>('version');
     const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
     // Guarda a versão ORIGINALMENTE escolhida no passo 1, mesmo depois de `selectedVersionId`
@@ -29,6 +33,10 @@ const BudgetReviewHome: React.FC<BudgetReviewHomeProps> = ({ hotels, selectedHot
     const [sourceVersionId, setSourceVersionId] = useState<string | null>(null);
     const [selectedMonths, setSelectedMonths] = useState<number[]>([]);
     const [creating, setCreating] = useState(false);
+    // Confirmação de exclusão é feita inline (2 cliques), não window.confirm() — janelas nativas
+    // ficam silenciosamente bloqueadas no sandbox onde esse app roda.
+    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
 
     // Mesma lógica da tela "Versões" (TimelineView/Planejamentos): a lista mostra TODAS as versões
     // de Budget já criadas, de qualquer hotel — não só do hotel selecionado no momento. Escolher
@@ -70,6 +78,21 @@ const BudgetReviewHome: React.FC<BudgetReviewHomeProps> = ({ hotels, selectedHot
         onStartReview(selectedVersionId, selectedMonths, sourceVersionId);
     };
 
+    const handleConfirmDelete = async (versionId: string) => {
+        if (!onDeleteReplica) return;
+        setDeletingId(versionId);
+        try {
+            await onDeleteReplica(versionId);
+            if (selectedVersionId === versionId) {
+                setSelectedVersionId(null);
+                setSourceVersionId(null);
+            }
+        } finally {
+            setDeletingId(null);
+            setConfirmDeleteId(null);
+        }
+    };
+
     return (
         <div className="max-w-4xl mx-auto py-6">
             <div className="flex items-center gap-3 mb-6">
@@ -94,17 +117,56 @@ const BudgetReviewHome: React.FC<BudgetReviewHomeProps> = ({ hotels, selectedHot
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6 max-h-[420px] overflow-y-auto pr-1">
                             {allVersions.map(v => {
                                 const hotelName = hotelNameForVersion(v);
+                                const isReplica = v.name.trim().endsWith('(Revisão)');
+                                const confirming = confirmDeleteId === v.id;
+
+                                if (confirming) {
+                                    return (
+                                        <div key={v.id} className="p-3 rounded-xl border-2 border-red-300 bg-red-50">
+                                            <p className="text-xs font-bold text-red-700 mb-1">Excluir "{v.name}"?</p>
+                                            <p className="text-[11px] text-red-500 mb-3">Apaga a versão e toda a despesa/ocupação dela. Não dá pra desfazer.</p>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => handleConfirmDelete(v.id)}
+                                                    disabled={deletingId === v.id}
+                                                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
+                                                >
+                                                    <Trash2 size={12} /> {deletingId === v.id ? 'Excluindo...' : 'Excluir'}
+                                                </button>
+                                                <button
+                                                    onClick={() => setConfirmDeleteId(null)}
+                                                    disabled={deletingId === v.id}
+                                                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold border border-gray-200 text-gray-600 hover:bg-gray-50"
+                                                >
+                                                    <X size={12} /> Cancelar
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                }
+
                                 return (
-                                    <button
+                                    <div
                                         key={v.id}
                                         onClick={() => {
                                             setSelectedVersionId(v.id);
                                             setSourceVersionId(v.id);
                                             if (hotelName && hotelName !== selectedHotel) setSelectedHotel(hotelName);
                                         }}
-                                        className={`text-left p-3 rounded-xl border transition-colors ${selectedVersionId === v.id ? 'border-[#F8981C] bg-[#F8981C]/5' : 'border-gray-200 hover:border-gray-300'}`}
+                                        role="button"
+                                        tabIndex={0}
+                                        className={`relative text-left p-3 rounded-xl border transition-colors cursor-pointer ${selectedVersionId === v.id ? 'border-[#F8981C] bg-[#F8981C]/5' : 'border-gray-200 hover:border-gray-300'}`}
                                     >
-                                        <div className="flex items-center justify-between">
+                                        {canDeleteReplica && isReplica && onDeleteReplica && (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(v.id); }}
+                                                title="Excluir esta versão de Revisão de Metas (só ADMIN)"
+                                                className="absolute top-2 right-2 p-1 rounded-md text-gray-300 hover:text-red-600 hover:bg-red-50"
+                                            >
+                                                <Trash2 size={13} />
+                                            </button>
+                                        )}
+                                        <div className="flex items-center justify-between pr-5">
                                             <span className="font-bold text-sm text-gray-800 truncate">{v.name}</span>
                                             {v.isLocked && <Lock size={12} className="text-gray-400 shrink-0" />}
                                         </div>
@@ -114,7 +176,7 @@ const BudgetReviewHome: React.FC<BudgetReviewHomeProps> = ({ hotels, selectedHot
                                             <span className="text-xs text-gray-500">{v.year}{v.month ? ` — ${MONTH_NAMES[v.month - 1]}` : ''}</span>
                                             {v.isMain && <span className="text-[9px] font-bold uppercase text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">Principal</span>}
                                         </div>
-                                    </button>
+                                    </div>
                                 );
                             })}
                         </div>
