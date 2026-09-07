@@ -327,9 +327,10 @@ const BudgetReviewComparatives: React.FC<BudgetReviewComparativesProps> = ({
                             <option value="">Selecione...</option>
                             {versionsForHotel.map(v => <option key={v.id} value={v.id}>{v.name} ({v.year})</option>)}
                         </select>
-                        {oldVersion && oldResolved && oldResolved.id !== oldVersion.id && (
-                            <p className="text-[10px] text-amber-600 font-semibold mb-1.5">
-                                Essa versão não tem despesa/ocupação importada — usando os dados de "{oldResolved.name}" ({oldResolved.year}) em vez disso.
+                        {oldVersion && oldResolved && (
+                            <p className="text-[9px] text-gray-400 font-mono mb-1.5 break-all">
+                                lendo despesa de: {oldResolved.name} (id: {oldResolved.id})
+                                {oldResolved.id !== oldVersion.id && <span className="text-amber-600 font-sans font-semibold"> — "{oldVersion.name}" (id: {oldVersion.id}) não tinha despesa/ocupação importada</span>}
                             </p>
                         )}
                         {oldVersion && renderMonthPicker('old', oldMonthSources)}
@@ -340,9 +341,10 @@ const BudgetReviewComparatives: React.FC<BudgetReviewComparativesProps> = ({
                             <option value="">Selecione...</option>
                             {versionsForHotel.map(v => <option key={v.id} value={v.id}>{v.name} ({v.year})</option>)}
                         </select>
-                        {newVersion && newResolved && newResolved.id !== newVersion.id && (
-                            <p className="text-[10px] text-amber-600 font-semibold mb-1.5">
-                                Essa versão não tem despesa/ocupação importada — usando os dados de "{newResolved.name}" ({newResolved.year}) em vez disso.
+                        {newVersion && newResolved && (
+                            <p className="text-[9px] text-gray-400 font-mono mb-1.5 break-all">
+                                lendo despesa de: {newResolved.name} (id: {newResolved.id})
+                                {newResolved.id !== newVersion.id && <span className="text-amber-600 font-sans font-semibold"> — "{newVersion.name}" (id: {newVersion.id}) não tinha despesa/ocupação importada</span>}
                             </p>
                         )}
                         {newVersion && renderMonthPicker('new', newMonthSources)}
