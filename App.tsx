@@ -1703,6 +1703,7 @@ const App: React.FC = () => {
       // Diagnóstico: toda conta Variável (tem calc) que NÃO virou override — junto do motivo —
       // pra achar por que ela fica com o mesmo valor da versão anterior mesmo sendo Variável.
       const skippedVariableRows: { month: number; label: string; reason: string }[] = [];
+      const computedSample: { label: string; denom: string; baseValor: number; baseDenom: number; currentDenom: number; newValue: number }[] = [];
       budgetReviewMonths.forEach(month => {
         const baselineRows = buildForecastRows(dreConfigs, month, mainSourceVersion.year, scopedSourceData, sourceHotel, hotels, {}, mainSourcePairedId || undefined, mainSourceVersion.id, accounts, packages, sourceOccupancyData, undefined, []);
         const currentRows = buildForecastRows(dreConfigs, month, year, scopedFinancialData, hotel, hotels, {}, reviewVersionPairedId || undefined, budgetReviewVersionId, accounts, packages, budgetOccupancyDataMap[budgetReviewVersionId] || {}, undefined, []);
@@ -1740,6 +1741,12 @@ const App: React.FC = () => {
             const rate = baseRow.budget / baseDenom;
             const currentDenom = resolveKpiTerm(selfDenom, currentRows, 'budget');
             const newValue = rate * currentDenom;
+            if (month === budgetReviewMonths[0]) {
+              // Amostra do primeiro mês selecionado — pra ver se o denominador realmente mudou
+              // entre a versão-fonte e a revisão (currentDenom vs baseDenom), ou se por
+              // coincidência ficou igual (por isso o valor não parece ter mudado).
+              computedSample.push({ label: baseRow.label, denom: selfDenom, baseValor: baseRow.budget, baseDenom, currentDenom, newValue: Math.round(newValue) });
+            }
             monthChanges.push({
               ano: String(year), cenario: 'Meta', tipo: 'Despesa', hotel, conta: `override_${baseRow.id}`,
               cr: '', mes: String(month), valor: newValue.toFixed(2), status: 'valid', versionId: budgetReviewVersionId,
@@ -1760,6 +1767,9 @@ const App: React.FC = () => {
 
       if (skippedVariableRows.length > 0) {
         console.warn('[Revisão de Metas] Contas Variáveis que NÃO foram recalculadas (motivo por linha): ' + JSON.stringify(skippedVariableRows));
+      }
+      if (computedSample.length > 0) {
+        console.warn(`[Revisão de Metas] Amostra do mês ${budgetReviewMonths[0]} — baseValor (versão-fonte), baseDenom (denominador na versão-fonte), currentDenom (denominador na revisão), newValue (calculado): ` + JSON.stringify(computedSample));
       }
 
       await persistBudgetReviewMonthChanges(hotel, year, budgetReviewVersionId, changesByMonth, staleOverridesToDelete);
