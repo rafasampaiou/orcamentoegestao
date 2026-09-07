@@ -443,8 +443,12 @@ const BudgetReviewComparatives: React.FC<BudgetReviewComparativesProps> = ({
                                         {columns.map((col, colIdx) => {
                                             const cellRow = colRowSets[colIdx].find(r => r.id === row.id);
                                             const val = cellRow ? (col.source === 'Meta' ? cellRow.budget : cellRow.real) : 0;
+                                            // Diagnóstico: uma célula da Meta ANTIGA nunca deveria vir de um override
+                                            // (override_<rowId> só existe pra versão em revisão) — se vier, é sinal de
+                                            // contaminação entre versões (achou/aplicou o override errado).
+                                            const suspicious = col.group === 'old' && col.source === 'Meta' && (cellRow as any)?.isManualBudgetOverride;
                                             return (
-                                                <td key={col.key} className="px-1 py-px text-right tabular-nums border-l border-gray-100 truncate">
+                                                <td key={col.key} className={`px-1 py-px text-right tabular-nums border-l border-gray-100 truncate ${suspicious ? 'bg-red-100' : ''}`} title={suspicious ? 'Suspeito: essa célula da Meta antiga veio de um override, que só deveria existir pra versão em revisão.' : undefined}>
                                                     {cellRow ? fmtValue(val, cellRow) : '-'}
                                                 </td>
                                             );
