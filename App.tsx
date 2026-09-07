@@ -1261,6 +1261,14 @@ const App: React.FC = () => {
       const newRealVersionId = `r-${timestamp}`;
       const newBudgetVersionId = `v-${timestamp}`;
 
+      // Deep clone (JSON round-trip) — nunca reusar a mesma referência de array/objeto da origem,
+      // senão editar a ocupação de uma versão pode acabar mexendo na outra (mesmo array em
+      // memória). budgetOccupancyDataMap[id] (dado AO VIVO, com qualquer edição feita nesta
+      // sessão) tem prioridade sobre o campo `.occupancyData` da própria BudgetVersion, que só
+      // reflete o que veio do Supabase no carregamento — edições só atualizam
+      // budgetOccupancyDataMap, nunca esse campo de volta.
+      const cloneOccupancy = (v: BudgetVersion | undefined) => v ? JSON.parse(JSON.stringify(budgetOccupancyDataMap[v.id] || v.occupancyData || {})) : {};
+
       // Create new version records with replicated metadata
       const newRealVersion: BudgetVersion = {
         id: newRealVersionId,
@@ -1270,7 +1278,7 @@ const App: React.FC = () => {
         isMain: false,
         isLocked: false,
         hotelId: sourceRealVersion?.hotelId || sourceBudgetVersion?.hotelId,
-        occupancyData: sourceRealVersion?.occupancyData || {},
+        occupancyData: cloneOccupancy(sourceRealVersion),
         laborData: sourceRealVersion?.laborData || {},
         extraRevenueData: sourceRealVersion?.extraRevenueData || [],
         closedMonths: [],
@@ -1286,7 +1294,7 @@ const App: React.FC = () => {
         isMain: false,
         isLocked: false,
         hotelId: sourceBudgetVersion?.hotelId || sourceRealVersion?.hotelId,
-        occupancyData: sourceBudgetVersion?.occupancyData || {},
+        occupancyData: cloneOccupancy(sourceBudgetVersion),
         laborData: sourceBudgetVersion?.laborData || {},
         extraRevenueData: sourceBudgetVersion?.extraRevenueData || [],
         closedMonths: [],
@@ -1427,6 +1435,15 @@ const App: React.FC = () => {
 
     const timestamp = Date.now();
     const newId = `v-review-${timestamp}`;
+    // Deep clone (JSON round-trip, seguro pra um objeto só com arrays de número) — nunca reusar a
+    // MESMA referência de array/objeto da origem. `budgetOccupancyDataMap[sourceVersionId]` (o
+    // dado AO VIVO, já com qualquer edição feita nesta sessão) tem prioridade sobre
+    // `source.occupancyData` (o campo da própria BudgetVersion, que só reflete o que veio do
+    // Supabase no carregamento — edições de ocupação só atualizam budgetOccupancyDataMap, nunca
+    // esse campo de volta). Sem o clone, editar a ocupação da réplica depois podia acabar mexendo
+    // no mesmo array em memória usado pela versão original (mesma referência, dois "donos").
+    const sourceOccupancy = budgetOccupancyDataMap[sourceVersionId] || source.occupancyData || {};
+    const clonedOccupancy: Record<string, number[]> = JSON.parse(JSON.stringify(sourceOccupancy));
     const newVersion: BudgetVersion = {
       id: newId,
       name: `${source.name} (Revisão)`,
@@ -1435,7 +1452,7 @@ const App: React.FC = () => {
       isMain: false,
       isLocked: false,
       hotelId: source.hotelId,
-      occupancyData: source.occupancyData || {},
+      occupancyData: clonedOccupancy,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
