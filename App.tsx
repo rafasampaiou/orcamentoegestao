@@ -1700,6 +1700,9 @@ const App: React.FC = () => {
       // matchesReal) pra deixar a linha passar no filtro por versão, então isso cobre a despesa que
       // foi gravada sob o id errado do par sem precisar remapear nada linha por linha.
       const reviewVersionPairedId = pairedVersionId(budgetReviewVersionId);
+      // Diagnóstico: toda conta Variável (tem calc) que NÃO virou override — junto do motivo —
+      // pra achar por que ela fica com o mesmo valor da versão anterior mesmo sendo Variável.
+      const skippedVariableRows: { month: number; label: string; reason: string }[] = [];
       budgetReviewMonths.forEach(month => {
         const baselineRows = buildForecastRows(dreConfigs, month, mainSourceVersion.year, scopedSourceData, sourceHotel, hotels, {}, mainSourcePairedId || undefined, mainSourceVersion.id, accounts, packages, sourceOccupancyData, undefined, []);
         const currentRows = buildForecastRows(dreConfigs, month, year, scopedFinancialData, hotel, hotels, {}, reviewVersionPairedId || undefined, budgetReviewVersionId, accounts, packages, budgetOccupancyDataMap[budgetReviewVersionId] || {}, undefined, []);
@@ -1718,13 +1721,22 @@ const App: React.FC = () => {
           const calc = baseRow.rowConfig?.kpiCalculation;
           const precomputedKpi = baseRow.rowConfig?.precomputedKpi;
           const currentRow = currentRows.find(r => r.id === baseRow.id);
-          if (!currentRow) return;
+          if (!currentRow) {
+            if (calc) skippedVariableRows.push({ month, label: baseRow.label, reason: 'linha não encontrada na versão em revisão (currentRow ausente)' });
+            return;
+          }
 
           if (calc) {
             const selfDenom = parseSelfRatioDenominator(calc.formula, baseRow.label);
-            if (!selfDenom) return;
+            if (!selfDenom) {
+              skippedVariableRows.push({ month, label: baseRow.label, reason: `fórmula não é uma razão simples (self ÷ denominador): "${calc.formula}"` });
+              return;
+            }
             const baseDenom = resolveKpiTerm(selfDenom, baselineRows, 'budget');
-            if (!baseDenom) return;
+            if (!baseDenom) {
+              skippedVariableRows.push({ month, label: baseRow.label, reason: `denominador "${selfDenom}" veio 0 na versão-fonte (não dá pra calcular a taxa)` });
+              return;
+            }
             const rate = baseRow.budget / baseDenom;
             const currentDenom = resolveKpiTerm(selfDenom, currentRows, 'budget');
             const newValue = rate * currentDenom;
@@ -1745,6 +1757,10 @@ const App: React.FC = () => {
         if (monthChanges.length > 0) changesByMonth[month] = monthChanges;
         if (monthDeletions.length > 0) staleOverridesToDelete[month] = monthDeletions;
       });
+
+      if (skippedVariableRows.length > 0) {
+        console.warn('[Revisão de Metas] Contas Variáveis que NÃO foram recalculadas (motivo por linha): ' + JSON.stringify(skippedVariableRows));
+      }
 
       await persistBudgetReviewMonthChanges(hotel, year, budgetReviewVersionId, changesByMonth, staleOverridesToDelete);
 
