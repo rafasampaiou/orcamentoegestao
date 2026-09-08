@@ -220,7 +220,10 @@ const TimelineView: React.FC<TimelineViewProps> = ({
                         <div className="flex justify-between items-start">
                           <div className={!showSettingsIcon ? 'pointer-events-none' : ''}>
                             <div className="font-bold text-sm leading-tight max-w-[150px] truncate">{version.year}</div>
-                            <div className="text-[10px] opacity-90 max-w-[150px] truncate leading-tight mt-0.5">{version.name}</div>
+                            <div className="text-[10px] opacity-90 max-w-[150px] truncate leading-tight mt-0.5">
+                              {version.name}
+                              {version.versionCode && <span className="opacity-70 font-mono"> · {version.versionCode}</span>}
+                            </div>
                           </div>
                           <div className="flex items-center gap-1.5 opacity-80">
                             {onSetMain && (
