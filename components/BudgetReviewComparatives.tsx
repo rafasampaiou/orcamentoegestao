@@ -393,11 +393,12 @@ const BudgetReviewComparatives: React.FC<BudgetReviewComparativesProps> = ({
                             <tr className="border-b border-gray-200">
                                 {columns.map((col, colIdx) => {
                                     const diag = colDiagnostics[colIdx];
+                                    const versionForCol = col.group === 'old' ? oldResolved : newResolved;
                                     return (
                                         <th key={col.key} className={`w-20 px-1 py-px text-center text-xs font-semibold border-l border-gray-100 truncate ${col.source === 'Real' ? 'text-emerald-600' : 'text-gray-400'}`}>
                                             {MONTH_NAMES[col.month - 1]} <span className="block text-[9px] font-black uppercase">{col.source === 'Real' ? 'Real' : 'Meta'}</span>
                                             <span className={`block text-[8px] font-normal normal-case ${diag.count === 0 ? 'text-red-400' : 'text-gray-300'}`} title="Linhas de financial_data encontradas pra esse mês/versão — 0 quer dizer que não existe dado gravado aqui, não é a tabela escondendo nada">
-                                                {diag.count} linha(s){!diag.hasOcc && col.source === 'Meta' ? ' · sem ocup.' : ''}
+                                                {col.source === 'Meta' && versionForCol?.versionCode ? `[${versionForCol.versionCode}] ` : ''}{diag.count} linha(s){!diag.hasOcc && col.source === 'Meta' ? ' · sem ocup.' : ''}
                                             </span>
                                         </th>
                                     );
