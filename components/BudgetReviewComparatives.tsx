@@ -117,7 +117,17 @@ const BudgetReviewComparatives: React.FC<BudgetReviewComparativesProps> = ({
             const occData = budgetOccupancyDataMap[col.versionId] && Object.keys(budgetOccupancyDataMap[col.versionId]).length > 0
                 ? budgetOccupancyDataMap[col.versionId]
                 : (paired ? budgetOccupancyDataMap[paired] : undefined) || {};
-            return buildForecastRows(dreConfigs, col.month, col.year, financialData, hotelName, hotels, {}, paired, col.versionId, accounts, packages, occData, undefined, []);
+            // Pré-filtra ANTES de montar a linha (mesma técnica do "Calcular Forecast" da Revisão
+            // de Metas, que já bate 100% com a DRE Forecast) em vez de deixar buildForecastRows
+            // filtrar sozinho a partir do array inteiro — passando só as linhas desta versão (ou
+            // seu par, ou sem versionId) evita pegar emprestado override_<rowId> de OUTRA versão
+            // (ex.: da réplica em revisão) que não deveria valer pra esta coluna.
+            const normHotel = normalizeHotelName(hotelName);
+            const scopedData = financialData.filter(r =>
+                r.versionId === col.versionId || (paired && r.versionId === paired) ||
+                (!r.versionId && parseInt(r.ano) === col.year && normalizeHotelName(r.hotel) === normHotel)
+            );
+            return buildForecastRows(dreConfigs, col.month, col.year, scopedData, hotelName, hotels, {}, paired, col.versionId, accounts, packages, occData, undefined, []);
         }
         return buildForecastRows(dreConfigs, col.month, col.year, financialData, hotelName, hotels, realOccupancyData, activeRealVersionId, undefined, accounts, packages, {}, undefined, []);
     }), [columns, dreConfigs, financialData, hotelName, hotels, accounts, packages, budgetOccupancyDataMap, realOccupancyData, activeRealVersionId]);
@@ -230,8 +240,13 @@ const BudgetReviewComparatives: React.FC<BudgetReviewComparativesProps> = ({
             ? budgetOccupancyDataMap[oldResolved.id]
             : (pairedOld ? budgetOccupancyDataMap[pairedOld] : undefined) || {};
         let baseReceita = 0, baseGop = 0, baseCusto = 0;
+        const normHotelForOld = normalizeHotelName(hotelName);
+        const oldScopedData = financialData.filter(r =>
+            r.versionId === oldResolved.id || (pairedOld && r.versionId === pairedOld) ||
+            (!r.versionId && parseInt(r.ano) === oldResolved.year && normalizeHotelName(r.hotel) === normHotelForOld)
+        );
         newMonthList.forEach(m => {
-            const rows = buildForecastRows(dreConfigs, m, oldResolved.year, financialData, hotelName, hotels, {}, pairedOld, oldResolved.id, accounts, packages, oldOccData, undefined, []);
+            const rows = buildForecastRows(dreConfigs, m, oldResolved.year, oldScopedData, hotelName, hotels, {}, pairedOld, oldResolved.id, accounts, packages, oldOccData, undefined, []);
             const val = (id: string) => rows.find(r => r.id === id)?.budget || 0;
             baseReceita += val('REV-NET'); baseGop += val('RES-OP-COM-IMP'); baseCusto += val('CST-HEAD');
         });
