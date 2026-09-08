@@ -325,12 +325,12 @@ const BudgetReviewComparatives: React.FC<BudgetReviewComparativesProps> = ({
                         <label className="text-xs font-bold text-gray-500 uppercase">Meta antiga</label>
                         <select value={oldVersionId} onChange={e => setOldVersionId(e.target.value)} className="w-full mt-1 mb-2 border border-gray-200 rounded-lg px-3 py-2 text-sm">
                             <option value="">Selecione...</option>
-                            {versionsForHotel.map(v => <option key={v.id} value={v.id}>{v.name} ({v.year})</option>)}
+                            {versionsForHotel.map(v => <option key={v.id} value={v.id}>{v.versionCode ? `[${v.versionCode}] ` : ''}{v.name} ({v.year})</option>)}
                         </select>
                         {oldVersion && oldResolved && (
                             <p className="text-[9px] text-gray-400 font-mono mb-1.5 break-all">
-                                lendo despesa de: {oldResolved.name} (id: {oldResolved.id})
-                                {oldResolved.id !== oldVersion.id && <span className="text-amber-600 font-sans font-semibold"> — "{oldVersion.name}" (id: {oldVersion.id}) não tinha despesa/ocupação importada</span>}
+                                lendo despesa de: [{oldResolved.versionCode || '?'}] {oldResolved.name} (id: {oldResolved.id})
+                                {oldResolved.id !== oldVersion.id && <span className="text-amber-600 font-sans font-semibold"> — "[{oldVersion.versionCode || '?'}] {oldVersion.name}" (id: {oldVersion.id}) não tinha despesa/ocupação importada</span>}
                             </p>
                         )}
                         {oldVersion && renderMonthPicker('old', oldMonthSources)}
@@ -339,12 +339,12 @@ const BudgetReviewComparatives: React.FC<BudgetReviewComparativesProps> = ({
                         <label className="text-xs font-bold text-gray-500 uppercase">Meta atual</label>
                         <select value={newVersionId} onChange={e => setNewVersionId(e.target.value)} className="w-full mt-1 mb-2 border border-gray-200 rounded-lg px-3 py-2 text-sm">
                             <option value="">Selecione...</option>
-                            {versionsForHotel.map(v => <option key={v.id} value={v.id}>{v.name} ({v.year})</option>)}
+                            {versionsForHotel.map(v => <option key={v.id} value={v.id}>{v.versionCode ? `[${v.versionCode}] ` : ''}{v.name} ({v.year})</option>)}
                         </select>
                         {newVersion && newResolved && (
                             <p className="text-[9px] text-gray-400 font-mono mb-1.5 break-all">
-                                lendo despesa de: {newResolved.name} (id: {newResolved.id})
-                                {newResolved.id !== newVersion.id && <span className="text-amber-600 font-sans font-semibold"> — "{newVersion.name}" (id: {newVersion.id}) não tinha despesa/ocupação importada</span>}
+                                lendo despesa de: [{newResolved.versionCode || '?'}] {newResolved.name} (id: {newResolved.id})
+                                {newResolved.id !== newVersion.id && <span className="text-amber-600 font-sans font-semibold"> — "[{newVersion.versionCode || '?'}] {newVersion.name}" (id: {newVersion.id}) não tinha despesa/ocupação importada</span>}
                             </p>
                         )}
                         {newVersion && renderMonthPicker('new', newMonthSources)}

@@ -453,6 +453,11 @@ export interface BudgetVersion {
     isMain?: boolean;
     hotelId?: string;
     hotel?: string;
+    // Código curto e único: "{2 últimos dígitos do ano}.{hotelId}.{sequência}" (ex.: "26.25.1" =
+    // 2026, hotel id 25, 1ª versão daquele hotel/ano). Diferente do nome (que pode se repetir
+    // entre a original e uma réplica de Revisão de Metas, causando confusão em Comparativos) —
+    // o código nunca se repete. Ver services/mockData.ts:generateVersionCode.
+    versionCode?: string;
     occupancyData?: Record<string, number[]>;
     laborData?: Record<string, any>;
     extraRevenueData?: any[];

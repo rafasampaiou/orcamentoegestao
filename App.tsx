@@ -4,7 +4,7 @@ import Sidebar from './components/Sidebar';
 import TimelineView from './components/TimelineView';
 
 import ForecastTable, { buildForecastRows } from './components/ForecastTable';
-import { normalizeHotelName, pairedVersionId } from './services/mockData';
+import { normalizeHotelName, pairedVersionId, generateVersionCode } from './services/mockData';
 import GMDView from './components/GMDView';
 import OccupancyView from './components/OccupancyView';
 import OccupancyMonthlyRealView from './components/OccupancyMonthlyRealView';
@@ -668,6 +668,20 @@ const App: React.FC = () => {
         hasLoadedFromSupabase.current = true;
 
         if (remoteVersions && remoteVersions.length > 0) {
+          // Backfill: versões antigas (de antes do código de versão existir) não têm version_code
+          // ainda — gera um pra cada uma que estiver faltando, na ordem de criação (mais antiga =
+          // sequência 1, batendo com "a original é a nº 1"), e grava de volta no Supabase. Muta os
+          // objetos em `remoteVersions` diretamente (mesma referência que vai pro state logo
+          // abaixo) pra cada chamada seguinte de generateVersionCode já enxergar os códigos recém
+          // atribuídos aos irmãos processados antes, sem colidir.
+          const missingCode = remoteVersions.filter(v => !v.versionCode).sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+          if (missingCode.length > 0) {
+            missingCode.forEach(v => { v.versionCode = generateVersionCode(v.hotelId, v.year, remoteVersions); });
+            missingCode.forEach(v => {
+              supabaseService.upsertBudgetVersion(v).catch(err => console.error('Falha ao gravar version_code de', v.id, err));
+            });
+          }
+
           setBudgetVersions(remoteVersions.filter(v => v.id.startsWith('v')));
           setRealVersions(remoteVersions.filter(v => v.id.startsWith('r')));
 
@@ -1268,6 +1282,10 @@ const App: React.FC = () => {
       // reflete o que veio do Supabase no carregamento — edições só atualizam
       // budgetOccupancyDataMap, nunca esse campo de volta.
       const cloneOccupancy = (v: BudgetVersion | undefined) => v ? JSON.parse(JSON.stringify(budgetOccupancyDataMap[v.id] || v.occupancyData || {})) : {};
+      // Código curto e único (ex.: "27.2.1") — Real e Budget nascem juntos aqui, então
+      // compartilham a mesma sequência (representam a mesma "versão" nas duas frentes).
+      const replicateHotelId = sourceRealVersion?.hotelId || sourceBudgetVersion?.hotelId;
+      const replicateVersionCode = generateVersionCode(replicateHotelId, replicateTarget.year, [...budgetVersions, ...realVersions]);
 
       // Create new version records with replicated metadata
       const newRealVersion: BudgetVersion = {
@@ -1278,6 +1296,7 @@ const App: React.FC = () => {
         isMain: false,
         isLocked: false,
         hotelId: sourceRealVersion?.hotelId || sourceBudgetVersion?.hotelId,
+        versionCode: replicateVersionCode,
         occupancyData: cloneOccupancy(sourceRealVersion),
         laborData: sourceRealVersion?.laborData || {},
         extraRevenueData: sourceRealVersion?.extraRevenueData || [],
@@ -1294,6 +1313,7 @@ const App: React.FC = () => {
         isMain: false,
         isLocked: false,
         hotelId: sourceBudgetVersion?.hotelId || sourceRealVersion?.hotelId,
+        versionCode: replicateVersionCode,
         occupancyData: cloneOccupancy(sourceBudgetVersion),
         laborData: sourceBudgetVersion?.laborData || {},
         extraRevenueData: sourceBudgetVersion?.extraRevenueData || [],
@@ -1444,6 +1464,11 @@ const App: React.FC = () => {
     // no mesmo array em memória usado pela versão original (mesma referência, dois "donos").
     const sourceOccupancy = budgetOccupancyDataMap[sourceVersionId] || source.occupancyData || {};
     const clonedOccupancy: Record<string, number[]> = JSON.parse(JSON.stringify(sourceOccupancy));
+    // Código curto e único (ex.: "26.25.2") — nunca colide, diferente do nome (que se repete
+    // entre a original e a réplica e é a raiz de boa parte da confusão de "qual versão é qual"
+    // em Comparativos). Sequência é a próxima entre TODAS as versões (Real + Budget) desse
+    // hotel/ano, não só as de Budget.
+    const versionCode = generateVersionCode(source.hotelId, source.year, [...budgetVersions, ...realVersions]);
     const newVersion: BudgetVersion = {
       id: newId,
       name: `${source.name} (Revisão)`,
@@ -1452,6 +1477,7 @@ const App: React.FC = () => {
       isMain: false,
       isLocked: false,
       hotelId: source.hotelId,
+      versionCode,
       occupancyData: clonedOccupancy,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -2425,7 +2451,7 @@ const App: React.FC = () => {
                   className={`w-full text-left p-3 rounded-xl border transition-colors ${v.id === metaChoiceSelectedId ? 'border-[#F8981C] bg-[#F8981C]/5' : 'border-gray-200 hover:border-gray-300'}`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-sm text-gray-800 truncate">{v.name}</span>
+                    <span className="font-bold text-sm text-gray-800 truncate">{v.versionCode ? `[${v.versionCode}] ` : ''}{v.name}</span>
                     {v.isMain && <span className="text-[9px] font-bold uppercase text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded shrink-0">Principal</span>}
                   </div>
                   <span className="text-xs text-gray-500">{v.year}</span>

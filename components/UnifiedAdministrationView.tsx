@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { getForecastData, normalizeAccountName } from '../services/mockData';
+import { getForecastData, normalizeAccountName, generateVersionCode } from '../services/mockData';
 import { Plus, Trash2, X, Save, Briefcase, Pencil, Calendar, PieChart, Lock, Settings as SettingsIcon, Users, Search, Upload, Settings, Eye, FileText, Layout, Info, ChevronUp, GripVertical, Database, BedDouble, DollarSign, Target, LayoutList, ArrowUp, ArrowDown, Copy, Loader2 } from 'lucide-react';
 import { User, UserRole, CostCenter, ImportedRow, Hotel, Account, BudgetVersion, LaborParameters, ScheduleItem, ImportedCostCenter, CostPackage, GMDConfiguration, ViewState, DreSection, HotelCategory, HotelRegion, ImportedAccount, KpiCalculation, PermissionMatrix, UserLog, userRoles, hasRole, hasPermission } from '../types';
 import { getDreReferenceOptions } from '../utils/dreReferences';
@@ -3801,6 +3801,9 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
     const timestamp = Date.now();
     const realId = `r-${timestamp}`;
     const budgetId = `v-${timestamp}`;
+    // Código curto e único (ex.: "26.25.1") — Real e Budget nascem juntos aqui, então
+    // compartilham a mesma sequência.
+    const newVersionCode = generateVersionCode(hotelId, year, [...budgetVersions, ...realVersions]);
 
     const newRealVersion: BudgetVersion = {
       id: realId,
@@ -3810,6 +3813,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       isMain: false,
       isLocked: false,
       hotelId: hotelId,
+      versionCode: newVersionCode,
       occupancyData: {},
       laborData: {},
       extraRevenueData: [],
@@ -3826,6 +3830,7 @@ const UnifiedAdministrationView: React.FC<UnifiedAdministrationViewProps> = ({
       isMain: false,
       isLocked: false,
       hotelId: hotelId,
+      versionCode: newVersionCode,
       occupancyData: {},
       laborData: {},
       extraRevenueData: [],

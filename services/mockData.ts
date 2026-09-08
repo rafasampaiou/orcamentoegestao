@@ -95,6 +95,24 @@ export const resolveVersionWithImportedData = (
     return sorted[0];
 };
 
+// Código curto e único de versão: "{2 últimos dígitos do ano}.{hotelId}.{sequência}" — ex.:
+// "26.25.1" (2026, hotel id 25, 1ª versão daquele hotel/ano); uma réplica de Revisão de Metas do
+// mesmo hotel/ano vira "26.25.2". Diferente do nome (que se repete entre original e réplica,
+// causando confusão em Comparativos/Revisão de Metas) — o código nunca colide, então pode
+// substituir o nome como identificador visual/de resolução em qualquer tela.
+export const generateVersionCode = (hotelId: string | undefined, year: number, allVersions: BudgetVersion[]): string => {
+    const shortYear = String(year).slice(-2);
+    const hotelPart = hotelId || '0';
+    const existingSeqs = allVersions
+        .filter(v => (v.hotelId || '0') === hotelPart && v.year === year && v.versionCode)
+        .map(v => {
+            const parts = (v.versionCode as string).split('.');
+            return parseInt(parts[2], 10) || 0;
+        });
+    const nextSeq = existingSeqs.length > 0 ? Math.max(...existingSeqs) + 1 : 1;
+    return `${shortYear}.${hotelPart}.${nextSeq}`;
+};
+
 export const mockHotels: Hotel[] = [
     { id: '1', code: 'ATB', name: 'Atibaia', type: 'Hotéis próprios', category: 'Resort', region: 'Sudeste' },
     { id: '2', code: 'ALX', name: 'Alexania', type: 'Hotéis próprios', category: 'Resort', region: 'Centro-Oeste' },

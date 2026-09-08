@@ -171,6 +171,7 @@ const BudgetReviewHome: React.FC<BudgetReviewHomeProps> = ({ hotels, selectedHot
                                             {v.isLocked && <Lock size={12} className="text-gray-400 shrink-0" />}
                                         </div>
                                         <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                            {v.versionCode && <span className="text-[9px] font-mono font-bold text-gray-400 bg-gray-100 px-1 rounded" title="Código único da versão — nunca se repete, diferente do nome">{v.versionCode}</span>}
                                             <span className="text-xs font-semibold text-gray-600">{hotelName}</span>
                                             <span className="text-xs text-gray-400">·</span>
                                             <span className="text-xs text-gray-500">{v.year}{v.month ? ` — ${MONTH_NAMES[v.month - 1]}` : ''}</span>
