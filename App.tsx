@@ -674,13 +674,46 @@ const App: React.FC = () => {
           // objetos em `remoteVersions` diretamente (mesma referência que vai pro state logo
           // abaixo) pra cada chamada seguinte de generateVersionCode já enxergar os códigos recém
           // atribuídos aos irmãos processados antes, sem colidir.
+          // Real e Budget nascem em PAR (mesmo sufixo de timestamp, "r-<ts>"/"v-<ts>") e devem
+          // compartilhar o MESMO código — sem essa checagem, o par virava duas sequências
+          // diferentes (a Real ficava ".1" e a Budget ".2" da MESMA versão, nunca tendo sido
+          // replicada de verdade) porque cada uma era numerada de forma independente aqui.
           const missingCode = remoteVersions.filter(v => !v.versionCode).sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
           if (missingCode.length > 0) {
-            missingCode.forEach(v => { v.versionCode = generateVersionCode(v.hotelId, v.year, remoteVersions); });
+            const codeByPairKey = new Map<string, string>();
+            const pairKeyOf = (v: BudgetVersion) => v.id.replace(/^[rv]-/, '');
+            missingCode.forEach(v => {
+              const pairKey = pairKeyOf(v);
+              const existing = codeByPairKey.get(pairKey);
+              v.versionCode = existing || generateVersionCode(v.hotelId, v.year, remoteVersions);
+              if (!existing) codeByPairKey.set(pairKey, v.versionCode);
+            });
             missingCode.forEach(v => {
               supabaseService.upsertBudgetVersion(v).catch(err => console.error('Falha ao gravar version_code de', v.id, err));
             });
           }
+
+          // Repara pares Real/Budget que JÁ tinham version_code, mas DIFERENTE entre si — sobra
+          // de uma versão anterior deste backfill (antes de considerar o par), que numerava cada
+          // lado independentemente. Preferência: mantém o código de menor sequência (mais
+          // provável de ser o certo) e realinha o outro lado do par pra igual.
+          const pairKeyOf = (v: BudgetVersion) => v.id.replace(/^[rv]-/, '');
+          const byPairKey = new Map<string, BudgetVersion[]>();
+          remoteVersions.forEach(v => {
+            const key = pairKeyOf(v);
+            if (!byPairKey.has(key)) byPairKey.set(key, []);
+            byPairKey.get(key)!.push(v);
+          });
+          byPairKey.forEach(pair => {
+            if (pair.length !== 2) return; // só mexe em pares Real+Budget de verdade (1 "r-" + 1 "v-")
+            const [a, b] = pair;
+            if (!a.versionCode || !b.versionCode || a.versionCode === b.versionCode) return;
+            const seqOf = (v: BudgetVersion) => parseInt((v.versionCode as string).split('.')[2], 10) || Infinity;
+            const winner = seqOf(a) <= seqOf(b) ? a : b;
+            const loser = winner === a ? b : a;
+            loser.versionCode = winner.versionCode;
+            supabaseService.upsertBudgetVersion(loser).catch(err => console.error('Falha ao realinhar version_code de', loser.id, err));
+          });
 
           setBudgetVersions(remoteVersions.filter(v => v.id.startsWith('v')));
           setRealVersions(remoteVersions.filter(v => v.id.startsWith('r')));
