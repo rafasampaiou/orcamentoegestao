@@ -27,7 +27,7 @@ const filterPillClass = (active: boolean) => `px-2.5 py-1 text-sm font-bold roun
 // colunas de % de distribuição no meio, cada uma flanqueada por uma coluna de espaço (16px, sem
 // borda/fundo) que abre um vão real entre as tabelas. Por ser tudo UM grid só (não duas <table>
 // lado a lado), cabeçalho e linhas ficam sempre alinhados entre si.
-const TABLE_COLS = 'minmax(100px,1fr) repeat(3, minmax(72px,88px))';
+const TABLE_COLS = 'minmax(100px,160px) repeat(3, minmax(72px,88px))';
 const GRID_TEMPLATE = `${TABLE_COLS} 16px repeat(2, 68px) 16px ${TABLE_COLS}`;
 
 interface Agg { atual: number; anterior: number; }
@@ -360,7 +360,7 @@ const DreSegmentadaView: React.FC<DreSegmentadaViewProps> = ({
                             const labelStyle = { paddingLeft: `${0.75 + row.indentLevel * 1.25}rem` };
                             return (
                                 <React.Fragment key={row.id}>
-                                    <div className={`px-3 py-1.5 border-b border-gray-100 ${rowBg}`} style={labelStyle}>{row.label}</div>
+                                    <div className={`px-3 py-1.5 border-b border-gray-100 truncate ${rowBg}`} style={labelStyle} title={row.label}>{row.label}</div>
                                     <div className={`text-right px-3 py-1.5 tabular-nums border-b border-gray-100 ${rowBg}`}>{formatValue(row.lazerAnterior, row.format)}</div>
                                     <div className={`text-right px-3 py-1.5 tabular-nums border-b border-gray-100 ${rowBg}`}>{formatValue(row.lazerAtual, row.format)}</div>
                                     <div className={`text-right px-3 py-1.5 tabular-nums border-b border-gray-100 ${rowBg}`}>{renderDiffCell(diffLazer, row.format, row.higherIsWorse)}</div>
@@ -386,7 +386,7 @@ const DreSegmentadaView: React.FC<DreSegmentadaViewProps> = ({
                                         ) : <span className="text-gray-300">—</span>}
                                     </div>
                                     <div />
-                                    <div className={`px-3 py-1.5 border-b border-gray-100 ${rowBg}`} style={labelStyle}>{row.label}</div>
+                                    <div className={`px-3 py-1.5 border-b border-gray-100 truncate ${rowBg}`} style={labelStyle} title={row.label}>{row.label}</div>
                                     <div className={`text-right px-3 py-1.5 tabular-nums border-b border-gray-100 ${rowBg}`}>{formatValue(row.eventosAnterior, row.format)}</div>
                                     <div className={`text-right px-3 py-1.5 tabular-nums border-b border-gray-100 ${rowBg}`}>{formatValue(row.eventosAtual, row.format)}</div>
                                     <div className={`text-right px-3 py-1.5 tabular-nums border-b border-gray-100 ${rowBg}`}>{renderDiffCell(diffEventos, row.format, row.higherIsWorse)}</div>
