@@ -27,7 +27,7 @@ const filterPillClass = (active: boolean) => `px-2.5 py-1 text-sm font-bold roun
 // colunas de % de distribuição no meio, cada uma flanqueada por uma coluna de espaço (16px, sem
 // borda/fundo) que abre um vão real entre as tabelas. Por ser tudo UM grid só (não duas <table>
 // lado a lado), cabeçalho e linhas ficam sempre alinhados entre si.
-const TABLE_COLS = 'minmax(100px,160px) repeat(3, minmax(72px,88px))';
+const TABLE_COLS = 'minmax(180px,220px) repeat(3, minmax(72px,88px))';
 const GRID_TEMPLATE = `${TABLE_COLS} 16px repeat(2, 68px) 16px ${TABLE_COLS}`;
 
 interface Agg { atual: number; anterior: number; }
@@ -53,6 +53,14 @@ const diffColorClass = (diff: number, higherIsWorse?: boolean) => {
     if (diff === 0) return 'text-gray-500';
     const good = higherIsWorse ? diff < 0 : diff > 0;
     return good ? 'text-emerald-700' : 'text-red-700';
+};
+
+// Fundo verde/vermelho claro na célula inteira do desvio (não só o texto), igual planilha —
+// mesma regra de "bom/ruim" do diffColorClass (higherIsWorse inverte pra despesa/imposto).
+const diffBgClass = (diff: number, higherIsWorse?: boolean) => {
+    if (diff === 0) return '';
+    const good = higherIsWorse ? diff < 0 : diff > 0;
+    return good ? 'bg-emerald-50' : 'bg-red-50';
 };
 
 const renderDiffCell = (diff: number, format: 'currency' | 'percent', higherIsWorse?: boolean) => (
@@ -363,7 +371,7 @@ const DreSegmentadaView: React.FC<DreSegmentadaViewProps> = ({
                                     <div className={`px-3 py-1.5 border-b border-gray-100 truncate ${rowBg}`} style={labelStyle} title={row.label}>{row.label}</div>
                                     <div className={`text-right px-3 py-1.5 tabular-nums border-b border-gray-100 ${rowBg}`}>{formatValue(row.lazerAnterior, row.format)}</div>
                                     <div className={`text-right px-3 py-1.5 tabular-nums border-b border-gray-100 ${rowBg}`}>{formatValue(row.lazerAtual, row.format)}</div>
-                                    <div className={`text-right px-3 py-1.5 tabular-nums border-b border-gray-100 ${rowBg}`}>{renderDiffCell(diffLazer, row.format, row.higherIsWorse)}</div>
+                                    <div className={`text-right px-3 py-1.5 tabular-nums border-b border-gray-100 ${row.bold ? 'font-black' : ''} ${diffBgClass(diffLazer, row.higherIsWorse) || (row.bold ? 'bg-gray-50/60' : '')}`}>{renderDiffCell(diffLazer, row.format, row.higherIsWorse)}</div>
                                     <div />
                                     <div className={`text-center px-2 py-1 border-b border-gray-100 ${row.editablePkgId ? 'bg-indigo-50/40' : ''}`}>
                                         {row.editablePkgId ? (
@@ -389,7 +397,7 @@ const DreSegmentadaView: React.FC<DreSegmentadaViewProps> = ({
                                     <div className={`px-3 py-1.5 border-b border-gray-100 truncate ${rowBg}`} style={labelStyle} title={row.label}>{row.label}</div>
                                     <div className={`text-right px-3 py-1.5 tabular-nums border-b border-gray-100 ${rowBg}`}>{formatValue(row.eventosAnterior, row.format)}</div>
                                     <div className={`text-right px-3 py-1.5 tabular-nums border-b border-gray-100 ${rowBg}`}>{formatValue(row.eventosAtual, row.format)}</div>
-                                    <div className={`text-right px-3 py-1.5 tabular-nums border-b border-gray-100 ${rowBg}`}>{renderDiffCell(diffEventos, row.format, row.higherIsWorse)}</div>
+                                    <div className={`text-right px-3 py-1.5 tabular-nums border-b border-gray-100 ${row.bold ? 'font-black' : ''} ${diffBgClass(diffEventos, row.higherIsWorse) || (row.bold ? 'bg-gray-50/60' : '')}`}>{renderDiffCell(diffEventos, row.format, row.higherIsWorse)}</div>
                                 </React.Fragment>
                             );
                         })}
