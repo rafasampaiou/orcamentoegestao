@@ -27,7 +27,7 @@ const filterPillClass = (active: boolean) => `px-2.5 py-1 text-sm font-bold roun
 // colunas de % de distribuição no meio, cada uma flanqueada por uma coluna de espaço (16px, sem
 // borda/fundo) que abre um vão real entre as tabelas. Por ser tudo UM grid só (não duas <table>
 // lado a lado), cabeçalho e linhas ficam sempre alinhados entre si.
-const TABLE_COLS = 'minmax(200px,2fr) repeat(3, minmax(96px,1fr))';
+const TABLE_COLS = 'minmax(200px,2fr) repeat(3, minmax(72px,88px))';
 const GRID_TEMPLATE = `${TABLE_COLS} 16px repeat(2, 68px) 16px ${TABLE_COLS}`;
 
 interface Agg { atual: number; anterior: number; }
