@@ -413,6 +413,9 @@ const App: React.FC = () => {
   // Tracks whether the profiles fetch has completed at least once, so the "no matching
   // profile" gate below doesn't false-positive on a valid user while `users` is still loading.
   const [profilesLoaded, setProfilesLoaded] = useState(false);
+  // 0-100, atualizado conforme cada busca inicial do Supabase termina — mostrado na LoadingScreen
+  // em vez de só a animação em loop (que nunca dizia se estava perto do fim ou não).
+  const [loadProgress, setLoadProgress] = useState(0);
 
   // Matriz de Permissões — nasce já com o catálogo default (= comportamento atual do `hasRole`
   // hardcoded que está sendo substituído), nunca fica vazia; o boot acima sobrescreve com o que
@@ -548,6 +551,21 @@ const App: React.FC = () => {
       if (hasLoadedFromSupabase.current) return; // Prevent multiple global fetches
       
       try {
+        // Progresso 0-100 da LoadingScreen: 14 buscas no total, cada uma vale 1 unidade — a de
+        // financial_data (de longe a mais lenta, paginada) reporta progresso FRACIONÁRIO dentro
+        // da própria unidade a cada página lida (curva que desacelera perto do fim, sem nunca
+        // travar em 100% antes de terminar de verdade), em vez de só pular de uma vez no final.
+        const TOTAL_STEPS = 14;
+        let completedUnits = 0;
+        const reportProgress = (units: number) => {
+          setLoadProgress(Math.round((Math.min(units, TOTAL_STEPS) / TOTAL_STEPS) * 100));
+        };
+        const markStepDone = <T,>(promise: Promise<T>): Promise<T> => promise.then(result => {
+          completedUnits += 1;
+          reportProgress(completedUnits);
+          return result;
+        });
+
         // All of these reads are independent of each other — fetching them concurrently
         // (instead of one round-trip at a time) cuts the startup wait from the sum of every
         // call's latency down to whichever single call is slowest.
@@ -557,17 +575,24 @@ const App: React.FC = () => {
           const remoteFinancial: any[] = [];
           const pageSize = 1000;
           let from = 0;
+          let pagesLoaded = 0;
           while (true) {
             const { data: page, error } = await (supabase as any)
               .from('financial_data')
               .select('*')
               .range(from, from + pageSize - 1);
             if (error) throw error;
+            pagesLoaded += 1;
+            // Curva que desacelera (1 - 1/(n+1)) — cresce rápido no começo e vai encostando em 1
+            // sem nunca chegar lá enquanto o loop não terminar de verdade.
+            reportProgress(completedUnits + (1 - 1 / (pagesLoaded + 1)));
             if (!page || page.length === 0) break;
             remoteFinancial.push(...page);
             if (page.length < pageSize) break;
             from += pageSize;
           }
+          completedUnits += 1;
+          reportProgress(completedUnits);
           return remoteFinancial;
         };
 
@@ -587,22 +612,22 @@ const App: React.FC = () => {
           remotePermissions,
           remoteMeetings
         ] = await Promise.all([
-          supabaseService.getHotels(),
-          supabaseService.getCostCenters(),
-          supabaseService.getAccounts(),
-          supabaseService.getProfiles(),
-          supabaseService.getGmdConfigs(),
-          supabaseService.getDreConfigs(),
-          supabaseService.getPackageKpiConfigs(),
-          supabaseService.getValidations().catch(valError => {
+          markStepDone(supabaseService.getHotels()),
+          markStepDone(supabaseService.getCostCenters()),
+          markStepDone(supabaseService.getAccounts()),
+          markStepDone(supabaseService.getProfiles()),
+          markStepDone(supabaseService.getGmdConfigs()),
+          markStepDone(supabaseService.getDreConfigs()),
+          markStepDone(supabaseService.getPackageKpiConfigs()),
+          markStepDone(supabaseService.getValidations().catch(valError => {
             // Don't let a missing 'validations' table (e.g. before the migration has been
             // run) abort the rest of this startup fetch.
             console.warn('Could not fetch validations from Supabase.', valError);
             return null;
-          }),
-          supabaseService.getHotelCategories(),
-          supabaseService.getHotelRegions(),
-          supabaseService.getBudgetVersions(),
+          })),
+          markStepDone(supabaseService.getHotelCategories()),
+          markStepDone(supabaseService.getHotelRegions()),
+          markStepDone(supabaseService.getBudgetVersions()),
           fetchFinancialData().catch(finError => {
             console.warn('Could not fetch financial data from Supabase.', finError);
             return [] as any[];
@@ -610,17 +635,17 @@ const App: React.FC = () => {
           // Matriz de Permissões — mesmo padrão defensivo de validations/financial: uma falha
           // aqui não pode travar o boot do app inteiro, só cai pro catálogo default (que já é
           // uma foto do comportamento atual, então nada muda pra ninguém nesse caso).
-          supabaseService.getPermissions().catch(permError => {
+          markStepDone(supabaseService.getPermissions().catch(permError => {
             console.warn('Could not fetch permissions from Supabase.', permError);
             return {} as PermissionMatrix;
-          }),
+          })),
           // Reuniões dinâmicas da "Versão do Forecast" — mesmo padrão defensivo: uma falha aqui
           // não pode travar o boot; sem nenhuma reunião carregada, o pior caso é o popup de
           // criação abrir de novo (nada é perdido, os dados legados continuam com fallback).
-          supabaseService.getMeetings().catch(meetingsError => {
+          markStepDone(supabaseService.getMeetings().catch(meetingsError => {
             console.warn('Could not fetch meetings from Supabase.', meetingsError);
             return [] as Meeting[];
-          })
+          }))
         ]);
 
         if (!isMounted) return;
@@ -832,7 +857,10 @@ const App: React.FC = () => {
       } catch (error) {
         console.warn('Could not fetch real data from Supabase, falling back to mockData.', error);
       } finally {
-        if (isMounted) setProfilesLoaded(true);
+        if (isMounted) {
+          setLoadProgress(100); // garante 100% mesmo se algum passo tiver caído no catch acima
+          setProfilesLoaded(true);
+        }
       }
     };
 
@@ -2421,7 +2449,7 @@ const App: React.FC = () => {
   // Dados iniciais (hotéis, contas, financeiro etc.) ainda não chegaram do Supabase — sem isso,
   // a tela renderizava na hora com tudo zerado e só preenchia alguns segundos depois.
   if (!profilesLoaded) {
-    return <LoadingScreen />;
+    return <LoadingScreen progress={loadProgress} />;
   }
 
   // Authenticated with Supabase but no matching row in `profiles` — this can happen with

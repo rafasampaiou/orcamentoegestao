@@ -1,11 +1,17 @@
 import React from 'react';
 import { TrendingUp } from 'lucide-react';
 
+interface LoadingScreenProps {
+    // 0-100 — quantas das buscas iniciais no Supabase já terminaram (ver App.tsx, fetchRealData).
+    progress?: number;
+}
+
 // Tela de carregamento inicial (dados do Supabase ainda não chegaram) — antes disso a tela
 // aparecia com tudo zerado por alguns segundos até os dados chegarem. Reaproveita o mesmo ícone
 // TrendingUp usado na marca do Sidebar, "enchendo" de baixo pra cima (2 cópias sobrepostas: uma
 // esmaecida fixa, outra verde revelada por uma altura animada em cima da mesma posição).
-const LoadingScreen: React.FC = () => {
+const LoadingScreen: React.FC<LoadingScreenProps> = ({ progress = 0 }) => {
+    const clampedProgress = Math.max(0, Math.min(100, Math.round(progress)));
     return (
         <div className="min-h-screen flex flex-col items-center justify-center gap-6" style={{ background: '#155645' }}>
             <div style={{ position: 'relative', width: 96, height: 96 }}>
@@ -27,6 +33,7 @@ const LoadingScreen: React.FC = () => {
             </div>
             <div className="flex flex-col items-center gap-1.5">
                 <p className="text-white font-black text-sm uppercase tracking-widest">Carregando dados</p>
+                <p className="text-[#4ADE80] font-black text-2xl tabular-nums">{clampedProgress}%</p>
                 <p className="text-white/40 text-xs">Isso pode levar alguns segundos</p>
             </div>
             <style>{`
